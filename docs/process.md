@@ -1,6 +1,6 @@
 # Project Process
 
-Status: Draft v1, under review. Owner: Artur. Author: Claude.
+Status: Approved v1, 2026-09-07. Owner: Artur. Author: Claude.
 This document is the living description of how the project is run. It is
 the deliverable of milestone `M0 Process` and is revised whenever the
 process changes.

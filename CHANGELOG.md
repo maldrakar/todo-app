@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/process.md` status set to Approved v1 after the owner's review.
+
 ## [0.0.0] - 2026-09-07
 
 ### Added
