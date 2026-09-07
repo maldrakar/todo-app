@@ -1,6 +1,6 @@
 # Project Process
 
-Status: Draft v0, under review. Owner: Artur. Author: Claude.
+Status: Draft v1, under review. Owner: Artur. Author: Claude.
 This document is the living description of how the project is run. It is
 the deliverable of milestone `M0 Process` and is revised whenever the
 process changes.
@@ -27,7 +27,7 @@ label and mentioned in the conversation.
 
 ## 3. Repository
 
-- Private repository `arthurbanshchikov/todo-app`, default branch `main`.
+- Private repository `maldrakar/todo-app`, default branch `main`.
 - `main` is never pushed to directly. The only exception is the
   bootstrap commit that creates the initial structure. GitHub branch
   protection is not available for private repositories on the free plan,
@@ -69,8 +69,22 @@ appears.
 | Type | `feature`, `bug`, `arch`, `infra`, `docs`, `spike`, `epic` |
 | Area | `core`, `ui-apple`, `ui-web` |
 
-**Epics.** A large theme is an issue labeled `epic` whose body holds a
-task list of child issues. The epic closes when all children are closed.
+**Epics.** A large theme is an issue labeled `epic`. It links to the
+spec and the plan, and its child tasks are attached as GitHub sub-issues,
+so GitHub shows progress on the parent. `gh` has no flag for sub-issues,
+so the link is made through `gh api graphql`; a task list in the epic
+body is the fallback if that fails. The epic closes when all children
+are closed.
+
+**Milestone versus epic.** They are two different axes. A milestone is a
+built-in GitHub entity and answers "in which increment": an issue has at
+most one, it carries a progress counter and filters, but no body, no
+nesting and no spec. An epic is an ordinary issue and answers "about
+what": it groups tasks by theme and holds the links to the spec and
+plan. An issue belongs to at most one milestone and at most one epic.
+Example: milestone `M1 Core architecture` holds the epic "Storage" with
+a spike, ADRs and implementation tasks as children, the epic "Search",
+and a standalone `infra` issue "CI workflow" that belongs to no epic.
 
 **Milestones.** Each milestone is one increment and maps to one version
 tag (section 9). The initial set follows the brief:
@@ -91,10 +105,14 @@ said out loud in chat so the owner can override it.
 | ---- | ---- | -------- |
 | Spike | A feasibility question: "can we", "is it possible" | An answer written into the issue. Any code is throwaway. |
 | Bounded | A small change to a flow that already exists in the repo | A short design in chat, the owner's OK, then code |
-| Architectural | A new subsystem, a feature module, a change to interfaces others depend on | A spec (section 7), the owner's review, an implementation plan, child issues under an epic |
+| Architectural | A new subsystem, a feature module, a change to interfaces others depend on | A spec (section 7), the owner's review, an implementation plan; the issue becomes an epic and the plan's tasks become its sub-issues |
 
 When in doubt, the heavier size is chosen. If hidden complexity shows up
 mid-task, the task is upgraded, never downgraded.
+
+An architectural issue is not replaced by a new one. After the plan is
+approved, the same issue gets the `epic` label, the plan's tasks are
+created as its sub-issues, and the spec and plan PRs reference it.
 
 ## 6. Task lifecycle
 
@@ -161,7 +179,10 @@ the two are separated.
    from the markdown: text, tables and diagrams, with comment threads.
 2. The owner reads it there and leaves comments in threads.
 3. The engineer reads the threads, updates the markdown, republishes the
-   page, replies in each thread and resolves it.
+   page, replies in each thread and resolves it. Every republished page
+   opens with a Revision notes block: what changed since the previous
+   version and which thread prompted it. The text diff itself lives in
+   git, since every revision of the spec is a commit in its PR.
 4. Approval is an explicit "approved" from the owner in chat. The spec
    is then merged into `main` through a PR labeled `docs`.
 
@@ -182,6 +203,23 @@ A decision that constrains future work is recorded as an ADR in
 `docs/adr/NNNN-title.md` with Context, Decision and Consequences. An ADR
 is proposed through a PR labeled `arch`; merging the PR moves it from
 Proposed to Accepted. Superseded ADRs are kept and marked as such.
+
+ADRs appear at two moments:
+
+- **After a spec is approved.** The decisions in it that constrain
+  future work are extracted into ADRs, in the same PR as the spec or
+  right after it.
+- **During implementation**, when an unplanned decision is made that
+  would be expensive to reverse.
+
+Example for M1. The spec "Core storage and search" is approved. Out of
+it come ADR-0001 "Core is written in Embedded Swift without Foundation",
+which constrains every module, and ADR-0002 "Persistence is an
+append-only event log on top of SQLite", which constrains sync and
+search. Later, implementation runs into the lack of existential types in
+Embedded Swift, and ADR-0003 "Module boundaries use generic protocols"
+records that. Naming a function is not an ADR; anything a newcomer would
+ask "why is it this way" about is.
 
 ## 9. Closing an increment
 
