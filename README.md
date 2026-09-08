@@ -3,7 +3,7 @@
 A reminders app in the spirit of Things 3, with one shared core and native UI per platform.
 
 - Target platforms: iOS, macOS, iPadOS, watchOS, and the web via WASM.
-- The shared core is written in Embedded Swift and compiles for every target above.
+- The shared core is written in Swift and restricted to the standard library and FoundationEssentials, so that it compiles for every target above (ADR-0001).
 - UI is platform-specific: SwiftUI is the likely choice for Apple platforms, React for the web. Both are decided during implementation.
 
 ## Status

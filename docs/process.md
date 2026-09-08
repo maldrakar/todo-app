@@ -92,7 +92,7 @@ tag (section 9). The initial set follows the brief:
 | Milestone | Content |
 | --------- | ------- |
 | `M0 Process` | This document, repository bootstrap, backlog setup |
-| `M1 Core architecture` | Storage, search, sync model, Embedded Swift toolchain for all targets |
+| `M1 Core architecture` | Storage, search, sync model, Swift toolchain for all targets |
 | `M2 Feature-module architecture` | How a feature module is structured, wired and tested |
 | `M3+` | Product functionality, planned after M2 |
 
@@ -212,14 +212,14 @@ ADRs appear at two moments:
 - **During implementation**, when an unplanned decision is made that
   would be expensive to reverse.
 
-Example for M1. The spec "Core storage and search" is approved. Out of
-it come ADR-0001 "Core is written in Embedded Swift without Foundation",
-which constrains every module, and ADR-0002 "Persistence is an
-append-only event log on top of SQLite", which constrains sync and
-search. Later, implementation runs into the lack of existential types in
-Embedded Swift, and ADR-0003 "Module boundaries use generic protocols"
-records that. Naming a function is not an ADR; anything a newcomer would
-ask "why is it this way" about is.
+Example for M1. The toolchain spike ends with ADR-0001 "Build the core
+in full Swift on the standard library and FoundationEssentials", which
+constrains every module. The spec "Core storage and search" is approved,
+and out of it comes ADR-0002 "Persistence is an append-only event log on
+top of SQLite", which constrains sync and search. Later, implementation
+runs into the size of the web bundle, and ADR-0003 "The search index is
+rebuilt on open instead of persisted" records that. Naming a function is
+not an ADR; anything a newcomer would ask "why is it this way" about is.
 
 ## 9. Closing an increment
 
