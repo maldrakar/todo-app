@@ -55,5 +55,5 @@ All issues closed, CI green, `CHANGELOG.md` moves Unreleased into `[0.N.0]`, tag
 
 ## Toolchain notes
 
-- Swift 6.2 and Xcode 26.3 locally. The core is Embedded Swift for iOS, macOS, iPadOS, watchOS and WASM.
+- Swift 6.2 and Xcode 26.3 locally. The core is full Swift restricted to the standard library and FoundationEssentials (ADR-0001) and compiles for iOS, macOS, iPadOS, watchOS and WASM. Apple targets build with the Xcode toolchain; the WASM target uses the swift.org toolchain through swiftly and its Swift SDK.
 - CI runs on macOS runners, which cost 10x minutes on a private repository. Keep CI lean.

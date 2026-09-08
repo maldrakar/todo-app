@@ -4,9 +4,14 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- ADR-0001: the core is full Swift on the standard library and FoundationEssentials, replacing the brief's Embedded Swift requirement after the toolchain spike (#3).
+
 ### Changed
 
 - `docs/process.md` status set to Approved v1 after the owner's review.
+- README, `CLAUDE.md`, the process document's M1 examples and the M1 milestone description follow ADR-0001.
 
 ## [0.0.0] - 2026-09-07
 
