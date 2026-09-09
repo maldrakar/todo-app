@@ -1,7 +1,7 @@
 # Spec: Core storage and search
 
 - Status: Draft
-- Owner review: Artifact link is added when the page is published
+- Owner review: https://claude.ai/code/artifact/91d34f57-8594-4a09-9017-1cc02bf2fb62
 - Issue: #4
 
 ## Problem
