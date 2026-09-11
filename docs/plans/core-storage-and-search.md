@@ -21,7 +21,7 @@
 - The same test suite runs on the host with `swift test` and on wasm32 with `swift test --swift-sdk swift-6.3.3-RELEASE_wasm`; both must be green before a PR.
 - Web size budget: `todo.wasm` built with `-c release` for `wasm32-unknown-wasip1` is at most 4.5 MiB after `gzip -9` (measured on 2026-09-11 with SQLite, FoundationEssentials and a smoke executable: 3.74 MB).
 - Toolchain: always the swiftly-managed `swift` (`~/.swiftly/bin/swift` on macOS), never `/usr/bin/swift`, which is Xcode's 6.2.4. Every command below assumes `export PATH="$HOME/.swiftly/bin:$PATH"` and the repository root as the working directory.
-- Branch per task `<type>/<issue>-<slug>`, PR title in Conventional Commits with scope `core`, `infra` or `ci`, body per template, `Closes #<sub-issue>`; squash merge. Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- Branch per task `<type>/<issue>-<slug>` with the sub-issue number from the table at the end, PR title in Conventional Commits with scope `core`, `infra` or `ci`, body per template, `Closes #<sub-issue>`; squash merge. Commit messages end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - Everything in the repository is in English. No `TODO` without a linked issue.
 - Every task's PR adds one line under `[Unreleased]` in `CHANGELOG.md` describing what the task delivered.
 
@@ -4639,23 +4639,23 @@ Expected: the `core` job green on the PR; after the squash merge, the `apple` jo
 
 ## Sub-issues for the epic
 
-The owner reviews this breakdown; after approval each row becomes a sub-issue of #4, labeled as shown, in milestone `M1 Core architecture`, in this order.
+Approved by the owner on 2026-09-11. Each row is a sub-issue of epic #4 in milestone `M1 Core architecture`, in this order; a task's PR ends with `Closes #<issue>`.
 
-| # | Title | Labels | Depends on |
-| - | ----- | ------ | ---------- |
-| 1 | Package skeleton with vendored SQLite and wasm32 smoke tests | `infra`, `core` | |
-| 2 | SQLiteKit: typed wrapper over the vendored SQLite | `feature`, `core` | 1 |
-| 3 | Value types: identifiers, calendar days, hybrid logical clocks, order keys | `feature`, `core` | 1 |
-| 4 | Schema version 1, migrations, store opening and snapshots | `feature`, `core` | 2, 3 |
-| 5 | Operation journal and last-write-wins apply | `feature`, `core` | 4 |
-| 6 | Task tree: effective parent and inherited trash | `feature`, `core` | 5 |
-| 7 | Task and tag write API and reads | `feature`, `core` | 6 |
-| 8 | Filters: model, JSON format, SQL compiler, sort keys | `feature`, `core` | 7 |
-| 9 | Views: nesting, built-in views, manual lists, pages | `feature`, `core` | 8 |
-| 10 | Search: quick find over titles, ranked search in notes | `feature`, `core` | 9 |
-| 11 | Sync skeleton: journal export, receive, in-memory relay, convergence test | `feature`, `core` | 9 |
-| 12 | The todo command-line demo | `feature`, `core` | 10, 11 |
-| 13 | CI with wasm32 tests and the size budget; closing documentation | `infra`, `ci` | 12 |
+| # | Issue | Title | Labels | Depends on |
+| - | ----- | ----- | ------ | ---------- |
+| 1 | #11 | Package skeleton with vendored SQLite and wasm32 smoke tests | `infra`, `core` | |
+| 2 | #12 | SQLiteKit: typed wrapper over the vendored SQLite | `feature`, `core` | 1 |
+| 3 | #13 | Value types: identifiers, calendar days, hybrid logical clocks, order keys | `feature`, `core` | 1 |
+| 4 | #14 | Schema version 1, migrations, store opening and snapshots | `feature`, `core` | 2, 3 |
+| 5 | #15 | Operation journal and last-write-wins apply | `feature`, `core` | 4 |
+| 6 | #16 | Task tree: effective parent and inherited trash | `feature`, `core` | 5 |
+| 7 | #17 | Task and tag write API and reads | `feature`, `core` | 6 |
+| 8 | #18 | Filters: model, JSON format, SQL compiler, sort keys | `feature`, `core` | 7 |
+| 9 | #19 | Views: nesting, built-in views, manual lists, pages | `feature`, `core` | 8 |
+| 10 | #20 | Search: quick find over titles, ranked search in notes | `feature`, `core` | 9 |
+| 11 | #21 | Sync skeleton: journal export, receive, in-memory relay, convergence test | `feature`, `core` | 9 |
+| 12 | #22 | The todo command-line demo | `feature`, `core` | 10, 11 |
+| 13 | #23 | CI with wasm32 tests and the size budget; closing documentation | `infra`, `core` | 12 |
 
 Tasks 10 and 11 are independent of each other and can run in parallel after 9.
 
