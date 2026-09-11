@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- Spec `docs/specs/core-storage-and-search.md`, approved by the owner on 2026-09-11: local-first core with an operation journal for a future sync, vendored SQLite on every platform, a flat model of tasks, tags and nested views with filters, FTS5 search over titles and notes.
 - ADR-0001: the core is full Swift on the standard library and FoundationEssentials, replacing the brief's Embedded Swift requirement after the toolchain spike (#3). `.swift-version` pins Swift 6.3.3 for swiftly.
 
 ### Changed
