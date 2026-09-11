@@ -1,6 +1,6 @@
 # ADR-0001: Build the core in full Swift on the standard library and FoundationEssentials
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-08
 - Related: #3 (toolchain spike, with the measurements), #4 (core architecture)
 
