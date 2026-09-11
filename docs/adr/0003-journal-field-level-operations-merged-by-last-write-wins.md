@@ -1,6 +1,6 @@
 # ADR-0003: Journal every change as a field-level operation and merge by last write wins per field
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-11
 - Related: `docs/specs/core-storage-and-search.md` (approved 2026-09-11), #4, ADR-0002
 

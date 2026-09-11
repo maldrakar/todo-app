@@ -1,6 +1,6 @@
 # ADR-0002: Persist the core's data in vendored SQLite on every platform
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-11
 - Related: `docs/specs/core-storage-and-search.md` (approved 2026-09-11), #4, amends ADR-0001
 

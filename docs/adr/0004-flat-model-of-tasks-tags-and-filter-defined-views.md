@@ -1,6 +1,6 @@
 # ADR-0004: Model tasks, tags and views as flat trees, with views defined by filters instead of containers
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-11
 - Related: `docs/specs/core-storage-and-search.md` (approved 2026-09-11), #4, ADR-0003
 
