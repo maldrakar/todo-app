@@ -30,7 +30,7 @@ Non-goals:
 
 - The sync transport itself (own server, CloudKit, WatchConnectivity), journal compaction and tombstone purging. Designed for, not built.
 - Repeating tasks, reminder times, notifications. These are M3 product features and arrive by migration.
-- Merging concurrent edits inside the text of one note. The last write wins per field.
+- Merging concurrent edits inside the text of one note. In M1 the last write wins per field; a real merge is an open question below, not a permanent limitation.
 - Undo and redo, attachments, sharing between users, encryption at rest.
 - Any UI, and reactive bindings such as Observation or Combine. The core reports what changed; UI layers wrap it.
 - The structure of feature modules. That is M2.
@@ -83,11 +83,15 @@ Three entities. The Things container hierarchy (areas, projects, headings) is de
 
 **Tag.** Id, title, optional parent tag, rank, deleted, timestamps.
 
-**View.** Id, title, rank (tab order), filter, sort, group-by, deleted, timestamps. A separate table holds manual order per view: (view, task, rank), only for tasks the user has dragged inside that view; everything else follows the sort. The built-in views Inbox, Today, Upcoming, Logbook and Trash are ordinary rows with fixed ids, so every device creates the same rows and sync does not duplicate them. The user may edit or delete them.
+**View.** Id, title, optional parent view, rank, filter, sort, group-by, deleted, timestamps. Views form a tree of any depth: the parent link gives the sidebar its folders, and rank is the position among sibling views, the order in which they appear there. A separate table holds the *manual list* of a view: rows of (view, task, rank) for the tasks the user has dragged inside that view, in the order they were dropped; everything else follows the sort. The built-in views Inbox, Today, Upcoming, Logbook and Trash are ordinary rows with fixed ids, so every device creates the same rows and sync does not duplicate them. The user may edit, nest or delete them.
+
+A view with children is shown as sections: each child view in rank order, then the parent's own results that no child claims. A view without a filter has no results of its own and serves as a folder. Headings come out of the same rule: a heading inside a project view is a child view whose filter is "listed in this view", so it holds exactly the tasks the user dragged under it, in their order. Folders in the sidebar, headings inside a view and any deeper mix of the two are one mechanism.
 
 A *day* is a calendar day stored as a count of days since 1970-01-01. The core converts to and from year-month-day with plain arithmetic and never asks what day it is: the platform passes "today" with every query. Time zones therefore never enter the core. A *timestamp* is milliseconds since 1970-01-01 as `Int64`.
 
 An *order key* is a short string generated between its two neighbours (fractional indexing), so moving one item never renumbers the others, and two devices reordering concurrently produce two valid keys instead of a conflict. Equal keys are broken by id.
+
+Tasks, tags and views each carry an optional parent link, so each forms a tree. A merge can make a link circular when two devices move items into each other concurrently, or point at a parent that was deleted. Such a link is ignored when reading: the item shows at the root until the user moves it again. Nothing is rejected at apply time, because a rejection on one device and not on another would make them diverge.
 
 Two Things concepts were dropped on purpose: the "Someday" bucket and the "This evening" flag. A tag or a view covers both, and adding a bucket later is one migration.
 
@@ -97,6 +101,18 @@ The tables above hold the truth for reading. The journal holds the truth for syn
 
 The *clock* is a hybrid logical clock: wall-clock milliseconds plus a counter, encoded as one `Int64`, with the device id as tie-break. It is monotonic on a device and orders events across devices once they exchange journals. The device id is generated at first open and stored in the database.
 
+An example with two devices whose wall clocks disagree by five seconds:
+
+| Step | Device A | Device B, wall clock 5 s behind |
+| ---- | -------- | ------------------------------- |
+| 1 | renames a task; the operation carries the clock (12:00:00.000, counter 0, A) | |
+| 2 | | renames the same task at what it believes is 11:59:57.000: clock (11:59:57.000, 0, B) |
+| 3 | journals are exchanged | journals are exchanged |
+| 4 | B's clock is earlier: A keeps its own title, B's operation stays in the journal unapplied | A's clock is later: B takes A's title, and B's clock jumps forward to 12:00:00.000 |
+| 5 | | B's next edit carries (12:00:00.000, 1, B): ordered after everything B has seen, whatever its wall clock says |
+
+Step 5 is the hybrid part: the counter carries causality when wall clocks are wrong. Two operations with the same time and counter can only come from two different devices and are ordered by device id, so every device makes the same choice. Had A and B changed different fields, both changes would have survived, because clocks are compared per field.
+
 **Applying an operation.** For every (entity, field) the store keeps the clock of the last write. An operation applies if its clock is later, otherwise it is dropped from the state but kept in the journal. This is last-write-wins per field: a title changed on one device and a date changed on another both survive. Local edits and remote operations go through the same path, so sync has no logic of its own beyond moving journal rows.
 
 **Unknown fields.** An operation for a field the current schema does not know is stored in the journal marked "not applied". The migration that adds the field replays such operations in clock order. This is why M1 carries no placeholder columns for reminders or repeat rules: they arrive in M3 without loss on devices that lag behind.
@@ -105,11 +121,13 @@ The *clock* is a hybrid logical clock: wall-clock milliseconds plus a counter, e
 
 ### Filters, sorting, grouping
 
-A filter is a tree stored as JSON in the view row. Conditions: status in a set; `when` and `deadline` relative to today (today, before or after an offset, between two offsets) or empty; has tag; parent equals or is empty; trashed; combined with and, or, not. The core compiles the tree into one SQL query; "today" comes from the query context. A view's filter implicitly excludes trashed and deleted tasks unless it mentions `trashed`.
+A filter is a tree stored as JSON in the view row. Conditions: status in a set; `when` and `deadline` relative to today (today, before or after an offset, between two offsets) or empty; has tag; parent equals or is empty; listed in a view's manual list; trashed; combined with and, or, not. The core compiles the tree into one SQL query; "today" comes from the query context. A view's filter implicitly excludes trashed and deleted tasks unless it mentions `trashed`.
 
 Sort keys: `when`, `deadline`, title, created, completed, updated, rank. Group-by: day of `when`, day of `deadline`, tag, parent, status. Manual order, where present, overrides the sort inside a group.
 
 An unknown condition kind, which happens when an older app receives a view saved by a newer one, is a typed error "view needs a newer app", never a wrong list.
+
+**Cost.** Compiling a filter is a string build, and the prepared statement is cached per view until the view changes, so nothing is parsed on every list. Execution relies on indexes over status, `when`, `deadline`, parent, the tag table and the manual-list table; at the scale of a personal list, thousands of tasks, a view query takes well under a millisecond. The test suite checks the query plans of the built-in views with `EXPLAIN QUERY PLAN`, so a filter that degrades into a full scan of the tasks table fails a test instead of surprising a user. If a view still turns out slow in practice, the remedies in order are a composite index for that filter shape, then a materialised membership table for that view kept up to date from the change set. Neither is expected in M1.
 
 Default built-in views, to be tuned in M3:
 
@@ -172,7 +190,7 @@ The API, at the level that matters for review:
 | SQLite | about 0.5 MB |
 | Budget, CI fails above it | 4.5 MB |
 
-- The demo is a `todo` command-line tool over a database file: add, list a view, complete, tag, search, move under a parent. It is the runnable deliverable of M1 and a living example of the API for the UI layers.
+- The demo is a `todo` command-line tool over a database file: add, list a view, complete, tag, search, move under a parent. It is the runnable deliverable of M1 and a living example of the API for the UI layers. It is also the seed of a future command-line client of the app, for people and for AI agents acting on their behalf, so it uses only the public API of the core and prints output that scripts can consume.
 
 ## Rejected alternatives
 
@@ -187,6 +205,7 @@ The API, at the level that matters for review:
 | Things-style containers: areas, projects, headings | Fixed grouping the owner does not want; three levels of manual order to sync. Views give the same lists by filter. |
 | Project as a tag | No hierarchy at all, but a project needs its own notes, deadline and completion; a tag has none, and checklists would need a fourth entity. |
 | Project as a separate entity | A second table with almost the same fields as a task and its own operations. A task with children covers it. |
+| Headings as a fourth entity | A heading is a child view with a manual list; a separate entity would duplicate the ordering and sync rules views already have. |
 | Journal as the source of truth, state derived (event sourcing) | Full history and rebuild from scratch, but the journal can never be compacted and every schema change replays the history. A personal task list does not need the history. |
 | Own CRDT, including text merging for notes | No library exists under ADR-0001's constraints; writing one is out of proportion for M1. |
 | Cascading trash by emitting operations to children | Conflicts with a concurrent move of a child on another device. Computed in the query instead. |
@@ -224,7 +243,7 @@ flowchart LR
   View[(View row:<br/>filter JSON, sort, group)] --> Compile[Compile filter to SQL]
   Today[today from the platform] --> Compile
   Compile --> Query[(State tables)]
-  Manual[(Manual order<br/>view, task, rank)] --> Merge[Sort, group,<br/>manual order on top]
+  Manual[(Manual list<br/>view, task, rank)] --> Merge[Sort, group,<br/>manual order on top]
   Query --> Merge --> Result[Tasks without notes]
 ```
 
@@ -249,12 +268,13 @@ sequenceDiagram
 - **Journal compaction and tombstone purge.** Both need to know that every device has received an operation, which only a transport can tell. Left open until the transport is designed. Growth estimate: about a hundred bytes per operation, so a year of heavy use is tens of megabytes at most.
 - **Web durability.** Whether the snapshot scheme stays or a virtual file system over OPFS replaces it is decided by measurement once the web UI exists.
 - **Product tuning of built-in views** and whether a "Someday" bucket returns as a field. M3 decisions; the schema accepts either.
+- **Merging concurrent edits of one note.** Last write wins in M1, but the losing operation stays in the journal, so nothing is lost at the data level, and a later merge strategy can recover even conflicts that happened before it existed. Candidates, to be chosen together with the transport: keep both versions and let the user pick, a three-way merge by lines as in git, or a text CRDT for notes only.
 
 ## Risks
 
 - **FoundationEssentials on WASI is unverified for `UUID` and the current time.** The toolchain spike did not exercise them. The first task of the plan is a smoke test: an empty package with SQLite, `UUID` and a timestamp builds and passes a test on wasm32. If either fails, identifiers come from the platform's random source instead.
 - **SQLite as a SwiftPM C target on wasm32 in full Swift mode** was proven by the spike only in embedded mode. Same smoke test.
-- **Concurrent edits of one note** on two offline devices: the later one wins, the other is lost. Accepted for M1 and stated in the non-goals.
+- **Concurrent edits of one note** on two offline devices: the later one wins in M1. The losing text stays in the journal, and a proper merge is the open question above.
 - **The web loses the last seconds before a snapshot** if the tab dies. Accepted; see the open question.
 - **Trigram with diacritic removal needs a recent SQLite.** We vendor the current release, so this is under our control, but it rules out the system library for good.
 - **CI minutes.** The macOS runner does compile checks only; if the budget still gets tight, the process document already names the fallbacks.
@@ -263,7 +283,7 @@ sequenceDiagram
 
 1. Persistence is vendored SQLite on every platform, an amendment to ADR-0001's dependency rule.
 2. Changes are a journal of field-level operations with hybrid logical clocks, merged by last-write-wins per field; state tables are primary, the journal serves sync.
-3. The data model is flat: tasks with an optional parent, tags, and views defined by filters; no container entities.
+3. The data model is flat: tasks with an optional parent, tags, and views defined by filters and nested to any depth; no container entities.
 
 ## Glossary of external types
 
