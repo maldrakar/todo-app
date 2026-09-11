@@ -5,6 +5,10 @@ import CSQLite
 /// while another is still inside `sqlite3_initialize` skips initialization, gets `SQLITE_OK` and then finds
 /// no VFS registered. Swift initializes a global `let` exactly once and blocks every other thread until it
 /// is done, which restores the ordering the C mutex used to provide. Every `open` reads it first.
+///
+/// This closes the initialization race only. A threads-off SQLite is not safe across threads afterwards
+/// either, and neither `Connection` nor `Statement` is `Sendable`: the core stays single-threaded, and the
+/// test suite is only safe in parallel because each test keeps its connections to itself.
 private let libraryInitialization: Int32 = sqlite3_initialize()
 
 /// One open SQLite database, closed when the last reference goes away.
@@ -50,10 +54,35 @@ public final class Connection {
         }
     }
 
+    /// Prepares exactly one statement.
+    ///
+    /// `sqlite3_prepare_v2` compiles the first statement of the text and hands back the rest, so anything
+    /// after the first would be dropped without a word by `run` and `rows`. It is refused instead; text with
+    /// several statements belongs in `execute`.
     public func prepare(_ sql: String) throws(SQLiteError) -> Statement {
         var raw: OpaquePointer?
-        let rc = sqlite3_prepare_v2(handle, sql, -1, &raw, nil)
-        guard rc == SQLITE_OK, let raw else { throw SQLiteError(handle: handle, code: rc) }
+        var rc = SQLITE_OK
+        var hasMoreStatements = false
+        sql.withCString { start in
+            var tail: UnsafePointer<CChar>?
+            rc = sqlite3_prepare_v2(handle, start, -1, &raw, &tail)
+            guard rc == SQLITE_OK, var cursor = tail else { return }
+            while cursor.pointee != 0 {
+                let byte = cursor.pointee
+                let isBlank = byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0B || byte == 0x0C || byte == 0x0D
+                if !isBlank && byte != 0x3B {  // a semicolon or blank space is a separator, not a statement
+                    hasMoreStatements = true
+                    return
+                }
+                cursor += 1
+            }
+        }
+        guard rc == SQLITE_OK else { throw SQLiteError(handle: handle, code: rc) }
+        guard let raw else { throw SQLiteError(code: SQLITE_MISUSE, message: "no statement to prepare in: \(sql)") }
+        guard !hasMoreStatements else {
+            sqlite3_finalize(raw)
+            throw SQLiteError(code: SQLITE_MISUSE, message: "more than one statement in: \(sql)")
+        }
         return Statement(handle: raw, connection: self)
     }
 
@@ -125,5 +154,10 @@ public final class Connection {
         let flags = UInt32(SQLITE_DESERIALIZE_FREEONCLOSE | SQLITE_DESERIALIZE_RESIZEABLE)
         let rc = sqlite3_deserialize(handle, "main", buffer.assumingMemoryBound(to: UInt8.self), sqlite3_int64(count), sqlite3_int64(count), flags)
         if rc != SQLITE_OK { throw SQLiteError(handle: handle, code: rc) }
+        // `sqlite3_deserialize` takes the bytes without looking at them: bytes that are not a database are
+        // only noticed by the first query, far from the restore that caused it. Ask one question now, while
+        // the caller still knows a snapshot was being restored. A connection that throws here is spent and
+        // has to be replaced, not retried.
+        _ = try rows("SELECT count(*) FROM sqlite_schema")
     }
 }
