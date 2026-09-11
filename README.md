@@ -20,4 +20,14 @@ Milestone `M0 Process` is complete: the project process is defined and the repos
 
 ## Building
 
-Nothing to build yet. Build instructions arrive with the first core package in M1.
+The core is a SwiftPM package built with the swift.org toolchain pinned in `.swift-version` and installed through [swiftly](https://www.swift.org/install/); Xcode only supplies the Apple SDKs.
+
+```sh
+swiftly install                      # reads .swift-version
+swift build
+swift test                           # host
+swift test --swift-sdk swift-6.3.3-RELEASE_wasm   # the same suite on wasm32 under WasmKit
+swift run todo --help                # command-line demo
+```
+
+The WebAssembly SDK is installed once with `swift sdk install <url> --checksum <sha256>`; the URL and checksum are in `.github/workflows/ci.yml`.
