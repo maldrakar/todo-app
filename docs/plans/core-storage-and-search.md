@@ -4,7 +4,7 @@
 
 **Goal:** Build the `TodoCore` Swift package: SQLite-backed storage for tasks, tags and nested views, an operation journal ready for sync, filter-defined views, full-text search, a sync skeleton proven by a two-store convergence test, and the `todo` command-line demo, all green on the host and on wasm32.
 
-**Architecture:** One SwiftPM package at the repository root with four targets: `CSQLite` (the vendored amalgamation), `SQLiteKit` (a thin typed wrapper), `TodoCore` (model, journal, store, views, search, sync skeleton) and `todo` (the CLI). Every write becomes field-level operations applied through one path that journals them, compares per-field hybrid logical clocks and updates the state tables; reads are SQL over the state tables plus a derived `task_tree` table for effective parent and trash. The web target keeps the database in memory and moves it as a snapshot.
+**Architecture:** One SwiftPM package at the repository root with five targets: `CSQLite` (the vendored amalgamation), `SQLiteKit` (a thin typed wrapper), `TodoCore` (model, journal, store, views, search, sync skeleton), `TodoCLI` (commands) and `todo` (the executable). Every write becomes field-level operations applied through one path that journals them, compares per-field hybrid logical clocks and updates the state tables; reads are SQL over the state tables plus a derived `task_tree` table for effective parent and trash. The web target keeps the database in memory and moves it as a snapshot.
 
 **Tech Stack:** Swift 6.3.3 from swift.org via swiftly (`.swift-version`), SwiftPM, swift-testing, SQLite 3.53.4 amalgamation with FTS5, Swift SDK `swift-6.3.3-RELEASE_wasm` with WasmKit for wasm32 tests, GitHub Actions.
 
@@ -60,7 +60,7 @@
 | `Tests/SQLiteKitTests/ConnectionTests.swift` | Wrapper tests |
 | `Tests/TodoCoreTests/*.swift` | One file per task, named below |
 | `scripts/wasm-size.sh` | Release wasm build and gzip size budget |
-| `.github/workflows/ci.yml` | Linux job for build, tests, wasm tests, size; macOS job for Apple SDK compile checks |
+| `.github/workflows/ci.yml` | Linux job for build, tests, wasm tests (Task 1) and size (Task 13); macOS job for Apple SDK compile checks (Task 13) |
 
 Every test creates its own `Store.openInMemory(now:)` with a deterministic clock, so tests run in parallel without shared state. The helper below is defined once in `Tests/TodoCoreTests/TestSupport.swift` (Task 4) and used by every later test file:
 
@@ -82,9 +82,9 @@ func makeStore(clock: TestClock = TestClock()) throws(StoreError) -> Store {
 
 ---
 
-### Task 1: Package skeleton, vendored SQLite, smoke tests on host and wasm32
+### Task 1: Package skeleton, vendored SQLite, smoke tests on host and wasm32, and the CI job that runs them
 
-Retires the two risks named in the spec: `UUID` and time on WASI, and SQLite as a C target on wasm32 in full Swift mode. Everything here was verified by hand on 2026-09-11; the task turns it into the repository's first code.
+Retires the two risks named in the spec: `UUID` and time on WASI, and SQLite as a C target on wasm32 in full Swift mode. Everything here was verified by hand on 2026-09-11; the task turns it into the repository's first code. The Linux CI job lands here too, so every later PR of the epic arrives with a green check; the size budget and the macOS compile checks follow in Task 13, once the `todo` executable exists.
 
 **Files:**
 - Create: `Package.swift`
@@ -94,11 +94,12 @@ Retires the two risks named in the spec: `UUID` and time on WASI, and SQLite as 
 - Create: `Sources/todo/main.swift` (placeholder, replaced in Task 12)
 - Create: `Tests/SQLiteKitTests/ConnectionTests.swift` (placeholder, replaced in Task 2)
 - Create: `Tests/TodoCoreTests/SmokeTests.swift`
+- Create: `.github/workflows/ci.yml`
 - Modify: `.gitignore`, `README.md`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: the module `CSQLite` (C API of SQLite), the targets every later task adds files to.
+- Produces: the module `CSQLite` (C API of SQLite), the targets every later task adds files to, and the `core` CI job that Task 13 extends.
 
 - [ ] **Step 1: Vendor the amalgamation**
 
@@ -295,7 +296,7 @@ Expected: `Test run with 5 tests in 0 suites passed` (4 in TodoCoreTests, 1 in S
 swift test --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -5
 ```
 
-Expected: the same 5 tests pass under WasmKit. If `swift sdk list` does not show `swift-6.3.3-RELEASE_wasm`, install it first: `swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz --checksum <sha256 from Task 13>`.
+Expected: the same 5 tests pass under WasmKit. If `swift sdk list` does not show `swift-6.3.3-RELEASE_wasm`, install it first: `swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7`.
 
 - [ ] **Step 7: Measure the wasm size once, so the budget in Task 13 is grounded**
 
@@ -334,11 +335,81 @@ swift run todo --help                # command-line demo
 The WebAssembly SDK is installed once with `swift sdk install <url> --checksum <sha256>`; the URL and checksum are in `.github/workflows/ci.yml`.
 ```
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 9: Add the Linux CI job**
+
+`.github/workflows/ci.yml`. One job on every pull request and every push to `main`: install the pinned toolchain through swiftly, install the WebAssembly SDK with its checksum, build, test on the host, test on wasm32. Task 13 adds the size budget step and the macOS job to this file.
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  WASM_SDK_URL: https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz
+  WASM_SDK_SHA256: cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
+
+jobs:
+  core:
+    name: Build and test on the host and on wasm32
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System packages for the swift.org toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4-openssl-dev libedit2 libgcc-13-dev libpython3-dev libsqlite3-0 libstdc++-13-dev libxml2-dev libncurses-dev libz3-dev pkg-config tzdata unzip zlib1g-dev
+
+      - name: Cache the toolchain and the WebAssembly SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/swiftly
+            ~/.swiftpm/swift-sdks
+          key: swiftly-${{ runner.os }}-${{ hashFiles('.swift-version') }}-wasm-v1
+
+      - name: Install swiftly and the pinned toolchain
+        run: |
+          set -eu
+          if [ ! -x "$HOME/.local/share/swiftly/bin/swiftly" ]; then
+            curl -fsSL -O "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz"
+            tar zxf "swiftly-$(uname -m).tar.gz"
+            ./swiftly init --quiet-shell-followup --assume-yes --skip-install --no-modify-profile
+          fi
+          . "$HOME/.local/share/swiftly/env.sh"
+          swiftly install
+          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
+
+      - name: Install the WebAssembly SDK
+        run: |
+          set -eu
+          if ! swift sdk list | grep -q swift-6.3.3-RELEASE_wasm; then
+            curl -fsSL -o wasm-sdk.tar.gz "$WASM_SDK_URL"
+            echo "$WASM_SDK_SHA256  wasm-sdk.tar.gz" | sha256sum -c -
+            swift sdk install wasm-sdk.tar.gz
+          fi
+
+      - name: Build
+        run: swift build
+
+      - name: Test on the host
+        run: swift test
+
+      - name: Test on wasm32 under WasmKit
+        run: swift test --swift-sdk swift-6.3.3-RELEASE_wasm
+```
+
+Push the branch and open the PR; the job must be green before the PR is handed to the owner. If `swiftly install` fails on a missing system package, add the package the log names to the `apt-get install` line. If the first run cannot find `wasmkit`, the SDK toolset needs it on the path: add `echo "$(dirname "$(readlink -f "$(which swift)")")" >> "$GITHUB_PATH"` after the swiftly step, since the toolchain ships `wasmkit` next to `swift`.
+
+- [ ] **Step 10: Commit**
 
 ```bash
-git add Package.swift Sources Tests .gitignore README.md
-git commit -m "feat(core): add the package skeleton with vendored SQLite and wasm32 smoke tests"
+git add Package.swift Sources Tests .gitignore README.md .github/workflows/ci.yml
+git commit -m "feat(core): add the package skeleton with vendored SQLite, wasm32 smoke tests and CI"
 ```
 
 ---
@@ -4471,15 +4542,15 @@ git commit -m "feat(core): add the todo command-line demo"
 
 ---
 
-### Task 13: Continuous integration, the size budget, and the documentation that closes the epic
+### Task 13: The wasm size budget, the macOS compile job, and the documentation that closes the epic
 
 **Files:**
-- Create: `scripts/wasm-size.sh`, `.github/workflows/ci.yml`
-- Modify: `README.md`, `docs/process.md` (section 10), `CLAUDE.md` (toolchain note), `CHANGELOG.md`
+- Create: `scripts/wasm-size.sh`
+- Modify: `.github/workflows/ci.yml` (from Task 1), `README.md`, `docs/process.md` (section 10), `CLAUDE.md` (toolchain note), `CHANGELOG.md`
 
 **Interfaces:**
-- Consumes: the whole package.
-- Produces: a green check on every PR from the Linux job; Apple SDK compile checks on pushes to `main` and manual runs; the wasm size as a number in every run.
+- Consumes: the whole package and the `core` job from Task 1.
+- Produces: the wasm size as a number in every run, failing the job over budget; Apple SDK compile checks on pushes to `main` and manual runs.
 
 - [ ] **Step 1: Write the size script and check it locally**
 
@@ -4509,76 +4580,18 @@ scripts/wasm-size.sh
 
 Expected: a line with the sizes and exit code 0. The measured value on 2026-09-11 for the smoke executable was 3,743,306 bytes after gzip; the full core should land near 4 MB.
 
-- [ ] **Step 2: Write the workflow**
+- [ ] **Step 2: Extend the workflow**
 
-`.github/workflows/ci.yml`:
+Two additions to `.github/workflows/ci.yml` from Task 1. First, a last step in the `core` job:
 
 ```yaml
-name: CI
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-env:
-  WASM_SDK_URL: https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz
-  WASM_SDK_SHA256: cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
-
-jobs:
-  core:
-    name: Build, test, wasm32, size budget
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: System packages for the swift.org toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4-openssl-dev libedit2 libgcc-13-dev libpython3-dev libsqlite3-0 libstdc++-13-dev libxml2-dev libncurses-dev libz3-dev pkg-config tzdata unzip zlib1g-dev
-
-      - name: Cache the toolchain and the WebAssembly SDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.local/share/swiftly
-            ~/.swiftpm/swift-sdks
-          key: swiftly-${{ runner.os }}-${{ hashFiles('.swift-version') }}-wasm-v1
-
-      - name: Install swiftly and the pinned toolchain
-        run: |
-          set -eu
-          if [ ! -x "$HOME/.local/share/swiftly/bin/swiftly" ]; then
-            curl -fsSL -O "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz"
-            tar zxf "swiftly-$(uname -m).tar.gz"
-            ./swiftly init --quiet-shell-followup --assume-yes --skip-install --no-modify-profile
-          fi
-          . "$HOME/.local/share/swiftly/env.sh"
-          swiftly install
-          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
-
-      - name: Install the WebAssembly SDK
-        run: |
-          set -eu
-          if ! swift sdk list | grep -q swift-6.3.3-RELEASE_wasm; then
-            curl -fsSL -o wasm-sdk.tar.gz "$WASM_SDK_URL"
-            echo "$WASM_SDK_SHA256  wasm-sdk.tar.gz" | sha256sum -c -
-            swift sdk install wasm-sdk.tar.gz
-          fi
-
-      - name: Build
-        run: swift build
-
-      - name: Test on the host
-        run: swift test
-
-      - name: Test on wasm32 under WasmKit
-        run: swift test --swift-sdk swift-6.3.3-RELEASE_wasm
-
       - name: Release wasm build and size budget
         run: scripts/wasm-size.sh
+```
 
+Second, a new job after `core`:
+
+```yaml
   apple:
     # macOS minutes cost tenfold, so this job runs on main and on demand, not on every pull request.
     name: Compile for the iOS and watchOS SDKs
@@ -4614,22 +4627,22 @@ jobs:
         run: swift build --target TodoCore --triple arm64_32-apple-watchos10.0 --sdk "$(xcrun --sdk watchos --show-sdk-path)"
 ```
 
-If the `macos-26` label is not available when the workflow first runs, use the newest macOS image that ships Xcode 26.3 and add `sudo xcode-select -s /Applications/Xcode_26.3.app` before the compile steps. The job is not on the PR path, so a wrong label cannot block merges; fix it in the same PR once the first `main` run shows the available images.
+Rename the `core` job to `Build, test, wasm32, size budget`. If the `macos-26` label is not available when the workflow first runs, use the newest macOS image that ships Xcode 26.3 and add `sudo xcode-select -s /Applications/Xcode_26.3.app` before the compile steps. The job is not on the PR path, so a wrong label cannot block merges; fix it in the same PR once the first `main` run shows the available images.
 
 - [ ] **Step 3: Update the documents**
 
-- `README.md`: a `## Continuous integration` section: what the Linux job does on every PR, that the macOS job runs on `main` and on demand, and the wasm budget line.
+- `README.md`: a `## Continuous integration` section: what the Linux job does on every PR (build, tests, wasm32 tests, size budget), that the macOS job runs on `main` and on demand, and the wasm budget line.
 - `docs/process.md` section 10: replace the first paragraph with the split between the Linux job (build, host tests, wasm tests, size budget, every PR) and the macOS job (Apple SDK compile checks, `main` and manual runs), keep the cost constraint paragraph.
 - `CLAUDE.md`, toolchain notes: replace "CI runs on macOS runners, which cost 10x minutes on a private repository. Keep CI lean." with "CI: the Linux job (build, tests, wasm32 tests, wasm size budget) runs on every PR; the macOS job (iOS and watchOS SDK compile checks) runs only on `main` and on demand because macOS minutes cost tenfold."
-- `CHANGELOG.md`, `[Unreleased]`: one line for CI and the size budget; check that every earlier task added its line.
+- `CHANGELOG.md`, `[Unreleased]`: one line for the size budget and the macOS job; check that every earlier task added its line.
 
 - [ ] **Step 4: Open the PR and watch the first run**
 
 ```bash
 git add scripts/wasm-size.sh .github/workflows/ci.yml README.md docs/process.md CLAUDE.md CHANGELOG.md
-git commit -m "ci: add the Linux CI job with wasm32 tests and the size budget, macOS compile checks on main"
-git push -u origin ci/<issue>-ci-workflow
-gh pr create --label infra --title "ci: add build, tests, wasm32 tests and the size budget" --body "<per the PR template, ending with Closes #<sub-issue>>"
+git commit -m "ci: add the wasm size budget and macOS compile checks on main"
+git push -u origin ci/23-size-budget-and-macos
+gh pr create --label infra --title "ci: add the wasm size budget and macOS compile checks" --body "<per the PR template, ending with Closes #23>"
 gh run watch
 ```
 
@@ -4643,7 +4656,7 @@ Approved by the owner on 2026-09-11. Each row is a sub-issue of epic #4 in miles
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | #11 | Package skeleton with vendored SQLite and wasm32 smoke tests | `infra`, `core` | |
+| 1 | #11 | Package skeleton with vendored SQLite, wasm32 smoke tests and the Linux CI job | `infra`, `core` | |
 | 2 | #12 | SQLiteKit: typed wrapper over the vendored SQLite | `feature`, `core` | 1 |
 | 3 | #13 | Value types: identifiers, calendar days, hybrid logical clocks, order keys | `feature`, `core` | 1 |
 | 4 | #14 | Schema version 1, migrations, store opening and snapshots | `feature`, `core` | 2, 3 |
@@ -4655,7 +4668,7 @@ Approved by the owner on 2026-09-11. Each row is a sub-issue of epic #4 in miles
 | 10 | #20 | Search: quick find over titles, ranked search in notes | `feature`, `core` | 9 |
 | 11 | #21 | Sync skeleton: journal export, receive, in-memory relay, convergence test | `feature`, `core` | 9 |
 | 12 | #22 | The todo command-line demo | `feature`, `core` | 10, 11 |
-| 13 | #23 | CI with wasm32 tests and the size budget; closing documentation | `infra`, `core` | 12 |
+| 13 | #23 | Wasm size budget, macOS compile checks and closing documentation | `infra`, `core` | 12 |
 
 Tasks 10 and 11 are independent of each other and can run in parallel after 9.
 
@@ -4672,7 +4685,7 @@ Coverage, section by section of `docs/specs/core-storage-and-search.md`:
 - Platform boundary: `now` injected (Task 4), `today` per query (Tasks 8 and 9), no timers, observer after commit (Task 5).
 - Migrations with `user_version` and replay: Tasks 4 and 5.
 - Concurrency and API shape, typed errors, no Swift concurrency: every task; `StoreError` in Task 4.
-- Testing on host and wasm32, CI split, size budget, CLI demo: Tasks 1, 12, 13.
+- Testing on host and wasm32 and the Linux CI job: Task 1; CLI demo: Task 12; size budget and the macOS job: Task 13.
 - Risks: FoundationEssentials on WASI and SQLite on wasm32 in full mode were verified by hand on 2026-09-11 and are re-verified by Task 1; the fake clock under WasmKit is a global constraint.
 
 Deviations from the spec, each small and stated where it happens:
