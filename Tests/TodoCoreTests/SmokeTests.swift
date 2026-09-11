@@ -1,18 +1,18 @@
 import Testing
 @testable import TodoCore
 
-@Test func vendoredSQLiteHasTheExpectedVersion() {
-    #expect(CoreSmoke.sqliteVersion() == "3.53.4")
+@Test func vendoredSQLiteHasTheExpectedVersion() throws {
+    #expect(try CoreSmoke.sqliteVersion() == "3.53.4")
 }
 
-@Test func trigramTokenizerFoldsCaseAndFindsCyrillicSubstrings() {
-    #expect(CoreSmoke.trigramMatches("отч") == 1)
-    #expect(CoreSmoke.trigramMatches("ОТЧ") == 1)
-    #expect(CoreSmoke.trigramMatches("xyz") == 0)
+@Test func trigramTokenizerFoldsCaseAndFindsCyrillicSubstrings() throws {
+    #expect(try CoreSmoke.trigramMatches("отч") == 1)
+    #expect(try CoreSmoke.trigramMatches("ОТЧ") == 1)
+    #expect(try CoreSmoke.trigramMatches("xyz") == 0)
 }
 
-@Test func databaseRoundTripsThroughSerializeAndDeserialize() {
-    #expect(CoreSmoke.snapshotSum() == 6)
+@Test func databaseRoundTripsThroughSerializeAndDeserialize() throws {
+    #expect(try CoreSmoke.snapshotSum() == 6)
 }
 
 @Test func uuidIsRandomAndClockAdvances() {
