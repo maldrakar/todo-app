@@ -978,7 +978,7 @@ rm Sources/TodoCore/TodoCore.swift Tests/TodoCoreTests/SmokeTests.swift
 swift test --filter TodoCoreTests 2>&1 | grep -E 'error:' | head -3
 ```
 
-Expected: `cannot find 'EntityID' in scope` and similar. Replace `Sources/todo/main.swift` with the line `import TodoCore` followed by `print("todo demo, today is \(Day(daysSinceEpoch: 0)) + n")` so the executable still compiles; the real CLI arrives in Task 12.
+Expected: `target 'TodoCore' referenced in product 'TodoCore' is empty`, and once the files below exist, `cannot find 'EntityID' in scope` and similar. Replace `Sources/todo/main.swift` with the line `import TodoCore` followed by `print("todo demo, the epoch day is \(Day(daysSinceEpoch: 0)), Int is \(Int.bitWidth)-bit")` so the executable still compiles; the real CLI arrives in Task 12.
 
 - [ ] **Step 3: Write `EntityID.swift`**
 
@@ -1118,16 +1118,18 @@ public final class HybridClock {
         return last
     }
 
+    /// Observing is not an event of its own: it only raises the high-water mark and leaves the increment to
+    /// the next `next()`, which is then the first stamp strictly above both this device and the remote one.
     public func observe(_ remote: HLC) {
         let wall = now()
         let millis = max(wall, last.millis, remote.millis)
         let counter: Int32
         if millis == last.millis && millis == remote.millis {
-            counter = max(last.counter, remote.counter) + 1
+            counter = max(last.counter, remote.counter)
         } else if millis == last.millis {
-            counter = last.counter + 1
+            counter = last.counter
         } else if millis == remote.millis {
-            counter = remote.counter + 1
+            counter = remote.counter
         } else {
             counter = 0
         }
@@ -1135,6 +1137,8 @@ public final class HybridClock {
     }
 }
 ```
+
+Why the wall-clock branch still stores `millis`: when `now()` is ahead of both clocks the merged millisecond is recorded anyway, so a wall clock that later goes backwards cannot drag a stamp below what this device has already seen.
 
 - [ ] **Step 6: Write `Rank.swift`**
 
