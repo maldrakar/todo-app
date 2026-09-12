@@ -43,3 +43,16 @@ import Testing
     #expect(!Rank.isValid("A"))
     #expect(!Rank.isValid("a-b"))
 }
+
+@Test func toleratesNeighboursThatAMergeCanProduce() {
+    // Equal ranks arise when two devices append to the same list offline; a key outside the alphabet arises
+    // from a corrupt row or a newer version. Neither may abort the process.
+    for (lower, upper) in [("k", "k"), ("m", "d"), ("k", ""), ("k", "A")] {
+        let key = Rank.between(lower, upper)
+        #expect(lower < key, "\(lower) < \(key)")
+        #expect(Rank.isValid(key))
+    }
+    let afterBrokenLower = Rank.between("A", "i")
+    #expect(afterBrokenLower < "i")
+    #expect(Rank.isValid(afterBrokenLower))
+}

@@ -1,12 +1,24 @@
+/// Why a string is not a calendar day. It carries the input because everything that parses a day — the command
+/// line, a filter document, a URL — reports the failure back to a person.
+public struct DayParseError: Error, Equatable, Sendable, CustomStringConvertible {
+    public let input: String
+
+    public init(input: String) { self.input = input }
+
+    public var description: String { "not a date: \(input), expected YYYY-MM-DD" }
+}
+
 /// A calendar day with no time zone, stored as days since 1970-01-01.
 ///
 /// The conversions are Howard Hinnant's `days_from_civil` and `civil_from_days` for the proleptic Gregorian
 /// calendar: plain integer arithmetic, no `Calendar` and no time zone, so the same day means the same thing
 /// on every platform the core builds for.
 public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
-    public let daysSinceEpoch: Int32
+    /// Internal on purpose: outside the core a day is a year, a month and a day or an ISO string, and this
+    /// integer is only how the store binds it to a SQLite column.
+    let daysSinceEpoch: Int32
 
-    public init(daysSinceEpoch: Int32) { self.daysSinceEpoch = daysSinceEpoch }
+    init(daysSinceEpoch: Int32) { self.daysSinceEpoch = daysSinceEpoch }
 
     public init(year: Int, month: Int, day: Int) {
         let y = month <= 2 ? year - 1 : year
@@ -18,14 +30,20 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
         daysSinceEpoch = Int32(era * 146097 + doe - 719468)
     }
 
-    /// Parses strict `YYYY-MM-DD`.
-    public init?(_ iso: String) {
+    /// Parses strict `YYYY-MM-DD`. A string that is not a day is an error rather than a `nil`, so a bad date
+    /// from an argument, a file or a sync payload says which string it was instead of vanishing.
+    public init(_ iso: String) throws(DayParseError) {
         let parts = iso.split(separator: "-", omittingEmptySubsequences: false)
+        // The widths are checked before the arithmetic, because a year of arbitrary length would overflow the
+        // day count rather than fail to parse.
         guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
-              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]),
-              (1...12).contains(m), (1...31).contains(d) else { return nil }
+              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]) else {
+            throw DayParseError(input: iso)
+        }
         let candidate = Day(year: y, month: m, day: d)
-        guard candidate.year == y, candidate.month == m, candidate.day == d else { return nil }
+        // One round trip replaces every field check: `description` prints exactly `YYYY-MM-DD`, so a sign, a
+        // month of 13 and a 30th of February all fail to come back as the string that was parsed.
+        guard candidate.description == iso else { throw DayParseError(input: iso) }
         self = candidate
     }
 

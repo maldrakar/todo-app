@@ -26,10 +26,15 @@ import Testing
     #expect(Day(year: 2024, month: 2, day: 28).advanced(by: 1) == Day(year: 2024, month: 2, day: 29))
 }
 
-@Test func parsesAndPrintsISO() {
-    #expect(Day("2026-09-11") == Day(year: 2026, month: 9, day: 11))
+@Test func parsesAndPrintsISO() throws {
+    #expect(try Day("2026-09-11") == Day(year: 2026, month: 9, day: 11))
     #expect(Day(year: 2026, month: 9, day: 1).description == "2026-09-01")
-    #expect(Day("2026-9-1") == nil)
-    #expect(Day("nope") == nil)
-    #expect(Day("2026-13-01") == nil)
+}
+
+@Test func refusesEverythingThatIsNotAStrictISODay() {
+    // The sign cases matter because `Int("+1")` parses: a day has to come back as the string it was read from.
+    for bad in ["2026-9-1", "nope", "2026-13-01", "2026-02-30", "+999-01-01", "2026-01-+1", "2026-01-01 ", ""] {
+        #expect(throws: DayParseError(input: bad)) { try Day(bad) }
+    }
+    #expect(DayParseError(input: "nope").description == "not a date: nope, expected YYYY-MM-DD")
 }

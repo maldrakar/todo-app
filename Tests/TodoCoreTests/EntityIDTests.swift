@@ -1,8 +1,8 @@
 import Testing
 @testable import TodoCore
 
-@Test func generatedIDsAreLowercaseUUIDsAndUnique() {
-    let a = EntityID.generate(), b = EntityID.generate()
+@Test func freshIDsAreLowercaseUUIDsAndUnique() {
+    let a = EntityID(), b = EntityID()
     #expect(a != b)
     #expect(a.rawValue.count == 36)
     #expect(a.rawValue == a.rawValue.lowercased())

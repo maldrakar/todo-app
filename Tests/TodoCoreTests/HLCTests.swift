@@ -39,3 +39,18 @@ import Testing
     clock.observe(HLC(millis: 100, counter: 9))
     #expect(clock.next() == HLC(millis: 5_000, counter: 1))
 }
+
+@Test func theCounterCeilingBorrowsTheNextMillisecond() {
+    // A bulk import inside one millisecond must not abort the process; it may only cost a millisecond.
+    let clock = HybridClock(now: { 1_000 })
+    for _ in 0...Int(HLC.maxCounter) { _ = clock.next() }
+    #expect(clock.next() == HLC(millis: 1_001, counter: 0))
+}
+
+@Test func rawDecodesEveryStoredValue() {
+    // Journal rows are decoded without validation, so even a value this version would never write reads back
+    // as what it sorts as instead of trapping.
+    #expect(HLC(raw: -1).raw == -1)
+    #expect(HLC(raw: 0) == HLC(millis: 0, counter: 0))
+    #expect(HLC(raw: -1) < HLC(raw: 0))
+}

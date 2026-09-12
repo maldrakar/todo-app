@@ -8,9 +8,8 @@ import Foundation
 public struct EntityID: Hashable, Comparable, Sendable, CustomStringConvertible {
     public let rawValue: String
 
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-
-    public static func generate() -> EntityID { EntityID(UUID().uuidString.lowercased()) }
+    /// Without an argument this mints a fresh identifier; with one it wraps what storage or sync already holds.
+    public init(_ rawValue: String = UUID().uuidString.lowercased()) { self.rawValue = rawValue }
 
     public var description: String { rawValue }
 
