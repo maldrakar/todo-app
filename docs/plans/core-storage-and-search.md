@@ -426,7 +426,7 @@ git commit -m "feat(core): add the package skeleton with vendored SQLite, wasm32
 - Produces, used by every `TodoCore` task:
   - `public struct SQLiteError: Error, Equatable, Sendable { let code: Int32; let message: String }`
   - `public enum Value: Equatable, Sendable { case null, integer(Int64), real(Double), text(String), blob([UInt8]) }` with `Value.text(String?)`-style helpers `Value(_ s: String?)`, `Value(_ i: Int64?)`, `Value(_ b: Bool)`, and accessors `int64`, `string`, `isNull`.
-  - `public final class Connection` with `static func open(path:) throws(SQLiteError) -> Connection`, `static func openInMemory() throws(SQLiteError) -> Connection`, `func execute(_ sql: String) throws(SQLiteError)`, `func run(_ sql: String, _ params: [Value] = []) throws(SQLiteError)`, `func rows(_ sql: String, _ params: [Value] = []) throws(SQLiteError) -> [[Value]]`, `func prepare(_ sql: String) throws(SQLiteError) -> Statement`, `func transaction<T>(_ body: () throws(SQLiteError) -> T) throws(SQLiteError) -> T`, `func userVersion() throws(SQLiteError) -> Int32`, `func setUserVersion(_:) throws(SQLiteError)`, `var lastInsertRowID: Int64`, `var changes: Int64`, `func serialize() throws(SQLiteError) -> [UInt8]`, `func deserialize(_ bytes: [UInt8]) throws(SQLiteError)`.
+  - `public final class Connection` with `static func open(path:pragmas:) throws(SQLiteError) -> Connection`, `static func openInMemory(pragmas:) throws(SQLiteError) -> Connection` (the client's pragmas, none by default), `func execute(_ sql: String) throws(SQLiteError)`, `func run(_ sql: String, _ params: [Value] = []) throws(SQLiteError)`, `func rows(_ sql: String, _ params: [Value] = []) throws(SQLiteError) -> [[Value]]`, `func prepare(_ sql: String) throws(SQLiteError) -> Statement`, `func transaction<T>(_ body: () throws(SQLiteError) -> T) throws(SQLiteError) -> T`, `func userVersion() throws(SQLiteError) -> Int32`, `func setUserVersion(_:) throws(SQLiteError)`, `var lastInsertRowID: Int64`, `var changes: Int64`, `func serialize() throws(SQLiteError) -> [UInt8]`, `func deserialize(_ bytes: [UInt8]) throws(SQLiteError)`.
   - `public final class Statement` with `func bind(_ values: [Value]) throws(SQLiteError)`, `func step() throws(SQLiteError) -> Bool`, `func reset() throws(SQLiteError)`, `func value(at: Int32) -> Value`, `func row() -> [Value]`, `var columnCount: Int32`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -438,7 +438,7 @@ import Testing
 @testable import SQLiteKit
 
 @Test func executesDDLAndReadsRowsBack() throws {
-    let db = try Connection.openInMemory()
+    let db = try Connection.openInMemory(pragmas: Store.pragmas)
     try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score REAL, data BLOB)")
     try db.run("INSERT INTO t (name, score, data) VALUES (?, ?, ?)", [.text("a"), .real(1.5), .blob([1, 2, 3])])
     try db.run("INSERT INTO t (name, score, data) VALUES (?, ?, ?)", [.null, .null, .null])
@@ -661,15 +661,15 @@ public final class Connection {
 
     deinit { sqlite3_close_v2(handle) }
 
-    public static func open(path: String) throws(SQLiteError) -> Connection {
-        try open(name: path, flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
+    public static func open(path: String, pragmas: [String] = []) throws(SQLiteError) -> Connection {
+        try open(name: path, flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, pragmas: pragmas)
     }
 
-    public static func openInMemory() throws(SQLiteError) -> Connection {
-        try open(name: ":memory:", flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY)
+    public static func openInMemory(pragmas: [String] = []) throws(SQLiteError) -> Connection {
+        try open(name: ":memory:", flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY, pragmas: pragmas)
     }
 
-    private static func open(name: String, flags: Int32) throws(SQLiteError) -> Connection {
+    private static func open(name: String, flags: Int32, pragmas: [String]) throws(SQLiteError) -> Connection {
         var raw: OpaquePointer?
         let rc = sqlite3_open_v2(name, &raw, flags, nil)
         guard rc == SQLITE_OK, let raw else {
@@ -678,7 +678,10 @@ public final class Connection {
             throw error
         }
         let connection = Connection(handle: raw)
-        try connection.execute("PRAGMA foreign_keys = OFF; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")
+        for pragma in pragmas {
+            do { try connection.execute("PRAGMA \(pragma);") }
+            catch { throw SQLiteError(code: error.code, message: "PRAGMA \(pragma): \(error.message)") }
+        }
         return connection
     }
 
@@ -772,7 +775,7 @@ public final class Connection {
 }
 ```
 
-Note on `journal_mode = WAL`: on an in-memory database the pragma is accepted and ignored, so the same open path serves both.
+Note on pragmas: `open` sets none of its own. Journal mode, synchrony and foreign keys are the client's policy and arrive as `pragmas`, so a change of policy never reaches into this target (review of PR #27). They run one statement at a time and outside any transaction, which is the only way that works: `journal_mode = WAL` fails inside a transaction and `foreign_keys` is a silent no-op there. On an in-memory database `journal_mode` is accepted and ignored, so one list serves both targets.
 
 - [ ] **Step 6: Run the tests**
 
@@ -1213,7 +1216,7 @@ git commit -m "feat(core): add identifiers, calendar days, hybrid logical clocks
 - Produces:
   - `public enum StoreError: Error, Equatable, Sendable { case sqlite(SQLiteError); case notFound(EntityID); case viewNeedsNewerApp(ViewID, kind: String); case invalidFilter(String); case invalid(String) }`
   - `public struct ChangeSet: Equatable, Sendable { public var tasks: Set<TaskID>; public var tags: Set<TagID>; public var views: Set<ViewID>; public var isEmpty: Bool }`
-  - `public final class Store { public let deviceID: String; public var onChange: ((ChangeSet) -> Void)?; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32; public static func systemNow() -> Int64 }` plus internal `let db: Connection`, `let clock: HybridClock`, `let now: () -> Int64`, `func meta(_ key: String) throws(StoreError) -> Value`, `func setMeta(_ key: String, _ value: Value) throws(StoreError)`, `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`).
+  - `public final class Store { public let deviceID: String; public var onChange: ((ChangeSet) -> Void)?; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32; public static func systemNow() -> Int64 }` plus internal `static let pragmas: [String]` (the pragmas every store opens with, since `SQLiteKit` sets none), `let db: Connection`, `let clock: HybridClock`, `let now: () -> Int64`, `func meta(_ key: String) throws(StoreError) -> Value`, `func setMeta(_ key: String, _ value: Value) throws(StoreError)`, `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`).
   - `enum Schema { static let version1: String }`, `enum Migrations { static let steps: [(version: Int32, sql: String)]; static func run(on db: Connection) throws(SQLiteError) -> (from: Int32, to: Int32) }`.
   - Two hooks that Task 5 and Task 6 fill in: `func replayUnappliedRows() throws(SQLiteError)` and `func rebuildTreeRows() throws(SQLiteError)`, empty in this task; their `StoreError` wrappers `replayUnapplied()` and `rebuildTree()` are called at the end of `init`.
 
@@ -1521,16 +1524,21 @@ public final class Store {
     /// Milliseconds since 1970-01-01 from the system clock. Under WasmKit this is a fake time; the platform passes a real one.
     public static func systemNow() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
 
+    /// How the core opens a database. `SQLiteKit` sets no pragmas of its own, so the policy lives here and
+    /// travels with the store. On an in-memory database `journal_mode` is accepted and ignored, so one list
+    /// serves the file and the web target alike.
+    static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
+
     public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store {
         let db: Connection
-        do { db = try Connection.open(path: path) } catch { throw .sqlite(error) }
+        do { db = try Connection.open(path: path, pragmas: pragmas) } catch { throw .sqlite(error) }
         return try Store(db: db, now: now)
     }
 
     public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store {
         let db: Connection
         do {
-            db = try Connection.openInMemory()
+            db = try Connection.openInMemory(pragmas: pragmas)
             if let snapshot { try db.deserialize(snapshot) }
         } catch { throw .sqlite(error) }
         return try Store(db: db, now: now)
