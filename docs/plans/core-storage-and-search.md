@@ -1137,12 +1137,18 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
     public var month: Int { civil.month }
     public var day: Int { civil.day }
 
+    /// The day `days` days after this one. Traps if the result leaves the `Int32` day count, which reaches
+    /// about 5.8 million years either side of 1970 and so lies past anything a date a person types can produce.
     public func advanced(by days: Int) -> Day { Day(daysSinceEpoch: daysSinceEpoch + Int32(days)) }
 
+    /// Days between two days, positive when the left one is later. On a 32-bit platform, wasm32 included, the
+    /// subtraction traps for two days at opposite ends of that same unreachable range.
     public static func - (lhs: Day, rhs: Day) -> Int { Int(lhs.daysSinceEpoch) - Int(rhs.daysSinceEpoch) }
 
     public static func < (lhs: Day, rhs: Day) -> Bool { lhs.daysSinceEpoch < rhs.daysSinceEpoch }
 
+    /// `YYYY-MM-DD`, defined for the years 0 to 9999. A day outside that range still prints, but what it
+    /// prints is not a string `init(_:)` parses back.
     public var description: String {
         let c = civil
         func pad(_ n: Int, _ width: Int) -> String {
@@ -1218,7 +1224,7 @@ public final class HybridClock {
 }
 ```
 
-Why `observe` merges instead of incrementing: observing is not an event of its own, so the first stamp strictly above both clocks is the next `next()`. Written as a maximum it is one line, and the wall clock joins that maximum, so a clock that later goes backwards cannot drag a stamp below what this device has already seen. The counter ceiling is handled in `next()` rather than by the `HLC` initializer, which keeps its precondition: a value outside 16 bits is a programming error, while a clock that runs out of room inside one millisecond is an ordinary bulk import.
+Why `observe` merges instead of incrementing: observing is not an event of its own, so the first stamp strictly above both clocks is the next `next()`. Written as a maximum it is one line, and the wall clock joins that maximum, so a clock that later goes backwards cannot drag a stamp below what this device has already seen. The counter ceiling is handled in `next()` rather than by the `HLC` initializer, which keeps its precondition: a value outside 16 bits is a programming error, while a clock that runs out of room inside one millisecond is an ordinary bulk import. And a second reason `observe` must not increment: `Store.receive` (Task 11) calls it once per incoming operation, so an increment there would spend one counter tick per received operation and exhaust the 16 bits on a large sync batch.
 
 - [ ] **Step 6: Write `Rank.swift`**
 
