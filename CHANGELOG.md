@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- `SQLiteKit`, a typed wrapper over the vendored SQLite: `Connection`, `Statement`, `Value` and `SQLiteError` with typed throws, transactions, user version, `lastInsertRowID`, `changes` and the snapshot pair `serialize`/`deserialize`. Because the vendored build has threads off, the wrapper also performs SQLite's one-time library initialization once before the first connection opens, and the `TodoCore` placeholder now goes through the wrapper instead of the C API.
 - Package skeleton for the `TodoCore` SwiftPM package: vendored SQLite 3.53.4 amalgamation as the `CSQLite` target with its provenance and upgrade steps recorded in `Sources/CSQLite/README.md`, placeholder `SQLiteKit`/`TodoCore`/`todo` targets, smoke tests proving UUID, timers and FTS5 trigram search work on both the host and wasm32 under WasmKit, and the Linux CI job that runs them.
 - Implementation plan `docs/plans/core-storage-and-search.md`: thirteen tasks that became sub-issues #11 to #23 of epic #4. ADR-0002 (vendored SQLite), ADR-0003 (operation journal with last-write-wins per field) and ADR-0004 (flat model with filter-defined views) extracted from the spec.
 - Spec `docs/specs/core-storage-and-search.md`, approved by the owner on 2026-09-11: local-first core with an operation journal for a future sync, vendored SQLite on every platform, a flat model of tasks, tags and nested views with filters, FTS5 search over titles and notes.

@@ -1,3 +1,3 @@
 import TodoCore
 
-print("todo demo, SQLite \(CoreSmoke.sqliteVersion()), Int is \(Int.bitWidth)-bit")
+print("todo demo, SQLite \(try CoreSmoke.sqliteVersion()), Int is \(Int.bitWidth)-bit")
