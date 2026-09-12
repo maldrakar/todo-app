@@ -23,12 +23,6 @@ public struct ChangeSet: Equatable, Sendable {
     public init() {}
 
     public var isEmpty: Bool { tasks.isEmpty && tags.isEmpty && views.isEmpty }
-
-    mutating func merge(_ other: ChangeSet) {
-        tasks.formUnion(other.tasks)
-        tags.formUnion(other.tags)
-        views.formUnion(other.views)
-    }
 }
 
 /// The core's data layer. Synchronous, single-connection, not thread-safe: the platform confines it.
@@ -79,7 +73,15 @@ public final class Store {
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
         // comparison in silence (#32). This runs before anything below issues a stamp.
-        if let seen = try sql({ () throws(SQLiteError) in try db.rows("SELECT max(clock) FROM ops").first?.first?.int64 }) {
+        //
+        // A row at or past the top millisecond the encoding holds — a corrupt journal, or one written by a
+        // future version — is left out of the scan: seeding from it would let `observe` push the clock to the
+        // one millisecond `next()` cannot represent, and trap the process on the very next stamp. `Store.receive`
+        // reaching the same precondition through a synced row is a separate, already-filed bug.
+        let seedingCeiling = HLC(millis: HLC.maxMillis - 1, counter: 0).raw
+        if let seen = try sql({ () throws(SQLiteError) in
+            try db.rows("SELECT max(clock) FROM ops WHERE clock < ?", [.integer(seedingCeiling)]).first?.first?.int64
+        }) {
             clock.observe(HLC(raw: seen))
         }
         try seedBuiltInViews()
@@ -131,7 +133,9 @@ public final class Store {
 
     /// Recomputes task_tree. The body arrives in Task 6.
     func rebuildTree() throws(StoreError) {
-        try sql { () throws(SQLiteError) in try rebuildTreeRows() }
+        try sql { () throws(SQLiteError) in
+            try db.transaction { () throws(SQLiteError) in try rebuildTreeRows() }
+        }
     }
 
     /// Runs inside a transaction opened by the caller. Task 5 fills it in.
