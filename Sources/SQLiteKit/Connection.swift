@@ -24,6 +24,11 @@ public final class Connection {
     /// `pragmas` are the bodies of `PRAGMA` statements — `"journal_mode = WAL"` — run in order the moment the
     /// database is open. The wrapper holds no opinion about them: journal mode, synchrony and foreign keys are
     /// the client's policy, so they arrive from the client and change there, not here.
+    ///
+    /// They are run one statement at a time and outside any transaction, which is the only way that works:
+    /// `journal_mode = WAL` fails inside a transaction and `foreign_keys` is a silent no-op there. SQLite also
+    /// ignores a pragma it does not know and a value it cannot use without saying so, so a setting that has to
+    /// hold is worth reading back.
     public static func open(path: String, pragmas: [String] = []) throws(SQLiteError) -> Connection {
         try open(name: path, flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, pragmas: pragmas)
     }
@@ -45,7 +50,10 @@ public final class Connection {
             throw error
         }
         let connection = Connection(handle: raw)
-        for pragma in pragmas { try connection.execute("PRAGMA \(pragma);") }
+        for pragma in pragmas {
+            do { try connection.execute("PRAGMA \(pragma);") }
+            catch { throw SQLiteError(code: error.code, message: "PRAGMA \(pragma): \(error.message)") }
+        }
         return connection
     }
 

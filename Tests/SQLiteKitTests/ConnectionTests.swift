@@ -77,6 +77,12 @@ let SQLITE_OK_CODE: Int32 = 0
     #expect(try configured.userVersion() == 3)
 }
 
+@Test func aPragmaThatFailsSaysWhichOneItWas() throws {
+    var caught: SQLiteError?
+    do { _ = try Connection.openInMemory(pragmas: ["foreign_keys = ON", "journal_mode = "]) } catch { caught = error }
+    #expect(caught?.message.contains("PRAGMA journal_mode = ") == true)
+}
+
 @Test func userVersionRoundTrips() throws {
     let db = try Connection.openInMemory()
     #expect(try db.userVersion() == 0)
