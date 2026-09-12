@@ -13,21 +13,27 @@ private let libraryInitialization: Int32 = sqlite3_initialize()
 
 /// One open SQLite database, closed when the last reference goes away.
 public final class Connection {
-    let handle: OpaquePointer
+    private let handle: OpaquePointer
 
     private init(handle: OpaquePointer) { self.handle = handle }
 
     deinit { sqlite3_close_v2(handle) }
 
-    public static func open(path: String) throws(SQLiteError) -> Connection {
-        try open(name: path, flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
+    /// Opens the database at `path`, creating it when it is not there yet.
+    ///
+    /// `pragmas` are the bodies of `PRAGMA` statements — `"journal_mode = WAL"` — run in order the moment the
+    /// database is open. The wrapper holds no opinion about them: journal mode, synchrony and foreign keys are
+    /// the client's policy, so they arrive from the client and change there, not here.
+    public static func open(path: String, pragmas: [String] = []) throws(SQLiteError) -> Connection {
+        try open(name: path, flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, pragmas: pragmas)
     }
 
-    public static func openInMemory() throws(SQLiteError) -> Connection {
-        try open(name: ":memory:", flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY)
+    /// Opens a private in-memory database. `pragmas` are applied as in `open(path:pragmas:)`.
+    public static func openInMemory(pragmas: [String] = []) throws(SQLiteError) -> Connection {
+        try open(name: ":memory:", flags: SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_MEMORY, pragmas: pragmas)
     }
 
-    private static func open(name: String, flags: Int32) throws(SQLiteError) -> Connection {
+    private static func open(name: String, flags: Int32, pragmas: [String]) throws(SQLiteError) -> Connection {
         guard libraryInitialization == SQLITE_OK else {
             throw SQLiteError(code: libraryInitialization, message: "sqlite3_initialize failed")
         }
@@ -39,7 +45,7 @@ public final class Connection {
             throw error
         }
         let connection = Connection(handle: raw)
-        try connection.execute("PRAGMA foreign_keys = OFF; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")
+        for pragma in pragmas { try connection.execute("PRAGMA \(pragma);") }
         return connection
     }
 
@@ -77,7 +83,7 @@ public final class Connection {
                 cursor += 1
             }
         }
-        guard rc == SQLITE_OK else { throw SQLiteError(handle: handle, code: rc) }
+        guard rc == SQLITE_OK else { throw lastError(code: rc) }
         guard let raw else { throw SQLiteError(code: SQLITE_MISUSE, message: "no statement to prepare in: \(sql)") }
         guard !hasMoreStatements else {
             sqlite3_finalize(raw)
@@ -129,6 +135,9 @@ public final class Connection {
         try execute("PRAGMA user_version = \(version)")
     }
 
+    /// The error SQLite reports for the last failed call on this connection, for the statements it prepared.
+    func lastError(code: Int32) -> SQLiteError { SQLiteError(handle: handle, code: code) }
+
     public var lastInsertRowID: Int64 { sqlite3_last_insert_rowid(handle) }
     public var changes: Int64 { Int64(sqlite3_changes64(handle)) }
 
@@ -153,7 +162,7 @@ public final class Connection {
         }
         let flags = UInt32(SQLITE_DESERIALIZE_FREEONCLOSE | SQLITE_DESERIALIZE_RESIZEABLE)
         let rc = sqlite3_deserialize(handle, "main", buffer.assumingMemoryBound(to: UInt8.self), sqlite3_int64(count), sqlite3_int64(count), flags)
-        if rc != SQLITE_OK { throw SQLiteError(handle: handle, code: rc) }
+        if rc != SQLITE_OK { throw lastError(code: rc) }
         // `sqlite3_deserialize` takes the bytes without looking at them: bytes that are not a database are
         // only noticed by the first query, far from the restore that caused it. Ask one question now, while
         // the caller still knows a snapshot was being restored. A connection that throws here is spent and

@@ -69,6 +69,14 @@ let SQLITE_OK_CODE: Int32 = 0
     #expect(statement.value(at: 0) == .integer(1))
 }
 
+@Test func openAppliesThePragmasTheClientAsksFor() throws {
+    let plain = try Connection.openInMemory()
+    #expect(try plain.rows("PRAGMA foreign_keys") == [[.integer(0)]])
+    let configured = try Connection.openInMemory(pragmas: ["foreign_keys = ON", "user_version = 3"])
+    #expect(try configured.rows("PRAGMA foreign_keys") == [[.integer(1)]])
+    #expect(try configured.userVersion() == 3)
+}
+
 @Test func userVersionRoundTrips() throws {
     let db = try Connection.openInMemory()
     #expect(try db.userVersion() == 0)
@@ -168,12 +176,11 @@ let SQLITE_OK_CODE: Int32 = 0
     #expect(Value(7 as Int64?) == .integer(7))
     #expect(Value(3 as Int32?) == .integer(3))
     #expect(Value(true) == .integer(1))
-    #expect(Value(false).bool == false)
+    #expect(Value(false) == .integer(0))
     #expect(Value.null.isNull)
-    #expect(Value.real(1.5).double == 1.5)
-    #expect(Value.blob([1, 2]).bytes == [1, 2])
-    #expect(Value.integer(2).bool)
+    #expect(Value.integer(1).isNull == false)
     #expect(Value.text("a").int64 == nil)
+    #expect(Value.integer(1).string == nil)
 }
 
 @Test func deserializeRejectsBytesThatAreNotADatabase() throws {

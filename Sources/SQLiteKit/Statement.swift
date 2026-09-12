@@ -1,16 +1,14 @@
 import CSQLite
 
-/// `SQLITE_TRANSIENT` is a macro the importer drops; SQLite copies the bound bytes when it sees this sentinel.
-let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-
 /// One prepared statement, finalized when the last reference goes away.
 public final class Statement {
-    let handle: OpaquePointer
+    /// `SQLITE_TRANSIENT` is a macro the importer drops; SQLite copies the bound bytes when it sees this sentinel.
+    private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+    private let handle: OpaquePointer
     /// Held so the connection outlives every statement prepared on it: `sqlite3_close_v2` on a connection with
     /// unfinalized statements leaves it alive as a zombie, and stepping a statement of a zombie is undefined.
     private let connection: Connection
-
-    private var db: OpaquePointer { connection.handle }
 
     init(handle: OpaquePointer, connection: Connection) {
         self.handle = handle
@@ -39,12 +37,12 @@ public final class Statement {
             case .text(let v):
                 // The length is given explicitly: a -1 length makes SQLite measure the text with `strlen`,
                 // which would cut a title or a note at its first interior NUL.
-                rc = sqlite3_bind_text(handle, index, v, try Self.length(of: v.utf8.count), sqliteTransient)
+                rc = sqlite3_bind_text(handle, index, v, try Self.length(of: v.utf8.count), Self.transient)
             case .blob(let v):
                 let count = try Self.length(of: v.count)
-                rc = v.withUnsafeBytes { sqlite3_bind_blob(handle, index, $0.baseAddress, count, sqliteTransient) }
+                rc = v.withUnsafeBytes { sqlite3_bind_blob(handle, index, $0.baseAddress, count, Self.transient) }
             }
-            if rc != SQLITE_OK { throw SQLiteError(handle: db, code: rc) }
+            if rc != SQLITE_OK { throw connection.lastError(code: rc) }
         }
     }
 
@@ -54,7 +52,7 @@ public final class Statement {
         switch rc {
         case SQLITE_ROW: return true
         case SQLITE_DONE: return false
-        default: throw SQLiteError(handle: db, code: rc)
+        default: throw connection.lastError(code: rc)
         }
     }
 
