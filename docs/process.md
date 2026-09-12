@@ -145,6 +145,24 @@ flowchart LR
    and the issue closes automatically. The squash commit message is the
    PR title, so `main` history reads as a list of Conventional Commits.
 
+**Reactions on review comments.** The reaction on a comment is left by
+its recipient, not by its author, and a comment without one has not been
+triaged yet.
+
+| Reaction | From the owner, on the engineer's comment | From the engineer, on the owner's comment |
+| -------- | ----------------------------------------- | ----------------------------------------- |
+| 👍 | Accepted, implement it | Understood, implementing it as written |
+| 👀 | Still under discussion, do not implement | There is a counter-argument or a question, and it goes into the thread before any code is written |
+| 👎 | Rejected, do not raise it again | The owner withdrew the comment after that discussion |
+
+The engineer's 👎 is set only with the owner's agreement; disagreement is
+expressed as 👀 with the argument in the thread, and the owner decides.
+Once a review has been read, no comment is left without a reaction, and
+👀 is a temporary state that resolves into 👍 or 👎. Only 👍 threads are
+implemented, and a thread is resolved after the change is pushed. This
+covers comments on pull requests and issues; spec review in an Artifact
+has no reactions and follows section 7.
+
 **Definition of Done** for a task: acceptance criteria met, tests written
 and green, CI green, spec or ADR updated if behavior or architecture
 changed, no `TODO` in code without a linked issue.
