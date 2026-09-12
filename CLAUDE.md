@@ -1,6 +1,9 @@
 # CLAUDE.md
 
 Digest of `docs/process.md`. When the two disagree, `docs/process.md` wins.
+Only this file is in context by default, so read the full document before
+architectural work, before a spec review and before closing a milestone, and
+whenever a point here is thin or silent.
 
 ## Language
 
@@ -40,6 +43,12 @@ Say the classification out loud before starting; when in doubt go heavier, never
 3. Before the PR: build, tests, self-review of the diff.
 4. PR title in Conventional Commits with a scope from `core` `apple` `web` `docs` `infra` `ci`, for example `feat(core): add task repository`. Body follows the PR template and ends with `Closes #N`.
 5. Squash merge, one commit per issue, branch deleted. The squash message is the PR title.
+
+Review reactions (the reaction on a comment is left by its recipient and is the verdict):
+
+- Owner on my comment: 👍 accepted, do it; 👀 discussing, do not implement; 👎 rejected, drop it.
+- Me on the owner's comment: 👍 understood, implementing; 👀 counter-argument or question, into the thread and wait; 👎 the owner withdrew it after that discussion, never a refusal of my own.
+- Every comment gets a reaction, 👀 resolves into 👍 or 👎, only 👍 threads are implemented, a thread is resolved after the change is pushed. Pull requests and issues only; Artifact spec review has no reactions.
 
 Definition of Done: acceptance criteria met, tests green, CI green, spec or ADR updated if architecture changed, no `TODO` without a linked issue.
 

@@ -25,6 +25,15 @@ the owner. New issues are created only after agreement in chat, with one
 exception: a bug discovered mid-task is filed immediately with the `bug`
 label and mentioned in the conversation.
 
+`CLAUDE.md` is a digest of this document, and it is the only one of the
+two that the engineer has in context by default. The digest therefore
+carries the rules that apply constantly, and this document is opened
+deliberately: before architectural work (section 5), before a spec
+review (section 7), before closing an increment (section 9), and
+whenever the digest is silent or ambiguous on the point at hand. A rule
+never lives in the digest alone; it is written here first and summarized
+there.
+
 ## 3. Repository
 
 - Private repository `maldrakar/todo-app`, default branch `main`.
@@ -144,6 +153,24 @@ flowchart LR
    OK in chat. Squash merge, one commit per issue, the branch is deleted
    and the issue closes automatically. The squash commit message is the
    PR title, so `main` history reads as a list of Conventional Commits.
+
+**Reactions on review comments.** The reaction on a comment is left by
+its recipient, not by its author, and a comment without one has not been
+triaged yet.
+
+| Reaction | From the owner, on the engineer's comment | From the engineer, on the owner's comment |
+| -------- | ----------------------------------------- | ----------------------------------------- |
+| 👍 | Accepted, implement it | Understood, implementing it as written |
+| 👀 | Still under discussion, do not implement | There is a counter-argument or a question, and it goes into the thread before any code is written |
+| 👎 | Rejected, do not raise it again | The owner withdrew the comment after that discussion |
+
+The engineer's 👎 is set only with the owner's agreement; disagreement is
+expressed as 👀 with the argument in the thread, and the owner decides.
+Once a review has been read, no comment is left without a reaction, and
+👀 is a temporary state that resolves into 👍 or 👎. Only 👍 threads are
+implemented, and a thread is resolved after the change is pushed. This
+covers comments on pull requests and issues; spec review in an Artifact
+has no reactions and follows section 7.
 
 **Definition of Done** for a task: acceptance criteria met, tests written
 and green, CI green, spec or ADR updated if behavior or architecture

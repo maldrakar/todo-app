@@ -15,6 +15,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Changed
 
+- `docs/process.md` and `CLAUDE.md` record when the full process document is read instead of the digest: only `CLAUDE.md` is in the engineer's context by default, so the document is opened before architectural work, a spec review or the close of an increment, and whenever the digest is thin. A rule is never written in the digest alone.
+- `docs/process.md` and `CLAUDE.md` record how reactions triage review comments: the reaction is left by the comment's recipient, the engineer now reacts to the owner's comments as well, 👀 marks a thread that is still being argued, and only 👍 threads are implemented.
 - ADR-0002 records what threads-off SQLite costs at startup: the mutex around the library's one-time initialization is compiled out with the rest, so `SQLiteKit` performs that initialization once before any connection opens and nothing outside it may call the C API.
 - `docs/process.md` status set to Approved v1 after the owner's review.
 - README, `CLAUDE.md`, the process document's M1 examples and the M1 milestone description follow ADR-0001.
