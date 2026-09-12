@@ -25,6 +25,15 @@ the owner. New issues are created only after agreement in chat, with one
 exception: a bug discovered mid-task is filed immediately with the `bug`
 label and mentioned in the conversation.
 
+`CLAUDE.md` is a digest of this document, and it is the only one of the
+two that the engineer has in context by default. The digest therefore
+carries the rules that apply constantly, and this document is opened
+deliberately: before architectural work (section 5), before a spec
+review (section 7), before closing an increment (section 9), and
+whenever the digest is silent or ambiguous on the point at hand. A rule
+never lives in the digest alone; it is written here first and summarized
+there.
+
 ## 3. Repository
 
 - Private repository `maldrakar/todo-app`, default branch `main`.

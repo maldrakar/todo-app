@@ -1,6 +1,9 @@
 # CLAUDE.md
 
 Digest of `docs/process.md`. When the two disagree, `docs/process.md` wins.
+Only this file is in context by default, so read the full document before
+architectural work, before a spec review and before closing a milestone, and
+whenever a point here is thin or silent.
 
 ## Language
 
