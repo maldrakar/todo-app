@@ -13,6 +13,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Changed
 
+- ADR-0002 records what threads-off SQLite costs at startup: the mutex around the library's one-time initialization is compiled out with the rest, so `SQLiteKit` performs that initialization once before any connection opens and nothing outside it may call the C API.
 - `docs/process.md` status set to Approved v1 after the owner's review.
 - README, `CLAUDE.md`, the process document's M1 examples and the M1 milestone description follow ADR-0001.
 

@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-11
+- Amended: 2026-09-12, the initialization consequence in the last paragraph, found while writing #12
 - Related: `docs/specs/core-storage-and-search.md` (approved 2026-09-11), #4, amends ADR-0001
 
 ## Context
@@ -20,4 +21,4 @@ Easier: one code path and one test suite on the host and on wasm32; indexed quer
 
 Harder: the web bundle grows by about half a megabyte after gzip, counted in the M1 size budget; the amalgamation is a large file in the repository that compiles once per clean build; the browser persists by whole-file snapshot, so a tab that dies before the delayed snapshot loses the last seconds of edits; a schema change is a migration.
 
-Constrained: no system SQLite anywhere; every core query is SQL against this schema; the web target must supply the snapshot bridge. Reversing this decision means rewriting the store, the search and the migrations against another engine and converting users' files; the operation journal of ADR-0003 would survive such a move, since it is engine-independent data.
+Constrained: no system SQLite anywhere; every core query is SQL against this schema; the web target must supply the snapshot bridge. Threads off also compiles out the mutex with which SQLite serializes its own one-time initialization, so that ordering is the caller's to provide: two threads that reach `sqlite3_open_v2` before the library has finished initializing will race, and the loser skips initialization, receives `SQLITE_OK` and finds no VFS registered. `SQLiteKit` therefore runs `sqlite3_initialize` exactly once through a Swift global before it opens any connection, and nothing outside `SQLiteKit` may reach for the C API, because a second entry point opens the race again. The core itself stays single-threaded, so this is the only place where threads meet SQLite; the parallel test runner is what found it, as `no such vfs:` in about one full run in six (#12). Reversing this decision means rewriting the store, the search and the migrations against another engine and converting users' files; the operation journal of ADR-0003 would survive such a move, since it is engine-independent data.
