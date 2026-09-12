@@ -1169,12 +1169,15 @@ public struct HLC: Hashable, Comparable, Sendable {
     /// The largest counter the 16 bits hold; `HybridClock` borrows the next millisecond rather than pass it.
     public static let maxCounter: Int32 = 65_535
 
+    /// One past the largest millisecond the 48 bits hold.
+    public static let maxMillis: Int64 = 1 << 47
+
     public let millis: Int64
     public let counter: Int32
 
     public init(millis: Int64, counter: Int32) {
         precondition(counter >= 0 && counter <= Self.maxCounter, "HLC counter overflow")
-        precondition(millis >= 0 && millis < 1 << 47, "HLC milliseconds outside the 48 bits of the encoding")
+        precondition(millis >= 0 && millis < Self.maxMillis, "HLC milliseconds outside the 48 bits of the encoding")
         self.millis = millis
         self.counter = counter
     }
@@ -1338,8 +1341,9 @@ import Testing
     for expected in ["meta", "tasks", "tags", "task_tags", "views", "view_items", "ops", "field_clocks", "task_tree",
                      "tasks_title_fts", "tasks_notes_fts", "tags_title_fts", "views_title_fts",
                      "tasks_ai", "tasks_au", "tasks_ad", "tags_ai", "tags_au", "tags_ad", "views_ai", "views_au", "views_ad",
-                     "tasks_status", "tasks_when", "tasks_deadline", "tasks_parent", "task_tags_tag", "ops_clock", "ops_identity"] {
-        #expect(names.contains(expected), expected)
+                     "tasks_status", "tasks_when", "tasks_deadline", "tasks_parent", "task_tags_tag", "ops_clock", "ops_identity",
+                     "ops_unapplied", "task_tree_parent"] {
+        #expect(names.contains(expected), "\(expected)")
     }
 }
 
@@ -1368,7 +1372,7 @@ import Testing
 }
 
 @Test func fileStoreOpensCreatesAndReopens() throws {
-    let path = "/tmp/todo-core-test-\(EntityID().rawValue).sqlite"
+    let path = ".build/todo-core-test-\(EntityID().rawValue).sqlite"
     let clock = TestClock()
     let a = try Store.open(path: path, now: clock.now)
     let id = a.deviceID
@@ -1613,12 +1617,6 @@ public struct ChangeSet: Equatable, Sendable {
     public init() {}
 
     public var isEmpty: Bool { tasks.isEmpty && tags.isEmpty && views.isEmpty }
-
-    mutating func merge(_ other: ChangeSet) {
-        tasks.formUnion(other.tasks)
-        tags.formUnion(other.tags)
-        views.formUnion(other.views)
-    }
 }
 
 /// The core's data layer. Synchronous, single-connection, not thread-safe: the platform confines it.
@@ -1669,7 +1667,15 @@ public final class Store {
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
         // comparison in silence (#32). This runs before anything below issues a stamp.
-        if let seen = try sql({ () throws(SQLiteError) in try db.rows("SELECT max(clock) FROM ops").first?.first?.int64 }) {
+        //
+        // A row at or past the top millisecond the encoding holds — a corrupt journal, or one written by a
+        // future version — is left out of the scan: seeding from it would let `observe` push the clock to the
+        // one millisecond `next()` cannot represent, and trap the process on the very next stamp. `Store.receive`
+        // reaching the same precondition through a synced row is a separate bug, #34.
+        let seedingCeiling = HLC(millis: HLC.maxMillis - 1, counter: 0).raw
+        if let seen = try sql({ () throws(SQLiteError) in
+            try db.rows("SELECT max(clock) FROM ops WHERE clock < ?", [.integer(seedingCeiling)]).first?.first?.int64
+        }) {
             clock.observe(HLC(raw: seen))
         }
         try seedBuiltInViews()
@@ -1721,7 +1727,9 @@ public final class Store {
 
     /// Recomputes task_tree. The body arrives in Task 6.
     func rebuildTree() throws(StoreError) {
-        try sql { () throws(SQLiteError) in try rebuildTreeRows() }
+        try sql { () throws(SQLiteError) in
+            try db.transaction { () throws(SQLiteError) in try rebuildTreeRows() }
+        }
     }
 
     /// Runs inside a transaction opened by the caller. Task 5 fills it in.
@@ -1735,11 +1743,13 @@ public final class Store {
 - [ ] **Step 6: Run the tests on both platforms**
 
 ```bash
-swift test --filter StoreOpenTests 2>&1 | tail -3
-swift test --filter StoreOpenTests --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
+swift test 2>&1 | tail -3
+swift test --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
 ```
 
-Expected: 6 tests pass on the host. On wasm32 the file-store test needs a writable `/tmp`; SwiftPM's WasmKit runner maps the package directory, so if that test fails with `unable to open database file` change its path to `.build/todo-core-test-<id>.sqlite`, which is inside the mapped directory on both platforms, and keep that path.
+Expected: a green suite on both platforms, `StoreOpenTests` inside it. The runs are unfiltered because `--filter` together with `--swift-sdk` fails on a SwiftPM bundle-path problem unrelated to this task. The file-store test writes into `.build/`, which is inside the directory SwiftPM's WasmKit runner maps, so one path serves the host and wasm32 alike.
+
+Two tests in the shipped file are not in the block above, both from the review of this task: `ftsTriggersTrackTaskTitleAndNotesThroughInsertUpdateAndDelete`, which inserts, updates and deletes a row in `tasks` with plain SQL and counts the `MATCH` hits in `tasks_title_fts` and `tasks_notes_fts` after each step — the only check that the twelve triggers and the `content_rowid` wiring are right, since nothing else in this task exercises them — and `openingIgnoresAJournalClockAtTheEncodingCeilingInsteadOfTrapping`, which is the seeding ceiling above. Writing to a state table directly is allowed here only because no `apply` path exists yet.
 
 - [ ] **Step 7: Commit**
 
