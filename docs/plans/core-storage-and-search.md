@@ -800,18 +800,19 @@ git commit -m "feat(core): add SQLiteKit, a typed wrapper over the vendored SQLi
 Four small pure units with exhaustive tests. None of them touches SQLite.
 
 **Files:**
-- Delete: `Sources/TodoCore/TodoCore.swift`, `Tests/TodoCoreTests/SmokeTests.swift` (the smoke checks move into the real code paths from Task 4 on)
+- Delete: `Sources/TodoCore/TodoCore.swift`, `Tests/TodoCoreTests/SmokeTests.swift` (the version pin and the trigram check move to `SQLiteKitTests`; the rest of the smoke checks move into the real code paths from Task 4 on)
 - Create: `Sources/TodoCore/Model/EntityID.swift`, `Sources/TodoCore/Model/Day.swift`, `Sources/TodoCore/Model/HLC.swift`, `Sources/TodoCore/Model/Rank.swift`
 - Create: `Tests/TodoCoreTests/DayTests.swift`, `Tests/TodoCoreTests/HLCTests.swift`, `Tests/TodoCoreTests/RankTests.swift`, `Tests/TodoCoreTests/EntityIDTests.swift`
 - Modify: `Sources/todo/main.swift` (print a `Day` instead of the smoke line)
+- Modify: `Tests/SQLiteKitTests/ConnectionTests.swift` (the vendored version pin and the Cyrillic trigram check, which nothing else in the plan asserts)
 
 **Interfaces:**
 - Consumes: `UUID` from FoundationEssentials.
 - Produces:
-  - `public struct EntityID: Hashable, Comparable, Sendable, CustomStringConvertible { public let rawValue: String; public init(_ rawValue: String); public static func generate() -> EntityID }` and `public typealias TaskID = EntityID`, `TagID`, `ViewID`.
-  - `public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible { public let daysSinceEpoch: Int32; public init(daysSinceEpoch: Int32); public init(year: Int, month: Int, day: Int); public init?(_ iso: String); public var year: Int; public var month: Int; public var day: Int; public func advanced(by: Int) -> Day; public static func - (Day, Day) -> Int }`.
-  - `public struct HLC: Hashable, Comparable, Sendable { public let millis: Int64; public let counter: Int32; public init(millis:counter:); public init(raw: Int64); public var raw: Int64 }` and `public final class HybridClock { public init(now: @escaping () -> Int64); public func next() -> HLC; public func observe(_ remote: HLC) }`.
-  - `public enum Rank { public static let initial: String; public static func between(_ lower: String?, _ upper: String?) -> String; public static func isValid(_ key: String) -> Bool }`.
+  - `public struct EntityID: Hashable, Comparable, Sendable, CustomStringConvertible { public let rawValue: String; public init(_ rawValue: String = UUID().uuidString.lowercased()) }` and `public typealias TaskID = EntityID`, `TagID`, `ViewID`. `EntityID()` mints a fresh identifier and `EntityID(raw)` wraps one that storage or sync already holds, so there is no second way to make one.
+  - `public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible { public init(year: Int, month: Int, day: Int); public init(_ iso: String) throws(DayParseError); public var year: Int; public var month: Int; public var day: Int; public func advanced(by: Int) -> Day; public static func - (Day, Day) -> Int }` with `daysSinceEpoch` and its initializer internal: outside the core a day is a year-month-day or an ISO string, and the integer is only how the store binds it. Parsing throws rather than returning `nil`, through `public struct DayParseError: Error, Equatable, Sendable, CustomStringConvertible { public let input: String }`.
+  - `public struct HLC: Hashable, Comparable, Sendable { public static let maxCounter: Int32; public let millis: Int64; public let counter: Int32; public init(millis:counter:); public init(raw: Int64); public var raw: Int64 }` and `public final class HybridClock { public init(now: @escaping () -> Int64); public func next() -> HLC; public func observe(_ remote: HLC) }`. `init(millis:counter:)` checks both fields; `init(raw:)` checks nothing, because journal rows have to decode as what they sort as.
+  - `public enum Rank { public static let initial: String; public static func between(_ lower: String?, _ upper: String?) -> String; public static func isValid(_ key: String) -> Bool }`. `between` is total: a neighbour that is not a valid key, and a pair that does not increase because two devices computed the same rank offline, are read as no neighbour on that side.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -821,8 +822,8 @@ Four small pure units with exhaustive tests. None of them touches SQLite.
 import Testing
 @testable import TodoCore
 
-@Test func generatedIDsAreLowercaseUUIDsAndUnique() {
-    let a = EntityID.generate(), b = EntityID.generate()
+@Test func freshIDsAreLowercaseUUIDsAndUnique() {
+    let a = EntityID(), b = EntityID()
     #expect(a != b)
     #expect(a.rawValue.count == 36)
     #expect(a.rawValue == a.rawValue.lowercased())
@@ -866,12 +867,17 @@ import Testing
     #expect(Day(year: 2024, month: 2, day: 28).advanced(by: 1) == Day(year: 2024, month: 2, day: 29))
 }
 
-@Test func parsesAndPrintsISO() {
-    #expect(Day("2026-09-11") == Day(year: 2026, month: 9, day: 11))
+@Test func parsesAndPrintsISO() throws {
+    #expect(try Day("2026-09-11") == Day(year: 2026, month: 9, day: 11))
     #expect(Day(year: 2026, month: 9, day: 1).description == "2026-09-01")
-    #expect(Day("2026-9-1") == nil)
-    #expect(Day("nope") == nil)
-    #expect(Day("2026-13-01") == nil)
+}
+
+@Test func refusesEverythingThatIsNotAStrictISODay() {
+    // The sign cases matter because `Int("+1")` parses: a day has to come back as the string it was read from.
+    for bad in ["2026-9-1", "nope", "2026-13-01", "2026-02-30", "+999-01-01", "2026-01-+1", "2026-01-01 ", ""] {
+        #expect(throws: DayParseError(input: bad)) { try Day(bad) }
+    }
+    #expect(DayParseError(input: "nope").description == "not a date: nope, expected YYYY-MM-DD")
 }
 ```
 
@@ -918,6 +924,21 @@ import Testing
     _ = clock.next()
     clock.observe(HLC(millis: 100, counter: 9))
     #expect(clock.next() == HLC(millis: 5_000, counter: 1))
+}
+
+@Test func theCounterCeilingBorrowsTheNextMillisecond() {
+    // A bulk import inside one millisecond must not abort the process; it may only cost a millisecond.
+    let clock = HybridClock(now: { 1_000 })
+    for _ in 0...Int(HLC.maxCounter) { _ = clock.next() }
+    #expect(clock.next() == HLC(millis: 1_001, counter: 0))
+}
+
+@Test func rawDecodesEveryStoredValue() {
+    // Journal rows are decoded without validation, so even a value this version would never write reads back
+    // as what it sorts as instead of trapping.
+    #expect(HLC(raw: -1).raw == -1)
+    #expect(HLC(raw: 0) == HLC(millis: 0, counter: 0))
+    #expect(HLC(raw: -1) < HLC(raw: 0))
 }
 ```
 
@@ -969,6 +990,43 @@ import Testing
     #expect(!Rank.isValid("A"))
     #expect(!Rank.isValid("a-b"))
 }
+
+@Test func toleratesNeighboursThatAMergeCanProduce() {
+    // Equal ranks arise when two devices append to the same list offline; a key outside the alphabet arises
+    // from a corrupt row or a newer version. Neither may abort the process.
+    for (lower, upper) in [("k", "k"), ("m", "d"), ("k", ""), ("k", "A")] {
+        let key = Rank.between(lower, upper)
+        #expect(lower < key, "\(lower) < \(key)")
+        #expect(Rank.isValid(key))
+    }
+    let afterBrokenLower = Rank.between("A", "i")
+    #expect(afterBrokenLower < "i")
+    #expect(Rank.isValid(afterBrokenLower))
+}
+```
+
+Appended to `Tests/SQLiteKitTests/ConnectionTests.swift`, so that the two checks worth keeping from the smoke tests live in the target that owns the vendored library:
+
+```swift
+@Test func theVendoredLibraryIsTheVersionTheRepositoryPins() throws {
+    // `Sources/CSQLite/README.md` records the provenance; this is what makes a silent bump visible.
+    let db = try Connection.openInMemory()
+    #expect(try db.rows("SELECT sqlite_version()").first?.first?.string == "3.53.4")
+}
+
+@Test func trigramSearchFindsCyrillicSubstringsOnEveryPlatform() throws {
+    // FTS5 with the trigram tokenizer is what the core searches titles with, and wasm32 is the platform the
+    // spec listed as unverified, so this runs on every platform CI tests.
+    let db = try Connection.openInMemory()
+    try db.execute("CREATE VIRTUAL TABLE t USING fts5(title, tokenize='trigram remove_diacritics 1');")
+    try db.execute("INSERT INTO t VALUES ('Квартальный отчёт'), ('Купить молоко');")
+    func matches(_ needle: String) throws -> Int64 {
+        try db.rows("SELECT count(*) FROM t WHERE t MATCH ?", [.text("\"\(needle)\"")]).first?.first?.int64 ?? -1
+    }
+    #expect(try matches("отч") == 1)
+    #expect(try matches("ОТЧ") == 1)
+    #expect(try matches("xyz") == 0)
+}
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -978,7 +1036,7 @@ rm Sources/TodoCore/TodoCore.swift Tests/TodoCoreTests/SmokeTests.swift
 swift test --filter TodoCoreTests 2>&1 | grep -E 'error:' | head -3
 ```
 
-Expected: `cannot find 'EntityID' in scope` and similar. Replace `Sources/todo/main.swift` with the line `import TodoCore` followed by `print("todo demo, today is \(Day(daysSinceEpoch: 0)) + n")` so the executable still compiles; the real CLI arrives in Task 12.
+Expected: `target 'TodoCore' referenced in product 'TodoCore' is empty`, and once the files below exist, `cannot find 'EntityID' in scope` and similar. Replace `Sources/todo/main.swift` with the line `import TodoCore` followed by `print("todo demo, the epoch day is \(Day(year: 1970, month: 1, day: 1)), Int is \(Int.bitWidth)-bit")` so the executable still compiles; the real CLI arrives in Task 12.
 
 - [ ] **Step 3: Write `EntityID.swift`**
 
@@ -994,9 +1052,8 @@ import Foundation
 public struct EntityID: Hashable, Comparable, Sendable, CustomStringConvertible {
     public let rawValue: String
 
-    public init(_ rawValue: String) { self.rawValue = rawValue }
-
-    public static func generate() -> EntityID { EntityID(UUID().uuidString.lowercased()) }
+    /// Without an argument this mints a fresh identifier; with one it wraps what storage or sync already holds.
+    public init(_ rawValue: String = UUID().uuidString.lowercased()) { self.rawValue = rawValue }
 
     public var description: String { rawValue }
 
@@ -1014,12 +1071,27 @@ Uses Howard Hinnant's `days_from_civil` and `civil_from_days`, valid for the pro
 
 ```swift
 // Sources/TodoCore/Model/Day.swift
+/// Why a string is not a calendar day. It carries the input because everything that parses a day — the command
+/// line, a filter document, a URL — reports the failure back to a person.
+public struct DayParseError: Error, Equatable, Sendable, CustomStringConvertible {
+    public let input: String
+
+    public init(input: String) { self.input = input }
+
+    public var description: String { "not a date: \(input), expected YYYY-MM-DD" }
+}
 
 /// A calendar day with no time zone, stored as days since 1970-01-01.
+///
+/// The conversions are Howard Hinnant's `days_from_civil` and `civil_from_days` for the proleptic Gregorian
+/// calendar: plain integer arithmetic, no `Calendar` and no time zone, so the same day means the same thing
+/// on every platform the core builds for.
 public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
-    public let daysSinceEpoch: Int32
+    /// Internal on purpose: outside the core a day is a year, a month and a day or an ISO string, and this
+    /// integer is only how the store binds it to a SQLite column.
+    let daysSinceEpoch: Int32
 
-    public init(daysSinceEpoch: Int32) { self.daysSinceEpoch = daysSinceEpoch }
+    init(daysSinceEpoch: Int32) { self.daysSinceEpoch = daysSinceEpoch }
 
     public init(year: Int, month: Int, day: Int) {
         let y = month <= 2 ? year - 1 : year
@@ -1031,14 +1103,20 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
         daysSinceEpoch = Int32(era * 146097 + doe - 719468)
     }
 
-    /// Parses strict `YYYY-MM-DD`.
-    public init?(_ iso: String) {
+    /// Parses strict `YYYY-MM-DD`. A string that is not a day is an error rather than a `nil`, so a bad date
+    /// from an argument, a file or a sync payload says which string it was instead of vanishing.
+    public init(_ iso: String) throws(DayParseError) {
         let parts = iso.split(separator: "-", omittingEmptySubsequences: false)
+        // The widths are checked before the arithmetic, because a year of arbitrary length would overflow the
+        // day count rather than fail to parse.
         guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
-              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]),
-              (1...12).contains(m), (1...31).contains(d) else { return nil }
+              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]) else {
+            throw DayParseError(input: iso)
+        }
         let candidate = Day(year: y, month: m, day: d)
-        guard candidate.year == y, candidate.month == m, candidate.day == d else { return nil }
+        // One round trip replaces every field check: `description` prints exactly `YYYY-MM-DD`, so a sign, a
+        // month of 13 and a 30th of February all fail to come back as the string that was parsed.
+        guard candidate.description == iso else { throw DayParseError(input: iso) }
         self = candidate
     }
 
@@ -1059,12 +1137,18 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
     public var month: Int { civil.month }
     public var day: Int { civil.day }
 
+    /// The day `days` days after this one. Traps if the result leaves the `Int32` day count, which reaches
+    /// about 5.8 million years either side of 1970 and so lies past anything a date a person types can produce.
     public func advanced(by days: Int) -> Day { Day(daysSinceEpoch: daysSinceEpoch + Int32(days)) }
 
+    /// Days between two days, positive when the left one is later. On a 32-bit platform, wasm32 included, the
+    /// subtraction traps for two days at opposite ends of that same unreachable range.
     public static func - (lhs: Day, rhs: Day) -> Int { Int(lhs.daysSinceEpoch) - Int(rhs.daysSinceEpoch) }
 
     public static func < (lhs: Day, rhs: Day) -> Bool { lhs.daysSinceEpoch < rhs.daysSinceEpoch }
 
+    /// `YYYY-MM-DD`, defined for the years 0 to 9999. A day outside that range still prints, but what it
+    /// prints is not a string `init(_:)` parses back.
     public var description: String {
         let c = civil
         func pad(_ n: Int, _ width: Int) -> String {
@@ -1080,20 +1164,26 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
 
 ```swift
 // Sources/TodoCore/Model/HLC.swift
-
 /// Hybrid logical clock value: wall-clock milliseconds and a counter, packed into one Int64 (48 + 16 bits).
 public struct HLC: Hashable, Comparable, Sendable {
+    /// The largest counter the 16 bits hold; `HybridClock` borrows the next millisecond rather than pass it.
+    public static let maxCounter: Int32 = 65_535
+
     public let millis: Int64
     public let counter: Int32
 
     public init(millis: Int64, counter: Int32) {
-        precondition(counter >= 0 && counter < 65_536, "HLC counter overflow")
+        precondition(counter >= 0 && counter <= Self.maxCounter, "HLC counter overflow")
+        precondition(millis >= 0 && millis < 1 << 47, "HLC milliseconds outside the 48 bits of the encoding")
         self.millis = millis
         self.counter = counter
     }
 
+    /// Decodes what the journal stored, without the checks above: a row written by another version of the app,
+    /// or a corrupt one, still has to read back as the value it sorts as instead of aborting the process.
     public init(raw: Int64) {
-        self.init(millis: raw >> 16, counter: Int32(raw & 0xFFFF))
+        millis = raw >> 16
+        counter = Int32(raw & 0xFFFF)
     }
 
     public var raw: Int64 { (millis << 16) | Int64(counter) }
@@ -1108,33 +1198,33 @@ public final class HybridClock {
 
     public init(now: @escaping () -> Int64) { self.now = now }
 
+    /// The stamp for a local event: strictly greater than every stamp this clock has issued or observed.
     public func next() -> HLC {
         let wall = now()
         if wall > last.millis {
             last = HLC(millis: wall, counter: 0)
+        } else if last.counter == HLC.maxCounter {
+            // The counter is all that separates stamps inside one millisecond, so when it fills up the clock
+            // borrows the next millisecond. Staying ahead of itself is what the journal needs; agreeing with
+            // the wall clock to the millisecond is not.
+            last = HLC(millis: last.millis + 1, counter: 0)
         } else {
             last = HLC(millis: last.millis, counter: last.counter + 1)
         }
         return last
     }
 
+    /// Records a clock seen from another device. Observing is not an event of its own, so it only raises the
+    /// high-water mark and leaves the increment to the next `next()`, which is then the first stamp strictly
+    /// above both this device and the remote one. The wall clock joins the maximum so that a clock that later
+    /// goes backwards cannot drag a stamp below what this device has already seen.
     public func observe(_ remote: HLC) {
-        let wall = now()
-        let millis = max(wall, last.millis, remote.millis)
-        let counter: Int32
-        if millis == last.millis && millis == remote.millis {
-            counter = max(last.counter, remote.counter) + 1
-        } else if millis == last.millis {
-            counter = last.counter + 1
-        } else if millis == remote.millis {
-            counter = remote.counter + 1
-        } else {
-            counter = 0
-        }
-        last = HLC(millis: millis, counter: counter)
+        last = max(last, remote, HLC(millis: now(), counter: 0))
     }
 }
 ```
+
+Why `observe` merges instead of incrementing: observing is not an event of its own, so the first stamp strictly above both clocks is the next `next()`. Written as a maximum it is one line, and the wall clock joins that maximum, so a clock that later goes backwards cannot drag a stamp below what this device has already seen. The counter ceiling is handled in `next()` rather than by the `HLC` initializer, which keeps its precondition: a value outside 16 bits is a programming error, while a clock that runs out of room inside one millisecond is an ordinary bulk import. And a second reason `observe` must not increment: `Store.receive` (Task 11) calls it once per incoming operation, so an increment there would spend one counter tick per received operation and exhaust the 16 bits on a large sync batch.
 
 - [ ] **Step 6: Write `Rank.swift`**
 
@@ -1142,11 +1232,13 @@ Keys are strings over the alphabet `0-9a-z`, compared byte-wise, never empty and
 
 ```swift
 // Sources/TodoCore/Model/Rank.swift
-
 /// Fractional order keys: `between(a, b)` returns a key strictly between its arguments without renumbering anything.
+///
+/// Keys are strings over `0-9a-z`, compared byte-wise, never empty and never ending in `0`, so they behave like
+/// fractions in (0, 1): `between` walks the common prefix of its neighbours and appends a midpoint digit.
 public enum Rank {
-    static let alphabet: [Character] = Array("0123456789abcdefghijklmnopqrstuvwxyz")
-    static let base = alphabet.count
+    private static let alphabet: [Character] = Array("0123456789abcdefghijklmnopqrstuvwxyz")
+    private static let base = alphabet.count
 
     /// The key for the first item of an empty list.
     public static let initial = "i"
@@ -1156,15 +1248,21 @@ public enum Rank {
     }
 
     /// `nil` on either side means "no neighbour": the start or the end of the list.
+    ///
+    /// Neighbours come out of the database, so they are whatever a merge or another version of the app wrote:
+    /// a key this version would never produce, or a pair that does not increase because two devices appended
+    /// to the same list offline and computed the same rank. Such a side is read as no neighbour at all, the
+    /// way ADR-0003 ignores a merged parent link it cannot use instead of rejecting it.
     public static func between(_ lower: String?, _ upper: String?) -> String {
-        let a = lower.map(digits) ?? []
-        let b = upper.map(digits)
-        if let b { precondition(a.lexicographicallyPrecedes(b), "lower \(lower ?? "") must sort before upper \(upper ?? "")") }
+        let a = lower.flatMap(digits) ?? []
+        let b = upper.flatMap(digits).flatMap { a.lexicographicallyPrecedes($0) ? $0 : nil }
         var result: [Int] = []
         var bounded = b != nil
         var i = 0
         while true {
             let x = i < a.count ? a[i] : 0
+            // While `bounded` holds, `result` is the common prefix of `a` and `b`, and `a` sorts before `b`,
+            // so `b` has a digit at every position `a` has one, and one more when `a` runs out.
             let y = bounded ? b![i] : base
             if y - x >= 2 {
                 result.append((x + y) / 2)
@@ -1177,8 +1275,8 @@ public enum Rank {
         return String(result.map { alphabet[$0] })
     }
 
-    private static func digits(_ key: String) -> [Int] {
-        precondition(isValid(key), "invalid rank key \(key)")
+    private static func digits(_ key: String) -> [Int]? {
+        guard isValid(key) else { return nil }
         return key.map { alphabet.firstIndex(of: $0)! }
     }
 }
@@ -1189,16 +1287,16 @@ Why `b![i]` cannot go out of range: while `bounded` holds, `result` equals the c
 - [ ] **Step 7: Run the tests on both platforms**
 
 ```bash
-swift test --filter TodoCoreTests 2>&1 | tail -3
-swift test --filter TodoCoreTests --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
+swift test 2>&1 | tail -3
+swift test --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
 ```
 
-Expected: 14 tests pass on both.
+Expected: 38 tests pass on both — 18 in `TodoCoreTests` and the 20 of `SQLiteKitTests`, which gained the version pin and the trigram check.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add Sources/TodoCore/Model Sources/todo/main.swift Tests/TodoCoreTests
+git add Sources/TodoCore/Model Sources/todo/main.swift Tests/TodoCoreTests Tests/SQLiteKitTests
 git rm -q Sources/TodoCore/TodoCore.swift Tests/TodoCoreTests/SmokeTests.swift 2>/dev/null || true
 git commit -m "feat(core): add identifiers, calendar days, hybrid logical clocks and order keys"
 ```
@@ -1270,12 +1368,24 @@ import Testing
 }
 
 @Test func fileStoreOpensCreatesAndReopens() throws {
-    let path = "/tmp/todo-core-test-\(EntityID.generate().rawValue).sqlite"
+    let path = "/tmp/todo-core-test-\(EntityID().rawValue).sqlite"
     let clock = TestClock()
     let a = try Store.open(path: path, now: clock.now)
     let id = a.deviceID
     let b = try Store.open(path: path, now: clock.now)
     #expect(b.deviceID == id)
+}
+
+@Test func reopeningCarriesTheClockPastEveryStampInTheJournal() throws {
+    // Issue #32: the high-water mark of the clock lives in the journal, not in the process.
+    let store = try makeStore()
+    let remote = HLC(millis: 9_000_000_000_000, counter: 7)
+    try store.sql { () throws(SQLiteError) in
+        try store.db.run("INSERT INTO ops (entity, entity_id, field, value, clock, device) VALUES ('task', 't', 'title', 'x', ?, 'other')",
+                         [.integer(remote.raw)])
+    }
+    let again = try Store.openInMemory(snapshot: try store.snapshot(), now: TestClock().now)
+    #expect(again.clock.next() > remote)
 }
 
 @Test func metaRoundTrips() throws {
@@ -1553,8 +1663,14 @@ public final class Store {
         if let stored {
             deviceID = stored
         } else {
-            deviceID = EntityID.generate().rawValue
+            deviceID = EntityID().rawValue
             try Store.writeMeta(db, "device_id", .text(deviceID))
+        }
+        // The journal holds every stamp this device has issued or seen from another one. Without replaying its
+        // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
+        // comparison in silence (#32). This runs before anything below issues a stamp.
+        if let seen = try sql({ () throws(SQLiteError) in try db.rows("SELECT max(clock) FROM ops").first?.first?.int64 }) {
+            clock.observe(HLC(raw: seen))
         }
         try seedBuiltInViews()
         try replayUnapplied()
@@ -4317,8 +4433,8 @@ public enum CLI {
             path = args[i + 1]
             args.removeSubrange(i...(i + 1))
         }
-        let today = environment["TODO_TODAY"].flatMap(Day.init) ?? currentDay()
         do {
+            let today = try environment["TODO_TODAY"].map(Day.init) ?? currentDay()
             let store = try Store.open(path: path, now: Store.systemNow)
             print(try run(args, store: store, today: today))
             return 0
@@ -4461,8 +4577,7 @@ public enum CLI {
 
     static func day(_ text: String?) throws -> Day? {
         guard let text else { return nil }
-        guard let day = Day(text) else { throw CLIError("not a date: \(text), expected YYYY-MM-DD") }
-        return day
+        do { return try Day(text) } catch { throw CLIError(error.description) }
     }
 
     static func sortKey(_ text: String) throws -> SortKey {

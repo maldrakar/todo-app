@@ -195,3 +195,23 @@ let SQLITE_OK_CODE: Int32 = 0
     do { try db.deserialize([UInt8](repeating: 7, count: 4096)) } catch { caught = error }
     #expect(caught != nil)
 }
+
+@Test func theVendoredLibraryIsTheVersionTheRepositoryPins() throws {
+    // `Sources/CSQLite/README.md` records the provenance; this is what makes a silent bump visible.
+    let db = try Connection.openInMemory()
+    #expect(try db.rows("SELECT sqlite_version()").first?.first?.string == "3.53.4")
+}
+
+@Test func trigramSearchFindsCyrillicSubstringsOnEveryPlatform() throws {
+    // FTS5 with the trigram tokenizer is what the core searches titles with, and wasm32 is the platform the
+    // spec listed as unverified, so this runs on every platform CI tests.
+    let db = try Connection.openInMemory()
+    try db.execute("CREATE VIRTUAL TABLE t USING fts5(title, tokenize='trigram remove_diacritics 1');")
+    try db.execute("INSERT INTO t VALUES ('Квартальный отчёт'), ('Купить молоко');")
+    func matches(_ needle: String) throws -> Int64 {
+        try db.rows("SELECT count(*) FROM t WHERE t MATCH ?", [.text("\"\(needle)\"")]).first?.first?.int64 ?? -1
+    }
+    #expect(try matches("отч") == 1)
+    #expect(try matches("ОТЧ") == 1)
+    #expect(try matches("xyz") == 0)
+}
