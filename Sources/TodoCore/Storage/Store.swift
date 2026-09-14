@@ -1,10 +1,5 @@
 // Sources/TodoCore/Storage/Store.swift
 import SQLiteKit
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 public enum StoreError: Error, Equatable, Sendable {
     case sqlite(SQLiteError)
@@ -16,11 +11,11 @@ public enum StoreError: Error, Equatable, Sendable {
 
 /// Which entities a committed transaction touched. UI layers re-query the views they show.
 public struct ChangeSet: Equatable, Sendable {
-    public var tasks: Set<TaskID> = []
-    public var tags: Set<TagID> = []
-    public var views: Set<ViewID> = []
+    public internal(set) var tasks: Set<TaskID> = []
+    public internal(set) var tags: Set<TagID> = []
+    public internal(set) var views: Set<ViewID> = []
 
-    public init() {}
+    init() {}
 
     public var isEmpty: Bool { tasks.isEmpty && tags.isEmpty && views.isEmpty }
 }
@@ -28,20 +23,18 @@ public struct ChangeSet: Equatable, Sendable {
 /// The core's data layer. Synchronous, single-connection, not thread-safe: the platform confines it.
 public final class Store {
     public let deviceID: String
-    /// Called after every committed transaction that changed something.
-    public var onChange: ((ChangeSet) -> Void)?
 
     let db: Connection
     let now: () -> Int64
     let clock: HybridClock
 
-    /// Milliseconds since 1970-01-01 from the system clock. Under WasmKit this is a fake time; the platform passes a real one.
-    public static func systemNow() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+    /// The `meta` row that holds this device's identity in the journal.
+    private static let deviceIDKey = "device_id"
 
     /// How the core opens a database. `SQLiteKit` sets no pragmas of its own, so the policy lives here and
     /// travels with the store. On an in-memory database `journal_mode` is accepted and ignored, so one list
     /// serves the file and the web target alike.
-    static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
+    private static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
 
     public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store {
         let db: Connection
@@ -63,12 +56,15 @@ public final class Store {
         self.now = now
         self.clock = HybridClock(now: now)
         do { _ = try Migrations.run(on: db) } catch { throw .sqlite(error) }
-        let stored = try Store.readMeta(db, "device_id").string
-        if let stored {
+        if let stored = try Store.readMeta(db, Store.deviceIDKey).string {
             deviceID = stored
         } else {
-            deviceID = EntityID().rawValue
-            try Store.writeMeta(db, "device_id", .text(deviceID))
+            // The identity is this device's only claim in the journal, so nothing keeps it until the row is in
+            // the database: a write that fails takes the whole open with it rather than leave a store whose id
+            // no reopen would agree with.
+            let minted = EntityID().rawValue
+            try Store.writeMeta(db, Store.deviceIDKey, .text(minted))
+            deviceID = minted
         }
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins

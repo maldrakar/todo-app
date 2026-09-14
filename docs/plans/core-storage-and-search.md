@@ -1316,8 +1316,8 @@ git commit -m "feat(core): add identifiers, calendar days, hybrid logical clocks
 - Consumes: `Connection`, `Value`, `SQLiteError` (Task 2); `EntityID`, `HybridClock` (Task 3).
 - Produces:
   - `public enum StoreError: Error, Equatable, Sendable { case sqlite(SQLiteError); case notFound(EntityID); case viewNeedsNewerApp(ViewID, kind: String); case invalidFilter(String); case invalid(String) }`
-  - `public struct ChangeSet: Equatable, Sendable { public var tasks: Set<TaskID>; public var tags: Set<TagID>; public var views: Set<ViewID>; public var isEmpty: Bool }`
-  - `public final class Store { public let deviceID: String; public var onChange: ((ChangeSet) -> Void)?; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32; public static func systemNow() -> Int64 }` plus internal `static let pragmas: [String]` (the pragmas every store opens with, since `SQLiteKit` sets none), `let db: Connection`, `let clock: HybridClock`, `let now: () -> Int64`, `func meta(_ key: String) throws(StoreError) -> Value`, `func setMeta(_ key: String, _ value: Value) throws(StoreError)`, `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`).
+  - `public struct ChangeSet: Equatable, Sendable { public internal(set) var tasks: Set<TaskID>; public internal(set) var tags: Set<TagID>; public internal(set) var views: Set<ViewID>; public var isEmpty: Bool }` — a snapshot the store hands out, so only the module builds one (review of PR #35). `onChange` and `systemNow` are not here: an observer with nothing to observe and a wall clock with no caller wait for the tasks that use them, Task 5 and Task 12.
+  - `public final class Store { public let deviceID: String; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32 }` plus `private static let pragmas: [String]` and `private static let deviceIDKey: String` (the pragmas every store opens with, since `SQLiteKit` sets none), `let db: Connection`, `let clock: HybridClock`, `let now: () -> Int64`, `func meta(_ key: String) throws(StoreError) -> Value`, `func setMeta(_ key: String, _ value: Value) throws(StoreError)`, `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`).
   - `enum Schema { static let version1: String }`, `enum Migrations { static let steps: [(version: Int32, sql: String)]; static func run(on db: Connection) throws(SQLiteError) -> (from: Int32, to: Int32) }`.
   - Two hooks that Task 5 and Task 6 fill in: `func replayUnappliedRows() throws(SQLiteError)` and `func rebuildTreeRows() throws(SQLiteError)`, empty in this task; their `StoreError` wrappers `replayUnapplied()` and `rebuildTree()` are called at the end of `init`.
 
@@ -1594,11 +1594,6 @@ enum Migrations {
 ```swift
 // Sources/TodoCore/Storage/Store.swift
 import SQLiteKit
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 public enum StoreError: Error, Equatable, Sendable {
     case sqlite(SQLiteError)
@@ -1610,11 +1605,11 @@ public enum StoreError: Error, Equatable, Sendable {
 
 /// Which entities a committed transaction touched. UI layers re-query the views they show.
 public struct ChangeSet: Equatable, Sendable {
-    public var tasks: Set<TaskID> = []
-    public var tags: Set<TagID> = []
-    public var views: Set<ViewID> = []
+    public internal(set) var tasks: Set<TaskID> = []
+    public internal(set) var tags: Set<TagID> = []
+    public internal(set) var views: Set<ViewID> = []
 
-    public init() {}
+    init() {}
 
     public var isEmpty: Bool { tasks.isEmpty && tags.isEmpty && views.isEmpty }
 }
@@ -1622,20 +1617,18 @@ public struct ChangeSet: Equatable, Sendable {
 /// The core's data layer. Synchronous, single-connection, not thread-safe: the platform confines it.
 public final class Store {
     public let deviceID: String
-    /// Called after every committed transaction that changed something.
-    public var onChange: ((ChangeSet) -> Void)?
 
     let db: Connection
     let now: () -> Int64
     let clock: HybridClock
 
-    /// Milliseconds since 1970-01-01 from the system clock. Under WasmKit this is a fake time; the platform passes a real one.
-    public static func systemNow() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+    /// The `meta` row that holds this device's identity in the journal.
+    private static let deviceIDKey = "device_id"
 
     /// How the core opens a database. `SQLiteKit` sets no pragmas of its own, so the policy lives here and
     /// travels with the store. On an in-memory database `journal_mode` is accepted and ignored, so one list
     /// serves the file and the web target alike.
-    static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
+    private static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
 
     public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store {
         let db: Connection
@@ -1657,12 +1650,15 @@ public final class Store {
         self.now = now
         self.clock = HybridClock(now: now)
         do { _ = try Migrations.run(on: db) } catch { throw .sqlite(error) }
-        let stored = try Store.readMeta(db, "device_id").string
-        if let stored {
+        if let stored = try Store.readMeta(db, Store.deviceIDKey).string {
             deviceID = stored
         } else {
-            deviceID = EntityID().rawValue
-            try Store.writeMeta(db, "device_id", .text(deviceID))
+            // The identity is this device's only claim in the journal, so nothing keeps it until the row is in
+            // the database: a write that fails takes the whole open with it rather than leave a store whose id
+            // no reopen would agree with.
+            let minted = EntityID().rawValue
+            try Store.writeMeta(db, Store.deviceIDKey, .text(minted))
+            deviceID = minted
         }
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
@@ -1766,7 +1762,7 @@ The single write path of ADR-0003. Every later write method builds operations an
 
 **Files:**
 - Create: `Sources/TodoCore/Storage/Operation.swift`, `Sources/TodoCore/Storage/Store+Apply.swift`
-- Modify: `Sources/TodoCore/Storage/Store.swift` (replace the empty `replayUnappliedRows`)
+- Modify: `Sources/TodoCore/Storage/Store.swift` (replace the empty `replayUnappliedRows`; add `public var onChange: ((ChangeSet) -> Void)?`, which has to live in the class because an extension cannot add a stored property)
 - Create: `Tests/TodoCoreTests/ApplyTests.swift`
 
 **Interfaces:**
@@ -4239,6 +4235,7 @@ The runnable deliverable of M1 and the seed of a future CLI client. Commands liv
 - Modify: `Package.swift` (add the `TodoCLI` library target and `TodoCLITests`)
 - Create: `Sources/TodoCLI/CLI.swift`, `Sources/TodoCLI/Format.swift`
 - Replace: `Sources/todo/main.swift`
+- Modify: `Sources/TodoCore/Storage/Store.swift` (add `public static func systemNow() -> Int64`, the wall clock the CLI passes as `now:`, with the FoundationEssentials import it needs)
 - Create: `Tests/TodoCLITests/CLITests.swift`
 - Modify: `README.md` (usage)
 
