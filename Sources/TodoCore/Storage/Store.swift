@@ -24,6 +24,10 @@ public struct ChangeSet: Equatable, Sendable {
 public final class Store {
     public let deviceID: String
 
+    /// Called after a transaction that changed something commits, with everything it touched. It lives in the
+    /// class because an extension cannot add a stored property, and it is the core's only push towards the UI.
+    public var onChange: ((ChangeSet) -> Void)?
+
     let db: Connection
     let clock: HybridClock
 
@@ -118,7 +122,7 @@ public final class Store {
     /// Filled in by Task 9: inserts Inbox, Today, Upcoming, Logbook and Trash with fixed ids and a zero clock.
     func seedBuiltInViews() throws(StoreError) {}
 
-    /// Re-applies journal rows whose field became known after a migration. The body arrives in Task 5.
+    /// Re-applies journal rows whose field became known after a migration.
     func replayUnapplied() throws(StoreError) {
         try sql { () throws(SQLiteError) in
             try db.transaction { () throws(SQLiteError) in try replayUnappliedRows() }
@@ -132,8 +136,21 @@ public final class Store {
         }
     }
 
-    /// Runs inside a transaction opened by the caller. Task 5 fills it in.
-    func replayUnappliedRows() throws(SQLiteError) {}
+    /// Runs inside a transaction opened by the caller: applies journal rows whose field is known now.
+    func replayUnappliedRows() throws(SQLiteError) {
+        let rows = try db.rows("SELECT seq, entity, entity_id, field, value, clock, device FROM ops WHERE applied = 0 ORDER BY clock, device, seq")
+        // Nothing reads these changes: the only caller is `Store.init`, where no observer can have been set
+        // yet. A replay that ever runs mid-session has to hand them to `onChange` instead of dropping them.
+        var changes = ChangeSet()
+        var treeDirty = false
+        for row in rows {
+            guard let kind = EntityKind(rawValue: row[1].string ?? ""), let field = row[3].string, FieldMap.isKnown(kind, field) else { continue }
+            let op = Operation(entity: kind, entityID: row[2].string ?? "", field: field, value: row[4], clock: HLC(raw: row[5].int64 ?? 0), device: row[6].string ?? "")
+            try applyToState(op, changes: &changes, treeDirty: &treeDirty)
+            try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [row[0]])
+        }
+        if treeDirty { try rebuildTreeRows() }
+    }
 
     /// Runs inside a transaction opened by the caller. Task 6 fills it in.
     func rebuildTreeRows() throws(SQLiteError) {}
