@@ -1317,7 +1317,7 @@ git commit -m "feat(core): add identifiers, calendar days, hybrid logical clocks
 - Produces:
   - `public enum StoreError: Error, Equatable, Sendable { case sqlite(SQLiteError); case notFound(EntityID); case viewNeedsNewerApp(ViewID, kind: String); case invalidFilter(String); case invalid(String) }`
   - `public struct ChangeSet: Equatable, Sendable { public internal(set) var tasks: Set<TaskID>; public internal(set) var tags: Set<TagID>; public internal(set) var views: Set<ViewID>; public var isEmpty: Bool }` — a snapshot the store hands out, so only the module builds one (review of PR #35). `onChange` and `systemNow` are not here: an observer with nothing to observe and a wall clock with no caller wait for the tasks that use them, Task 5 and Task 12.
-  - `public final class Store { public let deviceID: String; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32 }` plus `private static let pragmas: [String]` and `private static let deviceIDKey: String` (the pragmas every store opens with, since `SQLiteKit` sets none), `let db: Connection`, `let clock: HybridClock`, `static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value`, `static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError)` (static because `init` calls them before `deviceID` is assigned, and Swift forbids an instance call until every stored property is initialized), `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`). The store does not keep the `now` closure: `HybridClock` holds it and no later task reads it back. The instance pair `meta`/`setMeta` arrives in Task 11 with the sync cursor, its first caller.
+  - `public final class Store { public let deviceID: String; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32 }` plus `private static let pragmas: [String]` and `private static let deviceIDKey: String` (the pragmas every store opens with, since `SQLiteKit` sets none), `let db: Connection`, `let clock: HybridClock`, `func meta(_ key: String) throws(StoreError) -> Value`, `func setMeta(_ key: String, _ value: Value) throws(StoreError)`, `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`). The SQL behind the meta pair lives in `private static` twins because `init` calls them before `deviceID` is assigned and Swift forbids an instance call until every stored property is initialized; the instance pair is the seam Task 11's sync cursor reads through (review of PR #35). The store does not keep the `now` closure: `HybridClock` holds it and no later task reads it back.
   - `enum Schema { static let version1: String }`, `enum Migrations { static let steps: [(version: Int32, sql: String)]; static func run(on db: Connection) throws(SQLiteError) -> (from: Int32, to: Int32) }`.
   - Two hooks that Task 5 and Task 6 fill in: `func replayUnappliedRows() throws(SQLiteError)` and `func rebuildTreeRows() throws(SQLiteError)`, empty in this task; their `StoreError` wrappers `replayUnapplied()` and `rebuildTree()` are called at the end of `init`.
 
@@ -1394,11 +1394,11 @@ import Testing
 
 @Test func metaRoundTrips() throws {
     let store = try makeStore()
-    #expect(try Store.readMeta(store.db, "nothing").isNull)
-    try Store.writeMeta(store.db, "k", .text("v"))
-    #expect(try Store.readMeta(store.db, "k") == .text("v"))
-    try Store.writeMeta(store.db, "k", .integer(2))
-    #expect(try Store.readMeta(store.db, "k") == .integer(2))
+    #expect(try store.meta("nothing").isNull)
+    try store.setMeta("k", .text("v"))
+    #expect(try store.meta("k") == .text("v"))
+    try store.setMeta("k", .integer(2))
+    #expect(try store.meta("k") == .integer(2))
 }
 ```
 
@@ -1693,11 +1693,19 @@ public final class Store {
         do { return try body() } catch { throw .sqlite(error) }
     }
 
-    static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value {
+    func meta(_ key: String) throws(StoreError) -> Value {
+        try Store.readMeta(db, key)
+    }
+
+    func setMeta(_ key: String, _ value: Value) throws(StoreError) {
+        try Store.writeMeta(db, key, value)
+    }
+
+    private static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value {
         do { return try db.rows("SELECT value FROM meta WHERE key = ?", [.text(key)]).first?.first ?? .null } catch { throw .sqlite(error) }
     }
 
-    static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError) {
+    private static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError) {
         do { try db.run("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [.text(key), value]) } catch { throw .sqlite(error) }
     }
 
@@ -3982,15 +3990,7 @@ git commit -m "feat(core): add quick find over titles and ranked search in notes
 - Create: `Tests/TodoCoreTests/SyncTests.swift`
 
 **Interfaces:**
-- Consumes: `apply`, `Operation`, `EntityKind` (Task 5); `Store.readMeta`, `Store.writeMeta`, `clock` (Task 4). This task declares the instance pair it reads the cursor through, since it is their first caller (review of PR #35):
-
-```swift
-extension Store {
-    func meta(_ key: String) throws(StoreError) -> Value { try Store.readMeta(db, key) }
-    func setMeta(_ key: String, _ value: Value) throws(StoreError) { try Store.writeMeta(db, key, value) }
-}
-```
-
+- Consumes: `apply`, `Operation`, `EntityKind` (Task 5); `meta`, `setMeta`, `clock` (Task 4).
 - Produces:
   - `public struct JournalEntry: Equatable, Sendable { public var seq: Int64; public var op: Operation }`
   - `public enum SyncError: Error, Equatable, Sendable { case store(StoreError); case transport(String) }`

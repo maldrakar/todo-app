@@ -99,11 +99,19 @@ public final class Store {
         do { return try body() } catch { throw .sqlite(error) }
     }
 
-    static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value {
+    func meta(_ key: String) throws(StoreError) -> Value {
+        try Store.readMeta(db, key)
+    }
+
+    func setMeta(_ key: String, _ value: Value) throws(StoreError) {
+        try Store.writeMeta(db, key, value)
+    }
+
+    private static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value {
         do { return try db.rows("SELECT value FROM meta WHERE key = ?", [.text(key)]).first?.first ?? .null } catch { throw .sqlite(error) }
     }
 
-    static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError) {
+    private static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError) {
         do { try db.run("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [.text(key), value]) } catch { throw .sqlite(error) }
     }
 
