@@ -25,7 +25,6 @@ public final class Store {
     public let deviceID: String
 
     let db: Connection
-    let now: () -> Int64
     let clock: HybridClock
 
     /// The `meta` row that holds this device's identity in the journal.
@@ -53,7 +52,6 @@ public final class Store {
 
     init(db: Connection, now: @escaping () -> Int64) throws(StoreError) {
         self.db = db
-        self.now = now
         self.clock = HybridClock(now: now)
         do { _ = try Migrations.run(on: db) } catch { throw .sqlite(error) }
         if let stored = try Store.readMeta(db, Store.deviceIDKey).string {
@@ -101,19 +99,11 @@ public final class Store {
         do { return try body() } catch { throw .sqlite(error) }
     }
 
-    func meta(_ key: String) throws(StoreError) -> Value {
-        try Store.readMeta(db, key)
-    }
-
-    func setMeta(_ key: String, _ value: Value) throws(StoreError) {
-        try Store.writeMeta(db, key, value)
-    }
-
-    private static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value {
+    static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value {
         do { return try db.rows("SELECT value FROM meta WHERE key = ?", [.text(key)]).first?.first ?? .null } catch { throw .sqlite(error) }
     }
 
-    private static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError) {
+    static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError) {
         do { try db.run("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [.text(key), value]) } catch { throw .sqlite(error) }
     }
 
