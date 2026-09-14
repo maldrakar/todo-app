@@ -1169,12 +1169,15 @@ public struct HLC: Hashable, Comparable, Sendable {
     /// The largest counter the 16 bits hold; `HybridClock` borrows the next millisecond rather than pass it.
     public static let maxCounter: Int32 = 65_535
 
+    /// One past the largest millisecond the 48 bits hold.
+    public static let maxMillis: Int64 = 1 << 47
+
     public let millis: Int64
     public let counter: Int32
 
     public init(millis: Int64, counter: Int32) {
         precondition(counter >= 0 && counter <= Self.maxCounter, "HLC counter overflow")
-        precondition(millis >= 0 && millis < 1 << 47, "HLC milliseconds outside the 48 bits of the encoding")
+        precondition(millis >= 0 && millis < Self.maxMillis, "HLC milliseconds outside the 48 bits of the encoding")
         self.millis = millis
         self.counter = counter
     }
@@ -1313,8 +1316,8 @@ git commit -m "feat(core): add identifiers, calendar days, hybrid logical clocks
 - Consumes: `Connection`, `Value`, `SQLiteError` (Task 2); `EntityID`, `HybridClock` (Task 3).
 - Produces:
   - `public enum StoreError: Error, Equatable, Sendable { case sqlite(SQLiteError); case notFound(EntityID); case viewNeedsNewerApp(ViewID, kind: String); case invalidFilter(String); case invalid(String) }`
-  - `public struct ChangeSet: Equatable, Sendable { public var tasks: Set<TaskID>; public var tags: Set<TagID>; public var views: Set<ViewID>; public var isEmpty: Bool }`
-  - `public final class Store { public let deviceID: String; public var onChange: ((ChangeSet) -> Void)?; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32; public static func systemNow() -> Int64 }` plus internal `static let pragmas: [String]` (the pragmas every store opens with, since `SQLiteKit` sets none), `let db: Connection`, `let clock: HybridClock`, `let now: () -> Int64`, `func meta(_ key: String) throws(StoreError) -> Value`, `func setMeta(_ key: String, _ value: Value) throws(StoreError)`, `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`).
+  - `public struct ChangeSet: Equatable, Sendable { public internal(set) var tasks: Set<TaskID>; public internal(set) var tags: Set<TagID>; public internal(set) var views: Set<ViewID>; public var isEmpty: Bool }` — a snapshot the store hands out, so only the module builds one (review of PR #35). `onChange` and `systemNow` are not here: an observer with nothing to observe and a wall clock with no caller wait for the tasks that use them, Task 5 and Task 12.
+  - `public final class Store { public let deviceID: String; public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store; public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store; public func snapshot() throws(StoreError) -> [UInt8]; public func schemaVersion() throws(StoreError) -> Int32 }` plus `private static let pragmas: [String]` and `private static let deviceIDKey: String` (the pragmas every store opens with, since `SQLiteKit` sets none), `let db: Connection`, `let clock: HybridClock`, `func meta(_ key: String) throws(StoreError) -> Value`, `func setMeta(_ key: String, _ value: Value) throws(StoreError)`, `func sql<T>(_ body: () throws(SQLiteError) -> T) throws(StoreError) -> T` (wraps `SQLiteError` into `StoreError.sqlite`). The SQL behind the meta pair lives in `private static` twins because `init` calls them before `deviceID` is assigned and Swift forbids an instance call until every stored property is initialized; the instance pair is the seam Task 11's sync cursor reads through (review of PR #35). The store does not keep the `now` closure: `HybridClock` holds it and no later task reads it back.
   - `enum Schema { static let version1: String }`, `enum Migrations { static let steps: [(version: Int32, sql: String)]; static func run(on db: Connection) throws(SQLiteError) -> (from: Int32, to: Int32) }`.
   - Two hooks that Task 5 and Task 6 fill in: `func replayUnappliedRows() throws(SQLiteError)` and `func rebuildTreeRows() throws(SQLiteError)`, empty in this task; their `StoreError` wrappers `replayUnapplied()` and `rebuildTree()` are called at the end of `init`.
 
@@ -1338,8 +1341,9 @@ import Testing
     for expected in ["meta", "tasks", "tags", "task_tags", "views", "view_items", "ops", "field_clocks", "task_tree",
                      "tasks_title_fts", "tasks_notes_fts", "tags_title_fts", "views_title_fts",
                      "tasks_ai", "tasks_au", "tasks_ad", "tags_ai", "tags_au", "tags_ad", "views_ai", "views_au", "views_ad",
-                     "tasks_status", "tasks_when", "tasks_deadline", "tasks_parent", "task_tags_tag", "ops_clock", "ops_identity"] {
-        #expect(names.contains(expected), expected)
+                     "tasks_status", "tasks_when", "tasks_deadline", "tasks_parent", "task_tags_tag", "ops_clock", "ops_identity",
+                     "ops_unapplied", "task_tree_parent"] {
+        #expect(names.contains(expected), "\(expected)")
     }
 }
 
@@ -1368,7 +1372,7 @@ import Testing
 }
 
 @Test func fileStoreOpensCreatesAndReopens() throws {
-    let path = "/tmp/todo-core-test-\(EntityID().rawValue).sqlite"
+    let path = ".build/todo-core-test-\(EntityID().rawValue).sqlite"
     let clock = TestClock()
     let a = try Store.open(path: path, now: clock.now)
     let id = a.deviceID
@@ -1590,11 +1594,6 @@ enum Migrations {
 ```swift
 // Sources/TodoCore/Storage/Store.swift
 import SQLiteKit
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 public enum StoreError: Error, Equatable, Sendable {
     case sqlite(SQLiteError)
@@ -1606,38 +1605,29 @@ public enum StoreError: Error, Equatable, Sendable {
 
 /// Which entities a committed transaction touched. UI layers re-query the views they show.
 public struct ChangeSet: Equatable, Sendable {
-    public var tasks: Set<TaskID> = []
-    public var tags: Set<TagID> = []
-    public var views: Set<ViewID> = []
+    public internal(set) var tasks: Set<TaskID> = []
+    public internal(set) var tags: Set<TagID> = []
+    public internal(set) var views: Set<ViewID> = []
 
-    public init() {}
+    init() {}
 
     public var isEmpty: Bool { tasks.isEmpty && tags.isEmpty && views.isEmpty }
-
-    mutating func merge(_ other: ChangeSet) {
-        tasks.formUnion(other.tasks)
-        tags.formUnion(other.tags)
-        views.formUnion(other.views)
-    }
 }
 
 /// The core's data layer. Synchronous, single-connection, not thread-safe: the platform confines it.
 public final class Store {
     public let deviceID: String
-    /// Called after every committed transaction that changed something.
-    public var onChange: ((ChangeSet) -> Void)?
 
     let db: Connection
-    let now: () -> Int64
     let clock: HybridClock
 
-    /// Milliseconds since 1970-01-01 from the system clock. Under WasmKit this is a fake time; the platform passes a real one.
-    public static func systemNow() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+    /// The `meta` row that holds this device's identity in the journal.
+    private static let deviceIDKey = "device_id"
 
     /// How the core opens a database. `SQLiteKit` sets no pragmas of its own, so the policy lives here and
     /// travels with the store. On an in-memory database `journal_mode` is accepted and ignored, so one list
     /// serves the file and the web target alike.
-    static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
+    private static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
 
     public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store {
         let db: Connection
@@ -1656,20 +1646,30 @@ public final class Store {
 
     init(db: Connection, now: @escaping () -> Int64) throws(StoreError) {
         self.db = db
-        self.now = now
         self.clock = HybridClock(now: now)
         do { _ = try Migrations.run(on: db) } catch { throw .sqlite(error) }
-        let stored = try Store.readMeta(db, "device_id").string
-        if let stored {
+        if let stored = try Store.readMeta(db, Store.deviceIDKey).string {
             deviceID = stored
         } else {
-            deviceID = EntityID().rawValue
-            try Store.writeMeta(db, "device_id", .text(deviceID))
+            // The identity is this device's only claim in the journal, so nothing keeps it until the row is in
+            // the database: a write that fails takes the whole open with it rather than leave a store whose id
+            // no reopen would agree with.
+            let minted = EntityID().rawValue
+            try Store.writeMeta(db, Store.deviceIDKey, .text(minted))
+            deviceID = minted
         }
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
         // comparison in silence (#32). This runs before anything below issues a stamp.
-        if let seen = try sql({ () throws(SQLiteError) in try db.rows("SELECT max(clock) FROM ops").first?.first?.int64 }) {
+        //
+        // A row at or past the top millisecond the encoding holds — a corrupt journal, or one written by a
+        // future version — is left out of the scan: seeding from it would let `observe` push the clock to the
+        // one millisecond `next()` cannot represent, and trap the process on the very next stamp. `Store.receive`
+        // reaching the same precondition through a synced row is a separate bug, #34.
+        let seedingCeiling = HLC(millis: HLC.maxMillis - 1, counter: 0).raw
+        if let seen = try sql({ () throws(SQLiteError) in
+            try db.rows("SELECT max(clock) FROM ops WHERE clock < ?", [.integer(seedingCeiling)]).first?.first?.int64
+        }) {
             clock.observe(HLC(raw: seen))
         }
         try seedBuiltInViews()
@@ -1721,7 +1721,9 @@ public final class Store {
 
     /// Recomputes task_tree. The body arrives in Task 6.
     func rebuildTree() throws(StoreError) {
-        try sql { () throws(SQLiteError) in try rebuildTreeRows() }
+        try sql { () throws(SQLiteError) in
+            try db.transaction { () throws(SQLiteError) in try rebuildTreeRows() }
+        }
     }
 
     /// Runs inside a transaction opened by the caller. Task 5 fills it in.
@@ -1735,11 +1737,13 @@ public final class Store {
 - [ ] **Step 6: Run the tests on both platforms**
 
 ```bash
-swift test --filter StoreOpenTests 2>&1 | tail -3
-swift test --filter StoreOpenTests --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
+swift test 2>&1 | tail -3
+swift test --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
 ```
 
-Expected: 6 tests pass on the host. On wasm32 the file-store test needs a writable `/tmp`; SwiftPM's WasmKit runner maps the package directory, so if that test fails with `unable to open database file` change its path to `.build/todo-core-test-<id>.sqlite`, which is inside the mapped directory on both platforms, and keep that path.
+Expected: a green suite on both platforms, `StoreOpenTests` inside it. The runs are unfiltered because `--filter` together with `--swift-sdk` fails on a SwiftPM bundle-path problem unrelated to this task. The file-store test writes into `.build/`, which is inside the directory SwiftPM's WasmKit runner maps, so one path serves the host and wasm32 alike.
+
+Two tests in the shipped file are not in the block above, both from the review of this task: `ftsTriggersTrackTaskTitleAndNotesThroughInsertUpdateAndDelete`, which inserts, updates and deletes a row in `tasks` with plain SQL and counts the `MATCH` hits in `tasks_title_fts` and `tasks_notes_fts` after each step — the only check that the twelve triggers and the `content_rowid` wiring are right, since nothing else in this task exercises them — and `openingIgnoresAJournalClockAtTheEncodingCeilingInsteadOfTrapping`, which is the seeding ceiling above. Writing to a state table directly is allowed here only because no `apply` path exists yet.
 
 - [ ] **Step 7: Commit**
 
@@ -1756,7 +1760,7 @@ The single write path of ADR-0003. Every later write method builds operations an
 
 **Files:**
 - Create: `Sources/TodoCore/Storage/Operation.swift`, `Sources/TodoCore/Storage/Store+Apply.swift`
-- Modify: `Sources/TodoCore/Storage/Store.swift` (replace the empty `replayUnappliedRows`)
+- Modify: `Sources/TodoCore/Storage/Store.swift` (replace the empty `replayUnappliedRows`; add `public var onChange: ((ChangeSet) -> Void)?`, which has to live in the class because an extension cannot add a stored property)
 - Create: `Tests/TodoCoreTests/ApplyTests.swift`
 
 **Interfaces:**
@@ -4229,6 +4233,7 @@ The runnable deliverable of M1 and the seed of a future CLI client. Commands liv
 - Modify: `Package.swift` (add the `TodoCLI` library target and `TodoCLITests`)
 - Create: `Sources/TodoCLI/CLI.swift`, `Sources/TodoCLI/Format.swift`
 - Replace: `Sources/todo/main.swift`
+- Modify: `Sources/TodoCore/Storage/Store.swift` (add `public static func systemNow() -> Int64`, the wall clock the CLI passes as `now:`, with the FoundationEssentials import it needs)
 - Create: `Tests/TodoCLITests/CLITests.swift`
 - Modify: `README.md` (usage)
 

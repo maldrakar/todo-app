@@ -3,12 +3,15 @@ public struct HLC: Hashable, Comparable, Sendable {
     /// The largest counter the 16 bits hold; `HybridClock` borrows the next millisecond rather than pass it.
     public static let maxCounter: Int32 = 65_535
 
+    /// One past the largest millisecond the 48 bits hold.
+    public static let maxMillis: Int64 = 1 << 47
+
     public let millis: Int64
     public let counter: Int32
 
     public init(millis: Int64, counter: Int32) {
         precondition(counter >= 0 && counter <= Self.maxCounter, "HLC counter overflow")
-        precondition(millis >= 0 && millis < 1 << 47, "HLC milliseconds outside the 48 bits of the encoding")
+        precondition(millis >= 0 && millis < Self.maxMillis, "HLC milliseconds outside the 48 bits of the encoding")
         self.millis = millis
         self.counter = counter
     }
