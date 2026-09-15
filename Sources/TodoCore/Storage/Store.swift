@@ -72,13 +72,15 @@ public final class Store {
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
         // comparison in silence (#32). This runs before anything below issues a stamp.
         //
-        // A row at or past the top millisecond the encoding holds — a corrupt journal, or one written by a
-        // future version — is left out of the scan: seeding from it would let `observe` push the clock to the
-        // one millisecond `next()` cannot represent, and trap the process on the very next stamp. `Store.receive`
-        // reaching the same precondition through a synced row is a separate, already-filed bug.
-        let seedingCeiling = HLC(millis: HLC.maxMillis - 1, counter: 0).raw
+        // The scan used to bound itself away from the top of the encoding, because seeding from a row up there
+        // pushed the clock to the one millisecond `next()` could not represent and trapped the process on the
+        // very next stamp. `HybridClock` saturates inside its range instead (#34), so that rule lives in the
+        // clock alone, where `Store.receive` will meet it in Task 11, and the scan keeps only the rule that is
+        // its own: `clock` is declared INTEGER, but SQLite takes a column's type as a preference, and anything
+        // else stored there sorts above every number. Without `typeof` a single such row would answer `max`,
+        // fail to read back as a stamp, and turn the seed into no seed at all — #32 again, without a sound.
         if let seen = try sql({ () throws(SQLiteError) in
-            try db.rows("SELECT max(clock) FROM ops WHERE clock < ?", [.integer(seedingCeiling)]).first?.first?.int64
+            try db.rows("SELECT max(clock) FROM ops WHERE typeof(clock) = 'integer'").first?.first?.int64
         }) {
             clock.observe(HLC(raw: seen))
         }
