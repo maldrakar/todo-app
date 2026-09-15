@@ -1766,10 +1766,10 @@ The single write path of ADR-0003. Every later write method builds operations an
 **Interfaces:**
 - Consumes: `Store`, `ChangeSet`, `Store.sql`, `Store.db`, `Store.clock`, `Store.deviceID` (Task 4); `HLC` (Task 3); `Value` (Task 2).
 - Produces:
-  - `public enum EntityKind: String, Sendable { case task, tag, view, taskTag = "task_tag", viewItem = "view_item" }`
-  - `public struct Operation: Equatable, Sendable { public var entity: EntityKind; public var entityID: String; public var field: String; public var value: Value; public var clock: HLC; public var device: String; public init(entity:entityID:field:value:clock:device:); public static func pairID(_: EntityID, _: EntityID) -> String; static func splitPair(_: String) -> (String, String)? }`
+  - `public enum EntityKind: String, Sendable { case task, tag, view, taskTag = "task_tag", viewItem = "view_item" }`. The `Sendable` is required, not decoration: `FieldMap` keys two static lets by this type, and Swift 6 refuses a global keyed by a non-Sendable one.
+  - `public struct Operation: Equatable { public let entity: EntityKind; public let entityID: String; public let field: String; public let value: Value; public let clock: HLC; public let device: String; public init(entity:entityID:field:value:clock:device:); public static func pairID(_: EntityID, _: EntityID) -> String; static func splitPair(_: String) -> (String, String)? }`. An operation is a record of something that already happened, so every field is a `let` and a test that needs one from another device builds it rather than edits it. It is not `Sendable`: nothing sends one across an isolation boundary yet.
   - `enum FieldMap { static func table(_ kind: EntityKind) -> String; static func isKnown(_ kind: EntityKind, _ field: String) -> Bool; static func acceptsNull(_ kind: EntityKind, _ field: String) -> Bool }`. `acceptsNull` lists the columns the schema leaves nullable, because a null for any other one fails the statement and rolls back every operation batched with it. Journal field names equal column names: for tasks `title notes status when_day deadline_day parent rank trashed deleted created_at completed_at`; tags `title parent rank deleted created_at`; views `title parent rank filter sort group_by deleted created_at`; task_tag `present`; view_item `present rank`.
-  - `extension Store { @discardableResult public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet; static let treeFields: Set<String>; func op(_ kind: EntityKind, _ id: String, _ field: String, _ value: Value, _ stamp: HLC) -> Operation; func journal(_ op: Operation, applied: Bool) throws(SQLiteError); func applyToState(_ op: Operation, changes: inout ChangeSet, treeDirty: inout Bool) throws(SQLiteError) }`.
+  - `extension Store { @discardableResult public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet; func applyRows(_ ops: [Operation]) throws(SQLiteError) -> ChangeSet; static let treeFields: Set<String>; func op(_ kind: EntityKind, _ id: String, _ field: String, _ value: Value, _ stamp: HLC) -> Operation; func journal(_ op: Operation, applied: Bool) throws(SQLiteError); func applyToState(_ op: Operation, changes: inout ChangeSet, treeDirty: inout Bool) throws(SQLiteError); private func writeEntityRow(_ table: String, _ op: Operation) throws(SQLiteError) -> Bool }`. `applyRows` is the loop inside the transaction, so the journal replay in `Store.swift` goes through the same code instead of repeating it; `apply` is the transaction, the observer and nothing else.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1779,6 +1779,11 @@ The single write path of ADR-0003. Every later write method builds operations an
 import Testing
 @testable import TodoCore
 @testable import SQLiteKit
+
+/// An operation from another device, the way one arrives from sync.
+private func foreign(_ device: String, _ field: String, _ value: Value, _ clock: HLC, task id: String = "t1") -> Operation {
+    Operation(entity: .task, entityID: id, field: field, value: value, clock: clock, device: device)
+}
 
 private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) -> (String, Int64)? {
     try store.sql { () throws(SQLiteError) in
@@ -1818,8 +1823,8 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
 
 @Test func differentFieldsFromDifferentDevicesBothSurvive() throws {
     let store = try makeStore()
-    var a = store.op(.task, "t1", "title", .text("from A"), HLC(millis: 5_000, counter: 0)); a.device = "A"
-    var b = store.op(.task, "t1", "when_day", .integer(20_707), HLC(millis: 1_000, counter: 0)); b.device = "B"
+    let a = foreign("A", "title", .text("from A"), HLC(millis: 5_000, counter: 0))
+    let b = foreign("B", "when_day", .integer(20_707), HLC(millis: 1_000, counter: 0))
     try store.apply([a, b])
     let row = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT title, when_day FROM tasks WHERE id = 't1'") }
     #expect(row == [[.text("from A"), .integer(20_707)]])
@@ -1830,9 +1835,7 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     for order in [["A", "B"], ["B", "A"]] {
         let store = try makeStore()
         for device in order {
-            var op = store.op(.task, "t1", "title", .text("from \(device)"), stamp)
-            op.device = device
-            try store.apply([op])
+            try store.apply([foreign(device, "title", .text("from \(device)"), stamp)])
         }
         #expect(try titleAndCreated(store, "t1")?.0 == "from B")
     }
@@ -1943,6 +1946,19 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     let unapplied = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE applied = 0") }
     #expect(unapplied == [[.integer(0)]])
 }
+
+@Test func rankingATaskInsideAManualListDoesNotPutItInTheList() throws {
+    let store = try makeStore()
+    // `present` defaults to 1 in the schema, and the two operations arrive apart when delivery is out of
+    // order, so the row a lone `rank` creates must not read as a membership.
+    let pair = Operation.pairID(ViewID("v1"), TaskID("t1"))
+    try store.apply([store.op(.viewItem, pair, "rank", .text("m"), HLC(millis: 1_000, counter: 0))])
+    var rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
+    #expect(rows == [[.integer(0), .text("m")]])
+    try store.apply([store.op(.viewItem, pair, "present", .integer(1), HLC(millis: 1_001, counter: 0))])
+    rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
+    #expect(rows == [[.integer(1), .text("m")]])
+}
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -1959,20 +1975,23 @@ Expected: `value of type 'Store' has no member 'onChange'`.
 // Sources/TodoCore/Storage/Operation.swift
 import SQLiteKit
 
+/// `Sendable` is not decoration here: `FieldMap` below keys two static lets by this type, and a global keyed
+/// by a non-Sendable type does not pass Swift 6's concurrency checking.
 public enum EntityKind: String, Sendable {
     case task, tag, view
     case taskTag = "task_tag"
     case viewItem = "view_item"
 }
 
-/// One field of one entity set to one value at one clock by one device. The unit of the journal and of sync.
-public struct Operation: Equatable, Sendable {
-    public var entity: EntityKind
-    public var entityID: String
-    public var field: String
-    public var value: Value
-    public var clock: HLC
-    public var device: String
+/// One field of one entity set to one value at one clock by one device. The unit of the journal and of sync,
+/// and a record of something that already happened: nothing about it changes after it is built.
+public struct Operation: Equatable {
+    public let entity: EntityKind
+    public let entityID: String
+    public let field: String
+    public let value: Value
+    public let clock: HLC
+    public let device: String
 
     public init(entity: EntityKind, entityID: String, field: String, value: Value, clock: HLC, device: String) {
         self.entity = entity
@@ -2007,16 +2026,6 @@ enum FieldMap {
         .viewItem: ["present", "rank"],
     ]
 
-    static func table(_ kind: EntityKind) -> String {
-        switch kind {
-        case .task: return "tasks"
-        case .tag: return "tags"
-        case .view: return "views"
-        case .taskTag: return "task_tags"
-        case .viewItem: return "view_items"
-        }
-    }
-
     /// The fields whose column accepts a null. Every other column in the map is NOT NULL, and the schema
     /// refuses a null for it rather than fall back to its default, which `applyToState` has to know before it
     /// writes rather than find out from a failed statement.
@@ -2027,6 +2036,16 @@ enum FieldMap {
         .taskTag: [],
         .viewItem: [],
     ]
+
+    static func table(_ kind: EntityKind) -> String {
+        switch kind {
+        case .task: return "tasks"
+        case .tag: return "tags"
+        case .view: return "views"
+        case .taskTag: return "task_tags"
+        case .viewItem: return "view_items"
+        }
+    }
 
     static func isKnown(_ kind: EntityKind, _ field: String) -> Bool {
         known[kind]?.contains(field) ?? false
@@ -2045,8 +2064,8 @@ enum FieldMap {
 import SQLiteKit
 
 extension Store {
-    /// The one write path: journals every operation, applies those that win their field clock,
-    /// rebuilds the task tree when a structural field changed, and notifies the observer after commit.
+    /// The one write path: journals every operation, applies those that win their field clock, rebuilds the
+    /// task tree when the shape of it moved, and notifies the observer once the transaction has committed.
     ///
     /// It never touches this device's clock. An operation from another device carries a stamp this device has
     /// to stay ahead of, so it arrives through `receive`, which observes the stamp before handing it here.
@@ -2054,24 +2073,32 @@ extension Store {
     public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet {
         guard !ops.isEmpty else { return ChangeSet() }
         let changes = try sql { () throws(SQLiteError) in
-            try db.transaction { () throws(SQLiteError) in
-                var changes = ChangeSet()
-                var treeDirty = false
-                for op in ops {
-                    let known = FieldMap.isKnown(op.entity, op.field)
-                    try journal(op, applied: known)
-                    guard known else { continue }
-                    try applyToState(op, changes: &changes, treeDirty: &treeDirty)
-                }
-                if treeDirty { try rebuildTreeRows() }
-                return changes
-            }
+            try db.transaction { () throws(SQLiteError) in try applyRows(ops) }
         }
         if !changes.isEmpty { onChange?(changes) }
         return changes
     }
 
-    /// The fields of a task that the shape of the tree is derived from.
+    /// Everything `apply` does to the database, inside a transaction the caller has already opened. The replay
+    /// of the journal builds its operations out of rows and comes through here, so there is one loop and not
+    /// two: journaling an operation that is already in the journal is the `INSERT OR IGNORE` doing nothing.
+    func applyRows(_ ops: [Operation]) throws(SQLiteError) -> ChangeSet {
+        var changes = ChangeSet()
+        var treeDirty = false
+        for op in ops {
+            let known = FieldMap.isKnown(op.entity, op.field)
+            try journal(op, applied: known)
+            guard known else { continue }
+            try applyToState(op, changes: &changes, treeDirty: &treeDirty)
+        }
+        if treeDirty { try rebuildTreeRows() }
+        return changes
+    }
+
+    /// The three task fields `task_tree` is derived from, and the reason a change to one of them costs a
+    /// rebuild: `parent` is the link the tree is built out of, `deleted` takes a task out of the tree and moves
+    /// its children to the root, and `trashed` is inherited down it (Task 6). Each of the three can move rows
+    /// the operation never named, and no other field can move any.
     static let treeFields: Set<String> = ["parent", "trashed", "deleted"]
 
     /// Builds an operation stamped by this device.
@@ -2089,9 +2116,9 @@ extension Store {
         )
     }
 
-    /// Last write wins per field: the operation that loses its field clock, and the one the state cannot hold,
-    /// leave both the row and the clock as they were. The field name is interpolated into the SQL below, so the
-    /// `FieldMap` whitelist is what keeps that safe; it is checked here rather than trusted from the callers.
+    /// Writes one field of one entity into the state, inside the transaction its caller opened. The field name
+    /// is interpolated into the SQL, so the `FieldMap` whitelist is what keeps that safe, and it is checked
+    /// here rather than trusted from the two callers.
     func applyToState(_ op: Operation, changes: inout ChangeSet, treeDirty: inout Bool) throws(SQLiteError) {
         guard FieldMap.isKnown(op.entity, op.field) else { return }
         // A NOT NULL column refuses a null instead of falling back to its default, and that failure would roll
@@ -2099,6 +2126,8 @@ extension Store {
         // too, on this delivery and on every retry. One malformed operation from a peer is journaled and
         // skipped instead, and the field stays open for the next well-formed one.
         guard !op.value.isNull || FieldMap.acceptsNull(op.entity, op.field) else { return }
+        // Last write wins, per field, with the device id breaking a tie: this comparison is that rule, and
+        // everything below it runs only for an operation that is strictly newer than the field's current clock.
         let key: [Value] = [.text(op.entity.rawValue), .text(op.entityID), .text(op.field)]
         if let existing = try db.rows("SELECT clock, device FROM field_clocks WHERE entity = ? AND entity_id = ? AND field = ?", key).first {
             let current = (existing[0].int64 ?? 0, existing[1].string ?? "")
@@ -2107,33 +2136,30 @@ extension Store {
         // The state write and the change it reports share one branch, and a pair entity splits its id once.
         // The field clock at the end of the function is reached only by an operation the state took, so an id
         // that does not split leaves nothing behind for a well-formed one to lose to.
-        let millis = Value(op.clock.millis)
+        let table = FieldMap.table(op.entity)
         switch op.entity {
-        case .task, .tag, .view:
-            let table = FieldMap.table(op.entity)
-            try db.run("INSERT OR IGNORE INTO \(table) (id, created_at, updated_at) VALUES (?, ?, ?)", [.text(op.entityID), millis, millis])
-            let created = db.changes > 0
-            try db.run("UPDATE \(table) SET \(op.field) = ?, updated_at = max(updated_at, ?) WHERE id = ?", [op.value, millis, .text(op.entityID)])
-            switch op.entity {
-            case .task:
-                changes.tasks.insert(TaskID(op.entityID))
-                // A task this operation brought into being has to reach `task_tree` even when the field that
-                // created it says nothing about the tree: every read joins the tree, and a task missing from it
-                // is invisible until the next open rebuilds it.
-                if created || Store.treeFields.contains(op.field) { treeDirty = true }
-            case .tag: changes.tags.insert(TagID(op.entityID))
-            case .view: changes.views.insert(ViewID(op.entityID))
-            case .taskTag, .viewItem: break  // the pair kinds are the arms below, not this one
-            }
+        case .task:
+            let created = try writeEntityRow(table, op)
+            changes.tasks.insert(TaskID(op.entityID))
+            // A task this operation brought into being has to reach task_tree even when the field that created
+            // it says nothing about the tree: every read joins the tree from Task 6 on, and a task missing from
+            // it is invisible until the next open rebuilds it.
+            if created || Store.treeFields.contains(op.field) { treeDirty = true }
+        case .tag:
+            try writeEntityRow(table, op)
+            changes.tags.insert(TagID(op.entityID))
+        case .view:
+            try writeEntityRow(table, op)
+            changes.views.insert(ViewID(op.entityID))
         case .taskTag:
             guard let (taskID, tagID) = Operation.splitPair(op.entityID) else { return }
-            try db.run("INSERT OR IGNORE INTO task_tags (task_id, tag_id, present) VALUES (?, ?, 0)", [.text(taskID), .text(tagID)])
-            try db.run("UPDATE task_tags SET \(op.field) = ? WHERE task_id = ? AND tag_id = ?", [op.value, .text(taskID), .text(tagID)])
+            try db.run("INSERT OR IGNORE INTO \(table) (task_id, tag_id, present) VALUES (?, ?, 0)", [.text(taskID), .text(tagID)])
+            try db.run("UPDATE \(table) SET \(op.field) = ? WHERE task_id = ? AND tag_id = ?", [op.value, .text(taskID), .text(tagID)])
             changes.tasks.insert(TaskID(taskID))
         case .viewItem:
             guard let (viewID, taskID) = Operation.splitPair(op.entityID) else { return }
-            try db.run("INSERT OR IGNORE INTO view_items (view_id, task_id, present) VALUES (?, ?, 0)", [.text(viewID), .text(taskID)])
-            try db.run("UPDATE view_items SET \(op.field) = ? WHERE view_id = ? AND task_id = ?", [op.value, .text(viewID), .text(taskID)])
+            try db.run("INSERT OR IGNORE INTO \(table) (view_id, task_id, present) VALUES (?, ?, 0)", [.text(viewID), .text(taskID)])
+            try db.run("UPDATE \(table) SET \(op.field) = ? WHERE view_id = ? AND task_id = ?", [op.value, .text(viewID), .text(taskID)])
             changes.views.insert(ViewID(viewID))
             changes.tasks.insert(TaskID(taskID))
         }
@@ -2141,6 +2167,27 @@ extension Store {
             "INSERT INTO field_clocks (entity, entity_id, field, clock, device) VALUES (?, ?, ?, ?, ?) ON CONFLICT(entity, entity_id, field) DO UPDATE SET clock = excluded.clock, device = excluded.device",
             key + [.integer(op.clock.raw), .text(op.device)]
         )
+    }
+
+    /// One field of a task, tag or view, and whether the row had to be created for it. The update goes first
+    /// because a field of a row that already exists is the common case, and then it is the only statement;
+    /// `changes` counts the rows a statement matched, so zero of them means there is no such row yet and the
+    /// insert that follows gives the update something to land on.
+    ///
+    /// A pair row keeps its two statements instead. The schema defaults `present` to 1, and the row a `rank`
+    /// operation creates has to say 0 for it — ranking a task inside a manual list is not what puts it in the
+    /// list, and out-of-order delivery is exactly when the two arrive apart — so the seed is explicit, and
+    /// folding it into one upsert costs more in built SQL than the statement it saves.
+    @discardableResult
+    private func writeEntityRow(_ table: String, _ op: Operation) throws(SQLiteError) -> Bool {
+        let millis = Value(op.clock.millis)
+        let update = "UPDATE \(table) SET \(op.field) = ?, updated_at = max(updated_at, ?) WHERE id = ?"
+        let parameters: [Value] = [op.value, millis, .text(op.entityID)]
+        try db.run(update, parameters)
+        guard db.changes == 0 else { return false }
+        try db.run("INSERT INTO \(table) (id, created_at, updated_at) VALUES (?, ?, ?)", [.text(op.entityID), millis, millis])
+        try db.run(update, parameters)
+        return true
     }
 }
 ```
@@ -2150,20 +2197,21 @@ The column name in `UPDATE ... SET \(op.field)` is interpolated, so `applyToStat
 - [ ] **Step 5: Replace `replayUnappliedRows` in `Store.swift`**
 
 ```swift
-    /// Runs inside a transaction opened by the caller: applies journal rows whose field is known now.
+    /// Runs inside a transaction opened by the caller: hands the journal rows whose field is known now to the
+    /// same path a fresh operation takes, and marks them applied. Calling `apply` itself is not an option — it
+    /// opens a transaction of its own, and SQLite has no nested one — so what it shares is `applyRows`.
     func replayUnappliedRows() throws(SQLiteError) {
-        let rows = try db.rows("SELECT seq, entity, entity_id, field, value, clock, device FROM ops WHERE applied = 0 ORDER BY clock, device, seq")
-        // Nothing reads these changes: the only caller is `Store.init`, where no observer can have been set
-        // yet. A replay that ever runs mid-session has to hand them to `onChange` instead of dropping them.
-        var changes = ChangeSet()
-        var treeDirty = false
-        for row in rows {
+        var ops: [Operation] = []
+        var replayed: [Value] = []
+        for row in try db.rows("SELECT seq, entity, entity_id, field, value, clock, device FROM ops WHERE applied = 0 ORDER BY clock, device, seq") {
             guard let kind = EntityKind(rawValue: row[1].string ?? ""), let field = row[3].string, FieldMap.isKnown(kind, field) else { continue }
-            let op = Operation(entity: kind, entityID: row[2].string ?? "", field: field, value: row[4], clock: HLC(raw: row[5].int64 ?? 0), device: row[6].string ?? "")
-            try applyToState(op, changes: &changes, treeDirty: &treeDirty)
-            try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [row[0]])
+            ops.append(Operation(entity: kind, entityID: row[2].string ?? "", field: field, value: row[4], clock: HLC(raw: row[5].int64 ?? 0), device: row[6].string ?? ""))
+            replayed.append(row[0])
         }
-        if treeDirty { try rebuildTreeRows() }
+        // The change set goes nowhere: the only caller is `Store.init`, where no observer can have been set
+        // yet. A replay that ever runs mid-session has to hand it to `onChange` instead of dropping it.
+        _ = try applyRows(ops)
+        for seq in replayed { try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [seq]) }
     }
 ```
 
@@ -2174,7 +2222,7 @@ swift test --filter ApplyTests 2>&1 | tail -3
 swift test --filter ApplyTests --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
 ```
 
-Expected: 12 tests pass on both.
+Expected: 13 tests pass on both.
 
 - [ ] **Step 7: Commit**
 
@@ -4092,7 +4140,7 @@ git commit -m "feat(core): add quick find over titles and ranked search in notes
 **Interfaces:**
 - Consumes: `apply`, `Operation`, `EntityKind` (Task 5); `meta`, `setMeta`, `clock` (Task 4).
 - Produces:
-  - `public struct JournalEntry: Equatable, Sendable { public var seq: Int64; public var op: Operation }`
+  - `public struct JournalEntry: Equatable { public let seq: Int64; public let op: Operation }` (not `Sendable`, because `Operation` is not)
   - `public enum SyncError: Error, Equatable, Sendable { case store(StoreError); case transport(String) }`
   - `public protocol SyncTransport: AnyObject { func push(_ ops: [Operation]) throws(SyncError); func pull(after cursor: Int64) throws(SyncError) -> (ops: [Operation], cursor: Int64) }`
   - `public final class InMemoryRelay: SyncTransport` for tests and demos.
@@ -4175,10 +4223,8 @@ private func exchange(_ a: Store, _ b: Store, _ relay: InMemoryRelay) throws {
     a.onChange = { _ in calls += 1 }
     #expect(try a.receive(own).isEmpty)
     #expect(calls == 0)
-    var foreign = own.first { $0.field == "title" }!
-    foreign.device = "other"
-    foreign.clock = HLC(millis: foreign.clock.millis + 10, counter: 0)
-    foreign.value = .text("theirs")
+    let mine = own.first { $0.field == "title" }!
+    let foreign = Operation(entity: mine.entity, entityID: mine.entityID, field: mine.field, value: .text("theirs"), clock: HLC(millis: mine.clock.millis + 10, counter: 0), device: "other")
     #expect(try a.receive([foreign]).tasks == [id])
     #expect(try a.receive([foreign]).isEmpty, "a duplicate is dropped by the journal index and the field clock")
     #expect(try a.task(id)?.title == "theirs")
@@ -4213,9 +4259,9 @@ Expected: `cannot find 'InMemoryRelay' in scope`.
 // Sources/TodoCore/Sync/Sync.swift
 import SQLiteKit
 
-public struct JournalEntry: Equatable, Sendable {
-    public var seq: Int64
-    public var op: Operation
+public struct JournalEntry: Equatable {
+    public let seq: Int64
+    public let op: Operation
 }
 
 public enum SyncError: Error, Equatable, Sendable {

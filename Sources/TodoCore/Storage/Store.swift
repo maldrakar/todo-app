@@ -136,20 +136,21 @@ public final class Store {
         }
     }
 
-    /// Runs inside a transaction opened by the caller: applies journal rows whose field is known now.
+    /// Runs inside a transaction opened by the caller: hands the journal rows whose field is known now to the
+    /// same path a fresh operation takes, and marks them applied. Calling `apply` itself is not an option — it
+    /// opens a transaction of its own, and SQLite has no nested one — so what it shares is `applyRows`.
     func replayUnappliedRows() throws(SQLiteError) {
-        let rows = try db.rows("SELECT seq, entity, entity_id, field, value, clock, device FROM ops WHERE applied = 0 ORDER BY clock, device, seq")
-        // Nothing reads these changes: the only caller is `Store.init`, where no observer can have been set
-        // yet. A replay that ever runs mid-session has to hand them to `onChange` instead of dropping them.
-        var changes = ChangeSet()
-        var treeDirty = false
-        for row in rows {
+        var ops: [Operation] = []
+        var replayed: [Value] = []
+        for row in try db.rows("SELECT seq, entity, entity_id, field, value, clock, device FROM ops WHERE applied = 0 ORDER BY clock, device, seq") {
             guard let kind = EntityKind(rawValue: row[1].string ?? ""), let field = row[3].string, FieldMap.isKnown(kind, field) else { continue }
-            let op = Operation(entity: kind, entityID: row[2].string ?? "", field: field, value: row[4], clock: HLC(raw: row[5].int64 ?? 0), device: row[6].string ?? "")
-            try applyToState(op, changes: &changes, treeDirty: &treeDirty)
-            try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [row[0]])
+            ops.append(Operation(entity: kind, entityID: row[2].string ?? "", field: field, value: row[4], clock: HLC(raw: row[5].int64 ?? 0), device: row[6].string ?? ""))
+            replayed.append(row[0])
         }
-        if treeDirty { try rebuildTreeRows() }
+        // The change set goes nowhere: the only caller is `Store.init`, where no observer can have been set
+        // yet. A replay that ever runs mid-session has to hand it to `onChange` instead of dropping it.
+        _ = try applyRows(ops)
+        for seq in replayed { try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [seq]) }
     }
 
     /// Runs inside a transaction opened by the caller. Task 6 fills it in.

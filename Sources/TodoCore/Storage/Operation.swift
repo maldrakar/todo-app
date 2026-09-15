@@ -1,20 +1,23 @@
 // Sources/TodoCore/Storage/Operation.swift
 import SQLiteKit
 
+/// `Sendable` is not decoration here: `FieldMap` below keys two static lets by this type, and a global keyed
+/// by a non-Sendable type does not pass Swift 6's concurrency checking.
 public enum EntityKind: String, Sendable {
     case task, tag, view
     case taskTag = "task_tag"
     case viewItem = "view_item"
 }
 
-/// One field of one entity set to one value at one clock by one device. The unit of the journal and of sync.
-public struct Operation: Equatable, Sendable {
-    public var entity: EntityKind
-    public var entityID: String
-    public var field: String
-    public var value: Value
-    public var clock: HLC
-    public var device: String
+/// One field of one entity set to one value at one clock by one device. The unit of the journal and of sync,
+/// and a record of something that already happened: nothing about it changes after it is built.
+public struct Operation: Equatable {
+    public let entity: EntityKind
+    public let entityID: String
+    public let field: String
+    public let value: Value
+    public let clock: HLC
+    public let device: String
 
     public init(entity: EntityKind, entityID: String, field: String, value: Value, clock: HLC, device: String) {
         self.entity = entity
@@ -49,16 +52,6 @@ enum FieldMap {
         .viewItem: ["present", "rank"],
     ]
 
-    static func table(_ kind: EntityKind) -> String {
-        switch kind {
-        case .task: return "tasks"
-        case .tag: return "tags"
-        case .view: return "views"
-        case .taskTag: return "task_tags"
-        case .viewItem: return "view_items"
-        }
-    }
-
     /// The fields whose column accepts a null. Every other column in the map is NOT NULL, and the schema
     /// refuses a null for it rather than fall back to its default, which `applyToState` has to know before it
     /// writes rather than find out from a failed statement.
@@ -69,6 +62,16 @@ enum FieldMap {
         .taskTag: [],
         .viewItem: [],
     ]
+
+    static func table(_ kind: EntityKind) -> String {
+        switch kind {
+        case .task: return "tasks"
+        case .tag: return "tags"
+        case .view: return "views"
+        case .taskTag: return "task_tags"
+        case .viewItem: return "view_items"
+        }
+    }
 
     static func isKnown(_ kind: EntityKind, _ field: String) -> Bool {
         known[kind]?.contains(field) ?? false

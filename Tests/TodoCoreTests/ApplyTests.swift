@@ -2,6 +2,11 @@ import Testing
 @testable import TodoCore
 @testable import SQLiteKit
 
+/// An operation from another device, the way one arrives from sync.
+private func foreign(_ device: String, _ field: String, _ value: Value, _ clock: HLC, task id: String = "t1") -> Operation {
+    Operation(entity: .task, entityID: id, field: field, value: value, clock: clock, device: device)
+}
+
 private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) -> (String, Int64)? {
     try store.sql { () throws(SQLiteError) in
         try store.db.rows("SELECT title, created_at FROM tasks WHERE id = ?", [.text(id)]).first.map { ($0[0].string ?? "", $0[1].int64 ?? -1) }
@@ -40,8 +45,8 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
 
 @Test func differentFieldsFromDifferentDevicesBothSurvive() throws {
     let store = try makeStore()
-    var a = store.op(.task, "t1", "title", .text("from A"), HLC(millis: 5_000, counter: 0)); a.device = "A"
-    var b = store.op(.task, "t1", "when_day", .integer(20_707), HLC(millis: 1_000, counter: 0)); b.device = "B"
+    let a = foreign("A", "title", .text("from A"), HLC(millis: 5_000, counter: 0))
+    let b = foreign("B", "when_day", .integer(20_707), HLC(millis: 1_000, counter: 0))
     try store.apply([a, b])
     let row = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT title, when_day FROM tasks WHERE id = 't1'") }
     #expect(row == [[.text("from A"), .integer(20_707)]])
@@ -52,9 +57,7 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     for order in [["A", "B"], ["B", "A"]] {
         let store = try makeStore()
         for device in order {
-            var op = store.op(.task, "t1", "title", .text("from \(device)"), stamp)
-            op.device = device
-            try store.apply([op])
+            try store.apply([foreign(device, "title", .text("from \(device)"), stamp)])
         }
         #expect(try titleAndCreated(store, "t1")?.0 == "from B")
     }
@@ -164,4 +167,17 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     #expect(try titleAndCreated(store, "t1")?.0 == "newer")
     let unapplied = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE applied = 0") }
     #expect(unapplied == [[.integer(0)]])
+}
+
+@Test func rankingATaskInsideAManualListDoesNotPutItInTheList() throws {
+    let store = try makeStore()
+    // `present` defaults to 1 in the schema, and the two operations arrive apart when delivery is out of
+    // order, so the row a lone `rank` creates must not read as a membership.
+    let pair = Operation.pairID(ViewID("v1"), TaskID("t1"))
+    try store.apply([store.op(.viewItem, pair, "rank", .text("m"), HLC(millis: 1_000, counter: 0))])
+    var rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
+    #expect(rows == [[.integer(0), .text("m")]])
+    try store.apply([store.op(.viewItem, pair, "present", .integer(1), HLC(millis: 1_001, counter: 0))])
+    rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
+    #expect(rows == [[.integer(1), .text("m")]])
 }
