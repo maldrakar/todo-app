@@ -17,4 +17,10 @@ public enum Value: Equatable, Sendable {
     public var isNull: Bool { if case .null = self { return true } else { return false } }
     public var int64: Int64? { if case .integer(let v) = self { return v } else { return nil } }
     public var string: String? { if case .text(let v) = self { return v } else { return nil } }
+
+    /// A boolean column, which SQLite has no type for and every schema stores as an integer. The counterpart
+    /// of `init(_ b: Bool)`, and the reason it is not optional like the two above: every boolean column in the
+    /// schema is NOT NULL with a default, so there is no third state for a caller to tell apart, and anything
+    /// that is not a non-zero integer reads as false.
+    public var bool: Bool { (int64 ?? 0) != 0 }
 }
