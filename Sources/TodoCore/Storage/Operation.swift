@@ -2,8 +2,9 @@
 import SQLiteKit
 
 /// `Sendable` is not decoration here: `FieldMap` below keys two static lets by this type, and a global keyed
-/// by a non-Sendable type does not pass Swift 6's concurrency checking.
-public enum EntityKind: String, Sendable {
+/// by a non-Sendable type does not pass Swift 6's concurrency checking. `CaseIterable` is what lets the test
+/// that holds `FieldMap` and `Schema` together walk every kind.
+public enum EntityKind: String, Sendable, CaseIterable {
     case task, tag, view
     case taskTag = "task_tag"
     case viewItem = "view_item"
@@ -43,8 +44,12 @@ public struct Operation: Equatable {
 
 /// Journal field names are the state column names. A field outside this map is journaled but not applied,
 /// which is how an older app keeps operations from a newer one until it migrates.
+///
+/// The two maps restate what the DDL in `Schema` says, and a copy that drifts is expensive in both directions,
+/// so `FieldMapTests` walks `PRAGMA table_info` and requires the two to agree. They are readable for that test
+/// and not for anyone else; the rest of the module asks `isKnown` and `acceptsNull`.
 enum FieldMap {
-    private static let known: [EntityKind: Set<String>] = [
+    static let known: [EntityKind: Set<String>] = [
         .task: ["title", "notes", "status", "when_day", "deadline_day", "parent", "rank", "trashed", "deleted", "created_at", "completed_at"],
         .tag: ["title", "parent", "rank", "deleted", "created_at"],
         .view: ["title", "parent", "rank", "filter", "sort", "group_by", "deleted", "created_at"],
@@ -55,7 +60,7 @@ enum FieldMap {
     /// The fields whose column accepts a null. Every other column in the map is NOT NULL, and the schema
     /// refuses a null for it rather than fall back to its default, which `applyToState` has to know before it
     /// writes rather than find out from a failed statement.
-    private static let nullable: [EntityKind: Set<String>] = [
+    static let nullable: [EntityKind: Set<String>] = [
         .task: ["when_day", "deadline_day", "parent", "completed_at"],
         .tag: ["parent"],
         .view: ["parent", "filter", "group_by"],

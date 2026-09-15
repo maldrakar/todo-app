@@ -1761,15 +1761,15 @@ The single write path of ADR-0003. Every later write method builds operations an
 **Files:**
 - Create: `Sources/TodoCore/Storage/Operation.swift`, `Sources/TodoCore/Storage/Store+Apply.swift`
 - Modify: `Sources/TodoCore/Storage/Store.swift` (replace the empty `replayUnappliedRows`; add `public var onChange: ((ChangeSet) -> Void)?`, which has to live in the class because an extension cannot add a stored property)
-- Create: `Tests/TodoCoreTests/ApplyTests.swift`
+- Create: `Tests/TodoCoreTests/ApplyTests.swift`, `Tests/TodoCoreTests/FieldMapTests.swift`
 
 **Interfaces:**
 - Consumes: `Store`, `ChangeSet`, `Store.sql`, `Store.db`, `Store.clock`, `Store.deviceID` (Task 4); `HLC` (Task 3); `Value` (Task 2).
 - Produces:
-  - `public enum EntityKind: String, Sendable { case task, tag, view, taskTag = "task_tag", viewItem = "view_item" }`. The `Sendable` is required, not decoration: `FieldMap` keys two static lets by this type, and Swift 6 refuses a global keyed by a non-Sendable one.
+  - `public enum EntityKind: String, Sendable, CaseIterable { case task, tag, view, taskTag = "task_tag", viewItem = "view_item" }`. The `Sendable` is required, not decoration: `FieldMap` keys two static lets by this type, and Swift 6 refuses a global keyed by a non-Sendable one. `CaseIterable` is what the schema-agreement test walks.
   - `public struct Operation: Equatable { public let entity: EntityKind; public let entityID: String; public let field: String; public let value: Value; public let clock: HLC; public let device: String; public init(entity:entityID:field:value:clock:device:); public static func pairID(_: EntityID, _: EntityID) -> String; static func splitPair(_: String) -> (String, String)? }`. An operation is a record of something that already happened, so every field is a `let` and a test that needs one from another device builds it rather than edits it. It is not `Sendable`: nothing sends one across an isolation boundary yet.
-  - `enum FieldMap { static func table(_ kind: EntityKind) -> String; static func isKnown(_ kind: EntityKind, _ field: String) -> Bool; static func acceptsNull(_ kind: EntityKind, _ field: String) -> Bool }`. `acceptsNull` lists the columns the schema leaves nullable, because a null for any other one fails the statement and rolls back every operation batched with it. Journal field names equal column names: for tasks `title notes status when_day deadline_day parent rank trashed deleted created_at completed_at`; tags `title parent rank deleted created_at`; views `title parent rank filter sort group_by deleted created_at`; task_tag `present`; view_item `present rank`.
-  - `extension Store { @discardableResult public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet; func applyRows(_ ops: [Operation]) throws(SQLiteError) -> ChangeSet; static let treeFields: Set<String>; func op(_ kind: EntityKind, _ id: String, _ field: String, _ value: Value, _ stamp: HLC) -> Operation; func journal(_ op: Operation, applied: Bool) throws(SQLiteError); func applyToState(_ op: Operation, changes: inout ChangeSet, treeDirty: inout Bool) throws(SQLiteError); private func writeEntityRow(_ table: String, _ op: Operation) throws(SQLiteError) -> Bool }`. `applyRows` is the loop inside the transaction, so the journal replay in `Store.swift` goes through the same code instead of repeating it; `apply` is the transaction, the observer and nothing else.
+  - `enum FieldMap { static func table(_ kind: EntityKind) -> String; static func isKnown(_ kind: EntityKind, _ field: String) -> Bool; static func acceptsNull(_ kind: EntityKind, _ field: String) -> Bool }`, with `known` and `nullable` readable so the schema-agreement test can walk them. `acceptsNull` lists the columns the schema leaves nullable, because a null for any other one fails the statement and rolls back every operation batched with it. Journal field names equal column names: for tasks `title notes status when_day deadline_day parent rank trashed deleted created_at completed_at`; tags `title parent rank deleted created_at`; views `title parent rank filter sort group_by deleted created_at`; task_tag `present`; view_item `present rank`.
+  - `extension Store { @discardableResult public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet; @discardableResult func applyRows(_ ops: [Operation]) throws(SQLiteError) -> ChangeSet; static let treeFields: Set<String>; func op(_ kind: EntityKind, _ id: String, _ field: String, _ value: Value, _ stamp: HLC) -> Operation; func journal(_ op: Operation, applied: Bool) throws(SQLiteError); func applyToState(_ op: Operation, changes: inout ChangeSet, treeDirty: inout Bool) throws(SQLiteError); private func writeEntityRow(_ table: String, _ op: Operation) throws(SQLiteError) -> Bool; private func writePairRow(_ table: String, _ keys: (String, String), _ ids: (String, String), _ op: Operation) throws(SQLiteError) }`. `applyRows` is the loop inside the transaction, so the journal replay in `Store.swift` goes through the same code instead of repeating it; `apply` is the transaction, the observer and nothing else.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1905,14 +1905,14 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     #expect(rows == [[.text("v1"), .text("t1"), .integer(1), .text("m")]])
 }
 
-@Test func aNullForANotNullColumnIsJournaledAndSkippedInsteadOfFailingTheBatch() throws {
+@Test func aNullFromAnotherDeviceForANotNullColumnIsJournaledAndSkippedInsteadOfFailingTheBatch() throws {
     let store = try makeStore()
     try store.apply([store.op(.task, "t1", "title", .text("kept"), HLC(millis: 1_000, counter: 0))])
     // `title` is NOT NULL and `when_day` is not; both arrive in one batch, the way a peer's pull would deliver
     // them, and the good one must not be rolled back by the bad one.
     let changes = try store.apply([
-        store.op(.task, "t1", "title", .null, HLC(millis: 2_000, counter: 0)),
-        store.op(.task, "t1", "when_day", .null, HLC(millis: 2_001, counter: 0)),
+        foreign("B", "title", .null, HLC(millis: 2_000, counter: 0)),
+        foreign("B", "when_day", .null, HLC(millis: 2_001, counter: 0)),
     ])
     #expect(changes.tasks == [TaskID("t1")])
     let row = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT title, when_day FROM tasks WHERE id = 't1'") }
@@ -1959,6 +1959,63 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
     #expect(rows == [[.integer(1), .text("m")]])
 }
+
+@Test func aNullOfOurOwnForANotNullColumnIsRefusedBeforeAnythingIsWritten() throws {
+    let store = try makeStore()
+    // Our own operations are built by the write API, which cannot produce this: it is a bug in the caller, and
+    // a bug is worth an error rather than a row in the journal that nothing will ever apply.
+    do {
+        try store.apply([
+            store.op(.task, "t1", "title", .text("good"), HLC(millis: 1_000, counter: 0)),
+            store.op(.task, "t1", "notes", .null, HLC(millis: 1_001, counter: 0)),
+        ])
+        Issue.record("the batch was accepted")
+    } catch {
+        guard case .invalid = error else {
+            Issue.record("expected StoreError.invalid, got \(error)")
+            return
+        }
+    }
+    // Refused before the transaction opened, so the good operation beside it is not in the journal either.
+    let journal = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE device != 'seed'") }
+    #expect(journal == [[.integer(0)]])
+    #expect(try titleAndCreated(store, "t1") == nil)
+}
+```
+
+`Tests/TodoCoreTests/FieldMapTests.swift` holds `FieldMap` and `Schema` together, so that the second copy of the column names and their NOT NULL flags is a list a test proves rather than a convention:
+
+```swift
+import Testing
+@testable import TodoCore
+@testable import SQLiteKit
+
+/// Columns that exist in a state table but are never written by an operation: the row id, the entity id, the
+/// two halves of a pair key, and the stamp `applyToState` derives rather than journals.
+private let notJournalFields: Set<String> = ["rid", "id", "task_id", "tag_id", "view_id", "updated_at"]
+
+/// `FieldMap` restates what the DDL in `Schema` says, and the two drift apart expensively in both directions: a
+/// column the schema leaves nullable but the map calls NOT NULL drops every operation for it, and one the
+/// schema keeps NOT NULL but the map calls nullable fails the statement and rolls back the batch it arrived in.
+/// This is the test that keeps them honest, so that the second list can stay a list.
+@Test func everyColumnOfEveryStateTableIsTheJournalFieldTheMapClaimsItIs() throws {
+    let store = try makeStore()
+    for kind in EntityKind.allCases {
+        let table = FieldMap.table(kind)
+        let columns = try store.sql { () throws(SQLiteError) in try store.db.rows("PRAGMA table_info(\(table))") }
+        #expect(!columns.isEmpty, "\(table) has no columns, so the table name in FieldMap is wrong")
+        var seen: Set<String> = []
+        for column in columns {
+            guard let name = column[1].string, !notJournalFields.contains(name) else { continue }
+            seen.insert(name)
+            let acceptsNull = (column[3].int64 ?? 0) == 0
+            #expect(FieldMap.isKnown(kind, name), "\(table).\(name) is a column that no operation can write")
+            #expect(FieldMap.acceptsNull(kind, name) == acceptsNull, "\(table).\(name): FieldMap and the schema disagree about null")
+        }
+        #expect(FieldMap.known[kind] == seen, "\(table): FieldMap claims fields the schema does not have")
+        #expect(FieldMap.nullable[kind]?.isSubset(of: seen) == true, "\(table): FieldMap allows a null in a column that is not there")
+    }
+}
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -1976,8 +2033,9 @@ Expected: `value of type 'Store' has no member 'onChange'`.
 import SQLiteKit
 
 /// `Sendable` is not decoration here: `FieldMap` below keys two static lets by this type, and a global keyed
-/// by a non-Sendable type does not pass Swift 6's concurrency checking.
-public enum EntityKind: String, Sendable {
+/// by a non-Sendable type does not pass Swift 6's concurrency checking. `CaseIterable` is what lets the test
+/// that holds `FieldMap` and `Schema` together walk every kind.
+public enum EntityKind: String, Sendable, CaseIterable {
     case task, tag, view
     case taskTag = "task_tag"
     case viewItem = "view_item"
@@ -2017,8 +2075,12 @@ public struct Operation: Equatable {
 
 /// Journal field names are the state column names. A field outside this map is journaled but not applied,
 /// which is how an older app keeps operations from a newer one until it migrates.
+///
+/// The two maps restate what the DDL in `Schema` says, and a copy that drifts is expensive in both directions,
+/// so `FieldMapTests` walks `PRAGMA table_info` and requires the two to agree. They are readable for that test
+/// and not for anyone else; the rest of the module asks `isKnown` and `acceptsNull`.
 enum FieldMap {
-    private static let known: [EntityKind: Set<String>] = [
+    static let known: [EntityKind: Set<String>] = [
         .task: ["title", "notes", "status", "when_day", "deadline_day", "parent", "rank", "trashed", "deleted", "created_at", "completed_at"],
         .tag: ["title", "parent", "rank", "deleted", "created_at"],
         .view: ["title", "parent", "rank", "filter", "sort", "group_by", "deleted", "created_at"],
@@ -2029,7 +2091,7 @@ enum FieldMap {
     /// The fields whose column accepts a null. Every other column in the map is NOT NULL, and the schema
     /// refuses a null for it rather than fall back to its default, which `applyToState` has to know before it
     /// writes rather than find out from a failed statement.
-    private static let nullable: [EntityKind: Set<String>] = [
+    static let nullable: [EntityKind: Set<String>] = [
         .task: ["when_day", "deadline_day", "parent", "completed_at"],
         .tag: ["parent"],
         .view: ["parent", "filter", "group_by"],
@@ -2072,6 +2134,15 @@ extension Store {
     @discardableResult
     public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet {
         guard !ops.isEmpty else { return ChangeSet() }
+        // A value of our own that the state cannot hold is a bug in the caller, and the batch is refused before
+        // a single row is journaled. The same value from another device is not ours to refuse: it is journaled
+        // and skipped inside the transaction, because throwing there would roll back everything delivered with
+        // it and the next delivery of the same batch would fail the same way.
+        for op in ops where op.device == deviceID {
+            if op.value.isNull, FieldMap.isKnown(op.entity, op.field), !FieldMap.acceptsNull(op.entity, op.field) {
+                throw .invalid("a null for \(op.entity.rawValue).\(op.field), which the schema keeps NOT NULL")
+            }
+        }
         let changes = try sql { () throws(SQLiteError) in
             try db.transaction { () throws(SQLiteError) in try applyRows(ops) }
         }
@@ -2082,6 +2153,7 @@ extension Store {
     /// Everything `apply` does to the database, inside a transaction the caller has already opened. The replay
     /// of the journal builds its operations out of rows and comes through here, so there is one loop and not
     /// two: journaling an operation that is already in the journal is the `INSERT OR IGNORE` doing nothing.
+    @discardableResult
     func applyRows(_ ops: [Operation]) throws(SQLiteError) -> ChangeSet {
         var changes = ChangeSet()
         var treeDirty = false
@@ -2123,8 +2195,9 @@ extension Store {
         guard FieldMap.isKnown(op.entity, op.field) else { return }
         // A NOT NULL column refuses a null instead of falling back to its default, and that failure would roll
         // back the whole transaction — every operation delivered alongside this one would lose its journal row
-        // too, on this delivery and on every retry. One malformed operation from a peer is journaled and
-        // skipped instead, and the field stays open for the next well-formed one.
+        // too, on this delivery and on every retry. Only another device's operation reaches this line, since
+        // `apply` refuses our own before the transaction opens; it is journaled and skipped, and the field
+        // stays open for the next well-formed operation.
         guard !op.value.isNull || FieldMap.acceptsNull(op.entity, op.field) else { return }
         // Last write wins, per field, with the device id breaking a tie: this comparison is that rule, and
         // everything below it runs only for an operation that is strictly newer than the field's current clock.
@@ -2153,13 +2226,11 @@ extension Store {
             changes.views.insert(ViewID(op.entityID))
         case .taskTag:
             guard let (taskID, tagID) = Operation.splitPair(op.entityID) else { return }
-            try db.run("INSERT OR IGNORE INTO \(table) (task_id, tag_id, present) VALUES (?, ?, 0)", [.text(taskID), .text(tagID)])
-            try db.run("UPDATE \(table) SET \(op.field) = ? WHERE task_id = ? AND tag_id = ?", [op.value, .text(taskID), .text(tagID)])
+            try writePairRow(table, ("task_id", "tag_id"), (taskID, tagID), op)
             changes.tasks.insert(TaskID(taskID))
         case .viewItem:
             guard let (viewID, taskID) = Operation.splitPair(op.entityID) else { return }
-            try db.run("INSERT OR IGNORE INTO \(table) (view_id, task_id, present) VALUES (?, ?, 0)", [.text(viewID), .text(taskID)])
-            try db.run("UPDATE \(table) SET \(op.field) = ? WHERE view_id = ? AND task_id = ?", [op.value, .text(viewID), .text(taskID)])
+            try writePairRow(table, ("view_id", "task_id"), (viewID, taskID), op)
             changes.views.insert(ViewID(viewID))
             changes.tasks.insert(TaskID(taskID))
         }
@@ -2173,11 +2244,6 @@ extension Store {
     /// because a field of a row that already exists is the common case, and then it is the only statement;
     /// `changes` counts the rows a statement matched, so zero of them means there is no such row yet and the
     /// insert that follows gives the update something to land on.
-    ///
-    /// A pair row keeps its two statements instead. The schema defaults `present` to 1, and the row a `rank`
-    /// operation creates has to say 0 for it — ranking a task inside a manual list is not what puts it in the
-    /// list, and out-of-order delivery is exactly when the two arrive apart — so the seed is explicit, and
-    /// folding it into one upsert costs more in built SQL than the statement it saves.
     @discardableResult
     private func writeEntityRow(_ table: String, _ op: Operation) throws(SQLiteError) -> Bool {
         let millis = Value(op.clock.millis)
@@ -2188,6 +2254,19 @@ extension Store {
         try db.run("INSERT INTO \(table) (id, created_at, updated_at) VALUES (?, ?, ?)", [.text(op.entityID), millis, millis])
         try db.run(update, parameters)
         return true
+    }
+
+    /// The same shape for a pair row, which is addressed by two ids instead of one. The insert seeds `present`
+    /// explicitly because the schema defaults it to 1, and the row that a `rank` operation creates must not
+    /// read as a membership — ranking a task inside a manual list is not what puts it in the list, and
+    /// out-of-order delivery is exactly when the two operations arrive apart.
+    private func writePairRow(_ table: String, _ keys: (String, String), _ ids: (String, String), _ op: Operation) throws(SQLiteError) {
+        let update = "UPDATE \(table) SET \(op.field) = ? WHERE \(keys.0) = ? AND \(keys.1) = ?"
+        let parameters: [Value] = [op.value, .text(ids.0), .text(ids.1)]
+        try db.run(update, parameters)
+        guard db.changes == 0 else { return }
+        try db.run("INSERT INTO \(table) (\(keys.0), \(keys.1), present) VALUES (?, ?, 0)", [.text(ids.0), .text(ids.1)])
+        try db.run(update, parameters)
     }
 }
 ```
@@ -2210,7 +2289,7 @@ The column name in `UPDATE ... SET \(op.field)` is interpolated, so `applyToStat
         }
         // The change set goes nowhere: the only caller is `Store.init`, where no observer can have been set
         // yet. A replay that ever runs mid-session has to hand it to `onChange` instead of dropping it.
-        _ = try applyRows(ops)
+        try applyRows(ops)
         for seq in replayed { try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [seq]) }
     }
 ```
@@ -2222,7 +2301,7 @@ swift test --filter ApplyTests 2>&1 | tail -3
 swift test --filter ApplyTests --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
 ```
 
-Expected: 13 tests pass on both.
+Expected: 14 tests pass on both, and `FieldMapTests` with them.
 
 - [ ] **Step 7: Commit**
 

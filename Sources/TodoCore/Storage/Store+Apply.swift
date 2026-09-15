@@ -10,6 +10,15 @@ extension Store {
     @discardableResult
     public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet {
         guard !ops.isEmpty else { return ChangeSet() }
+        // A value of our own that the state cannot hold is a bug in the caller, and the batch is refused before
+        // a single row is journaled. The same value from another device is not ours to refuse: it is journaled
+        // and skipped inside the transaction, because throwing there would roll back everything delivered with
+        // it and the next delivery of the same batch would fail the same way.
+        for op in ops where op.device == deviceID {
+            if op.value.isNull, FieldMap.isKnown(op.entity, op.field), !FieldMap.acceptsNull(op.entity, op.field) {
+                throw .invalid("a null for \(op.entity.rawValue).\(op.field), which the schema keeps NOT NULL")
+            }
+        }
         let changes = try sql { () throws(SQLiteError) in
             try db.transaction { () throws(SQLiteError) in try applyRows(ops) }
         }
@@ -20,6 +29,7 @@ extension Store {
     /// Everything `apply` does to the database, inside a transaction the caller has already opened. The replay
     /// of the journal builds its operations out of rows and comes through here, so there is one loop and not
     /// two: journaling an operation that is already in the journal is the `INSERT OR IGNORE` doing nothing.
+    @discardableResult
     func applyRows(_ ops: [Operation]) throws(SQLiteError) -> ChangeSet {
         var changes = ChangeSet()
         var treeDirty = false
@@ -61,8 +71,9 @@ extension Store {
         guard FieldMap.isKnown(op.entity, op.field) else { return }
         // A NOT NULL column refuses a null instead of falling back to its default, and that failure would roll
         // back the whole transaction — every operation delivered alongside this one would lose its journal row
-        // too, on this delivery and on every retry. One malformed operation from a peer is journaled and
-        // skipped instead, and the field stays open for the next well-formed one.
+        // too, on this delivery and on every retry. Only another device's operation reaches this line, since
+        // `apply` refuses our own before the transaction opens; it is journaled and skipped, and the field
+        // stays open for the next well-formed operation.
         guard !op.value.isNull || FieldMap.acceptsNull(op.entity, op.field) else { return }
         // Last write wins, per field, with the device id breaking a tie: this comparison is that rule, and
         // everything below it runs only for an operation that is strictly newer than the field's current clock.
@@ -91,13 +102,11 @@ extension Store {
             changes.views.insert(ViewID(op.entityID))
         case .taskTag:
             guard let (taskID, tagID) = Operation.splitPair(op.entityID) else { return }
-            try db.run("INSERT OR IGNORE INTO \(table) (task_id, tag_id, present) VALUES (?, ?, 0)", [.text(taskID), .text(tagID)])
-            try db.run("UPDATE \(table) SET \(op.field) = ? WHERE task_id = ? AND tag_id = ?", [op.value, .text(taskID), .text(tagID)])
+            try writePairRow(table, ("task_id", "tag_id"), (taskID, tagID), op)
             changes.tasks.insert(TaskID(taskID))
         case .viewItem:
             guard let (viewID, taskID) = Operation.splitPair(op.entityID) else { return }
-            try db.run("INSERT OR IGNORE INTO \(table) (view_id, task_id, present) VALUES (?, ?, 0)", [.text(viewID), .text(taskID)])
-            try db.run("UPDATE \(table) SET \(op.field) = ? WHERE view_id = ? AND task_id = ?", [op.value, .text(viewID), .text(taskID)])
+            try writePairRow(table, ("view_id", "task_id"), (viewID, taskID), op)
             changes.views.insert(ViewID(viewID))
             changes.tasks.insert(TaskID(taskID))
         }
@@ -111,11 +120,6 @@ extension Store {
     /// because a field of a row that already exists is the common case, and then it is the only statement;
     /// `changes` counts the rows a statement matched, so zero of them means there is no such row yet and the
     /// insert that follows gives the update something to land on.
-    ///
-    /// A pair row keeps its two statements instead. The schema defaults `present` to 1, and the row a `rank`
-    /// operation creates has to say 0 for it — ranking a task inside a manual list is not what puts it in the
-    /// list, and out-of-order delivery is exactly when the two arrive apart — so the seed is explicit, and
-    /// folding it into one upsert costs more in built SQL than the statement it saves.
     @discardableResult
     private func writeEntityRow(_ table: String, _ op: Operation) throws(SQLiteError) -> Bool {
         let millis = Value(op.clock.millis)
@@ -126,5 +130,18 @@ extension Store {
         try db.run("INSERT INTO \(table) (id, created_at, updated_at) VALUES (?, ?, ?)", [.text(op.entityID), millis, millis])
         try db.run(update, parameters)
         return true
+    }
+
+    /// The same shape for a pair row, which is addressed by two ids instead of one. The insert seeds `present`
+    /// explicitly because the schema defaults it to 1, and the row that a `rank` operation creates must not
+    /// read as a membership — ranking a task inside a manual list is not what puts it in the list, and
+    /// out-of-order delivery is exactly when the two operations arrive apart.
+    private func writePairRow(_ table: String, _ keys: (String, String), _ ids: (String, String), _ op: Operation) throws(SQLiteError) {
+        let update = "UPDATE \(table) SET \(op.field) = ? WHERE \(keys.0) = ? AND \(keys.1) = ?"
+        let parameters: [Value] = [op.value, .text(ids.0), .text(ids.1)]
+        try db.run(update, parameters)
+        guard db.changes == 0 else { return }
+        try db.run("INSERT INTO \(table) (\(keys.0), \(keys.1), present) VALUES (?, ?, 0)", [.text(ids.0), .text(ids.1)])
+        try db.run(update, parameters)
     }
 }

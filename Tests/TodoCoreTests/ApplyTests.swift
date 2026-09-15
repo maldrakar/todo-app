@@ -127,14 +127,14 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     #expect(rows == [[.text("v1"), .text("t1"), .integer(1), .text("m")]])
 }
 
-@Test func aNullForANotNullColumnIsJournaledAndSkippedInsteadOfFailingTheBatch() throws {
+@Test func aNullFromAnotherDeviceForANotNullColumnIsJournaledAndSkippedInsteadOfFailingTheBatch() throws {
     let store = try makeStore()
     try store.apply([store.op(.task, "t1", "title", .text("kept"), HLC(millis: 1_000, counter: 0))])
     // `title` is NOT NULL and `when_day` is not; both arrive in one batch, the way a peer's pull would deliver
     // them, and the good one must not be rolled back by the bad one.
     let changes = try store.apply([
-        store.op(.task, "t1", "title", .null, HLC(millis: 2_000, counter: 0)),
-        store.op(.task, "t1", "when_day", .null, HLC(millis: 2_001, counter: 0)),
+        foreign("B", "title", .null, HLC(millis: 2_000, counter: 0)),
+        foreign("B", "when_day", .null, HLC(millis: 2_001, counter: 0)),
     ])
     #expect(changes.tasks == [TaskID("t1")])
     let row = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT title, when_day FROM tasks WHERE id = 't1'") }
@@ -180,4 +180,26 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     try store.apply([store.op(.viewItem, pair, "present", .integer(1), HLC(millis: 1_001, counter: 0))])
     rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
     #expect(rows == [[.integer(1), .text("m")]])
+}
+
+@Test func aNullOfOurOwnForANotNullColumnIsRefusedBeforeAnythingIsWritten() throws {
+    let store = try makeStore()
+    // Our own operations are built by the write API, which cannot produce this: it is a bug in the caller, and
+    // a bug is worth an error rather than a row in the journal that nothing will ever apply.
+    do {
+        try store.apply([
+            store.op(.task, "t1", "title", .text("good"), HLC(millis: 1_000, counter: 0)),
+            store.op(.task, "t1", "notes", .null, HLC(millis: 1_001, counter: 0)),
+        ])
+        Issue.record("the batch was accepted")
+    } catch {
+        guard case .invalid = error else {
+            Issue.record("expected StoreError.invalid, got \(error)")
+            return
+        }
+    }
+    // Refused before the transaction opened, so the good operation beside it is not in the journal either.
+    let journal = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE device != 'seed'") }
+    #expect(journal == [[.integer(0)]])
+    #expect(try titleAndCreated(store, "t1") == nil)
 }

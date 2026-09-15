@@ -149,7 +149,7 @@ public final class Store {
         }
         // The change set goes nowhere: the only caller is `Store.init`, where no observer can have been set
         // yet. A replay that ever runs mid-session has to hand it to `onChange` instead of dropping it.
-        _ = try applyRows(ops)
+        try applyRows(ops)
         for seq in replayed { try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [seq]) }
     }
 
