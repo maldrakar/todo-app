@@ -10,15 +10,6 @@ extension Store {
     @discardableResult
     public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet {
         guard !ops.isEmpty else { return ChangeSet() }
-        // A value of our own that the state cannot hold is a bug in the caller, and the batch is refused before
-        // a single row is journaled. The same value from another device is not ours to refuse: it is journaled
-        // and skipped inside the transaction, because throwing there would roll back everything delivered with
-        // it and the next delivery of the same batch would fail the same way.
-        for op in ops where op.device == deviceID {
-            if op.value.isNull, FieldMap.isKnown(op.entity, op.field), !FieldMap.acceptsNull(op.entity, op.field) {
-                throw .invalid("a null for \(op.entity.rawValue).\(op.field), which the schema keeps NOT NULL")
-            }
-        }
         let changes = try sql { () throws(SQLiteError) in
             try db.transaction { () throws(SQLiteError) in try applyRows(ops) }
         }
@@ -71,10 +62,17 @@ extension Store {
         guard FieldMap.isKnown(op.entity, op.field) else { return }
         // A NOT NULL column refuses a null instead of falling back to its default, and that failure would roll
         // back the whole transaction — every operation delivered alongside this one would lose its journal row
-        // too, on this delivery and on every retry. Only another device's operation reaches this line, since
-        // `apply` refuses our own before the transaction opens; it is journaled and skipped, and the field
-        // stays open for the next well-formed operation.
-        guard !op.value.isNull || FieldMap.acceptsNull(op.entity, op.field) else { return }
+        // too, on this delivery and on every retry. So the operation is journaled and skipped instead, and the
+        // field stays open for the next well-formed one, which is what an operation from another device has
+        // earned. From our own code the same value is a bug rather than something to survive: the write API
+        // builds operations out of typed values, and it takes a `Value(someOptional)` over a NOT NULL column to
+        // produce this. The assertion is where that bug stops being silent, in every test run and every debug
+        // build. It does not reach the built-in view seed of Task 9, whose operations carry a device id of
+        // their own; what covers those is the test that holds `FieldMap` and the schema together.
+        if op.value.isNull, !FieldMap.acceptsNull(op.entity, op.field) {
+            assert(op.device != deviceID, "a null for \(op.entity.rawValue).\(op.field), which the schema keeps NOT NULL")
+            return
+        }
         // Last write wins, per field, with the device id breaking a tie: this comparison is that rule, and
         // everything below it runs only for an operation that is strictly newer than the field's current clock.
         let key: [Value] = [.text(op.entity.rawValue), .text(op.entityID), .text(op.field)]

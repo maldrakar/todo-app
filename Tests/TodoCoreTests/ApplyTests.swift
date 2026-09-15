@@ -181,25 +181,3 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
     #expect(rows == [[.integer(1), .text("m")]])
 }
-
-@Test func aNullOfOurOwnForANotNullColumnIsRefusedBeforeAnythingIsWritten() throws {
-    let store = try makeStore()
-    // Our own operations are built by the write API, which cannot produce this: it is a bug in the caller, and
-    // a bug is worth an error rather than a row in the journal that nothing will ever apply.
-    do {
-        try store.apply([
-            store.op(.task, "t1", "title", .text("good"), HLC(millis: 1_000, counter: 0)),
-            store.op(.task, "t1", "notes", .null, HLC(millis: 1_001, counter: 0)),
-        ])
-        Issue.record("the batch was accepted")
-    } catch {
-        guard case .invalid = error else {
-            Issue.record("expected StoreError.invalid, got \(error)")
-            return
-        }
-    }
-    // Refused before the transaction opened, so the good operation beside it is not in the journal either.
-    let journal = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE device != 'seed'") }
-    #expect(journal == [[.integer(0)]])
-    #expect(try titleAndCreated(store, "t1") == nil)
-}
