@@ -54,3 +54,33 @@ import Testing
     #expect(HLC(raw: 0) == HLC(millis: 0, counter: 0))
     #expect(HLC(raw: -1) < HLC(raw: 0))
 }
+
+@Test func aStampAtTheTopOfTheRangeSaturatesInsteadOfTrapping() {
+    // `HLC(raw: Int64.max)` is the largest stamp the encoding holds, and `observe` takes whatever the journal
+    // or a peer hands it. Borrowing the next millisecond from there leaves the 48 bits, so the clock stops
+    // instead: the top stamp is its last answer, and it repeats it rather than abort the process (#34).
+    let clock = HybridClock(now: { 1_000 })
+    clock.observe(HLC(raw: .max))
+    let ceiling = HLC(millis: HLC.maxMillis - 1, counter: HLC.maxCounter)
+    #expect(clock.next() == ceiling)
+    #expect(clock.next() == ceiling)
+}
+
+@Test func theCounterCeilingSaturatesInTheLastMillisecondItCanRepresent() {
+    // The same ceiling reached from below, by a local clock that fills the counter in the last millisecond
+    // of the range: there is no next millisecond to borrow, so the stamp stands still.
+    let clock = HybridClock(now: { HLC.maxMillis - 1 })
+    for _ in 0...Int(HLC.maxCounter) { _ = clock.next() }
+    #expect(clock.next() == HLC(millis: HLC.maxMillis - 1, counter: HLC.maxCounter))
+}
+
+@Test func aWallClockOutsideTheEncodingDoesNotTrap() {
+    // `now()` is injected, and a device whose system clock sits outside the 48 bits — far in the future, or
+    // before the epoch — must not abort either: the reading is pulled into the range before it is stamped.
+    var wall = Int64.max
+    let clock = HybridClock(now: { wall })
+    #expect(clock.next() == HLC(millis: HLC.maxMillis - 1, counter: 0))
+    wall = -1
+    clock.observe(HLC(millis: 5, counter: 0))
+    #expect(clock.next() == HLC(millis: HLC.maxMillis - 1, counter: 1))
+}
