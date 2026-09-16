@@ -1,4 +1,4 @@
-// Sources/TodoCore/Model/Task.swift
+// Sources/TodoCore/Model/TodoTask.swift
 
 public enum TaskStatus: Int64, Sendable, CaseIterable {
     case open = 0
@@ -10,7 +10,7 @@ public enum TaskStatus: Int64, Sendable, CaseIterable {
 /// effective values from the task tree, so a copy kept across a write would describe a tree that has moved.
 /// Notes are read separately, because they are the one field of a task that is unbounded and no list needs
 /// them.
-public struct Task: Equatable, Sendable {
+public struct TodoTask: Equatable, Sendable {
     public let id: TaskID
     public let title: String
     public let status: TaskStatus

@@ -2,7 +2,7 @@
 import SQLiteKit
 
 extension Store {
-    /// Every column a `Task` is read from, in the order `task(from:)` decodes them. `parent` and `trashed`
+    /// Every column a `TodoTask` is read from, in the order `task(from:)` decodes them. `parent` and `trashed`
     /// come from the tree and not from `tasks`, which is what makes a merge's leftovers invisible to a read.
     static let taskColumns = "t.id, t.title, t.status, t.when_day, t.deadline_day, tt.parent, t.rank, tt.trashed, t.created_at, t.updated_at, t.completed_at"
 
@@ -126,7 +126,7 @@ extension Store {
 
     // MARK: - Reads
 
-    public func task(_ id: TaskID) throws(StoreError) -> Task? {
+    public func task(_ id: TaskID) throws(StoreError) -> TodoTask? {
         try loadTasks(where: "t.id = ?", [.text(id.rawValue)], orderBy: "t.rank").first
     }
 
@@ -139,12 +139,12 @@ extension Store {
     }
 
     /// Direct children by effective parent, in rank order. `nil` lists the root.
-    public func children(of parent: TaskID?, includeTrashed: Bool = false) throws(StoreError) -> [Task] {
+    public func children(of parent: TaskID?, includeTrashed: Bool = false) throws(StoreError) -> [TodoTask] {
         try loadTasks(where: "tt.parent IS ? AND (? OR tt.trashed = 0)", [Value(parent?.rawValue), Value(includeTrashed)], orderBy: "t.rank, t.id")
     }
 
     /// Every task that is not deleted, oldest first. The CLI resolves id prefixes over this list.
-    public func allTasks(includeTrashed: Bool = false) throws(StoreError) -> [Task] {
+    public func allTasks(includeTrashed: Bool = false) throws(StoreError) -> [TodoTask] {
         try loadTasks(where: "(? OR tt.trashed = 0)", [Value(includeTrashed)], orderBy: "t.created_at, t.id")
     }
 
@@ -259,7 +259,7 @@ extension Store {
     /// Loads tasks with their tags. `clause` may use the aliases `t` (tasks) and `tt` (task_tree); `join` is
     /// appended after the tree join, which is where Tasks 8 to 10 hang a filter, a manual list or an FTS
     /// table off the same loader.
-    func loadTasks(where clause: String, _ params: [Value], orderBy: String, join: String = "", limit: Int? = nil) throws(StoreError) -> [Task] {
+    func loadTasks(where clause: String, _ params: [Value], orderBy: String, join: String = "", limit: Int? = nil) throws(StoreError) -> [TodoTask] {
         let limitClause = limit.map { " LIMIT \($0)" } ?? ""
         let rows = try sql { () throws(SQLiteError) in
             try db.rows("SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id \(join) WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)", params)
@@ -268,8 +268,8 @@ extension Store {
         return rows.map { Store.task(from: $0, tags: tags[$0[0].string ?? ""] ?? []) }
     }
 
-    static func task(from row: [Value], tags: Set<TagID>) -> Task {
-        Task(
+    static func task(from row: [Value], tags: Set<TagID>) -> TodoTask {
+        TodoTask(
             id: TaskID(row[0].string ?? ""),
             title: row[1].string ?? "",
             status: TaskStatus(rawValue: row[2].int64 ?? 0) ?? .open,

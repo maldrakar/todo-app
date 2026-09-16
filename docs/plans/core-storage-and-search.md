@@ -42,7 +42,7 @@
 | `Sources/TodoCore/Model/HLC.swift` | `HLC` value and `HybridClock` generator |
 | `Sources/TodoCore/Model/Rank.swift` | `Rank.between`: fractional order keys |
 | `Sources/TodoCore/Model/Placement.swift` | `Placement`: where a created or moved item lands among its siblings |
-| `Sources/TodoCore/Model/Task.swift` | `Task`, `TaskStatus`, `NewTask`, `TaskChange` |
+| `Sources/TodoCore/Model/TodoTask.swift` | `TodoTask`, `TaskStatus`, `NewTask`, `TaskChange` |
 | `Sources/TodoCore/Model/Tag.swift` | `Tag`, `TagChange` |
 | `Sources/TodoCore/Model/View.swift` | `View`, `NewView`, `ViewChange`, `SortKey`, `SortField`, `GroupBy` |
 | `Sources/TodoCore/Model/Filter.swift` | `Filter`, `DayCondition`, JSON codec, `FilterError` |
@@ -3854,8 +3854,8 @@ git commit -m "feat(core): add the filter model with its JSON format and SQL com
   - `public enum ViewChange: Sendable, Equatable { case title(String), filter(Filter?), sort([SortKey]), groupBy(GroupBy?) }`
   - `public enum BuiltInViews { public static let inbox, today, upcoming, logbook, trash: ViewID; static let definitions: [(id: ViewID, title: String, rank: String, filter: Filter, sort: [SortKey], groupBy: GroupBy?)] }`
   - `extension Store`: `createView(_:at:) -> ViewID`, `update(view:_:)`, `delete(view:)`, `move(view:to:at:)`, `views() -> [View]` (tree order), `view(_:) -> View?`, `children(ofView:) -> [View]`, `pin(task:in:at:)`, `unpin(task:from:)`, `manualList(of:) -> [TaskID]`.
-  - `public struct ViewPage: Equatable, Sendable { view: View; sections: [Section] }`, `public struct Section: Equatable, Sendable { view: View? (nil: the view's own remainder); groups: [TaskGroup] }`, `public struct TaskGroup: Equatable, Sendable { key: GroupKey?; tasks: [Task] }`, `public enum GroupKey: Hashable, Sendable { case day(Day?), tag(TagID?), parent(TaskID?), status(TaskStatus) }`.
-  - `extension Store`: `tasks(in: ViewID, today: Day) -> [Task]` (flat, manual order first), `page(of: ViewID, today: Day) -> ViewPage`, internal `tasks(matching: View, today:)`, `group(_:by:)`.
+  - `public struct ViewPage: Equatable, Sendable { view: View; sections: [Section] }`, `public struct Section: Equatable, Sendable { view: View? (nil: the view's own remainder); groups: [TaskGroup] }`, `public struct TaskGroup: Equatable, Sendable { key: GroupKey?; tasks: [TodoTask] }`, `public enum GroupKey: Hashable, Sendable { case day(Day?), tag(TagID?), parent(TaskID?), status(TaskStatus) }`.
+  - `extension Store`: `tasks(in: ViewID, today: Day) -> [TodoTask]` (flat, manual order first), `page(of: ViewID, today: Day) -> ViewPage`, internal `tasks(matching: View, today:)`, `group(_:by:)`.
 
 Built-in definitions (fixed ids, seeded with clock zero by device `seed`, so any user edit wins and every device creates identical journal rows):
 
@@ -4260,7 +4260,7 @@ public enum GroupKey: Hashable, Sendable {
 
 public struct TaskGroup: Equatable, Sendable {
     public var key: GroupKey?
-    public var tasks: [Task]
+    public var tasks: [TodoTask]
 }
 
 /// One section of a page: a child view's tasks, or (`view == nil`) the page's own remainder.
@@ -4276,7 +4276,7 @@ public struct ViewPage: Equatable, Sendable {
 
 extension Store {
     /// The tasks a view selects: pinned ones first in manual order, then the view's sort. Sections are ignored.
-    public func tasks(in viewID: ViewID, today: Day) throws(StoreError) -> [Task] {
+    public func tasks(in viewID: ViewID, today: Day) throws(StoreError) -> [TodoTask] {
         guard let view = try view(viewID) else { throw .notFound(viewID) }
         return try tasks(matching: view, today: today)
     }
@@ -4299,7 +4299,7 @@ extension Store {
         return ViewPage(view: view, sections: sections)
     }
 
-    func tasks(matching view: View, today: Day) throws(StoreError) -> [Task] {
+    func tasks(matching view: View, today: Day) throws(StoreError) -> [TodoTask] {
         if let kind = view.needsNewerApp { throw .viewNeedsNewerApp(view.id, kind: kind) }
         guard let filter = view.filter else { return [] }
         let clause = FilterCompiler.whereClause(filter, today: today)
@@ -4309,10 +4309,10 @@ extension Store {
     }
 
     /// Stable partition: groups appear in the order their first task appears.
-    func group(_ tasks: [Task], by groupBy: GroupBy?) -> [TaskGroup] {
+    func group(_ tasks: [TodoTask], by groupBy: GroupBy?) -> [TaskGroup] {
         guard let groupBy else { return [TaskGroup(key: nil, tasks: tasks)] }
         var order: [GroupKey] = []
-        var buckets: [GroupKey: [Task]] = [:]
+        var buckets: [GroupKey: [TodoTask]] = [:]
         for task in tasks {
             let key: GroupKey
             switch groupBy {
@@ -4363,8 +4363,8 @@ git commit -m "feat(core): add nested views, built-in views, manual lists and pa
 **Interfaces:**
 - Consumes: the FTS5 tables and triggers (Task 4); `loadTasks(where:_:orderBy:join:limit:)`, `tags()`, `views()` (Tasks 7 and 9).
 - Produces:
-  - `public enum QuickFindHit: Equatable, Sendable { case task(Task); case tag(Tag); case view(View) }`
-  - `public struct NoteHit: Equatable, Sendable { public var task: Task; public var snippet: String; public var score: Double }`
+  - `public enum QuickFindHit: Equatable, Sendable { case task(TodoTask); case tag(Tag); case view(View) }`
+  - `public struct NoteHit: Equatable, Sendable { public var task: TodoTask; public var snippet: String; public var score: Double }`
   - `extension Store { public func quickFind(_ query: String, limit: Int = 20) throws(StoreError) -> [QuickFindHit]; public func searchNotes(_ query: String, limit: Int = 20) throws(StoreError) -> [NoteHit]; static func trigramQuery(_ text: String) -> String?; static func wordsQuery(_ text: String) -> String? }`
 
 Quick find returns tasks first, then tags, then views, each alphabetically by title; trashed and deleted tasks never appear. Queries shorter than three characters cannot use the trigram index and scan titles in Swift instead. Notes search is word-based with the last word as a prefix, ranked by `bm25`, with the matched words in square brackets in a twelve-token snippet.
@@ -4481,13 +4481,13 @@ Expected: `value of type 'Store' has no member 'quickFind'`.
 import SQLiteKit
 
 public enum QuickFindHit: Equatable, Sendable {
-    case task(Task)
+    case task(TodoTask)
     case tag(Tag)
     case view(View)
 }
 
 public struct NoteHit: Equatable, Sendable {
-    public var task: Task
+    public var task: TodoTask
     public var snippet: String
     /// bm25 score: lower is a better match.
     public var score: Double
@@ -4538,7 +4538,7 @@ extension Store {
         let ids = rows.map { TaskID($0[0].string ?? "") }
         let marks = Array(repeating: "?", count: ids.count).joined(separator: ", ")
         let tasks = try loadTasks(where: "t.id IN (\(marks))", ids.map { .text($0.rawValue) }, orderBy: "t.id")
-        var byID: [TaskID: Task] = [:]
+        var byID: [TaskID: TodoTask] = [:]
         for task in tasks { byID[task.id] = task }
         return rows.compactMap { row in
             guard let task = byID[TaskID(row[0].string ?? "")] else { return nil }
@@ -4968,7 +4968,7 @@ import TodoCore
 enum Format {
     static func short(_ id: EntityID) -> String { String(id.rawValue.prefix(8)) }
 
-    static func line(_ task: Task, tagsByID: [TagID: Tag]) -> String {
+    static func line(_ task: TodoTask, tagsByID: [TagID: Tag]) -> String {
         let box: String
         switch task.status {
         case .open: box = "[ ]"
@@ -5207,7 +5207,7 @@ public enum CLI {
         return SortKey(field, descending: parts.count > 1 && parts[1] == "desc")
     }
 
-    static func resolveTask(_ prefix: String?, _ store: Store, includeTrashed: Bool = false) throws -> Task {
+    static func resolveTask(_ prefix: String?, _ store: Store, includeTrashed: Bool = false) throws -> TodoTask {
         guard let prefix, !prefix.isEmpty else { throw CLIError("a task ID is required") }
         let matches = try store.allTasks(includeTrashed: includeTrashed).filter { $0.id.rawValue.hasPrefix(prefix.lowercased()) }
         switch matches.count {

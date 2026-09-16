@@ -27,6 +27,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Fixed
 
+- The task entity of `TodoCore` is `TodoTask`, not `Task`. An unqualified `Task` in a module that imports the core resolved to the entity and hid `_Concurrency.Task`, so every consumer that used structured concurrency would have had to qualify it; a test that spells `Task<Void, Never>` from a consumer's point of view now guards the name. `TaskID`, `TaskStatus`, `NewTask` and `TaskChange` keep their names, and the plan's later tasks name the new type (#42).
 - A stamp at the end of the hybrid clock's range no longer aborts the process. `HybridClock` saturates at the largest stamp the encoding holds instead of borrowing a millisecond outside it, and pulls the wall-clock reading into that range as well, so neither a journal row, nor an operation from another device, nor a system clock set past the end of time can reach the initializer's precondition and kill every later edit on the device. What saturation costs is written in the type: at the ceiling stamps stop being unique, so last-write-wins falls back to the device-id tie-break. Opening a store no longer bounds its own journal scan against the same trap, so the rule lives in the clock alone, where a future `receive` from the transport meets it too.
 
 ## [0.0.0] - 2026-09-07
