@@ -11,21 +11,23 @@
 /// same column shape and the same hazard, and read the same way.
 enum TreeRules {
     struct Node {
-        var id: String
-        var parent: String?
-        var deleted: Bool
+        let id: String
+        let parent: String?
+        let deleted: Bool
     }
 
     /// Effective parent for every non-deleted node. The result holds only non-deleted ids, a value of
     /// `.some(nil)` means "at the root", and an id that is absent has no place in the tree at all. Every value
     /// is also a key, and the links form a forest, so a walk up from any node reaches a root in a finite
-    /// number of steps — `Store.inheritedTrash` is built on that promise.
+    /// number of steps — `Store.inheritedTrash` is built on that promise. Ids are expected to be unique, as
+    /// they are in every table this reads from, where the column is declared UNIQUE.
     ///
     /// Linear in the number of nodes, which is not the obvious reading of the rule: asking each node in turn
     /// whether the chain above it comes back costs a walk per node, and a chain 60,000 deep — which sync can
     /// deliver, and which nothing in the write path bounds — would turn every edit and every open into minutes
     /// of work. Each node has at most one parent, so the links form a functional graph whose cycles are
-    /// disjoint, and one marked walk per unvisited node finds every node that lies on one.
+    /// disjoint, and one marked walk per unvisited node finds every node that lies on one. Each node is
+    /// touched by exactly one walk, which is also where its answer is written.
     static func effectiveParents(_ nodes: [Node]) -> [String: String?] {
         var byID: [String: Node] = [:]
         for node in nodes { byID[node.id] = node }
@@ -41,6 +43,7 @@ enum TreeRules {
         // up there belongs to its own members and not to the chain hanging off it, which keeps its shape.
         enum Mark { case walking, settled }
         var marks: [String: Mark] = [:]
+        var result: [String: String?] = [:]
         var onCycle: Set<String> = []
         var path: [String] = []
         for node in nodes where !node.deleted && marks[node.id] == nil {
@@ -49,18 +52,20 @@ enum TreeRules {
             while let current = cursor, let currentNode = byID[current], !currentNode.deleted, marks[current] == nil {
                 marks[current] = .walking
                 path.append(current)
-                cursor = link(currentNode)
+                let parent = link(currentNode)
+                result[current] = parent
+                cursor = parent
             }
             if let closed = cursor, marks[closed] == .walking, let start = path.firstIndex(of: closed) {
                 onCycle.formUnion(path[start...])
             }
             for id in path { marks[id] = .settled }
         }
-
-        var result: [String: String?] = [:]
-        for node in nodes where !node.deleted {
-            result[node.id] = onCycle.contains(node.id) ? nil : link(node)
-        }
+        // Only the members of a cycle have to give their link back, and usually there are none. Everyone else
+        // was answered by the walk that visited them, so nothing here passes over all the nodes again.
+        // `updateValue` and not `result[id] = nil`, which on a dictionary of optionals removes the key and
+        // would take the node out of the tree altogether instead of moving it to the root.
+        for id in onCycle { result.updateValue(nil, forKey: id) }
         return result
     }
 }

@@ -11,9 +11,12 @@ extension Store {
     /// and the column takes it; the derived row holds 0 or 1, so a filter compiled against `task_tree` can
     /// compare it to 1 and mean it (Task 8).
     ///
-    /// Cost is linear in the number of tasks, in four passes: read them, resolve the links, inherit the trash,
-    /// write the rows. It is still a whole-table rebuild, which is why `apply` runs it only when `parent`,
-    /// `trashed` or `deleted` changed, or when an operation brought a task into being.
+    /// The answer is recomputed from every task, because one link can put a whole subtree at the root and the
+    /// rule is not local. The rows are not. Emptying the table and writing it back cost more than everything
+    /// else here together — the write is what a rebuild is expensive for, not the thinking — so what reaches
+    /// the database is the difference: the rows whose effective parent or inherited trash actually moved, and
+    /// the rows that no longer belong to any task. An ordinary edit moves a handful of them and writes a
+    /// handful, whatever the size of the database.
     func rebuildTreeRows() throws(SQLiteError) {
         var nodes: [TreeRules.Node] = []
         var ownTrashed: [String: Bool] = [:]
@@ -25,13 +28,33 @@ extension Store {
         let parents = TreeRules.effectiveParents(nodes)
         let inherited = Store.inheritedTrash(parents, ownTrashed)
 
-        try db.run("DELETE FROM task_tree")
-        let insert = try db.prepare("INSERT INTO task_tree (id, parent, trashed) VALUES (?, ?, ?)")
-        // In key order, so the rows append to the primary key's B-tree instead of splitting pages in the
-        // middle of it, and so that the same state lays the table out the same way twice.
-        for id in parents.keys.sorted() {
-            try insert.bind([.text(id), Value(parents[id] ?? nil), Value(inherited[id] ?? false)])
-            _ = try insert.step()
+        var stored: [String: (parent: String?, trashed: Bool)] = [:]
+        for row in try db.rows("SELECT id, parent, trashed FROM task_tree") {
+            stored[row[0].string ?? ""] = (row[1].string, row[2].bool)
+        }
+
+        var moved: [String] = []
+        for (id, parent) in parents {
+            let trashed = inherited[id] ?? false
+            if let row = stored[id], row.parent == parent, row.trashed == trashed { continue }
+            moved.append(id)
+        }
+        // In key order, so the rows go into the primary key's B-tree in ascending runs rather than at random.
+        moved.sort()
+        let upsert = try db.prepare("""
+            INSERT INTO task_tree (id, parent, trashed) VALUES (?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET parent = excluded.parent, trashed = excluded.trashed
+            """)
+        for id in moved {
+            try upsert.bind([.text(id), Value(parents[id] ?? nil), Value(inherited[id] ?? false)])
+            _ = try upsert.step()
+        }
+
+        // A row whose task was deleted, or which no task ever owned. `parents` holds every id that belongs.
+        let drop = try db.prepare("DELETE FROM task_tree WHERE id = ?")
+        for id in stored.keys.sorted() where parents.index(forKey: id) == nil {
+            try drop.bind([.text(id)])
+            _ = try drop.step()
         }
     }
 
