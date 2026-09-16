@@ -41,7 +41,10 @@
 | `Sources/TodoCore/Model/Day.swift` | `Day`: calendar day as days since 1970-01-01 |
 | `Sources/TodoCore/Model/HLC.swift` | `HLC` value and `HybridClock` generator |
 | `Sources/TodoCore/Model/Rank.swift` | `Rank.between`: fractional order keys |
-| `Sources/TodoCore/Model/Entities.swift` | `Task`, `TaskStatus`, `Tag`, `View`, `SortKey`, `SortField`, `GroupBy` |
+| `Sources/TodoCore/Model/Placement.swift` | `Placement`: where a created or moved item lands among its siblings |
+| `Sources/TodoCore/Model/Task.swift` | `Task`, `TaskStatus`, `NewTask`, `TaskChange` |
+| `Sources/TodoCore/Model/Tag.swift` | `Tag`, `TagChange` |
+| `Sources/TodoCore/Model/View.swift` | `View`, `NewView`, `ViewChange`, `SortKey`, `SortField`, `GroupBy` |
 | `Sources/TodoCore/Model/Filter.swift` | `Filter`, `DayCondition`, JSON codec, `FilterError` |
 | `Sources/TodoCore/Storage/Schema.swift` | DDL of schema version 1 |
 | `Sources/TodoCore/Storage/Migrations.swift` | Ordered migration steps, `Migrations.run` |
@@ -2498,21 +2501,22 @@ git commit -m "feat(core): derive effective parent and inherited trash into task
 ### Task 7: Tasks and tags: write API and reads
 
 **Files:**
-- Create: `Sources/TodoCore/Model/Entities.swift` (the `Task`, `TaskStatus`, `Tag`, `Placement` types; `View` and its friends join in Task 9)
+- Create: `Sources/TodoCore/Model/Placement.swift`, `Sources/TodoCore/Model/Task.swift`, `Sources/TodoCore/Model/Tag.swift` (one file per entity; `View` gets its own in Task 9)
 - Create: `Sources/TodoCore/Storage/Store+Tasks.swift`, `Sources/TodoCore/Storage/Store+Tags.swift`
 - Create: `Tests/TodoCoreTests/TaskTests.swift`, `Tests/TodoCoreTests/TagTests.swift`
 
 **Interfaces:**
-- Consumes: `apply`, `op` (Task 5); `TreeRules` (Task 6); `Rank`, `Day`, `EntityID` (Task 3).
+- Consumes: `apply`, `op`, `FieldMap.table` (Task 5); `TreeRules` (Task 6); `Rank`, `Day`, `EntityID` (Task 3).
 - Produces:
   - `public enum TaskStatus: Int64, Sendable, CaseIterable { case open = 0, done = 1, canceled = 2 }`
   - `public enum Placement: Sendable, Equatable { case end, start, after(EntityID) }`
-  - `public struct Task: Equatable, Sendable { id, title, status, when: Day?, deadline: Day?, parent: TaskID? (effective), rank, tags: Set<TagID>, trashed: Bool (effective), createdAt: Int64, updatedAt: Int64, completedAt: Int64? }`
-  - `public struct NewTask: Sendable { title, notes = "", when: Day? = nil, deadline: Day? = nil, parent: TaskID? = nil, tags: Set<TagID> = []; init(title:) }`
-  - `public enum TaskChange: Sendable, Equatable { case title(String), notes(String), status(TaskStatus), when(Day?), deadline(Day?) }`
-  - `public struct Tag: Equatable, Sendable { id, title, parent: TagID? (effective), rank, createdAt, updatedAt }`
-  - `public enum TagChange: Sendable, Equatable { case title(String), parent(TagID?) }`
-  - `extension Store`: `createTask(_:at:) -> TaskID`, `update(task:_:)`, `trash(task:)`, `restore(task:)`, `delete(task:)`, `move(task:to:at:)`, `add(tag:to:)`, `remove(tag:from:)`, `task(_:) -> Task?`, `notes(of:) -> String`, `children(of:includeTrashed:) -> [Task]`, `allTasks(includeTrashed:) -> [Task]`, `createTag(title:parent:at:) -> TagID`, `update(tag:_:)`, `delete(tag:)`, `tags() -> [Tag]`, `tag(_:) -> Tag?`; internal `loadTasks(where:_:orderBy:join:limit:)`, `requireTask(_:)`, `siblingRank(table:parentColumnValue:placement:excluding:)`, `static let taskColumns`.
+  - `public struct Task: Equatable, Sendable`, every field a `let`: `id, title, status, when: Day?, deadline: Day?, parent: TaskID? (effective), rank, tags: Set<TagID>, trashed: Bool (effective), createdAt: Int64, updatedAt: Int64, completedAt: Int64?`
+  - `public struct NewTask: Sendable`, every field a `let`, `init(title:notes:when:deadline:parent:tags:)` with a default for all but the title
+  - `public enum TaskChange: Sendable, Equatable { case title(String), notes(String), status(TaskStatus), when(Day?), deadline(Day?) }` — the columns that are a value and nothing more, so the parent belongs to `move` and a tag to `add`/`remove`; an internal `field` names the column it writes
+  - `public struct Tag: Equatable, Sendable`, every field a `let`: `id, title, parent: TagID? (effective), rank, createdAt, updatedAt`
+  - `public enum TagChange: Sendable, Equatable { case title(String) }`, with the same internal `field`
+  - `extension Store`: `createTask(_:at:) -> TaskID`, `update(task:_:)`, `trash(task:)`, `restore(task:)`, `delete(task:)`, `move(task:to:at:)`, `move(task:at:)`, `add(tag:to:)`, `remove(tag:from:)`, `task(_:) -> Task?`, `notes(of:) -> String`, `children(of:includeTrashed:) -> [Task]`, `allTasks(includeTrashed:) -> [Task]`, `createTag(title:parent:at:) -> TagID`, `update(tag:_:)`, `move(tag:to:at:)`, `move(tag:at:)`, `delete(tag:)`, `tags() -> [Tag]`, `tag(_:) -> Tag?`; internal `loadTasks(where:_:orderBy:join:limit:)`, `requireTask(_:)`, `requireTag(_:)`, `setFlag(_:_:_:_:)`, `siblingRank(in:parent:placement:excluding:)` (by `EntityKind`, so the table comes from `FieldMap.table`), `effectiveParent(of:in:)`, `isUnder(_:ancestor:in:)`, `lastPerField(_:by:)`, `static let taskColumns`, `static func task(from:tags:)`; private `orderedSiblings(in:parent:excluding:)`, `effectiveParents(in:)`, `tagsByTask(_:)`.
+  - Tags move the way tasks do: re-parenting is `move(tag:to:at:)` with a placement, a reorder inside one list is `move(tag:at:)` and writes the rank alone, and both refuse a move into the item's own subtree. Task 9's views follow the same shape.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2521,6 +2525,7 @@ git commit -m "feat(core): derive effective parent and inherited trash into task
 ```swift
 import Testing
 @testable import TodoCore
+@testable import SQLiteKit
 
 @Test func createTaskStoresEveryFieldAndDefaults() throws {
     let clock = TestClock()
@@ -2554,14 +2559,10 @@ import Testing
 @Test func childrenAreOrderedByRankAndPlacementWorks() throws {
     let store = try makeStore()
     let project = try store.createTask(NewTask(title: "Project"))
-    var child = NewTask(title: "1"); child.parent = project
-    let first = try store.createTask(child)
-    child.title = "3"
-    let third = try store.createTask(child)
-    child.title = "2"
-    let second = try store.createTask(child, at: .after(first))
-    child.title = "0"
-    let zero = try store.createTask(child, at: .start)
+    let first = try store.createTask(NewTask(title: "1", parent: project))
+    let third = try store.createTask(NewTask(title: "3", parent: project))
+    let second = try store.createTask(NewTask(title: "2", parent: project), at: .after(first))
+    let zero = try store.createTask(NewTask(title: "0", parent: project), at: .start)
     #expect(try store.children(of: project).map(\.title) == ["0", "1", "2", "3"])
     #expect(try store.children(of: nil).map(\.id) == [project])
     try store.move(task: third, to: project, at: .start)
@@ -2584,12 +2585,11 @@ import Testing
 @Test func trashRestoreAndDeleteFollowTheTree() throws {
     let store = try makeStore()
     let p = try store.createTask(NewTask(title: "p"))
-    var c = NewTask(title: "c"); c.parent = p
-    let child = try store.createTask(c)
+    let child = try store.createTask(NewTask(title: "c", parent: p))
     try store.trash(task: p)
     #expect(try store.task(child)?.trashed == true)
     #expect(try store.children(of: p).isEmpty)
-    #expect(try store.allTasks().isEmpty && try store.allTasks(includeTrashed: true).count == 2)
+    #expect(try store.allTasks().isEmpty && store.allTasks(includeTrashed: true).count == 2)
     #expect(try store.children(of: p, includeTrashed: true).count == 1)
     try store.restore(task: p)
     #expect(try store.task(child)?.trashed == false)
@@ -2602,8 +2602,7 @@ import Testing
     let store = try makeStore()
     let work = try store.createTag(title: "work")
     let home = try store.createTag(title: "home")
-    var new = NewTask(title: "t"); new.tags = [work]
-    let id = try store.createTask(new)
+    let id = try store.createTask(NewTask(title: "t", tags: [work]))
     try store.add(tag: home, to: id)
     #expect(try store.task(id)?.tags == [work, home])
     try store.remove(tag: work, from: id)
@@ -2612,13 +2611,123 @@ import Testing
     #expect(try store.task(id)?.tags == [])
 }
 
-@Test func writesReportChangeSets() throws {
+@Test func writesReportChangeSetsAndReachTheJournal() throws {
     let store = try makeStore()
     var seen: [ChangeSet] = []
     store.onChange = { seen.append($0) }
+    func journalled() throws -> Int64 {
+        try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE device != 'seed'").first?.first?.int64 ?? 0 }
+    }
+    let tag = try store.createTag(title: "work")
     let id = try store.createTask(NewTask(title: "t"))
+    let created = try journalled()
+    #expect(created == 15, "five fields for the tag and ten for the task, each one an operation and nothing written beside them")
     try store.update(task: id, [])
-    #expect(seen.count == 1 && seen[0].tasks == [id])
+    #expect(try journalled() == created, "an edit that changes nothing writes nothing")
+    try store.add(tag: tag, to: id)
+    try store.move(task: id, to: nil, at: .start)
+    try store.trash(task: id)
+    #expect(try journalled() == created + 4, "one operation for the tag, two for the move, one for the trash")
+    #expect(seen.count == 5)
+    #expect(seen[0].tags == [tag] && seen[0].tasks.isEmpty)
+    #expect(seen.dropFirst().allSatisfy { $0.tasks == [id] && $0.tags.isEmpty })
+}
+
+/// `when_day` is a plain INTEGER column and takes whatever a peer or a newer version of the app writes into
+/// it; `Day` holds 32 bits. A read that converts without checking traps, and since the value is stored, it
+/// traps again on every later read of every list that holds the task — the shape of #34.
+@Test func aDayOutsideTheRangeOfTheColumnReadsAsNoDay() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "t"))
+    try store.apply([
+        store.op(.task, id.rawValue, "when_day", .integer(5_000_000_000), store.clock.next()),
+        store.op(.task, id.rawValue, "deadline_day", .integer(-5_000_000_000), store.clock.next()),
+    ])
+    let task = try #require(try store.task(id))
+    #expect(task.when == nil && task.deadline == nil, "a day the type cannot hold reads as no day, the way an unusable parent link reads as no link")
+    #expect(try store.allTasks().count == 1)
+}
+
+/// The read rule that puts a cycle at the root belongs to merges, where neither of two concurrent links is
+/// the better one. A local move has the whole tree in hand, and scattering the subtree a person dragged is
+/// not what they asked for.
+@Test func movingATaskUnderItsOwnDescendantIsRefused() throws {
+    let store = try makeStore()
+    let project = try store.createTask(NewTask(title: "Project"))
+    let child = try store.createTask(NewTask(title: "Child", parent: project))
+    let grandchild = try store.createTask(NewTask(title: "Grandchild", parent: child))
+    var caught: StoreError?
+    do { try store.move(task: project, to: grandchild, at: .end) } catch { caught = error }
+    #expect(caught == .invalid("a task cannot be moved under its own descendant"))
+    #expect(try store.children(of: nil).map(\.id) == [project], "the refused move left the tree as it was")
+    #expect(try store.children(of: child).map(\.id) == [grandchild])
+}
+
+/// Every operation of one call carries one stamp, so a field named twice would meet itself as an equal in
+/// `apply`, the second would lose and its journal row would be dropped as a duplicate: the value would be
+/// gone from the state and from sync alike.
+@Test func theLastChangeForAFieldWins() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "t"))
+    try store.update(task: id, [.title("first"), .status(.done), .title("second")])
+    let task = try #require(try store.task(id))
+    #expect(task.title == "second" && task.status == .done)
+}
+
+@Test func theCompletionTimeMovesOnlyWhenTheTaskCrossesOpen() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "t"))
+    try store.update(task: id, [.status(.done)])
+    let completed = try #require(try store.task(id)?.completedAt)
+    try store.update(task: id, [.status(.done)])
+    #expect(try store.task(id)?.completedAt == completed, "marking a done task done again keeps when it was done")
+    try store.update(task: id, [.status(.canceled)])
+    #expect(try store.task(id)?.completedAt == completed, "a task already out of open did not leave it a second time")
+    try store.update(task: id, [.status(.open)])
+    #expect(try store.task(id)?.completedAt == nil)
+    try store.update(task: id, [.status(.canceled)])
+    #expect(try store.task(id)?.completedAt != nil, "canceled leaves open too")
+}
+
+/// A write names what it edits, and `apply` inserts the row it does not find, which is what sync needs and
+/// what a typo must not reach.
+@Test func writesRefuseIdsThatAreNotThere() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "t"))
+    let missingTag = TagID("no-such-tag")
+    let missingTask = TaskID("no-such-task")
+    var caught: StoreError?
+    do { try store.add(tag: missingTag, to: id) } catch { caught = error }
+    #expect(caught == .notFound(missingTag))
+    do { try store.remove(tag: missingTag, from: missingTask) } catch { caught = error }
+    #expect(caught == .notFound(missingTask))
+    do { _ = try store.createTask(NewTask(title: "x", tags: [missingTag])) } catch { caught = error }
+    #expect(caught == .notFound(missingTag))
+    do { _ = try store.createTask(NewTask(title: "y"), at: .after(missingTask)) } catch { caught = error }
+    #expect(caught == .notFound(missingTask))
+    do { _ = try store.notes(of: missingTask) } catch { caught = error }
+    #expect(caught == .notFound(missingTask))
+    #expect(try store.allTasks().map(\.id) == [id], "nothing a refused write named reached the state")
+}
+
+/// A drag inside one list is not a statement about the parent, and `move(task:to:at:)` could only say it by
+/// re-asserting the link at a new stamp, which is a peer's concurrent re-parent lost.
+@Test func aReorderKeepsTheParentAndWritesTheRankAlone() throws {
+    let store = try makeStore()
+    func journalled() throws -> Int64 {
+        try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE device != 'seed'").first?.first?.int64 ?? 0 }
+    }
+    let project = try store.createTask(NewTask(title: "Project"))
+    let first = try store.createTask(NewTask(title: "1", parent: project))
+    try store.createTask(NewTask(title: "2", parent: project))
+    let third = try store.createTask(NewTask(title: "3", parent: project))
+    let before = try journalled()
+    try store.move(task: third, at: .after(first))
+    #expect(try store.children(of: project).map(\.title) == ["1", "3", "2"])
+    #expect(try store.task(third)?.parent == project)
+    #expect(try journalled() == before + 1, "the rank, and no operation naming the parent")
+    try store.move(task: first, at: .end)
+    #expect(try store.children(of: project).map(\.title) == ["3", "2", "1"])
 }
 ```
 
@@ -2627,6 +2736,7 @@ import Testing
 ```swift
 import Testing
 @testable import TodoCore
+@testable import SQLiteKit
 
 @Test func tagsNestOrderAndUpdate() throws {
     let store = try makeStore()
@@ -2635,7 +2745,8 @@ import Testing
     let home = try store.createTag(title: "Home", parent: areas, at: .start)
     #expect(try store.tags().map(\.title) == ["Areas", "Home", "Work"])
     #expect(try store.tag(work)?.parent == areas)
-    try store.update(tag: work, [.title("Office"), .parent(nil)])
+    try store.update(tag: work, [.title("Office")])
+    try store.move(tag: work, to: nil, at: .end)
     let office = try #require(try store.tag(work))
     #expect(office.title == "Office" && office.parent == nil)
     #expect(try store.tags().map(\.title) == ["Areas", "Home", "Office"], "Office moved to the root after Areas")
@@ -2653,6 +2764,70 @@ import Testing
     #expect(tags.allSatisfy { $0.parent == nil })
     #expect(tags.count == 2)
 }
+
+/// A placement ranks among the siblings a read shows, and `tags()` resolves a parent link the way the task
+/// tree does: a tag whose stored parent was deleted is at the root, whatever the column still says.
+@Test func aTagPlacementRanksAmongTheTagsAReadShows() throws {
+    let store = try makeStore()
+    let areas = try store.createTag(title: "Areas")
+    try store.createTag(title: "Home", parent: areas)
+    try store.createTag(title: "Work", parent: areas)
+    try store.delete(tag: areas)
+    try store.createTag(title: "New")
+    #expect(try store.tags().map(\.title) == ["Home", "Work", "New"])
+    try store.createTag(title: "First", at: .start)
+    #expect(try store.tags().map(\.title) == ["First", "Home", "Work", "New"])
+}
+
+/// A chain thousands of links deep arrives from sync as easily as a shallow one, and a stack is not what
+/// should decide whether the tag tree reads — the rule `TreeRules` and `inheritedTrash` already follow.
+@Test func aDeepTagChainReadsWithoutRecursion() throws {
+    let store = try makeStore()
+    let stamp = store.clock.next()
+    var ops: [Operation] = []
+    var ids: [String] = []
+    for depth in 0..<1_000 {
+        let id = "tag-\(depth)"
+        ops.append(store.op(.tag, id, "title", .text("t\(depth)"), stamp))
+        ops.append(store.op(.tag, id, "parent", depth == 0 ? .null : .text(ids[depth - 1]), stamp))
+        ops.append(store.op(.tag, id, "rank", .text(Rank.initial), stamp))
+        ops.append(store.op(.tag, id, "deleted", Value(false), stamp))
+        ids.append(id)
+    }
+    try store.apply(ops)
+    let tags = try store.tags()
+    #expect(tags.map(\.id.rawValue) == ids, "parents before children, however deep the chain")
+}
+
+@Test func theLastChangeForATagFieldWins() throws {
+    let store = try makeStore()
+    let a = try store.createTag(title: "a")
+    try store.update(tag: a, [.title("first"), .title("second")])
+    #expect(try store.tag(a)?.title == "second")
+}
+
+/// Tags move the way tasks do: re-parenting is a move with a placement, a reorder inside one list writes the
+/// rank alone, and a move into the tag's own subtree is refused rather than left to the reading rule, which
+/// would answer it by putting every tag on the cycle at the root.
+@Test func tagsMoveAndReorderTheWayTasksDo() throws {
+    let store = try makeStore()
+    let areas = try store.createTag(title: "Areas")
+    let work = try store.createTag(title: "Work", parent: areas)
+    let home = try store.createTag(title: "Home", parent: areas)
+    let errands = try store.createTag(title: "Errands", parent: areas)
+    #expect(try store.tags().map(\.title) == ["Areas", "Work", "Home", "Errands"])
+    try store.move(tag: errands, at: .after(work))
+    #expect(try store.tags().map(\.title) == ["Areas", "Work", "Errands", "Home"])
+    #expect(try store.tag(errands)?.parent == areas, "a reorder says nothing about the parent")
+    try store.move(tag: home, to: nil, at: .start)
+    #expect(try store.tags().map(\.title) == ["Home", "Areas", "Work", "Errands"])
+    var caught: StoreError?
+    do { try store.move(tag: areas, to: areas, at: .end) } catch { caught = error }
+    #expect(caught == .invalid("a tag cannot be its own parent"))
+    do { try store.move(tag: areas, to: work, at: .end) } catch { caught = error }
+    #expect(caught == .invalid("a tag cannot be moved under its own descendant"))
+    #expect(try store.tags().map(\.title) == ["Home", "Areas", "Work", "Errands"], "the refused moves left the tree as it was")
+}
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -2663,10 +2838,26 @@ swift test --filter 'TaskTests|TagTests' 2>&1 | grep -E 'error:' | head -3
 
 Expected: `cannot find 'NewTask' in scope`.
 
-- [ ] **Step 3: Write `Entities.swift`**
+- [ ] **Step 3: Write the model files**
+
+`Sources/TodoCore/Model/Placement.swift`:
 
 ```swift
-// Sources/TodoCore/Model/Entities.swift
+// Sources/TodoCore/Model/Placement.swift
+
+/// Where a created or moved item lands among its siblings. Tasks, tags and the views of Task 9 are all
+/// ordered lists of one parent's children, and all three rank a new member the same way.
+public enum Placement: Sendable, Equatable {
+    case end
+    case start
+    case after(EntityID)
+}
+```
+
+`Sources/TodoCore/Model/Task.swift`:
+
+```swift
+// Sources/TodoCore/Model/Task.swift
 
 public enum TaskStatus: Int64, Sendable, CaseIterable {
     case open = 0
@@ -2674,40 +2865,63 @@ public enum TaskStatus: Int64, Sendable, CaseIterable {
     case canceled = 2
 }
 
-/// Where a created or moved item lands among its siblings.
-public enum Placement: Sendable, Equatable {
-    case end
-    case start
-    case after(EntityID)
-}
-
-/// A task as read from the store. `parent` and `trashed` are effective values from the task tree; notes are read separately.
+/// A task as read from the store, and a value that never changes after the read: `parent` and `trashed` are
+/// effective values from the task tree, so a copy kept across a write would describe a tree that has moved.
+/// Notes are read separately, because they are the one field of a task that is unbounded and no list needs
+/// them.
 public struct Task: Equatable, Sendable {
-    public var id: TaskID
-    public var title: String
-    public var status: TaskStatus
-    public var when: Day?
-    public var deadline: Day?
-    public var parent: TaskID?
-    public var rank: String
-    public var tags: Set<TagID>
-    public var trashed: Bool
-    public var createdAt: Int64
-    public var updatedAt: Int64
-    public var completedAt: Int64?
+    public let id: TaskID
+    public let title: String
+    public let status: TaskStatus
+    public let when: Day?
+    public let deadline: Day?
+    public let parent: TaskID?
+    public let rank: String
+    public let tags: Set<TagID>
+    public let trashed: Bool
+    public let createdAt: Int64
+    public let updatedAt: Int64
+    public let completedAt: Int64?
 }
 
+/// What a caller knows about a task before it exists. Everything but the title has a default, and the id, the
+/// rank and the timestamps are the store's to mint.
 public struct NewTask: Sendable {
-    public var title: String
-    public var notes: String = ""
-    public var when: Day? = nil
-    public var deadline: Day? = nil
-    public var parent: TaskID? = nil
-    public var tags: Set<TagID> = []
+    public let title: String
+    public let notes: String
+    public let when: Day?
+    public let deadline: Day?
+    public let parent: TaskID?
+    public let tags: Set<TagID>
 
-    public init(title: String) { self.title = title }
+    public init(
+        title: String,
+        notes: String = "",
+        when: Day? = nil,
+        deadline: Day? = nil,
+        parent: TaskID? = nil,
+        tags: Set<TagID> = []
+    ) {
+        self.title = title
+        self.notes = notes
+        self.when = when
+        self.deadline = deadline
+        self.parent = parent
+        self.tags = tags
+    }
 }
 
+/// One field of a task set to one value. A write takes a list of these, so an edit that changes three fields
+/// is one transaction, one clock and one change set rather than three of each.
+///
+/// The set is the columns of a task that are a value and nothing more, which is why the parent and the tags
+/// are not in it. Re-parenting is not one field: it ranks the task among its new siblings, so it is two
+/// operations under one stamp, it can close a cycle that has to be refused, and it needs a placement to say
+/// where the task lands — that is `move(task:to:at:)`, with `move(task:at:)` for a reorder inside one list.
+/// A tag on a task is not a field of the task at all: the journal carries it as its own `task_tag` entity, so
+/// attaching one is an operation about that pair, and a whole `Set` written at once would make one device's
+/// attach overwrite another's instead of merging with it — `add(tag:to:)` and `remove(tag:from:)` keep every
+/// pair a last-write-wins field of its own.
 public enum TaskChange: Sendable, Equatable {
     case title(String)
     case notes(String)
@@ -2716,18 +2930,51 @@ public enum TaskChange: Sendable, Equatable {
     case deadline(Day?)
 }
 
+extension TaskChange {
+    /// The state column this change writes, which is how a write keeps the last change for a field and drops
+    /// the earlier ones. `status` carries `completed_at` with it and is keyed by the status alone.
+    var field: String {
+        switch self {
+        case .title: "title"
+        case .notes: "notes"
+        case .status: "status"
+        case .when: "when_day"
+        case .deadline: "deadline_day"
+        }
+    }
+}
+```
+
+`Sources/TodoCore/Model/Tag.swift`:
+
+```swift
+// Sources/TodoCore/Model/Tag.swift
+
+/// A tag as read from the store. `parent` is effective, by the same rule the task tree follows: a link to a
+/// missing, deleted or circular parent reads as no link and the tag shows at the root.
 public struct Tag: Equatable, Sendable {
-    public var id: TagID
-    public var title: String
-    public var parent: TagID?
-    public var rank: String
-    public var createdAt: Int64
-    public var updatedAt: Int64
+    public let id: TagID
+    public let title: String
+    public let parent: TagID?
+    public let rank: String
+    public let createdAt: Int64
+    public let updatedAt: Int64
 }
 
+/// One field of a tag set to one value. The parent is not among them, for the reason written on `TaskChange`:
+/// re-parenting also ranks the tag among its new siblings, so it is `move(tag:to:at:)`, with `move(tag:at:)`
+/// for a reorder inside one list.
 public enum TagChange: Sendable, Equatable {
     case title(String)
-    case parent(TagID?)
+}
+
+extension TagChange {
+    /// The state column this change writes, which is how a write keeps the last change for a field.
+    var field: String {
+        switch self {
+        case .title: "title"
+        }
+    }
 }
 ```
 
@@ -2738,15 +2985,21 @@ public enum TagChange: Sendable, Equatable {
 import SQLiteKit
 
 extension Store {
+    /// Every column a `Task` is read from, in the order `task(from:)` decodes them. `parent` and `trashed`
+    /// come from the tree and not from `tasks`, which is what makes a merge's leftovers invisible to a read.
     static let taskColumns = "t.id, t.title, t.status, t.when_day, t.deadline_day, tt.parent, t.rank, tt.trashed, t.created_at, t.updated_at, t.completed_at"
 
-    // MARK: Writes
+    // MARK: - Writes
 
+    /// Creates a task and returns its id. Every field the caller gave is one operation in the same
+    /// transaction, so a task never exists half-written, and the `created_at` operation is what carries this
+    /// device's stamp into the row.
     @discardableResult
     public func createTask(_ new: NewTask, at placement: Placement = .end) throws(StoreError) -> TaskID {
         if let parent = new.parent { try requireTask(parent) }
-        let id = TaskID.generate()
-        let rank = try siblingRank(table: "tasks", parent: new.parent, placement: placement, excluding: nil)
+        for tag in new.tags { try requireTag(tag) }
+        let id = TaskID()
+        let rank = try siblingRank(in: .task, parent: new.parent, placement: placement, excluding: nil)
         let stamp = clock.next()
         let fields: [(String, Value)] = [
             ("title", .text(new.title)), ("notes", .text(new.notes)), ("status", .integer(TaskStatus.open.rawValue)),
@@ -2760,12 +3013,27 @@ extension Store {
         return id
     }
 
+    /// Sets the given fields. The completion time follows the status rather than being written by the caller:
+    /// a task that leaves `open` records when it left, and one that returns to it has no completion time at
+    /// all. Both are one operation each, so the two fields cannot disagree after a merge. A status the task
+    /// already holds is not a crossing and moves nothing — marking a done task done again, which a bulk edit
+    /// or a checkbox that re-sends its state does all the time, must not reorder the Logbook.
+    ///
+    /// A field named twice keeps the last change for it. Every operation of one call carries one stamp, so
+    /// two of them for one field would meet as equals in `apply`, the second would lose the comparison and
+    /// its journal row would be dropped as a duplicate: the value would be gone from the state and from a
+    /// future sync alike, without a sound.
     public func update(task id: TaskID, _ changes: [TaskChange]) throws(StoreError) {
-        try requireTask(id)
         guard !changes.isEmpty else { return }
+        // The status the task holds now, and the existence check in the same query: the completion time below
+        // moves only when the task crosses in or out of `open`, which is not a question the caller's list can
+        // answer on its own.
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT status FROM tasks WHERE id = ? AND deleted = 0", [.text(id.rawValue)]) }
+        guard let row = rows.first else { throw .notFound(id) }
+        let current = TaskStatus(rawValue: row[0].int64 ?? 0) ?? .open
         let stamp = clock.next()
         var ops: [Operation] = []
-        for change in changes {
+        for change in Store.lastPerField(changes, by: { $0.field }) {
             switch change {
             case .title(let title): ops.append(op(.task, id.rawValue, "title", .text(title), stamp))
             case .notes(let notes): ops.append(op(.task, id.rawValue, "notes", .text(notes), stamp))
@@ -2773,43 +3041,80 @@ extension Store {
             case .deadline(let day): ops.append(op(.task, id.rawValue, "deadline_day", Value(day?.daysSinceEpoch), stamp))
             case .status(let status):
                 ops.append(op(.task, id.rawValue, "status", .integer(status.rawValue), stamp))
-                ops.append(op(.task, id.rawValue, "completed_at", status == .open ? .null : .integer(stamp.millis), stamp))
+                if (status == .open) != (current == .open) {
+                    ops.append(op(.task, id.rawValue, "completed_at", status == .open ? .null : .integer(stamp.millis), stamp))
+                }
             }
         }
         try apply(ops)
     }
 
+    /// Moves the task to the trash, which a person can see into and take things back out of. Its descendants
+    /// follow through the tree without an operation of their own, so `restore` brings back exactly what the
+    /// trashing took down.
     public func trash(task id: TaskID) throws(StoreError) { try setFlag(.task, id, "trashed", true) }
+
+    /// Takes the task out of the trash, and with it everything that went down with it.
     public func restore(task id: TaskID) throws(StoreError) { try setFlag(.task, id, "trashed", false) }
-    /// Tombstones the task: the row stays for sync, nothing shows it again.
+
+    /// Tombstones the task: emptying the trash, and the half of the pair that does not come back. `trashed`
+    /// is a place a task sits in and can leave; `deleted` ends it. The row itself stays behind, because a
+    /// peer that never heard of the deletion would sync the task back from its own copy, and a tombstone is
+    /// how it learns instead. Nothing reads the task again, and its children move to the root rather than
+    /// vanish underneath it.
     public func delete(task id: TaskID) throws(StoreError) { try setFlag(.task, id, "deleted", true) }
 
+    /// Re-parents the task and ranks it among its new siblings. The two operations share one stamp: a device
+    /// that sees only one of them would place the task in a list it is not in.
     public func move(task id: TaskID, to parent: TaskID?, at placement: Placement) throws(StoreError) {
         try requireTask(id)
         if let parent {
             guard parent != id else { throw .invalid("a task cannot be its own parent") }
             try requireTask(parent)
+            // A move into the task's own subtree closes a cycle, and the reading rule of ADR-0003 answers a
+            // cycle by putting every task on it at the root: a person who drags a project onto one of its own
+            // items would watch the subtree scatter. That rule is for merges, where neither of two concurrent
+            // links is the better one and neither device ever saw the cycle; here the whole tree is in hand.
+            if try isUnder(parent, ancestor: id, in: .task) { throw .invalid("a task cannot be moved under its own descendant") }
         }
-        let rank = try siblingRank(table: "tasks", parent: parent, placement: placement, excluding: id)
+        let rank = try siblingRank(in: .task, parent: parent, placement: placement, excluding: id)
         let stamp = clock.next()
         try apply([op(.task, id.rawValue, "parent", Value(parent?.rawValue), stamp), op(.task, id.rawValue, "rank", .text(rank), stamp)])
     }
 
+    /// Ranks the task among the siblings it already has, without saying anything about its parent.
+    ///
+    /// `move(task:to:at:)` can do this too, by being handed the parent the task is under — but then the write
+    /// carries a `parent` operation at a new stamp, and this device asserts the link a peer may have moved in
+    /// the meantime. A drag inside one list means nothing about the parent, so it writes the rank alone.
+    public func move(task id: TaskID, at placement: Placement) throws(StoreError) {
+        try requireTask(id)
+        let rank = try siblingRank(in: .task, parent: try effectiveParent(of: id, in: .task), placement: placement, excluding: id)
+        try apply([op(.task, id.rawValue, "rank", .text(rank), clock.next())])
+    }
+
     public func add(tag: TagID, to task: TaskID) throws(StoreError) {
         try requireTask(task)
+        try requireTag(tag)
         try apply([op(.taskTag, Operation.pairID(task, tag), "present", Value(true), clock.next())])
     }
 
+    /// Detaching is a `present = 0` and not a deleted row, so that a peer that attached the same tag offline
+    /// meets a field clock to lose to instead of an absence that reads as "never attached". The tag itself is
+    /// not required to be there: a tag deleted on another device is exactly one a person may be detaching.
     public func remove(tag: TagID, from task: TaskID) throws(StoreError) {
+        try requireTask(task)
         try apply([op(.taskTag, Operation.pairID(task, tag), "present", Value(false), clock.next())])
     }
 
-    // MARK: Reads
+    // MARK: - Reads
 
     public func task(_ id: TaskID) throws(StoreError) -> Task? {
         try loadTasks(where: "t.id = ?", [.text(id.rawValue)], orderBy: "t.rank").first
     }
 
+    /// The notes of a task, read on their own. Throws if the task is not there, which is what tells an empty
+    /// note apart from a task that no longer exists.
     public func notes(of id: TaskID) throws(StoreError) -> String {
         let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT notes FROM tasks WHERE id = ? AND deleted = 0", [.text(id.rawValue)]) }
         guard let row = rows.first else { throw .notFound(id) }
@@ -2826,8 +3131,11 @@ extension Store {
         try loadTasks(where: "(? OR tt.trashed = 0)", [Value(includeTrashed)], orderBy: "t.created_at, t.id")
     }
 
-    // MARK: Shared helpers
+    // MARK: - Shared helpers
 
+    /// A write names the task it edits, and a caller that names one that is gone gets an error rather than an
+    /// operation that creates a row out of nothing: `applyToState` inserts the row it does not find, which is
+    /// what sync needs and what a typo must not reach.
     func requireTask(_ id: TaskID) throws(StoreError) {
         let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT 1 FROM tasks WHERE id = ? AND deleted = 0", [.text(id.rawValue)]) }
         if rows.isEmpty { throw .notFound(id) }
@@ -2838,14 +3146,14 @@ extension Store {
         try apply([op(kind, id.rawValue, field, Value(value), clock.next())])
     }
 
-    /// A rank among the siblings of `parent` in `table` ("tasks" uses the effective parent from task_tree, "tags" and "views" the raw column).
-    func siblingRank(table: String, parent: EntityID?, placement: Placement, excluding: EntityID?) throws(StoreError) -> String {
-        let sql = table == "tasks"
-            ? "SELECT t.id, t.rank FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE tt.parent IS ? AND t.id != ? ORDER BY t.rank, t.id"
-            : "SELECT id, rank FROM \(table) WHERE parent IS ? AND deleted = 0 AND id != ? ORDER BY rank, id"
-        let siblings = try self.sql { () throws(SQLiteError) in
-            try db.rows(sql, [Value(parent?.rawValue), .text(excluding?.rawValue ?? "")]).map { ($0[0].string ?? "", $0[1].string ?? Rank.initial) }
-        }
+    /// A rank among the siblings of `parent` in `table`: `tasks` asks the effective parent from `task_tree`,
+    /// `tags` and `views` the raw column, since neither has a derived table of its own.
+    ///
+    /// The siblings are read at the moment of the write, so two devices editing the same list offline can and
+    /// do compute the same key. That is what `Rank.between` tolerates and what the `, id` in every order
+    /// clause settles: equal ranks fall back to the id, and the list is stable everywhere.
+    func siblingRank(in kind: EntityKind, parent: EntityID?, placement: Placement, excluding: EntityID?) throws(StoreError) -> String {
+        let siblings = try orderedSiblings(in: kind, parent: parent, excluding: excluding)
         switch placement {
         case .end: return Rank.between(siblings.last?.1, nil)
         case .start: return Rank.between(nil, siblings.first?.1)
@@ -2856,26 +3164,107 @@ extension Store {
         }
     }
 
-    /// Loads tasks with their tags. `clause` may use aliases `t` (tasks) and `tt` (task_tree); `join` is appended after the tree join.
-    func loadTasks(where clause: String, _ params: [Value], orderBy: String, join: String = "", limit: Int? = nil) throws(StoreError) -> [Task] {
-        let limitClause = limit.map { " LIMIT \($0)" } ?? ""
-        var tasks = try sql { () throws(SQLiteError) in
-            try db.rows("SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id \(join) WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)", params).map(Store.task(from:))
+    /// The siblings a read would show under `parent`, in the order it would show them, which is the list a
+    /// placement has to rank among. Tasks take their effective parent from `task_tree`; tags and views have
+    /// no derived table of their own, so the same rule is applied here instead of trusting the column —
+    /// a tag whose stored parent was deleted, or made circular by a merge, is at the root of every read, and
+    /// a placement that ranked it against the raw column would rank among a list nobody sees.
+    private func orderedSiblings(in kind: EntityKind, parent: EntityID?, excluding: EntityID?) throws(StoreError) -> [(id: String, rank: String)] {
+        if kind == .task {
+            return try sql { () throws(SQLiteError) in
+                try db.rows(
+                    "SELECT t.id, t.rank FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE tt.parent IS ? AND t.id != ? ORDER BY t.rank, t.id",
+                    [Value(parent?.rawValue), .text(excluding?.rawValue ?? "")]
+                ).map { ($0[0].string ?? "", $0[1].string ?? Rank.initial) }
+            }
         }
-        try attachTags(&tasks)
-        return tasks
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, parent, rank, deleted FROM \(FieldMap.table(kind))") }
+        let parents = TreeRules.effectiveParents(rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[1].string, deleted: $0[3].bool) })
+        return rows.compactMap { row -> (id: String, rank: String)? in
+            let id = row[0].string ?? ""
+            guard !row[3].bool, id != excluding?.rawValue, (parents[id] ?? nil) == parent?.rawValue else { return nil }
+            return (id, row[2].string ?? Rank.initial)
+        }.sorted { ($0.rank, $0.id) < ($1.rank, $1.id) }
     }
 
-    static func task(from row: [Value]) -> Task {
+    /// The item's parent as a read sees it, which is the list a reorder ranks among.
+    func effectiveParent(of id: EntityID, in kind: EntityKind) throws(StoreError) -> EntityID? {
+        if kind == .task {
+            let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT parent FROM task_tree WHERE id = ?", [.text(id.rawValue)]) }
+            return rows.first?[0].string.map(EntityID.init)
+        }
+        return (try effectiveParents(in: kind)[id.rawValue] ?? nil).map(EntityID.init)
+    }
+
+    /// Whether `id` sits under `ancestor` as a read sees the tree, which is what a move has to refuse.
+    ///
+    /// For tasks the walk is SQLite's and not the stack's, and `UNION` bounds it even if `task_tree` ever held
+    /// a cycle, which `TreeRules` promises it does not. For the kinds without a derived tree the same promise
+    /// is what ends the loop: every chain of effective parents reaches a root in a finite number of steps.
+    func isUnder(_ id: EntityID, ancestor: EntityID, in kind: EntityKind) throws(StoreError) -> Bool {
+        if kind == .task {
+            let rows = try sql { () throws(SQLiteError) in
+                try db.rows("""
+                    WITH RECURSIVE ancestors(id) AS (
+                        SELECT ?
+                        UNION
+                        SELECT tt.parent FROM task_tree tt JOIN ancestors a ON tt.id = a.id WHERE tt.parent IS NOT NULL
+                    )
+                    SELECT 1 FROM ancestors WHERE id = ? LIMIT 1
+                    """, [.text(id.rawValue), .text(ancestor.rawValue)])
+            }
+            return !rows.isEmpty
+        }
+        let parents = try effectiveParents(in: kind)
+        var cursor: String? = id.rawValue
+        while let current = cursor {
+            if current == ancestor.rawValue { return true }
+            cursor = parents[current] ?? nil
+        }
+        return false
+    }
+
+    /// Effective parent links of a table that has no derived tree of its own, by the rule every read follows.
+    private func effectiveParents(in kind: EntityKind) throws(StoreError) -> [String: String?] {
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, parent, deleted FROM \(FieldMap.table(kind))") }
+        return TreeRules.effectiveParents(rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[1].string, deleted: $0[2].bool) })
+    }
+
+    /// The last change for each field, in the order the fields first appear. What it is for is written where
+    /// the write methods use it.
+    static func lastPerField<Change>(_ changes: [Change], by field: (Change) -> String) -> [Change] {
+        var latest: [String: Change] = [:]
+        var order: [String] = []
+        for change in changes where latest.updateValue(change, forKey: field(change)) == nil { order.append(field(change)) }
+        return order.compactMap { latest[$0] }
+    }
+
+    /// Loads tasks with their tags. `clause` may use the aliases `t` (tasks) and `tt` (task_tree); `join` is
+    /// appended after the tree join, which is where Tasks 8 to 10 hang a filter, a manual list or an FTS
+    /// table off the same loader.
+    func loadTasks(where clause: String, _ params: [Value], orderBy: String, join: String = "", limit: Int? = nil) throws(StoreError) -> [Task] {
+        let limitClause = limit.map { " LIMIT \($0)" } ?? ""
+        let rows = try sql { () throws(SQLiteError) in
+            try db.rows("SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id \(join) WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)", params)
+        }
+        let tags = try tagsByTask(rows.map { $0[0].string ?? "" })
+        return rows.map { Store.task(from: $0, tags: tags[$0[0].string ?? ""] ?? []) }
+    }
+
+    static func task(from row: [Value], tags: Set<TagID>) -> Task {
         Task(
             id: TaskID(row[0].string ?? ""),
             title: row[1].string ?? "",
             status: TaskStatus(rawValue: row[2].int64 ?? 0) ?? .open,
-            when: row[3].int64.map { Day(daysSinceEpoch: Int32($0)) },
-            deadline: row[4].int64.map { Day(daysSinceEpoch: Int32($0)) },
+            // A day column is a plain INTEGER and holds whatever a peer or a newer version of the app wrote
+            // into it, while `Day` is 32 bits wide. A conversion that trapped would abort the process on every
+            // read of every list the task appears in, for as long as the value is stored (#34), so a day the
+            // type cannot hold reads as no day, the way an unusable parent link reads as no link.
+            when: row[3].int64.flatMap { Int32(exactly: $0) }.map(Day.init(daysSinceEpoch:)),
+            deadline: row[4].int64.flatMap { Int32(exactly: $0) }.map(Day.init(daysSinceEpoch:)),
             parent: row[5].string.map(TaskID.init),
             rank: row[6].string ?? Rank.initial,
-            tags: [],
+            tags: tags,
             trashed: row[7].bool,
             createdAt: row[8].int64 ?? 0,
             updatedAt: row[9].int64 ?? 0,
@@ -2883,20 +3272,20 @@ extension Store {
         )
     }
 
-    private func attachTags(_ tasks: inout [Task]) throws(StoreError) {
-        guard !tasks.isEmpty else { return }
-        var index: [TaskID: Int] = [:]
-        for (i, task) in tasks.enumerated() { index[task.id] = i }
-        let ids = Array(index.keys)
+    /// One query for the tags of a whole page of tasks instead of one per task, chunked because SQLite has a
+    /// limit on how many parameters a statement takes. A tag that has been deleted is left out here rather
+    /// than in every caller: the pair row stays for sync, and nothing shows it again.
+    private func tagsByTask(_ ids: [String]) throws(StoreError) -> [String: Set<TagID>] {
+        guard !ids.isEmpty else { return [:] }
+        var tags: [String: Set<TagID>] = [:]
         for chunk in stride(from: 0, to: ids.count, by: 500).map({ Array(ids[$0..<min($0 + 500, ids.count)]) }) {
             let placeholders = Array(repeating: "?", count: chunk.count).joined(separator: ", ")
             let rows = try sql { () throws(SQLiteError) in
-                try db.rows("SELECT x.task_id, x.tag_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.present = 1 AND x.task_id IN (\(placeholders))", chunk.map { .text($0.rawValue) })
+                try db.rows("SELECT x.task_id, x.tag_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.present = 1 AND x.task_id IN (\(placeholders))", chunk.map { .text($0) })
             }
-            for row in rows {
-                if let i = index[TaskID(row[0].string ?? "")] { tasks[i].tags.insert(TagID(row[1].string ?? "")) }
-            }
+            for row in rows { tags[row[0].string ?? "", default: []].insert(TagID(row[1].string ?? "")) }
         }
+        return tags
     }
 }
 ```
@@ -2911,8 +3300,8 @@ extension Store {
     @discardableResult
     public func createTag(title: String, parent: TagID? = nil, at placement: Placement = .end) throws(StoreError) -> TagID {
         if let parent { try requireTag(parent) }
-        let id = TagID.generate()
-        let rank = try siblingRank(table: "tags", parent: parent, placement: placement, excluding: nil)
+        let id = TagID()
+        let rank = try siblingRank(in: .tag, parent: parent, placement: placement, excluding: nil)
         let stamp = clock.next()
         try apply([
             op(.tag, id.rawValue, "title", .text(title), stamp),
@@ -2924,33 +3313,54 @@ extension Store {
         return id
     }
 
+    /// Sets the given fields. A field named twice keeps the last change for it, for the reason written on
+    /// `update(task:_:)`.
     public func update(tag id: TagID, _ changes: [TagChange]) throws(StoreError) {
-        try requireTag(id)
         guard !changes.isEmpty else { return }
+        try requireTag(id)
         let stamp = clock.next()
-        var ops: [Operation] = []
-        for change in changes {
+        let ops = Store.lastPerField(changes, by: { $0.field }).map { change in
             switch change {
-            case .title(let title): ops.append(op(.tag, id.rawValue, "title", .text(title), stamp))
-            case .parent(let parent):
-                if let parent {
-                    guard parent != id else { throw .invalid("a tag cannot be its own parent") }
-                    try requireTag(parent)
-                }
-                let rank = try siblingRank(table: "tags", parent: parent, placement: .end, excluding: id)
-                ops.append(op(.tag, id.rawValue, "parent", Value(parent?.rawValue), stamp))
-                ops.append(op(.tag, id.rawValue, "rank", .text(rank), stamp))
+            case .title(let title): op(.tag, id.rawValue, "title", .text(title), stamp)
             }
         }
         try apply(ops)
     }
 
+    /// Re-parents the tag and ranks it among its new siblings, the way `move(task:to:at:)` does for a task:
+    /// two operations under one stamp, and a move into the tag's own subtree refused here rather than left to
+    /// the reading rule, which would answer the cycle by putting every tag on it at the root.
+    public func move(tag id: TagID, to parent: TagID?, at placement: Placement) throws(StoreError) {
+        try requireTag(id)
+        if let parent {
+            guard parent != id else { throw .invalid("a tag cannot be its own parent") }
+            try requireTag(parent)
+            if try isUnder(parent, ancestor: id, in: .tag) { throw .invalid("a tag cannot be moved under its own descendant") }
+        }
+        let rank = try siblingRank(in: .tag, parent: parent, placement: placement, excluding: id)
+        let stamp = clock.next()
+        try apply([op(.tag, id.rawValue, "parent", Value(parent?.rawValue), stamp), op(.tag, id.rawValue, "rank", .text(rank), stamp)])
+    }
+
+    /// Ranks the tag among the siblings it already has, without saying anything about its parent.
+    public func move(tag id: TagID, at placement: Placement) throws(StoreError) {
+        try requireTag(id)
+        let rank = try siblingRank(in: .tag, parent: try effectiveParent(of: id, in: .tag), placement: placement, excluding: id)
+        try apply([op(.tag, id.rawValue, "rank", .text(rank), clock.next())])
+    }
+
+    /// Tombstones the tag. Its children move to the root and the tasks that carry it stop showing it, both by
+    /// the reading rule and not by a write that touches every one of them.
     public func delete(tag id: TagID) throws(StoreError) {
         try requireTag(id)
         try setFlag(.tag, id, "deleted", true)
     }
 
-    /// Every tag, parents before children, siblings by rank. `parent` is effective: missing, deleted or circular links read as root.
+    /// Every tag, parents before children, siblings by rank. `parent` is effective: a link to a missing,
+    /// deleted or circular parent reads as root, exactly as `task_tree` resolves the same hazard for tasks.
+    ///
+    /// This loads the whole table. Tags number in the tens, and the tree order needs every row anyway, so the
+    /// query that would ask for one branch would still have to read the rest to know where the branch hangs.
     public func tags() throws(StoreError) -> [Tag] {
         let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, title, parent, rank, created_at, updated_at, deleted FROM tags") }
         let nodes = rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[2].string, deleted: $0[6].bool) }
@@ -2961,14 +3371,19 @@ extension Store {
             let tag = Tag(id: TagID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(TagID.init), rank: row[3].string ?? Rank.initial, createdAt: row[4].int64 ?? 0, updatedAt: row[5].int64 ?? 0)
             byParent[parents[id] ?? nil, default: []].append(tag)
         }
-        var ordered: [Tag] = []
-        func visit(_ parent: String?) {
-            for tag in (byParent[parent] ?? []).sorted(by: { ($0.rank, $0.id.rawValue) < ($1.rank, $1.id.rawValue) }) {
-                ordered.append(tag)
-                visit(tag.id.rawValue)
-            }
+        // Parents before children without recursion: a chain thousands of links deep arrives from sync as
+        // easily as a shallow one, and a stack — 64 KiB of it on wasm32 — is not what should decide whether
+        // the tag tree reads. It is the rule `TreeRules` and `Store.inheritedTrash` already follow. Children
+        // go onto the stack in reverse, so they come off it in rank order.
+        func children(of parent: String?) -> [Tag] {
+            (byParent[parent] ?? []).sorted { ($0.rank, $0.id.rawValue) < ($1.rank, $1.id.rawValue) }
         }
-        visit(nil)
+        var ordered: [Tag] = []
+        var stack = Array(children(of: nil).reversed())
+        while let tag = stack.popLast() {
+            ordered.append(tag)
+            stack.append(contentsOf: children(of: tag.id.rawValue).reversed())
+        }
         return ordered
     }
 
@@ -2983,7 +3398,7 @@ extension Store {
 }
 ```
 
-`tags()` loads the whole table: tags number in the tens, and the tree order needs every row anyway.
+`tags()` loads the whole table: tags number in the tens, and both the tree order and the effective parent of a single tag need every row anyway.
 
 - [ ] **Step 6: Run the tests on both platforms**
 
@@ -2992,12 +3407,12 @@ swift test --filter 'TaskTests|TagTests' 2>&1 | tail -3
 swift test --filter 'TaskTests|TagTests' --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
 ```
 
-Expected: 9 tests pass on both.
+Expected: 19 tests pass on both.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Update the changelog and commit**
 
 ```bash
-git add Sources/TodoCore Tests/TodoCoreTests/TaskTests.swift Tests/TodoCoreTests/TagTests.swift
+git add Sources/TodoCore Tests/TodoCoreTests/TaskTests.swift Tests/TodoCoreTests/TagTests.swift CHANGELOG.md
 git commit -m "feat(core): add the task and tag write API and reads"
 ```
 
@@ -3425,7 +3840,7 @@ git commit -m "feat(core): add the filter model with its JSON format and SQL com
 ### Task 9: Views: nesting, built-in views, manual lists, pages with sections and groups
 
 **Files:**
-- Modify: `Sources/TodoCore/Model/Entities.swift` (add `View`, `NewView`, `ViewChange`, `BuiltInViews`)
+- Create: `Sources/TodoCore/Model/View.swift` (`View`, `NewView`, `ViewChange`, `BuiltInViews`), one file per entity as in Task 7
 - Create: `Sources/TodoCore/Storage/Store+Views.swift`, `Sources/TodoCore/Query/Store+Query.swift`
 - Modify: `Sources/TodoCore/Storage/Store.swift` (replace the empty `seedBuiltInViews`)
 - Modify: `docs/specs/core-storage-and-search.md` (Logbook row of the built-in views table, see Step 7)
@@ -3618,7 +4033,7 @@ swift test --filter 'ViewTests|QueryTests' 2>&1 | grep -E 'error:' | head -3
 
 Expected: `cannot find 'NewView' in scope`.
 
-- [ ] **Step 3: Add the view types to `Entities.swift`**
+- [ ] **Step 3: Write `View.swift`**
 
 ```swift
 /// A view as read from the store. `parent` is effective; `needsNewerApp` carries the kind an older app could not read.
