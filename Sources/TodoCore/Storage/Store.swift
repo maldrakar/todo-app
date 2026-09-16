@@ -10,6 +10,11 @@ public enum StoreError: Error, Equatable, Sendable {
 }
 
 /// Which entities a committed transaction touched. UI layers re-query the views they show.
+///
+/// It names the entities the operations addressed, not every row that moved. Trashing or re-parenting a task
+/// rewrites the effective parent and inherited trash of everything below it in `task_tree`, and those
+/// descendants are not in `tasks`: a consumer that redraws a single task from this set alone leaves a stale
+/// child on screen, while redrawing the view the task belongs to is what the set is sized for.
 public struct ChangeSet: Equatable, Sendable {
     public internal(set) var tasks: Set<TaskID> = []
     public internal(set) var tags: Set<TagID> = []
@@ -131,7 +136,8 @@ public final class Store {
         }
     }
 
-    /// Recomputes task_tree. The body arrives in Task 6.
+    /// Recomputes task_tree from the state, which is what an open costs and what a migration needs: the rows
+    /// `apply` keeps in step are only as good as the rules that were compiled in when it wrote them.
     func rebuildTree() throws(StoreError) {
         try sql { () throws(SQLiteError) in
             try db.transaction { () throws(SQLiteError) in try rebuildTreeRows() }
@@ -154,7 +160,4 @@ public final class Store {
         try applyRows(ops)
         for seq in replayed { try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [seq]) }
     }
-
-    /// Runs inside a transaction opened by the caller. Task 6 fills it in.
-    func rebuildTreeRows() throws(SQLiteError) {}
 }
