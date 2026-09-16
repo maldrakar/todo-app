@@ -11,17 +11,18 @@ public struct Tag: Equatable, Sendable {
     public let updatedAt: Int64
 }
 
+/// One field of a tag set to one value. The parent is not among them, for the reason written on `TaskChange`:
+/// re-parenting also ranks the tag among its new siblings, so it is `move(tag:to:at:)`, with `move(tag:at:)`
+/// for a reorder inside one list.
 public enum TagChange: Sendable, Equatable {
     case title(String)
-    case parent(TagID?)
 }
 
 extension TagChange {
-    /// The state column this change writes; `parent` carries the new `rank` with it.
+    /// The state column this change writes, which is how a write keeps the last change for a field.
     var field: String {
         switch self {
         case .title: "title"
-        case .parent: "parent"
         }
     }
 }

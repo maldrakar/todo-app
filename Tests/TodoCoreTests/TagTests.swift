@@ -9,7 +9,8 @@ import Testing
     let home = try store.createTag(title: "Home", parent: areas, at: .start)
     #expect(try store.tags().map(\.title) == ["Areas", "Home", "Work"])
     #expect(try store.tag(work)?.parent == areas)
-    try store.update(tag: work, [.title("Office"), .parent(nil)])
+    try store.update(tag: work, [.title("Office")])
+    try store.move(tag: work, to: nil, at: .end)
     let office = try #require(try store.tag(work))
     #expect(office.title == "Office" && office.parent == nil)
     #expect(try store.tags().map(\.title) == ["Areas", "Home", "Office"], "Office moved to the root after Areas")
@@ -62,12 +63,32 @@ import Testing
     #expect(tags.map(\.id.rawValue) == ids, "parents before children, however deep the chain")
 }
 
-@Test func aTagRefusesItsOwnParentAndKeepsTheLastChangeForAField() throws {
+@Test func theLastChangeForATagFieldWins() throws {
     let store = try makeStore()
     let a = try store.createTag(title: "a")
-    var caught: StoreError?
-    do { try store.update(tag: a, [.parent(a)]) } catch { caught = error }
-    #expect(caught == .invalid("a tag cannot be its own parent"))
     try store.update(tag: a, [.title("first"), .title("second")])
     #expect(try store.tag(a)?.title == "second")
+}
+
+/// Tags move the way tasks do: re-parenting is a move with a placement, a reorder inside one list writes the
+/// rank alone, and a move into the tag's own subtree is refused rather than left to the reading rule, which
+/// would answer it by putting every tag on the cycle at the root.
+@Test func tagsMoveAndReorderTheWayTasksDo() throws {
+    let store = try makeStore()
+    let areas = try store.createTag(title: "Areas")
+    let work = try store.createTag(title: "Work", parent: areas)
+    let home = try store.createTag(title: "Home", parent: areas)
+    let errands = try store.createTag(title: "Errands", parent: areas)
+    #expect(try store.tags().map(\.title) == ["Areas", "Work", "Home", "Errands"])
+    try store.move(tag: errands, at: .after(work))
+    #expect(try store.tags().map(\.title) == ["Areas", "Work", "Errands", "Home"])
+    #expect(try store.tag(errands)?.parent == areas, "a reorder says nothing about the parent")
+    try store.move(tag: home, to: nil, at: .start)
+    #expect(try store.tags().map(\.title) == ["Home", "Areas", "Work", "Errands"])
+    var caught: StoreError?
+    do { try store.move(tag: areas, to: areas, at: .end) } catch { caught = error }
+    #expect(caught == .invalid("a tag cannot be its own parent"))
+    do { try store.move(tag: areas, to: work, at: .end) } catch { caught = error }
+    #expect(caught == .invalid("a tag cannot be moved under its own descendant"))
+    #expect(try store.tags().map(\.title) == ["Home", "Areas", "Work", "Errands"], "the refused moves left the tree as it was")
 }

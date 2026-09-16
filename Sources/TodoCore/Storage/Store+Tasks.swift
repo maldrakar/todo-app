@@ -92,7 +92,7 @@ extension Store {
             // cycle by putting every task on it at the root: a person who drags a project onto one of its own
             // items would watch the subtree scatter. That rule is for merges, where neither of two concurrent
             // links is the better one and neither device ever saw the cycle; here the whole tree is in hand.
-            if try isUnder(parent, ancestor: id) { throw .invalid("a task cannot be moved under its own descendant") }
+            if try isUnder(parent, ancestor: id, in: .task) { throw .invalid("a task cannot be moved under its own descendant") }
         }
         let rank = try siblingRank(in: .task, parent: parent, placement: placement, excluding: id)
         let stamp = clock.next()
@@ -106,14 +106,8 @@ extension Store {
     /// the meantime. A drag inside one list means nothing about the parent, so it writes the rank alone.
     public func move(task id: TaskID, at placement: Placement) throws(StoreError) {
         try requireTask(id)
-        let rank = try siblingRank(in: .task, parent: try effectiveParent(of: id), placement: placement, excluding: id)
+        let rank = try siblingRank(in: .task, parent: try effectiveParent(of: id, in: .task), placement: placement, excluding: id)
         try apply([op(.task, id.rawValue, "rank", .text(rank), clock.next())])
-    }
-
-    /// The task's parent as the tree reads it, which is the list a reorder ranks among.
-    private func effectiveParent(of id: TaskID) throws(StoreError) -> TaskID? {
-        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT parent FROM task_tree WHERE id = ?", [.text(id.rawValue)]) }
-        return rows.first?[0].string.map(TaskID.init)
     }
 
     public func add(tag: TagID, to task: TaskID) throws(StoreError) {
@@ -210,20 +204,47 @@ extension Store {
         }.sorted { ($0.rank, $0.id) < ($1.rank, $1.id) }
     }
 
-    /// Whether `id` sits under `ancestor` in the effective tree. The walk is SQLite's and not the stack's, and
-    /// `UNION` bounds it even if `task_tree` ever held a cycle, which `TreeRules` promises it does not.
-    private func isUnder(_ id: TaskID, ancestor: TaskID) throws(StoreError) -> Bool {
-        let rows = try sql { () throws(SQLiteError) in
-            try db.rows("""
-                WITH RECURSIVE ancestors(id) AS (
-                    SELECT ?
-                    UNION
-                    SELECT tt.parent FROM task_tree tt JOIN ancestors a ON tt.id = a.id WHERE tt.parent IS NOT NULL
-                )
-                SELECT 1 FROM ancestors WHERE id = ? LIMIT 1
-                """, [.text(id.rawValue), .text(ancestor.rawValue)])
+    /// The item's parent as a read sees it, which is the list a reorder ranks among.
+    func effectiveParent(of id: EntityID, in kind: EntityKind) throws(StoreError) -> EntityID? {
+        if kind == .task {
+            let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT parent FROM task_tree WHERE id = ?", [.text(id.rawValue)]) }
+            return rows.first?[0].string.map(EntityID.init)
         }
-        return !rows.isEmpty
+        return (try effectiveParents(in: kind)[id.rawValue] ?? nil).map(EntityID.init)
+    }
+
+    /// Whether `id` sits under `ancestor` as a read sees the tree, which is what a move has to refuse.
+    ///
+    /// For tasks the walk is SQLite's and not the stack's, and `UNION` bounds it even if `task_tree` ever held
+    /// a cycle, which `TreeRules` promises it does not. For the kinds without a derived tree the same promise
+    /// is what ends the loop: every chain of effective parents reaches a root in a finite number of steps.
+    func isUnder(_ id: EntityID, ancestor: EntityID, in kind: EntityKind) throws(StoreError) -> Bool {
+        if kind == .task {
+            let rows = try sql { () throws(SQLiteError) in
+                try db.rows("""
+                    WITH RECURSIVE ancestors(id) AS (
+                        SELECT ?
+                        UNION
+                        SELECT tt.parent FROM task_tree tt JOIN ancestors a ON tt.id = a.id WHERE tt.parent IS NOT NULL
+                    )
+                    SELECT 1 FROM ancestors WHERE id = ? LIMIT 1
+                    """, [.text(id.rawValue), .text(ancestor.rawValue)])
+            }
+            return !rows.isEmpty
+        }
+        let parents = try effectiveParents(in: kind)
+        var cursor: String? = id.rawValue
+        while let current = cursor {
+            if current == ancestor.rawValue { return true }
+            cursor = parents[current] ?? nil
+        }
+        return false
+    }
+
+    /// Effective parent links of a table that has no derived tree of its own, by the rule every read follows.
+    private func effectiveParents(in kind: EntityKind) throws(StoreError) -> [String: String?] {
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, parent, deleted FROM \(FieldMap.table(kind))") }
+        return TreeRules.effectiveParents(rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[1].string, deleted: $0[2].bool) })
     }
 
     /// The last change for each field, in the order the fields first appear. What it is for is written where

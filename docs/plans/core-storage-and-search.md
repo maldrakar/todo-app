@@ -2512,10 +2512,11 @@ git commit -m "feat(core): derive effective parent and inherited trash into task
   - `public enum Placement: Sendable, Equatable { case end, start, after(EntityID) }`
   - `public struct Task: Equatable, Sendable`, every field a `let`: `id, title, status, when: Day?, deadline: Day?, parent: TaskID? (effective), rank, tags: Set<TagID>, trashed: Bool (effective), createdAt: Int64, updatedAt: Int64, completedAt: Int64?`
   - `public struct NewTask: Sendable`, every field a `let`, `init(title:notes:when:deadline:parent:tags:)` with a default for all but the title
-  - `public enum TaskChange: Sendable, Equatable { case title(String), notes(String), status(TaskStatus), when(Day?), deadline(Day?) }`, with an internal `field` naming the column it writes
+  - `public enum TaskChange: Sendable, Equatable { case title(String), notes(String), status(TaskStatus), when(Day?), deadline(Day?) }` — the columns that are a value and nothing more, so the parent belongs to `move` and a tag to `add`/`remove`; an internal `field` names the column it writes
   - `public struct Tag: Equatable, Sendable`, every field a `let`: `id, title, parent: TagID? (effective), rank, createdAt, updatedAt`
-  - `public enum TagChange: Sendable, Equatable { case title(String), parent(TagID?) }`, with the same internal `field`
-  - `extension Store`: `createTask(_:at:) -> TaskID`, `update(task:_:)`, `trash(task:)`, `restore(task:)`, `delete(task:)`, `move(task:to:at:)`, `move(task:at:)` (a reorder that writes the rank alone), `add(tag:to:)`, `remove(tag:from:)`, `task(_:) -> Task?`, `notes(of:) -> String`, `children(of:includeTrashed:) -> [Task]`, `allTasks(includeTrashed:) -> [Task]`, `createTag(title:parent:at:) -> TagID`, `update(tag:_:)`, `delete(tag:)`, `tags() -> [Tag]`, `tag(_:) -> Tag?`; internal `loadTasks(where:_:orderBy:join:limit:)`, `requireTask(_:)`, `requireTag(_:)`, `setFlag(_:_:_:_:)`, `siblingRank(in:parent:placement:excluding:)` (by `EntityKind`, so the table name comes from `FieldMap.table`), `lastPerField(_:by:)`, `static let taskColumns`, `static func task(from:tags:)`; private `orderedSiblings(in:parent:excluding:)`, `isUnder(_:ancestor:)`, `effectiveParent(of:)`, `tagsByTask(_:)`.
+  - `public enum TagChange: Sendable, Equatable { case title(String) }`, with the same internal `field`
+  - `extension Store`: `createTask(_:at:) -> TaskID`, `update(task:_:)`, `trash(task:)`, `restore(task:)`, `delete(task:)`, `move(task:to:at:)`, `move(task:at:)`, `add(tag:to:)`, `remove(tag:from:)`, `task(_:) -> Task?`, `notes(of:) -> String`, `children(of:includeTrashed:) -> [Task]`, `allTasks(includeTrashed:) -> [Task]`, `createTag(title:parent:at:) -> TagID`, `update(tag:_:)`, `move(tag:to:at:)`, `move(tag:at:)`, `delete(tag:)`, `tags() -> [Tag]`, `tag(_:) -> Tag?`; internal `loadTasks(where:_:orderBy:join:limit:)`, `requireTask(_:)`, `requireTag(_:)`, `setFlag(_:_:_:_:)`, `siblingRank(in:parent:placement:excluding:)` (by `EntityKind`, so the table comes from `FieldMap.table`), `effectiveParent(of:in:)`, `isUnder(_:ancestor:in:)`, `lastPerField(_:by:)`, `static let taskColumns`, `static func task(from:tags:)`; private `orderedSiblings(in:parent:excluding:)`, `effectiveParents(in:)`, `tagsByTask(_:)`.
+  - Tags move the way tasks do: re-parenting is `move(tag:to:at:)` with a placement, a reorder inside one list is `move(tag:at:)` and writes the rank alone, and both refuse a move into the item's own subtree. Task 9's views follow the same shape.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2744,7 +2745,8 @@ import Testing
     let home = try store.createTag(title: "Home", parent: areas, at: .start)
     #expect(try store.tags().map(\.title) == ["Areas", "Home", "Work"])
     #expect(try store.tag(work)?.parent == areas)
-    try store.update(tag: work, [.title("Office"), .parent(nil)])
+    try store.update(tag: work, [.title("Office")])
+    try store.move(tag: work, to: nil, at: .end)
     let office = try #require(try store.tag(work))
     #expect(office.title == "Office" && office.parent == nil)
     #expect(try store.tags().map(\.title) == ["Areas", "Home", "Office"], "Office moved to the root after Areas")
@@ -2797,14 +2799,34 @@ import Testing
     #expect(tags.map(\.id.rawValue) == ids, "parents before children, however deep the chain")
 }
 
-@Test func aTagRefusesItsOwnParentAndKeepsTheLastChangeForAField() throws {
+@Test func theLastChangeForATagFieldWins() throws {
     let store = try makeStore()
     let a = try store.createTag(title: "a")
-    var caught: StoreError?
-    do { try store.update(tag: a, [.parent(a)]) } catch { caught = error }
-    #expect(caught == .invalid("a tag cannot be its own parent"))
     try store.update(tag: a, [.title("first"), .title("second")])
     #expect(try store.tag(a)?.title == "second")
+}
+
+/// Tags move the way tasks do: re-parenting is a move with a placement, a reorder inside one list writes the
+/// rank alone, and a move into the tag's own subtree is refused rather than left to the reading rule, which
+/// would answer it by putting every tag on the cycle at the root.
+@Test func tagsMoveAndReorderTheWayTasksDo() throws {
+    let store = try makeStore()
+    let areas = try store.createTag(title: "Areas")
+    let work = try store.createTag(title: "Work", parent: areas)
+    let home = try store.createTag(title: "Home", parent: areas)
+    let errands = try store.createTag(title: "Errands", parent: areas)
+    #expect(try store.tags().map(\.title) == ["Areas", "Work", "Home", "Errands"])
+    try store.move(tag: errands, at: .after(work))
+    #expect(try store.tags().map(\.title) == ["Areas", "Work", "Errands", "Home"])
+    #expect(try store.tag(errands)?.parent == areas, "a reorder says nothing about the parent")
+    try store.move(tag: home, to: nil, at: .start)
+    #expect(try store.tags().map(\.title) == ["Home", "Areas", "Work", "Errands"])
+    var caught: StoreError?
+    do { try store.move(tag: areas, to: areas, at: .end) } catch { caught = error }
+    #expect(caught == .invalid("a tag cannot be its own parent"))
+    do { try store.move(tag: areas, to: work, at: .end) } catch { caught = error }
+    #expect(caught == .invalid("a tag cannot be moved under its own descendant"))
+    #expect(try store.tags().map(\.title) == ["Home", "Areas", "Work", "Errands"], "the refused moves left the tree as it was")
 }
 ```
 
@@ -2891,6 +2913,15 @@ public struct NewTask: Sendable {
 
 /// One field of a task set to one value. A write takes a list of these, so an edit that changes three fields
 /// is one transaction, one clock and one change set rather than three of each.
+///
+/// The set is the columns of a task that are a value and nothing more, which is why the parent and the tags
+/// are not in it. Re-parenting is not one field: it ranks the task among its new siblings, so it is two
+/// operations under one stamp, it can close a cycle that has to be refused, and it needs a placement to say
+/// where the task lands — that is `move(task:to:at:)`, with `move(task:at:)` for a reorder inside one list.
+/// A tag on a task is not a field of the task at all: the journal carries it as its own `task_tag` entity, so
+/// attaching one is an operation about that pair, and a whole `Set` written at once would make one device's
+/// attach overwrite another's instead of merging with it — `add(tag:to:)` and `remove(tag:from:)` keep every
+/// pair a last-write-wins field of its own.
 public enum TaskChange: Sendable, Equatable {
     case title(String)
     case notes(String)
@@ -2930,17 +2961,18 @@ public struct Tag: Equatable, Sendable {
     public let updatedAt: Int64
 }
 
+/// One field of a tag set to one value. The parent is not among them, for the reason written on `TaskChange`:
+/// re-parenting also ranks the tag among its new siblings, so it is `move(tag:to:at:)`, with `move(tag:at:)`
+/// for a reorder inside one list.
 public enum TagChange: Sendable, Equatable {
     case title(String)
-    case parent(TagID?)
 }
 
 extension TagChange {
-    /// The state column this change writes; `parent` carries the new `rank` with it.
+    /// The state column this change writes, which is how a write keeps the last change for a field.
     var field: String {
         switch self {
         case .title: "title"
-        case .parent: "parent"
         }
     }
 }
@@ -3043,7 +3075,7 @@ extension Store {
             // cycle by putting every task on it at the root: a person who drags a project onto one of its own
             // items would watch the subtree scatter. That rule is for merges, where neither of two concurrent
             // links is the better one and neither device ever saw the cycle; here the whole tree is in hand.
-            if try isUnder(parent, ancestor: id) { throw .invalid("a task cannot be moved under its own descendant") }
+            if try isUnder(parent, ancestor: id, in: .task) { throw .invalid("a task cannot be moved under its own descendant") }
         }
         let rank = try siblingRank(in: .task, parent: parent, placement: placement, excluding: id)
         let stamp = clock.next()
@@ -3057,14 +3089,8 @@ extension Store {
     /// the meantime. A drag inside one list means nothing about the parent, so it writes the rank alone.
     public func move(task id: TaskID, at placement: Placement) throws(StoreError) {
         try requireTask(id)
-        let rank = try siblingRank(in: .task, parent: try effectiveParent(of: id), placement: placement, excluding: id)
+        let rank = try siblingRank(in: .task, parent: try effectiveParent(of: id, in: .task), placement: placement, excluding: id)
         try apply([op(.task, id.rawValue, "rank", .text(rank), clock.next())])
-    }
-
-    /// The task's parent as the tree reads it, which is the list a reorder ranks among.
-    private func effectiveParent(of id: TaskID) throws(StoreError) -> TaskID? {
-        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT parent FROM task_tree WHERE id = ?", [.text(id.rawValue)]) }
-        return rows.first?[0].string.map(TaskID.init)
     }
 
     public func add(tag: TagID, to task: TaskID) throws(StoreError) {
@@ -3161,20 +3187,47 @@ extension Store {
         }.sorted { ($0.rank, $0.id) < ($1.rank, $1.id) }
     }
 
-    /// Whether `id` sits under `ancestor` in the effective tree. The walk is SQLite's and not the stack's, and
-    /// `UNION` bounds it even if `task_tree` ever held a cycle, which `TreeRules` promises it does not.
-    private func isUnder(_ id: TaskID, ancestor: TaskID) throws(StoreError) -> Bool {
-        let rows = try sql { () throws(SQLiteError) in
-            try db.rows("""
-                WITH RECURSIVE ancestors(id) AS (
-                    SELECT ?
-                    UNION
-                    SELECT tt.parent FROM task_tree tt JOIN ancestors a ON tt.id = a.id WHERE tt.parent IS NOT NULL
-                )
-                SELECT 1 FROM ancestors WHERE id = ? LIMIT 1
-                """, [.text(id.rawValue), .text(ancestor.rawValue)])
+    /// The item's parent as a read sees it, which is the list a reorder ranks among.
+    func effectiveParent(of id: EntityID, in kind: EntityKind) throws(StoreError) -> EntityID? {
+        if kind == .task {
+            let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT parent FROM task_tree WHERE id = ?", [.text(id.rawValue)]) }
+            return rows.first?[0].string.map(EntityID.init)
         }
-        return !rows.isEmpty
+        return (try effectiveParents(in: kind)[id.rawValue] ?? nil).map(EntityID.init)
+    }
+
+    /// Whether `id` sits under `ancestor` as a read sees the tree, which is what a move has to refuse.
+    ///
+    /// For tasks the walk is SQLite's and not the stack's, and `UNION` bounds it even if `task_tree` ever held
+    /// a cycle, which `TreeRules` promises it does not. For the kinds without a derived tree the same promise
+    /// is what ends the loop: every chain of effective parents reaches a root in a finite number of steps.
+    func isUnder(_ id: EntityID, ancestor: EntityID, in kind: EntityKind) throws(StoreError) -> Bool {
+        if kind == .task {
+            let rows = try sql { () throws(SQLiteError) in
+                try db.rows("""
+                    WITH RECURSIVE ancestors(id) AS (
+                        SELECT ?
+                        UNION
+                        SELECT tt.parent FROM task_tree tt JOIN ancestors a ON tt.id = a.id WHERE tt.parent IS NOT NULL
+                    )
+                    SELECT 1 FROM ancestors WHERE id = ? LIMIT 1
+                    """, [.text(id.rawValue), .text(ancestor.rawValue)])
+            }
+            return !rows.isEmpty
+        }
+        let parents = try effectiveParents(in: kind)
+        var cursor: String? = id.rawValue
+        while let current = cursor {
+            if current == ancestor.rawValue { return true }
+            cursor = parents[current] ?? nil
+        }
+        return false
+    }
+
+    /// Effective parent links of a table that has no derived tree of its own, by the rule every read follows.
+    private func effectiveParents(in kind: EntityKind) throws(StoreError) -> [String: String?] {
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, parent, deleted FROM \(FieldMap.table(kind))") }
+        return TreeRules.effectiveParents(rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[1].string, deleted: $0[2].bool) })
     }
 
     /// The last change for each field, in the order the fields first appear. What it is for is written where
@@ -3260,27 +3313,40 @@ extension Store {
         return id
     }
 
-    /// Re-parenting is part of an edit here and not a `move` of its own: a tag tree is a handful of names in a
-    /// sidebar, and the one placement it needs is the end of its new parent's list.
+    /// Sets the given fields. A field named twice keeps the last change for it, for the reason written on
+    /// `update(task:_:)`.
     public func update(tag id: TagID, _ changes: [TagChange]) throws(StoreError) {
         guard !changes.isEmpty else { return }
         try requireTag(id)
         let stamp = clock.next()
-        var ops: [Operation] = []
-        for change in Store.lastPerField(changes, by: { $0.field }) {
+        let ops = Store.lastPerField(changes, by: { $0.field }).map { change in
             switch change {
-            case .title(let title): ops.append(op(.tag, id.rawValue, "title", .text(title), stamp))
-            case .parent(let parent):
-                if let parent {
-                    guard parent != id else { throw .invalid("a tag cannot be its own parent") }
-                    try requireTag(parent)
-                }
-                let rank = try siblingRank(in: .tag, parent: parent, placement: .end, excluding: id)
-                ops.append(op(.tag, id.rawValue, "parent", Value(parent?.rawValue), stamp))
-                ops.append(op(.tag, id.rawValue, "rank", .text(rank), stamp))
+            case .title(let title): op(.tag, id.rawValue, "title", .text(title), stamp)
             }
         }
         try apply(ops)
+    }
+
+    /// Re-parents the tag and ranks it among its new siblings, the way `move(task:to:at:)` does for a task:
+    /// two operations under one stamp, and a move into the tag's own subtree refused here rather than left to
+    /// the reading rule, which would answer the cycle by putting every tag on it at the root.
+    public func move(tag id: TagID, to parent: TagID?, at placement: Placement) throws(StoreError) {
+        try requireTag(id)
+        if let parent {
+            guard parent != id else { throw .invalid("a tag cannot be its own parent") }
+            try requireTag(parent)
+            if try isUnder(parent, ancestor: id, in: .tag) { throw .invalid("a tag cannot be moved under its own descendant") }
+        }
+        let rank = try siblingRank(in: .tag, parent: parent, placement: placement, excluding: id)
+        let stamp = clock.next()
+        try apply([op(.tag, id.rawValue, "parent", Value(parent?.rawValue), stamp), op(.tag, id.rawValue, "rank", .text(rank), stamp)])
+    }
+
+    /// Ranks the tag among the siblings it already has, without saying anything about its parent.
+    public func move(tag id: TagID, at placement: Placement) throws(StoreError) {
+        try requireTag(id)
+        let rank = try siblingRank(in: .tag, parent: try effectiveParent(of: id, in: .tag), placement: placement, excluding: id)
+        try apply([op(.tag, id.rawValue, "rank", .text(rank), clock.next())])
     }
 
     /// Tombstones the tag. Its children move to the root and the tasks that carry it stop showing it, both by
@@ -3341,7 +3407,7 @@ swift test --filter 'TaskTests|TagTests' 2>&1 | tail -3
 swift test --filter 'TaskTests|TagTests' --swift-sdk swift-6.3.3-RELEASE_wasm 2>&1 | tail -3
 ```
 
-Expected: 18 tests pass on both.
+Expected: 19 tests pass on both.
 
 - [ ] **Step 7: Update the changelog and commit**
 

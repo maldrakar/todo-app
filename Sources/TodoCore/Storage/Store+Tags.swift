@@ -18,27 +18,40 @@ extension Store {
         return id
     }
 
-    /// Re-parenting is part of an edit here and not a `move` of its own: a tag tree is a handful of names in a
-    /// sidebar, and the one placement it needs is the end of its new parent's list.
+    /// Sets the given fields. A field named twice keeps the last change for it, for the reason written on
+    /// `update(task:_:)`.
     public func update(tag id: TagID, _ changes: [TagChange]) throws(StoreError) {
         guard !changes.isEmpty else { return }
         try requireTag(id)
         let stamp = clock.next()
-        var ops: [Operation] = []
-        for change in Store.lastPerField(changes, by: { $0.field }) {
+        let ops = Store.lastPerField(changes, by: { $0.field }).map { change in
             switch change {
-            case .title(let title): ops.append(op(.tag, id.rawValue, "title", .text(title), stamp))
-            case .parent(let parent):
-                if let parent {
-                    guard parent != id else { throw .invalid("a tag cannot be its own parent") }
-                    try requireTag(parent)
-                }
-                let rank = try siblingRank(in: .tag, parent: parent, placement: .end, excluding: id)
-                ops.append(op(.tag, id.rawValue, "parent", Value(parent?.rawValue), stamp))
-                ops.append(op(.tag, id.rawValue, "rank", .text(rank), stamp))
+            case .title(let title): op(.tag, id.rawValue, "title", .text(title), stamp)
             }
         }
         try apply(ops)
+    }
+
+    /// Re-parents the tag and ranks it among its new siblings, the way `move(task:to:at:)` does for a task:
+    /// two operations under one stamp, and a move into the tag's own subtree refused here rather than left to
+    /// the reading rule, which would answer the cycle by putting every tag on it at the root.
+    public func move(tag id: TagID, to parent: TagID?, at placement: Placement) throws(StoreError) {
+        try requireTag(id)
+        if let parent {
+            guard parent != id else { throw .invalid("a tag cannot be its own parent") }
+            try requireTag(parent)
+            if try isUnder(parent, ancestor: id, in: .tag) { throw .invalid("a tag cannot be moved under its own descendant") }
+        }
+        let rank = try siblingRank(in: .tag, parent: parent, placement: placement, excluding: id)
+        let stamp = clock.next()
+        try apply([op(.tag, id.rawValue, "parent", Value(parent?.rawValue), stamp), op(.tag, id.rawValue, "rank", .text(rank), stamp)])
+    }
+
+    /// Ranks the tag among the siblings it already has, without saying anything about its parent.
+    public func move(tag id: TagID, at placement: Placement) throws(StoreError) {
+        try requireTag(id)
+        let rank = try siblingRank(in: .tag, parent: try effectiveParent(of: id, in: .tag), placement: placement, excluding: id)
+        try apply([op(.tag, id.rawValue, "rank", .text(rank), clock.next())])
     }
 
     /// Tombstones the tag. Its children move to the root and the tasks that carry it stop showing it, both by
