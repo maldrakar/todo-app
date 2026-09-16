@@ -34,14 +34,10 @@ import Testing
 @Test func childrenAreOrderedByRankAndPlacementWorks() throws {
     let store = try makeStore()
     let project = try store.createTask(NewTask(title: "Project"))
-    var child = NewTask(title: "1"); child.parent = project
-    let first = try store.createTask(child)
-    child.title = "3"
-    let third = try store.createTask(child)
-    child.title = "2"
-    let second = try store.createTask(child, at: .after(first))
-    child.title = "0"
-    let zero = try store.createTask(child, at: .start)
+    let first = try store.createTask(NewTask(title: "1", parent: project))
+    let third = try store.createTask(NewTask(title: "3", parent: project))
+    let second = try store.createTask(NewTask(title: "2", parent: project), at: .after(first))
+    let zero = try store.createTask(NewTask(title: "0", parent: project), at: .start)
     #expect(try store.children(of: project).map(\.title) == ["0", "1", "2", "3"])
     #expect(try store.children(of: nil).map(\.id) == [project])
     try store.move(task: third, to: project, at: .start)
@@ -64,8 +60,7 @@ import Testing
 @Test func trashRestoreAndDeleteFollowTheTree() throws {
     let store = try makeStore()
     let p = try store.createTask(NewTask(title: "p"))
-    var c = NewTask(title: "c"); c.parent = p
-    let child = try store.createTask(c)
+    let child = try store.createTask(NewTask(title: "c", parent: p))
     try store.trash(task: p)
     #expect(try store.task(child)?.trashed == true)
     #expect(try store.children(of: p).isEmpty)
@@ -82,8 +77,7 @@ import Testing
     let store = try makeStore()
     let work = try store.createTag(title: "work")
     let home = try store.createTag(title: "home")
-    var new = NewTask(title: "t"); new.tags = [work]
-    let id = try store.createTask(new)
+    let id = try store.createTask(NewTask(title: "t", tags: [work]))
     try store.add(tag: home, to: id)
     #expect(try store.task(id)?.tags == [work, home])
     try store.remove(tag: work, from: id)
@@ -135,10 +129,8 @@ import Testing
 @Test func movingATaskUnderItsOwnDescendantIsRefused() throws {
     let store = try makeStore()
     let project = try store.createTask(NewTask(title: "Project"))
-    var middle = NewTask(title: "Child"); middle.parent = project
-    let child = try store.createTask(middle)
-    var lowest = NewTask(title: "Grandchild"); lowest.parent = child
-    let grandchild = try store.createTask(lowest)
+    let child = try store.createTask(NewTask(title: "Child", parent: project))
+    let grandchild = try store.createTask(NewTask(title: "Grandchild", parent: child))
     var caught: StoreError?
     do { try store.move(task: project, to: grandchild, at: .end) } catch { caught = error }
     #expect(caught == .invalid("a task cannot be moved under its own descendant"))
@@ -184,12 +176,31 @@ import Testing
     #expect(caught == .notFound(missingTag))
     do { try store.remove(tag: missingTag, from: missingTask) } catch { caught = error }
     #expect(caught == .notFound(missingTask))
-    var tagged = NewTask(title: "x"); tagged.tags = [missingTag]
-    do { _ = try store.createTask(tagged) } catch { caught = error }
+    do { _ = try store.createTask(NewTask(title: "x", tags: [missingTag])) } catch { caught = error }
     #expect(caught == .notFound(missingTag))
     do { _ = try store.createTask(NewTask(title: "y"), at: .after(missingTask)) } catch { caught = error }
     #expect(caught == .notFound(missingTask))
     do { _ = try store.notes(of: missingTask) } catch { caught = error }
     #expect(caught == .notFound(missingTask))
     #expect(try store.allTasks().map(\.id) == [id], "nothing a refused write named reached the state")
+}
+
+/// A drag inside one list is not a statement about the parent, and `move(task:to:at:)` could only say it by
+/// re-asserting the link at a new stamp, which is a peer's concurrent re-parent lost.
+@Test func aReorderKeepsTheParentAndWritesTheRankAlone() throws {
+    let store = try makeStore()
+    func journalled() throws -> Int64 {
+        try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE device != 'seed'").first?.first?.int64 ?? 0 }
+    }
+    let project = try store.createTask(NewTask(title: "Project"))
+    let first = try store.createTask(NewTask(title: "1", parent: project))
+    try store.createTask(NewTask(title: "2", parent: project))
+    let third = try store.createTask(NewTask(title: "3", parent: project))
+    let before = try journalled()
+    try store.move(task: third, at: .after(first))
+    #expect(try store.children(of: project).map(\.title) == ["1", "3", "2"])
+    #expect(try store.task(third)?.parent == project)
+    #expect(try journalled() == before + 1, "the rank, and no operation naming the parent")
+    try store.move(task: first, at: .end)
+    #expect(try store.children(of: project).map(\.title) == ["3", "2", "1"])
 }

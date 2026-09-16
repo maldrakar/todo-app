@@ -16,7 +16,7 @@ extension Store {
         if let parent = new.parent { try requireTask(parent) }
         for tag in new.tags { try requireTag(tag) }
         let id = TaskID()
-        let rank = try siblingRank(table: "tasks", parent: new.parent, placement: placement, excluding: nil)
+        let rank = try siblingRank(in: .task, parent: new.parent, placement: placement, excluding: nil)
         let stamp = clock.next()
         let fields: [(String, Value)] = [
             ("title", .text(new.title)), ("notes", .text(new.notes)), ("status", .integer(TaskStatus.open.rawValue)),
@@ -41,10 +41,13 @@ extension Store {
     /// its journal row would be dropped as a duplicate: the value would be gone from the state and from a
     /// future sync alike, without a sound.
     public func update(task id: TaskID, _ changes: [TaskChange]) throws(StoreError) {
+        guard !changes.isEmpty else { return }
+        // The status the task holds now, and the existence check in the same query: the completion time below
+        // moves only when the task crosses in or out of `open`, which is not a question the caller's list can
+        // answer on its own.
         let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT status FROM tasks WHERE id = ? AND deleted = 0", [.text(id.rawValue)]) }
         guard let row = rows.first else { throw .notFound(id) }
         let current = TaskStatus(rawValue: row[0].int64 ?? 0) ?? .open
-        guard !changes.isEmpty else { return }
         let stamp = clock.next()
         var ops: [Operation] = []
         for change in Store.lastPerField(changes, by: { $0.field }) {
@@ -63,13 +66,19 @@ extension Store {
         try apply(ops)
     }
 
-    /// Moves the task to the trash. Its descendants follow through the tree without an operation of their own,
-    /// so restoring it brings back exactly what it took down.
+    /// Moves the task to the trash, which a person can see into and take things back out of. Its descendants
+    /// follow through the tree without an operation of their own, so `restore` brings back exactly what the
+    /// trashing took down.
     public func trash(task id: TaskID) throws(StoreError) { try setFlag(.task, id, "trashed", true) }
 
+    /// Takes the task out of the trash, and with it everything that went down with it.
     public func restore(task id: TaskID) throws(StoreError) { try setFlag(.task, id, "trashed", false) }
 
-    /// Tombstones the task: the row stays for sync, nothing shows it again, and its children move to the root.
+    /// Tombstones the task: emptying the trash, and the half of the pair that does not come back. `trashed`
+    /// is a place a task sits in and can leave; `deleted` ends it. The row itself stays behind, because a
+    /// peer that never heard of the deletion would sync the task back from its own copy, and a tombstone is
+    /// how it learns instead. Nothing reads the task again, and its children move to the root rather than
+    /// vanish underneath it.
     public func delete(task id: TaskID) throws(StoreError) { try setFlag(.task, id, "deleted", true) }
 
     /// Re-parents the task and ranks it among its new siblings. The two operations share one stamp: a device
@@ -85,9 +94,26 @@ extension Store {
             // links is the better one and neither device ever saw the cycle; here the whole tree is in hand.
             if try isUnder(parent, ancestor: id) { throw .invalid("a task cannot be moved under its own descendant") }
         }
-        let rank = try siblingRank(table: "tasks", parent: parent, placement: placement, excluding: id)
+        let rank = try siblingRank(in: .task, parent: parent, placement: placement, excluding: id)
         let stamp = clock.next()
         try apply([op(.task, id.rawValue, "parent", Value(parent?.rawValue), stamp), op(.task, id.rawValue, "rank", .text(rank), stamp)])
+    }
+
+    /// Ranks the task among the siblings it already has, without saying anything about its parent.
+    ///
+    /// `move(task:to:at:)` can do this too, by being handed the parent the task is under — but then the write
+    /// carries a `parent` operation at a new stamp, and this device asserts the link a peer may have moved in
+    /// the meantime. A drag inside one list means nothing about the parent, so it writes the rank alone.
+    public func move(task id: TaskID, at placement: Placement) throws(StoreError) {
+        try requireTask(id)
+        let rank = try siblingRank(in: .task, parent: try effectiveParent(of: id), placement: placement, excluding: id)
+        try apply([op(.task, id.rawValue, "rank", .text(rank), clock.next())])
+    }
+
+    /// The task's parent as the tree reads it, which is the list a reorder ranks among.
+    private func effectiveParent(of id: TaskID) throws(StoreError) -> TaskID? {
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT parent FROM task_tree WHERE id = ?", [.text(id.rawValue)]) }
+        return rows.first?[0].string.map(TaskID.init)
     }
 
     public func add(tag: TagID, to task: TaskID) throws(StoreError) {
@@ -149,8 +175,8 @@ extension Store {
     /// The siblings are read at the moment of the write, so two devices editing the same list offline can and
     /// do compute the same key. That is what `Rank.between` tolerates and what the `, id` in every order
     /// clause settles: equal ranks fall back to the id, and the list is stable everywhere.
-    func siblingRank(table: String, parent: EntityID?, placement: Placement, excluding: EntityID?) throws(StoreError) -> String {
-        let siblings = try orderedSiblings(table: table, parent: parent, excluding: excluding)
+    func siblingRank(in kind: EntityKind, parent: EntityID?, placement: Placement, excluding: EntityID?) throws(StoreError) -> String {
+        let siblings = try orderedSiblings(in: kind, parent: parent, excluding: excluding)
         switch placement {
         case .end: return Rank.between(siblings.last?.1, nil)
         case .start: return Rank.between(nil, siblings.first?.1)
@@ -162,12 +188,12 @@ extension Store {
     }
 
     /// The siblings a read would show under `parent`, in the order it would show them, which is the list a
-    /// placement has to rank among. Tasks take their effective parent from `task_tree`; `tags` and `views`
-    /// have no derived table of their own, so the same rule is applied here instead of trusting the column —
+    /// placement has to rank among. Tasks take their effective parent from `task_tree`; tags and views have
+    /// no derived table of their own, so the same rule is applied here instead of trusting the column —
     /// a tag whose stored parent was deleted, or made circular by a merge, is at the root of every read, and
     /// a placement that ranked it against the raw column would rank among a list nobody sees.
-    private func orderedSiblings(table: String, parent: EntityID?, excluding: EntityID?) throws(StoreError) -> [(id: String, rank: String)] {
-        if table == "tasks" {
+    private func orderedSiblings(in kind: EntityKind, parent: EntityID?, excluding: EntityID?) throws(StoreError) -> [(id: String, rank: String)] {
+        if kind == .task {
             return try sql { () throws(SQLiteError) in
                 try db.rows(
                     "SELECT t.id, t.rank FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE tt.parent IS ? AND t.id != ? ORDER BY t.rank, t.id",
@@ -175,7 +201,7 @@ extension Store {
                 ).map { ($0[0].string ?? "", $0[1].string ?? Rank.initial) }
             }
         }
-        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, parent, rank, deleted FROM \(table)") }
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, parent, rank, deleted FROM \(FieldMap.table(kind))") }
         let parents = TreeRules.effectiveParents(rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[1].string, deleted: $0[3].bool) })
         return rows.compactMap { row -> (id: String, rank: String)? in
             let id = row[0].string ?? ""
@@ -214,14 +240,14 @@ extension Store {
     /// table off the same loader.
     func loadTasks(where clause: String, _ params: [Value], orderBy: String, join: String = "", limit: Int? = nil) throws(StoreError) -> [Task] {
         let limitClause = limit.map { " LIMIT \($0)" } ?? ""
-        var tasks = try sql { () throws(SQLiteError) in
-            try db.rows("SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id \(join) WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)", params).map(Store.task(from:))
+        let rows = try sql { () throws(SQLiteError) in
+            try db.rows("SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id \(join) WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)", params)
         }
-        try attachTags(&tasks)
-        return tasks
+        let tags = try tagsByTask(rows.map { $0[0].string ?? "" })
+        return rows.map { Store.task(from: $0, tags: tags[$0[0].string ?? ""] ?? []) }
     }
 
-    static func task(from row: [Value]) -> Task {
+    static func task(from row: [Value], tags: Set<TagID>) -> Task {
         Task(
             id: TaskID(row[0].string ?? ""),
             title: row[1].string ?? "",
@@ -234,7 +260,7 @@ extension Store {
             deadline: row[4].int64.flatMap { Int32(exactly: $0) }.map(Day.init(daysSinceEpoch:)),
             parent: row[5].string.map(TaskID.init),
             rank: row[6].string ?? Rank.initial,
-            tags: [],
+            tags: tags,
             trashed: row[7].bool,
             createdAt: row[8].int64 ?? 0,
             updatedAt: row[9].int64 ?? 0,
@@ -245,19 +271,16 @@ extension Store {
     /// One query for the tags of a whole page of tasks instead of one per task, chunked because SQLite has a
     /// limit on how many parameters a statement takes. A tag that has been deleted is left out here rather
     /// than in every caller: the pair row stays for sync, and nothing shows it again.
-    private func attachTags(_ tasks: inout [Task]) throws(StoreError) {
-        guard !tasks.isEmpty else { return }
-        var index: [TaskID: Int] = [:]
-        for (i, task) in tasks.enumerated() { index[task.id] = i }
-        let ids = Array(index.keys)
+    private func tagsByTask(_ ids: [String]) throws(StoreError) -> [String: Set<TagID>] {
+        guard !ids.isEmpty else { return [:] }
+        var tags: [String: Set<TagID>] = [:]
         for chunk in stride(from: 0, to: ids.count, by: 500).map({ Array(ids[$0..<min($0 + 500, ids.count)]) }) {
             let placeholders = Array(repeating: "?", count: chunk.count).joined(separator: ", ")
             let rows = try sql { () throws(SQLiteError) in
-                try db.rows("SELECT x.task_id, x.tag_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.present = 1 AND x.task_id IN (\(placeholders))", chunk.map { .text($0.rawValue) })
+                try db.rows("SELECT x.task_id, x.tag_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.present = 1 AND x.task_id IN (\(placeholders))", chunk.map { .text($0) })
             }
-            for row in rows {
-                if let i = index[TaskID(row[0].string ?? "")] { tasks[i].tags.insert(TagID(row[1].string ?? "")) }
-            }
+            for row in rows { tags[row[0].string ?? "", default: []].insert(TagID(row[1].string ?? "")) }
         }
+        return tags
     }
 }

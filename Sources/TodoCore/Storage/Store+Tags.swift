@@ -6,7 +6,7 @@ extension Store {
     public func createTag(title: String, parent: TagID? = nil, at placement: Placement = .end) throws(StoreError) -> TagID {
         if let parent { try requireTag(parent) }
         let id = TagID()
-        let rank = try siblingRank(table: "tags", parent: parent, placement: placement, excluding: nil)
+        let rank = try siblingRank(in: .tag, parent: parent, placement: placement, excluding: nil)
         let stamp = clock.next()
         try apply([
             op(.tag, id.rawValue, "title", .text(title), stamp),
@@ -21,8 +21,8 @@ extension Store {
     /// Re-parenting is part of an edit here and not a `move` of its own: a tag tree is a handful of names in a
     /// sidebar, and the one placement it needs is the end of its new parent's list.
     public func update(tag id: TagID, _ changes: [TagChange]) throws(StoreError) {
-        try requireTag(id)
         guard !changes.isEmpty else { return }
+        try requireTag(id)
         let stamp = clock.next()
         var ops: [Operation] = []
         for change in Store.lastPerField(changes, by: { $0.field }) {
@@ -33,7 +33,7 @@ extension Store {
                     guard parent != id else { throw .invalid("a tag cannot be its own parent") }
                     try requireTag(parent)
                 }
-                let rank = try siblingRank(table: "tags", parent: parent, placement: .end, excluding: id)
+                let rank = try siblingRank(in: .tag, parent: parent, placement: .end, excluding: id)
                 ops.append(op(.tag, id.rawValue, "parent", Value(parent?.rawValue), stamp))
                 ops.append(op(.tag, id.rawValue, "rank", .text(rank), stamp))
             }
