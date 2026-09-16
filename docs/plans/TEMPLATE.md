@@ -12,8 +12,14 @@ section is history; a departure is stated in the task's pull request and
 fixed forward into the sections that depend on it, never back into the
 shipped one (`docs/process.md`, sections 6 and 7).
 
-> Executed task by task, one sub-issue per branch and pull request, with
-> superpowers:subagent-driven-development or superpowers:executing-plans.
+> Written by hand from this template, not from superpowers:writing-plans,
+> whose task format is the full code of every step. From that skill keep
+> the file map, the task right-sizing, the consumed and produced
+> interfaces and the self-review against the spec. Executed task by
+> task, one sub-issue per branch and pull request, with
+> superpowers:subagent-driven-development or superpowers:executing-plans,
+> which read the global constraints, the spec and the task's section and
+> need no step-level code.
 
 ## Global constraints
 
