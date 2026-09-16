@@ -53,6 +53,7 @@ CHANGELOG.md              Keep a Changelog format, with an Unreleased section
 CLAUDE.md                 short digest of this process for the engineer
 docs/brief.md             the original project brief
 docs/process.md           this document
+docs/style.md             the code rules the owner's reviews established
 docs/adr/NNNN-title.md    architecture decision records
 docs/specs/<topic>.md     design specs, one per architectural piece of work
 docs/plans/<topic>.md     implementation plans derived from approved specs
@@ -114,7 +115,7 @@ said out loud in chat so the owner can override it.
 | ---- | ---- | -------- |
 | Spike | A feasibility question: "can we", "is it possible" | An answer written into the issue. Any code is throwaway. |
 | Bounded | A small change to a flow that already exists in the repo | A short design in chat, the owner's OK, then code |
-| Architectural | A new subsystem, a feature module, a change to interfaces others depend on | A spec (section 7), the owner's review, an implementation plan; the issue becomes an epic and the plan's tasks become its sub-issues |
+| Architectural | A new subsystem, a feature module, a change to interfaces others depend on | A spec (section 7), the owner's review of it, an implementation plan whose task table and interfaces the owner reviews; the issue becomes an epic and the plan's tasks become its sub-issues |
 
 When in doubt, the heavier size is chosen. If hidden complexity shows up
 mid-task, the task is upgraded, never downgraded.
@@ -142,8 +143,12 @@ flowchart LR
    milestone and classifies it (section 5).
 2. **Branch.** `<type>/<issue-number>-<slug>`, for example
    `feature/12-task-repository`. Development is test-first.
-3. **Verify.** Before opening a PR: build, tests, and a self-review of the
-   diff.
+3. **Verify.** Before opening a PR: build, tests, a self-review of the
+   diff against the spec, the plan and `docs/style.md`, and a review
+   pass by a second agent over the finished diff, pointed at the same
+   three documents and asked to justify every finding with a line and a
+   failure scenario. A finding is confirmed by a failing test before the
+   code changes.
 4. **Pull request.** Follows the PR template: what changed, how it was
    verified, `Closes #N`. The title uses Conventional Commits with a
    scope, for example `feat(core): add task repository`. Scopes: `core`,
@@ -153,6 +158,30 @@ flowchart LR
    OK in chat. Squash merge, one commit per issue, the branch is deleted
    and the issue closes automatically. The squash commit message is the
    PR title, so `main` history reads as a list of Conventional Commits.
+
+**Working from a plan.** A task that comes from a plan (section 7)
+starts by reading its section against the code its dependencies
+actually shipped, because the plan was written before any of it
+compiled. A departure from the section is made in the task's own PR and
+stated in the PR body with its reason. The section itself is not
+rewritten to match: after the merge the code, the tests, the ADRs and
+the changelog are the record. What is updated, in the same PR, is the
+section of every later task that depends on the changed interface.
+
+**Open questions.** A question the engineer cannot settle alone is asked
+in chat before the PR is opened, or goes into a thread on the PR, where
+the reactions below track it. The PR body is not the place: text there
+carries no reaction, so a question written into it has no way to show
+that it is still open, and the ones written there so far went
+unanswered.
+
+**Code rules.** `docs/style.md` holds the rules the owner's reviews have
+established: tightest visibility, no member without a caller, no policy
+of the client in a lower layer, immutable values, one shape everywhere
+it fits, no trap on data from outside. It is written for the engineer
+and for every agent that implements or reviews a diff, and both get it
+before they start. The owner edits it directly; a rule that a review
+establishes twice is added to it in the PR that got the review.
 
 **Reactions on review comments.** The reaction on a comment is left by
 its recipient, not by its author, and a comment without one has not been
@@ -173,8 +202,9 @@ covers comments on pull requests and issues; spec review in an Artifact
 has no reactions and follows section 7.
 
 **Definition of Done** for a task: acceptance criteria met, tests written
-and green, CI green, spec or ADR updated if behavior or architecture
-changed, no `TODO` in code without a linked issue.
+and green, CI green, the diff holds to `docs/style.md`, spec or ADR
+updated if behavior or architecture changed, no `TODO` in code without a
+linked issue.
 
 ## 7. Specs and how they are reviewed
 
@@ -217,12 +247,37 @@ The markdown in the repository is the source of truth. The Artifact is a
 rendered view for review and is regenerated from the markdown; HTML is
 never committed as a spec.
 
-**Plan** (`docs/plans/<topic>.md`) is written for the engineer and is
-derived from the approved spec. It carries the full detail. The owner
-reviews only its task breakdown, which becomes the child issues of the
-epic.
+**Plan** (`docs/plans/<topic>.md`, copy `TEMPLATE.md`) is written for
+the engineer and is derived from the approved spec. It fixes what the
+tasks are, in what order, and what each one promises to the next; it
+does not carry the implementation. The first plan of M1 did, at 5,400
+lines of which four fifths were Swift written without a compiler, and
+for the tasks with real logic in them half to all of that code was
+rewritten once it met the compiler, the tests and a measurement, while
+the task table, the global constraints and the interfaces between tasks
+held from the day they were approved. So a plan holds:
 
-The spec template will be calibrated after the first real spec in M1.
+- Global constraints and a file map, once for the whole plan.
+- Per task, 50 to 100 lines: the goal and the files it touches; its
+  interface as signatures, meaning types, methods, errors and their
+  visibility, since that is what later tasks depend on; the invariants
+  in prose, the "why" a signature cannot say; the list of tests, one
+  line each saying what the test proves; and the facts verified by hand
+  together with the traps found on the way.
+- Code only where it already ran: a spike's result, a compiler probe, a
+  measured query. Code that has not been executed is a draft, and a
+  draft belongs in the task's branch, not in the plan.
+
+The owner reviews the task table, which becomes the child issues of the
+epic, and the interface of each task, because names, visibility and
+members without a caller are exactly what a code review would otherwise
+catch one task too late. Once a task ships, its section is history: a
+departure is stated in the PR and fixed forward into the sections that
+depend on it (section 6), never back into the shipped one.
+
+The spec template held through its first use in M1 without change. The
+plan template is untested until the first plan of M2 and is expected to
+change after it.
 
 ## 8. Architecture decision records
 
@@ -290,5 +345,8 @@ repository public.
 ## 12. Known gaps
 
 - `main` is protected by convention only (section 3).
-- The spec template and review flow are untested until the first M1
-  spec; section 7 is expected to change after it.
+- The plan template and the owner's review of task interfaces are
+  untested until the first plan of M2; section 7 is expected to change
+  after it.
+- `docs/style.md` was written from the reviews of M1's first seven tasks
+  and is not complete; it grows with each review.
