@@ -61,7 +61,7 @@ extension Store {
     // MARK: - Writes
 
     @discardableResult
-    public func createView(_ new: NewView, at placement: Placement = .end) throws(StoreError) -> ViewID {
+    public func createView(_ new: NewTaskView, at placement: Placement = .end) throws(StoreError) -> ViewID {
         if let parent = new.parent { try requireView(parent) }
         let id = ViewID()
         let rank = try siblingRank(in: .view, parent: new.parent, placement: placement, excluding: nil)
@@ -77,7 +77,7 @@ extension Store {
 
     /// Sets the given fields. A field named twice keeps the last change for it, for the reason written on
     /// `update(task:_:)`.
-    public func update(view id: ViewID, _ changes: [ViewChange]) throws(StoreError) {
+    public func update(view id: ViewID, _ changes: [TaskViewChange]) throws(StoreError) {
         guard !changes.isEmpty else { return }
         try requireView(id)
         let stamp = clock.next()
@@ -152,17 +152,17 @@ extension Store {
     ///
     /// This loads the whole table. Views number in the tens, and the tree order needs every row anyway, so
     /// the query that would ask for one branch would still have to read the rest to know where it hangs.
-    public func views() throws(StoreError) -> [TodoView] {
+    public func views() throws(StoreError) -> [TaskView] {
         let rows = try sql { () throws(SQLiteError) in
             try db.rows("SELECT id, title, parent, rank, filter, sort, group_by, created_at, updated_at, deleted FROM views")
         }
         let nodes = rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[2].string, deleted: $0[9].bool) }
         let parents = TreeRules.effectiveParents(nodes)
-        let views = rows.compactMap { row -> TodoView? in
+        let views = rows.compactMap { row -> TaskView? in
             guard !row[9].bool else { return nil }
             let id = row[0].string ?? ""
             let definition = ViewDefinition(filter: row[4], sort: row[5], groupBy: row[6])
-            return TodoView(
+            return TaskView(
                 id: ViewID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(ViewID.init),
                 rank: row[3].string ?? Rank.initial, filter: definition.filter, sort: definition.sort,
                 groupBy: definition.groupBy, needsNewerApp: definition.needsNewerApp,
@@ -172,12 +172,12 @@ extension Store {
         return TreeRules.inTreeOrder(views)
     }
 
-    public func view(_ id: ViewID) throws(StoreError) -> TodoView? {
+    public func view(_ id: ViewID) throws(StoreError) -> TaskView? {
         try views().first { $0.id == id }
     }
 
     /// The child views of one view, in rank order; `nil` lists the sidebar's top level.
-    public func children(ofView parent: ViewID?) throws(StoreError) -> [TodoView] {
+    public func children(ofView parent: ViewID?) throws(StoreError) -> [TaskView] {
         try views().filter { $0.parent == parent }
     }
 
@@ -193,7 +193,7 @@ extension Store {
     func seedBuiltInViews() throws(StoreError) {
         let zero = HLC(millis: 0, counter: 0)
         var ops: [Operation] = []
-        for definition in BuiltInViews.definitions {
+        for definition in BuiltInTaskViews.definitions {
             let fields: [(String, Value)] = [
                 ("title", .text(definition.title)), ("parent", .null), ("rank", .text(definition.rank)),
                 ("filter", try filterValue(definition.filter)), ("sort", try sortValue(definition.sort)),

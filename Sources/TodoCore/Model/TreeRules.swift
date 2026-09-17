@@ -85,18 +85,29 @@ extension TreeRules {
     /// Without recursion: a chain thousands of links deep arrives from sync as easily as a shallow one, and a
     /// stack — 64 KiB of it on wasm32 — is not what should decide whether a tree reads. Children go onto the
     /// stack in reverse, so they come off it in rank order.
+    ///
+    /// Every item comes out, exactly once, whatever the links say. `effectiveParents` promises a forest, so
+    /// the two callers never exercise the rest; the promise is theirs to keep and losing a row from a sidebar
+    /// is not a way to find out that one of them stopped. A parent that is not in the list reads as no
+    /// parent, the way a link to a missing one does everywhere else here, and anything still unreached — the
+    /// members of a cycle — follows the tree rather than vanishing under it.
     static func inTreeOrder<Item: TreeOrdered>(_ items: [Item]) -> [Item] {
+        let present = Set(items.map(\.id))
         var byParent: [EntityID?: [Item]] = [:]
-        for item in items { byParent[item.parent, default: []].append(item) }
+        for item in items {
+            byParent[item.parent.flatMap { present.contains($0) ? $0 : nil }, default: []].append(item)
+        }
         func children(of parent: EntityID?) -> [Item] {
             (byParent[parent] ?? []).sorted { ($0.rank, $0.id.rawValue) < ($1.rank, $1.id.rawValue) }
         }
         var ordered: [Item] = []
+        var emitted: Set<EntityID> = []
         var stack = Array(children(of: nil).reversed())
         while let item = stack.popLast() {
+            guard emitted.insert(item.id).inserted else { continue }
             ordered.append(item)
             stack.append(contentsOf: children(of: item.id).reversed())
         }
-        return ordered
+        return ordered + items.filter { !emitted.contains($0.id) }.sorted { ($0.rank, $0.id.rawValue) < ($1.rank, $1.id.rawValue) }
     }
 }

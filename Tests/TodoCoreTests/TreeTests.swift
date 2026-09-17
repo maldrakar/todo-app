@@ -163,3 +163,52 @@ private func treeWasRebuilt(_ store: Store) throws(StoreError) -> Bool {
     let t = try tree(again)
     #expect(t["c"]?.parent == "p" && t["c"]?.trashed == true)
 }
+
+// MARK: - TreeRules.inTreeOrder
+
+/// The shape the sidebar order needs of an item. `tags()` and `views()` pass `Tag` and `TaskView`; these
+/// tests pass this, so what is under test is the rule and not the two tables that happen to use it.
+private struct Node: TreeOrdered, Equatable {
+    let id: EntityID
+    let parent: EntityID?
+    let rank: String
+
+    init(_ id: String, parent: String? = nil, rank: String = "i") {
+        self.id = EntityID(id)
+        self.parent = parent.map(EntityID.init)
+        self.rank = rank
+    }
+}
+
+@Test func treeOrderPutsParentsBeforeChildrenAndSortsSiblingsByRankThenID() {
+    let nodes = [
+        Node("b", rank: "m"), Node("a", rank: "c"),
+        Node("a2", parent: "a", rank: "t"), Node("a1", parent: "a", rank: "d"),
+        Node("a1x", parent: "a1"),
+        // Two siblings whose ranks two offline devices computed alike: the id settles them.
+        Node("zz", parent: "b", rank: "i"), Node("yy", parent: "b", rank: "i"),
+    ]
+    #expect(TreeRules.inTreeOrder(nodes).map(\.id.rawValue) == ["a", "a1", "a1x", "a2", "b", "yy", "zz"])
+}
+
+@Test func treeOrderReadsALinkToAnItemThatIsNotThereAsNoLink() {
+    // The deleted and the never-seen parent both arrive as an id the list does not hold; the child belongs
+    // at the root, where it is visible, and not under a parent nothing will ever draw.
+    let nodes = [Node("kid", parent: "gone", rank: "m"), Node("root", rank: "c")]
+    #expect(TreeRules.inTreeOrder(nodes).map(\.id.rawValue) == ["root", "kid"])
+}
+
+/// `effectiveParents` promises a forest, so its callers never send a cycle here. If one ever arrives — a
+/// second caller, or that promise broken — the items on it still come out: a row missing from a sidebar is
+/// a bug nobody can see, and this is the line that keeps it from being silent.
+@Test func treeOrderLosesNothingToACycle() {
+    let nodes = [Node("root"), Node("x", parent: "y"), Node("y", parent: "x")]
+    let ordered = TreeRules.inTreeOrder(nodes)
+    #expect(ordered.map(\.id.rawValue) == ["root", "x", "y"])
+    #expect(Set(ordered.map(\.id)) == Set(nodes.map(\.id)), "every item comes out")
+    #expect(ordered.count == nodes.count, "and exactly once")
+}
+
+@Test func treeOrderIsEmptyForNoItems() {
+    #expect(TreeRules.inTreeOrder([Node]()).isEmpty)
+}

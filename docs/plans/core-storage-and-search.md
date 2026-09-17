@@ -44,7 +44,7 @@
 | `Sources/TodoCore/Model/Placement.swift` | `Placement`: where a created or moved item lands among its siblings |
 | `Sources/TodoCore/Model/TodoTask.swift` | `TodoTask`, `TaskStatus`, `NewTask`, `TaskChange` |
 | `Sources/TodoCore/Model/Tag.swift` | `Tag`, `TagChange` |
-| `Sources/TodoCore/Model/View.swift` | `View`, `NewView`, `ViewChange` |
+| `Sources/TodoCore/Model/View.swift` | `View`, `NewTaskView`, `TaskViewChange` |
 | `Sources/TodoCore/Model/Filter.swift` | `Filter`, `DayCondition`, `SortKey`, `SortField`, `GroupBy`, JSON codec, `FilterError` |
 | `Sources/TodoCore/Storage/Schema.swift` | DDL of schema version 1 |
 | `Sources/TodoCore/Storage/Migrations.swift` | Ordered migration steps, `Migrations.run` |
@@ -3840,7 +3840,7 @@ git commit -m "feat(core): add the filter model with its JSON format and SQL com
 ### Task 9: Views: nesting, built-in views, manual lists, pages with sections and groups
 
 **Files:**
-- Create: `Sources/TodoCore/Model/View.swift` (`View`, `NewView`, `ViewChange`, `BuiltInViews`), one file per entity as in Task 7
+- Create: `Sources/TodoCore/Model/View.swift` (`View`, `NewTaskView`, `TaskViewChange`, `BuiltInTaskViews`), one file per entity as in Task 7
 - Create: `Sources/TodoCore/Storage/Store+Views.swift`, `Sources/TodoCore/Query/Store+Query.swift`
 - Modify: `Sources/TodoCore/Storage/Store.swift` (replace the empty `seedBuiltInViews`)
 - Modify: `docs/specs/core-storage-and-search.md` (Logbook row of the built-in views table, see Step 7)
@@ -3865,12 +3865,12 @@ private func sortValue(_ keys: [SortKey]) throws(StoreError) -> Value {
 - Consumes: `Filter`, `SortKey`, `GroupBy`, `FilterCompiler` (Task 8); `loadTasks`, `siblingRank`, `setFlag`, `Placement` (Task 7); `TreeRules` (Task 6); `apply`, `op` (Task 5).
 - Produces:
   - `public struct View: Equatable, Sendable { id, title, parent: ViewID? (effective), rank, filter: Filter? (nil: folder), sort: [SortKey], groupBy: GroupBy?, needsNewerApp: String? (the unsupported kind), createdAt, updatedAt }`
-  - `public struct NewView: Sendable { title, parent: ViewID? = nil, filter: Filter? = nil, sort: [SortKey] = [], groupBy: GroupBy? = nil; init(title:) }`
-  - `public enum ViewChange: Sendable, Equatable { case title(String), filter(Filter?), sort([SortKey]), groupBy(GroupBy?) }`
-  - `public enum BuiltInViews { public static let inbox, today, upcoming, logbook, trash: ViewID; static let definitions: [(id: ViewID, title: String, rank: String, filter: Filter, sort: [SortKey], groupBy: GroupBy?)] }`
+  - `public struct NewTaskView: Sendable { title, parent: ViewID? = nil, filter: Filter? = nil, sort: [SortKey] = [], groupBy: GroupBy? = nil; init(title:) }`
+  - `public enum TaskViewChange: Sendable, Equatable { case title(String), filter(Filter?), sort([SortKey]), groupBy(GroupBy?) }`
+  - `public enum BuiltInTaskViews { public static let inbox, today, upcoming, logbook, trash: ViewID; static let definitions: [(id: ViewID, title: String, rank: String, filter: Filter, sort: [SortKey], groupBy: GroupBy?)] }`
   - `extension Store`: `createView(_:at:) -> ViewID`, `update(view:_:)`, `delete(view:)`, `move(view:to:at:)`, `views() -> [View]` (tree order), `view(_:) -> View?`, `children(ofView:) -> [View]`, `pin(task:in:at:)`, `unpin(task:from:)`, `manualList(of:) -> [TaskID]`.
-  - `public struct ViewPage: Equatable, Sendable { view: View; sections: [Section] }`, `public struct Section: Equatable, Sendable { view: View? (nil: the view's own remainder); groups: [TaskGroup] }`, `public struct TaskGroup: Equatable, Sendable { key: GroupKey?; tasks: [TodoTask] }`, `public enum GroupKey: Hashable, Sendable { case day(Day?), tag(TagID?), parent(TaskID?), status(TaskStatus) }`.
-  - `extension Store`: `tasks(in: ViewID, today: Day) -> [TodoTask]` (flat, manual order first), `page(of: ViewID, today: Day) -> ViewPage`, internal `tasks(matching: View, today:)`, `group(_:by:)`.
+  - `public struct TaskViewPage: Equatable, Sendable { view: View; sections: [Section] }`, `public struct Section: Equatable, Sendable { view: View? (nil: the view's own remainder); groups: [TaskGroup] }`, `public struct TaskGroup: Equatable, Sendable { key: GroupKey?; tasks: [TodoTask] }`, `public enum GroupKey: Hashable, Sendable { case day(Day?), tag(TagID?), parent(TaskID?), status(TaskStatus) }`.
+  - `extension Store`: `tasks(in: ViewID, today: Day) -> [TodoTask]` (flat, manual order first), `page(of: ViewID, today: Day) -> TaskViewPage`, internal `tasks(matching: View, today:)`, `group(_:by:)`.
 
 Built-in definitions (fixed ids, seeded with clock zero by device `seed`, so any user edit wins and every device creates identical journal rows):
 
@@ -3895,9 +3895,9 @@ import Testing
     let clock = TestClock()
     let store = try makeStore(clock: clock)
     #expect(try store.views().map(\.title) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash"])
-    #expect(try store.view(BuiltInViews.today)?.filter == .and([.status([.open]), .when(.onOrBefore(0))]))
-    try store.update(view: BuiltInViews.today, [.title("Сегодня")])
-    try store.delete(view: BuiltInViews.trash)
+    #expect(try store.view(BuiltInTaskViews.today)?.filter == .and([.status([.open]), .when(.onOrBefore(0))]))
+    try store.update(view: BuiltInTaskViews.today, [.title("Сегодня")])
+    try store.delete(view: BuiltInTaskViews.trash)
     let reopened = try Store.openInMemory(snapshot: try store.snapshot(), now: clock.now)
     #expect(try reopened.views().map(\.title) == ["Inbox", "Сегодня", "Upcoming", "Logbook"])
     let seeded = try reopened.sql { () throws(SQLiteError) in try reopened.db.rows("SELECT count(*) FROM ops WHERE device = 'seed'") }
@@ -3906,8 +3906,8 @@ import Testing
 
 @Test func viewsNestMoveAndReadBackTheirDefinition() throws {
     let store = try makeStore()
-    let folder = try store.createView(NewView(title: "Work"))
-    var new = NewView(title: "Reviews"); new.parent = folder
+    let folder = try store.createView(NewTaskView(title: "Work"))
+    var new = NewTaskView(title: "Reviews"); new.parent = folder
     new.filter = .hasTag(TagID("g1")); new.sort = [SortKey(.deadline)]; new.groupBy = .deadlineDay
     let reviews = try store.createView(new)
     let inside = try #require(try store.view(reviews))
@@ -3941,7 +3941,7 @@ import Testing
     let a = try store.createTask(NewTask(title: "a"))
     let b = try store.createTask(NewTask(title: "b"))
     let c = try store.createTask(NewTask(title: "c"))
-    let heading = try store.createView(NewView(title: "H"))
+    let heading = try store.createView(NewTaskView(title: "H"))
     try store.pin(task: a, in: heading)
     try store.pin(task: c, in: heading)
     try store.pin(task: b, in: heading, at: .after(a))
@@ -3978,21 +3978,21 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     let store = try makeStore()
     _ = try seeded(store)
     func titles(_ view: ViewID) throws -> [String] { try store.tasks(in: view, today: today).map(\.title) }
-    #expect(try titles(BuiltInViews.inbox) == ["loose"])
-    #expect(try titles(BuiltInViews.today) == ["overdue", "due"])
-    #expect(try titles(BuiltInViews.upcoming) == ["later", "much later"])
-    #expect(try titles(BuiltInViews.logbook) == ["done"])
-    #expect(try titles(BuiltInViews.trash) == ["binned"])
-    #expect(try store.tasks(in: BuiltInViews.today, today: today.advanced(by: 2)).map(\.title) == ["overdue", "due", "later"])
+    #expect(try titles(BuiltInTaskViews.inbox) == ["loose"])
+    #expect(try titles(BuiltInTaskViews.today) == ["overdue", "due"])
+    #expect(try titles(BuiltInTaskViews.upcoming) == ["later", "much later"])
+    #expect(try titles(BuiltInTaskViews.logbook) == ["done"])
+    #expect(try titles(BuiltInTaskViews.trash) == ["binned"])
+    #expect(try store.tasks(in: BuiltInTaskViews.today, today: today.advanced(by: 2)).map(\.title) == ["overdue", "due", "later"])
 }
 
 @Test func manualOrderComesFirstThenTheSort() throws {
     let store = try makeStore()
     let ids = try seeded(store)
-    try store.pin(task: ids["due"]!, in: BuiltInViews.today)
-    #expect(try store.tasks(in: BuiltInViews.today, today: today).map(\.title) == ["due", "overdue"])
-    try store.unpin(task: ids["due"]!, from: BuiltInViews.today)
-    #expect(try store.tasks(in: BuiltInViews.today, today: today).map(\.title) == ["overdue", "due"])
+    try store.pin(task: ids["due"]!, in: BuiltInTaskViews.today)
+    #expect(try store.tasks(in: BuiltInTaskViews.today, today: today).map(\.title) == ["due", "overdue"])
+    try store.unpin(task: ids["due"]!, from: BuiltInTaskViews.today)
+    #expect(try store.tasks(in: BuiltInTaskViews.today, today: today).map(\.title) == ["overdue", "due"])
 }
 
 @Test func pagesRenderChildViewsAsSectionsThenTheRemainder() throws {
@@ -4001,9 +4001,9 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     var child = NewTask(title: "design"); child.parent = project; let design = try store.createTask(child)
     child.title = "build"; let build = try store.createTask(child)
     child.title = "ship"; let ship = try store.createTask(child)
-    var projectView = NewView(title: "Project"); projectView.filter = .parent(project)
+    var projectView = NewTaskView(title: "Project"); projectView.filter = .parent(project)
     let view = try store.createView(projectView)
-    var heading = NewView(title: "Phase 1"); heading.parent = view
+    var heading = NewTaskView(title: "Phase 1"); heading.parent = view
     let phase1 = try store.createView(heading)
     try store.update(view: phase1, [.filter(.listedIn(phase1))])
     try store.pin(task: design, in: phase1)
@@ -4017,7 +4017,7 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     #expect(page.sections[1].view == nil)
     #expect(page.sections[1].groups.flatMap(\.tasks).map(\.id) == [ship])
 
-    let folder = try store.createView(NewView(title: "Folder"))
+    let folder = try store.createView(NewTaskView(title: "Folder"))
     try store.move(view: view, to: folder, at: .end)
     let folderPage = try store.page(of: folder, today: today)
     #expect(folderPage.sections.count == 1 && folderPage.sections[0].view?.id == view, "a folder shows only its children")
@@ -4027,11 +4027,11 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
 @Test func groupingByDayAndByTag() throws {
     let store = try makeStore()
     let ids = try seeded(store)
-    let upcoming = try store.page(of: BuiltInViews.upcoming, today: today)
+    let upcoming = try store.page(of: BuiltInTaskViews.upcoming, today: today)
     #expect(upcoming.sections[0].groups.map(\.key) == [.day(today.advanced(by: 2)), .day(today.advanced(by: 9))])
     let work = try store.createTag(title: "work")
     try store.add(tag: work, to: ids["due"]!)
-    var byTag = NewView(title: "By tag"); byTag.filter = .status([.open]); byTag.groupBy = .tag; byTag.sort = [SortKey(.title)]
+    var byTag = NewTaskView(title: "By tag"); byTag.filter = .status([.open]); byTag.groupBy = .tag; byTag.sort = [SortKey(.title)]
     let view = try store.createView(byTag)
     let page = try store.page(of: view, today: today)
     #expect(page.sections[0].groups.map(\.key) == [.tag(work), .tag(nil)])
@@ -4046,7 +4046,7 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
 swift test --filter 'ViewTests|QueryTests' 2>&1 | grep -E 'error:' | head -3
 ```
 
-Expected: `cannot find 'NewView' in scope`.
+Expected: `cannot find 'NewTaskView' in scope`.
 
 - [ ] **Step 3: Write `View.swift`**
 
@@ -4065,7 +4065,7 @@ public struct View: Equatable, Sendable {
     public var updatedAt: Int64
 }
 
-public struct NewView: Sendable {
+public struct NewTaskView: Sendable {
     public var title: String
     public var parent: ViewID? = nil
     public var filter: Filter? = nil
@@ -4075,7 +4075,7 @@ public struct NewView: Sendable {
     public init(title: String) { self.title = title }
 }
 
-public enum ViewChange: Sendable, Equatable {
+public enum TaskViewChange: Sendable, Equatable {
     case title(String)
     case filter(Filter?)
     case sort([SortKey])
@@ -4083,7 +4083,7 @@ public enum ViewChange: Sendable, Equatable {
 }
 
 /// Fixed ids so every device seeds the same rows; the seed uses clock zero so any user edit wins.
-public enum BuiltInViews {
+public enum BuiltInTaskViews {
     public static let inbox = ViewID("00000000-0000-4000-8000-000000000001")
     public static let today = ViewID("00000000-0000-4000-8000-000000000002")
     public static let upcoming = ViewID("00000000-0000-4000-8000-000000000003")
@@ -4110,7 +4110,7 @@ extension Store {
     // MARK: Writes
 
     @discardableResult
-    public func createView(_ new: NewView, at placement: Placement = .end) throws(StoreError) -> ViewID {
+    public func createView(_ new: NewTaskView, at placement: Placement = .end) throws(StoreError) -> ViewID {
         if let parent = new.parent { try requireView(parent) }
         let id = ViewID.generate()
         let rank = try siblingRank(table: "views", parent: new.parent, placement: placement, excluding: nil)
@@ -4128,7 +4128,7 @@ extension Store {
         return id
     }
 
-    public func update(view id: ViewID, _ changes: [ViewChange]) throws(StoreError) {
+    public func update(view id: ViewID, _ changes: [TaskViewChange]) throws(StoreError) {
         try requireView(id)
         guard !changes.isEmpty else { return }
         let stamp = clock.next()
@@ -4246,7 +4246,7 @@ extension Store {
     func seedBuiltInViews() throws(StoreError) {
         let zero = HLC(millis: 0, counter: 0)
         var ops: [Operation] = []
-        for d in BuiltInViews.definitions {
+        for d in BuiltInTaskViews.definitions {
             let fields: [(String, Value)] = [
                 ("title", .text(d.title)), ("parent", .null), ("rank", .text(d.rank)), ("filter", try filterValue(d.filter)),
                 ("sort", try sortValue(d.sort)), ("group_by", Value(d.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(0)),
@@ -4284,7 +4284,7 @@ public struct Section: Equatable, Sendable {
     public var groups: [TaskGroup]
 }
 
-public struct ViewPage: Equatable, Sendable {
+public struct TaskViewPage: Equatable, Sendable {
     public var view: View
     public var sections: [Section]
 }
@@ -4298,7 +4298,7 @@ extension Store {
 
     /// A page: each child view as a section in rank order, then the view's own results that no child claimed.
     /// One level deep: a child's own children flatten into the child's section when it is opened, not here.
-    public func page(of viewID: ViewID, today: Day) throws(StoreError) -> ViewPage {
+    public func page(of viewID: ViewID, today: Day) throws(StoreError) -> TaskViewPage {
         guard let view = try view(viewID) else { throw .notFound(viewID) }
         var sections: [Section] = []
         var claimed: Set<TaskID> = []
@@ -4311,7 +4311,7 @@ extension Store {
         if !own.isEmpty || sections.isEmpty {
             sections.append(Section(view: nil, groups: group(own, by: view.groupBy)))
         }
-        return ViewPage(view: view, sections: sections)
+        return TaskViewPage(view: view, sections: sections)
     }
 
     func tasks(matching view: View, today: Day) throws(StoreError) -> [TodoTask] {
@@ -4378,7 +4378,7 @@ git commit -m "feat(core): add nested views, built-in views, manual lists and pa
 **Interfaces:**
 - Consumes: the FTS5 tables and triggers (Task 4); `loadTasks(where:_:orderBy:join:limit:)`, `tags()`, `views()` (Tasks 7 and 9).
 - Produces:
-  - `public enum QuickFindHit: Equatable, Sendable { case task(TodoTask); case tag(Tag); case view(TodoView) }`
+  - `public enum QuickFindHit: Equatable, Sendable { case task(TodoTask); case tag(Tag); case view(TaskView) }`
   - `public struct NoteHit: Equatable, Sendable { public var task: TodoTask; public var snippet: String; public var score: Double }`
   - `extension Store { public func quickFind(_ query: String, limit: Int = 20) throws(StoreError) -> [QuickFindHit]; public func searchNotes(_ query: String, limit: Int = 20) throws(StoreError) -> [NoteHit]; static func trigramQuery(_ text: String) -> String?; static func wordsQuery(_ text: String) -> String? }`
 
@@ -4407,7 +4407,7 @@ private func titles(_ hits: [QuickFindHit]) -> [String] {
     _ = try store.createTask(NewTask(title: "Квартальный отчёт"))
     _ = try store.createTask(NewTask(title: "Buy Milk"))
     _ = try store.createTag(title: "Отчётность")
-    _ = try store.createView(NewView(title: "Reports"))
+    _ = try store.createView(NewTaskView(title: "Reports"))
     #expect(titles(try store.quickFind("ОТЧ")) == ["task:Квартальный отчёт", "tag:Отчётность"])
     #expect(titles(try store.quickFind("milk")) == ["task:Buy Milk"])
     #expect(titles(try store.quickFind("por")) == ["view:Reports"])
@@ -4498,7 +4498,7 @@ import SQLiteKit
 public enum QuickFindHit: Equatable, Sendable {
     case task(TodoTask)
     case tag(Tag)
-    case view(TodoView)
+    case view(TaskView)
 }
 
 public struct NoteHit: Equatable, Sendable {
@@ -4594,7 +4594,7 @@ extension Store {
     }
 
     private static func byTitle(_ a: Tag, _ b: Tag) -> Bool { (a.title.lowercased(), a.id.rawValue) < (b.title.lowercased(), b.id.rawValue) }
-    private static func byTitle(_ a: TodoView, _ b: TodoView) -> Bool { (a.title.lowercased(), a.id.rawValue) < (b.title.lowercased(), b.id.rawValue) }
+    private static func byTitle(_ a: TaskView, _ b: TaskView) -> Bool { (a.title.lowercased(), a.id.rawValue) < (b.title.lowercased(), b.id.rawValue) }
 }
 ```
 
@@ -4674,7 +4674,7 @@ private func exchange(_ a: Store, _ b: Store, _ relay: InMemoryRelay) throws {
     try b.update(task: id, [.title("B after sync")])           // B's clock jumped past A's during receive
     try exchange(a, b, relay)
     #expect(try a.task(id)?.title == "B after sync")
-    #expect(try a.tasks(in: BuiltInViews.today, today: day).map(\.id) == [id])
+    #expect(try a.tasks(in: BuiltInTaskViews.today, today: day).map(\.id) == [id])
 }
 
 @Test func structureTagsViewsAndPinsPropagate() throws {
@@ -4684,7 +4684,7 @@ private func exchange(_ a: Store, _ b: Store, _ relay: InMemoryRelay) throws {
     let kid = try a.createTask(child)
     let tag = try a.createTag(title: "work")
     try a.add(tag: tag, to: kid)
-    let view = try a.createView(NewView(title: "H"))
+    let view = try a.createView(NewTaskView(title: "H"))
     try a.update(view: view, [.filter(.listedIn(view))])
     try a.pin(task: kid, in: view)
     try exchange(a, b, relay)
@@ -4998,7 +4998,7 @@ enum Format {
         return parts.joined(separator: "  ")
     }
 
-    static func page(_ page: ViewPage, tagsByID: [TagID: Tag]) -> String {
+    static func page(_ page: TaskViewPage, tagsByID: [TagID: Tag]) -> String {
         var lines: [String] = ["\(page.view.title) (\(page.sections.flatMap(\.groups).flatMap(\.tasks).count) tasks)"]
         for section in page.sections {
             if let view = section.view { lines.append("## \(view.title)") }
@@ -5019,7 +5019,7 @@ enum Format {
         }
     }
 
-    static func views(_ views: [TodoView]) -> String {
+    static func views(_ views: [TaskView]) -> String {
         var depth: [ViewID: Int] = [:]
         return views.map { view in
             let level = view.parent.flatMap { depth[$0] }.map { $0 + 1 } ?? 0
@@ -5120,8 +5120,8 @@ public enum CLI {
                 guard let key = GroupBy(rawValue: group) else { throw CLIError("unknown group key \(group)") }
                 groupBy = key
             }
-            // `NewView`'s fields are `let` (Task 9), so every option is resolved before the value is built.
-            let id = try store.createView(NewView(
+            // `NewTaskView`'s fields are `let` (Task 9), so every option is resolved before the value is built.
+            let id = try store.createView(NewTaskView(
                 title: title,
                 parent: try options["parent"]?.last.map { try resolveView($0, store).id },
                 filter: try options["filter"]?.last.map { try Filter(json: $0) },
@@ -5235,7 +5235,7 @@ public enum CLI {
         }
     }
 
-    static func resolveView(_ text: String, _ store: Store) throws -> TodoView {
+    static func resolveView(_ text: String, _ store: Store) throws -> TaskView {
         let views = try store.views()
         if let byTitle = views.first(where: { $0.title.lowercased() == text.lowercased() }) { return byTitle }
         let byPrefix = views.filter { $0.id.rawValue.hasPrefix(text.lowercased()) }
@@ -5457,4 +5457,4 @@ Deviations from the spec, each small and stated where it happens:
 - A task with several tags is grouped under its smallest tag id (Task 9); the UI may regroup.
 - The "Cost" paragraph's `EXPLAIN QUERY PLAN` test for built-in views is not a separate task: add it to `QueryTests` in Task 9 as `builtInViewsUseIndexes`, asserting that the plan of each built-in view's SQL contains no `SCAN tasks` line, once the queries exist. If a plan does scan, add the composite index the plan names, in the same PR.
 
-Type and name consistency checked across tasks: `Store.op(_:_:_:_:_:)` (Task 5) is used unchanged in Tasks 6, 7, 9 and 11; `loadTasks(where:_:orderBy:join:limit:)` (Task 7) in Tasks 9 and 10; `siblingRank(table:parent:placement:excluding:)` (Task 7) in Task 9; `TreeRules.effectiveParents` (Task 6) in Tasks 7 and 9; `FilterCompiler.whereClause` and `orderBy` (Task 8) in Task 9; `BuiltInViews` ids (Task 9) in Tasks 10 to 12; `SortKey.json`/`parse` (Task 8) in Task 9.
+Type and name consistency checked across tasks: `Store.op(_:_:_:_:_:)` (Task 5) is used unchanged in Tasks 6, 7, 9 and 11; `loadTasks(where:_:orderBy:join:limit:)` (Task 7) in Tasks 9 and 10; `siblingRank(table:parent:placement:excluding:)` (Task 7) in Task 9; `TreeRules.effectiveParents` (Task 6) in Tasks 7 and 9; `FilterCompiler.whereClause` and `orderBy` (Task 8) in Task 9; `BuiltInTaskViews` ids (Task 9) in Tasks 10 to 12; `SortKey.json`/`parse` (Task 8) in Task 9.

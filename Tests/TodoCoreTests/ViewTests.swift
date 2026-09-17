@@ -6,9 +6,9 @@ import Testing
     let clock = TestClock()
     let store = try makeStore(clock: clock)
     #expect(try store.views().map(\.title) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash"])
-    #expect(try store.view(BuiltInViews.today)?.filter == .and([.status([.open]), .when(.onOrBefore(0))]))
-    try store.update(view: BuiltInViews.today, [.title("Сегодня")])
-    try store.delete(view: BuiltInViews.trash)
+    #expect(try store.view(BuiltInTaskViews.today)?.filter == .and([.status([.open]), .when(.onOrBefore(0))]))
+    try store.update(view: BuiltInTaskViews.today, [.title("Сегодня")])
+    try store.delete(view: BuiltInTaskViews.trash)
     let reopened = try Store.openInMemory(snapshot: try store.snapshot(), now: clock.now)
     #expect(try reopened.views().map(\.title) == ["Inbox", "Сегодня", "Upcoming", "Logbook"])
     let seeded = try reopened.sql { () throws(SQLiteError) in try reopened.db.rows("SELECT count(*) FROM ops WHERE device = 'seed'") }
@@ -17,8 +17,8 @@ import Testing
 
 @Test func viewsNestMoveAndReadBackTheirDefinition() throws {
     let store = try makeStore()
-    let folder = try store.createView(NewView(title: "Work"))
-    let reviews = try store.createView(NewView(
+    let folder = try store.createView(NewTaskView(title: "Work"))
+    let reviews = try store.createView(NewTaskView(
         title: "Reviews", parent: folder, filter: .hasTag(TagID("g1")), sort: [SortKey(.deadline)], groupBy: .deadlineDay
     ))
     let inside = try #require(try store.view(reviews))
@@ -39,8 +39,8 @@ import Testing
 /// drags a folder onto one of its own children would watch the sidebar scatter.
 @Test func aViewCannotBeMovedUnderItselfOrItsOwnDescendant() throws {
     let store = try makeStore()
-    let folder = try store.createView(NewView(title: "Work"))
-    let inner = try store.createView(NewView(title: "Reviews", parent: folder))
+    let folder = try store.createView(NewTaskView(title: "Work"))
+    let inner = try store.createView(NewTaskView(title: "Reviews", parent: folder))
     var caught: StoreError?
     do { try store.move(view: folder, to: folder, at: .end) } catch { caught = error }
     #expect(caught == .invalid("a view cannot be its own parent"))
@@ -88,7 +88,7 @@ import Testing
     let a = try store.createTask(NewTask(title: "a"))
     let b = try store.createTask(NewTask(title: "b"))
     let c = try store.createTask(NewTask(title: "c"))
-    let heading = try store.createView(NewView(title: "H"))
+    let heading = try store.createView(NewTaskView(title: "H"))
     try store.pin(task: a, in: heading)
     try store.pin(task: c, in: heading)
     try store.pin(task: b, in: heading, at: .after(a))

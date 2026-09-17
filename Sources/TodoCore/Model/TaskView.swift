@@ -1,4 +1,4 @@
-// Sources/TodoCore/Model/View.swift
+// Sources/TodoCore/Model/TaskView.swift
 
 /// A view as read from the store: a filter over tasks, a place in the sidebar tree, and how its results are
 /// sorted and grouped. `parent` is effective, by the rule the task tree follows — a link to a missing,
@@ -9,7 +9,7 @@
 /// version of the app could not read out of the stored definition: a view written by a newer app is reported
 /// by name instead of evaluated, because a filter with a condition dropped is a list missing exactly the rows
 /// that condition selected.
-public struct TodoView: Equatable, Sendable {
+public struct TaskView: Equatable, Sendable {
     public let id: ViewID
     public let title: String
     public let parent: ViewID?
@@ -24,7 +24,7 @@ public struct TodoView: Equatable, Sendable {
 
 /// What a caller knows about a view before it exists. Everything but the title has a default, and the id, the
 /// rank and the timestamps are the store's to mint, the way `NewTask` leaves them.
-public struct NewView: Sendable {
+public struct NewTaskView: Sendable {
     public let title: String
     public let parent: ViewID?
     public let filter: Filter?
@@ -48,14 +48,14 @@ public struct NewView: Sendable {
 
 /// One field of a view set to one value. The parent is not among them, for the reason written on
 /// `TaskChange`: re-parenting also ranks the view among its new siblings, so it is `move(view:to:at:)`.
-public enum ViewChange: Sendable, Equatable {
+public enum TaskViewChange: Sendable, Equatable {
     case title(String)
     case filter(Filter?)
     case sort([SortKey])
     case groupBy(GroupBy?)
 }
 
-extension ViewChange {
+extension TaskViewChange {
     /// The state column this change writes, which is how a write keeps the last change for a field.
     var field: String {
         switch self {
@@ -71,7 +71,7 @@ extension ViewChange {
 /// merges them instead of ending up with two Inboxes; the seed carries clock zero, so any edit a person makes
 /// to one of them outranks it and survives every later open. They are ordinary rows: nesting, editing and
 /// deleting them works exactly as it does for a view a person created.
-public enum BuiltInViews {
+public enum BuiltInTaskViews {
     public static let inbox = ViewID("00000000-0000-4000-8000-000000000001")
     public static let today = ViewID("00000000-0000-4000-8000-000000000002")
     public static let upcoming = ViewID("00000000-0000-4000-8000-000000000003")
@@ -89,4 +89,4 @@ public enum BuiltInViews {
     ]
 }
 
-extension TodoView: TreeOrdered {}
+extension TaskView: TreeOrdered {}
