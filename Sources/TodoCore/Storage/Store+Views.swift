@@ -119,7 +119,8 @@ extension Store {
 
     // MARK: - Manual lists
 
-    /// Puts the task into the view's manual list, where it comes before everything the sort brings. The two
+    /// Puts the task into the view's manual list, where it comes before everything the sort brings inside its
+    /// own group — the whole list being one group when the view groups by nothing (`group(_:by:manual:)`). The two
     /// operations share one stamp: a device that saw only the rank would hold a position in a list the task
     /// is not in, which is the case `writePairRow` seeds `present = 0` for.
     public func pin(task: TaskID, in view: ViewID, at placement: Placement = .end) throws(StoreError) {
@@ -211,15 +212,21 @@ extension Store {
         if rows.isEmpty { throw .notFound(id) }
     }
 
+    /// The second statement every grouped read runs, and the one a placement ranks among. It is a constant
+    /// rather than a literal inside the read below for the reason `viewStatement` is assembled where it is:
+    /// `builtInViewsUseIndexes` explains this exact string, and a guard that explained a copy would pass
+    /// while the copy drifted away from the query a person waits on.
+    static let manualListQuery = """
+        SELECT v.task_id, v.rank FROM view_items v JOIN tasks t ON t.id = v.task_id AND t.deleted = 0
+        WHERE v.view_id = ? AND v.present = 1 AND v.task_id != ? ORDER BY v.rank, v.task_id
+        """
+
     /// The manual list of a view as a read shows it, with the ranks a placement needs. A deleted task is
     /// skipped here rather than in every caller: the pair row stays for sync, and nothing shows it again.
     private func pinnedItems(of view: ViewID, excluding: TaskID?) throws(StoreError) -> [(id: String, rank: String)] {
         try sql { () throws(SQLiteError) in
-            try db.rows("""
-                SELECT v.task_id, v.rank FROM view_items v JOIN tasks t ON t.id = v.task_id AND t.deleted = 0
-                WHERE v.view_id = ? AND v.present = 1 AND v.task_id != ? ORDER BY v.rank, v.task_id
-                """, [.text(view.rawValue), .text(excluding?.rawValue ?? "")]
-            ).map { (id: $0[0].string ?? "", rank: $0[1].string ?? Rank.initial) }
+            try db.rows(Store.manualListQuery, [.text(view.rawValue), .text(excluding?.rawValue ?? "")])
+                .map { (id: $0[0].string ?? "", rank: $0[1].string ?? Rank.initial) }
         }
     }
 

@@ -3870,7 +3870,7 @@ private func sortValue(_ keys: [SortKey]) throws(StoreError) -> Value {
   - `public enum BuiltInTaskViews { public static let inbox, today, upcoming, logbook, trash: ViewID; static let definitions: [(id: ViewID, title: String, rank: String, filter: Filter, sort: [SortKey], groupBy: GroupBy?)] }`
   - `extension Store`: `createView(_:at:) -> ViewID`, `update(view:_:)`, `delete(view:)`, `move(view:to:at:)`, `views() -> [View]` (tree order), `view(_:) -> View?`, `children(ofView:) -> [View]`, `pin(task:in:at:)`, `unpin(task:from:)`, `manualList(of:) -> [TaskID]`.
   - `public struct TaskViewPage: Equatable, Sendable { view: View; sections: [Section] }`, `public struct Section: Equatable, Sendable { view: View? (nil: the view's own remainder); groups: [TaskGroup] }`, `public struct TaskGroup: Equatable, Sendable { key: GroupKey?; tasks: [TodoTask] }`, `public enum GroupKey: Hashable, Sendable { case day(Day?), tag(TagID?), parent(TaskID?), status(TaskStatus) }`.
-  - `extension Store`: `tasks(in: ViewID, today: Day) -> [TodoTask]` (flat, manual order first), `page(of: ViewID, today: Day) -> TaskViewPage`, internal `tasks(matching: View, today:)`, `group(_:by:)`.
+  - `extension Store`: `tasks(in: ViewID, today: Day) -> [TodoTask]` (flat: the groups laid end to end), `page(of: ViewID, today: Day) -> TaskViewPage`, private `tasks(matching: View, today:)`, `groups(of:from:)`, `group(_:by:manual:)`.
 
 Built-in definitions (fixed ids, seeded with clock zero by device `seed`, so any user edit wins and every device creates identical journal rows):
 

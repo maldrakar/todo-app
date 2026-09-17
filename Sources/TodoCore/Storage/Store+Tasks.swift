@@ -263,19 +263,19 @@ extension Store {
         return order.compactMap { latest[$0] }
     }
 
-    /// Loads tasks with their tags. `clause` may use the aliases `t` (tasks) and `tt` (task_tree); `join` is
-    /// appended after the tree join, which is where Tasks 8 to 10 hang a filter, a manual list or an FTS
-    /// table off the same loader.
-    func loadTasks(where clause: String, _ params: [Value], orderBy: String, join: String = "", limit: Int? = nil) throws(StoreError) -> [TodoTask] {
-        try loadTasks(sql: Store.taskQuery(where: clause, orderBy: orderBy, join: join, limit: limit), params)
+    /// Loads tasks with their tags. `clause` may use the aliases `t` (tasks) and `tt` (task_tree), which is
+    /// all a filter has needed: a view's manual list is a read of its own and the searches of Task 10 select
+    /// through a subquery, so the loader joins the tree and nothing else. `limit` is Task 10's.
+    func loadTasks(where clause: String, _ params: [Value], orderBy: String, limit: Int? = nil) throws(StoreError) -> [TodoTask] {
+        try loadTasks(sql: Store.taskQuery(where: clause, orderBy: orderBy, limit: limit), params)
     }
 
     /// The statement the loader above runs, assembled and not executed. A view's read builds it through
     /// here and hands the same string to `EXPLAIN QUERY PLAN` in the suite: a plan explained from a second
     /// copy of the SQL would keep passing while the copy drifted away from the query a person waits on.
-    static func taskQuery(where clause: String, orderBy: String, join: String, limit: Int?) -> String {
+    static func taskQuery(where clause: String, orderBy: String, limit: Int?) -> String {
         let limitClause = limit.map { " LIMIT \($0)" } ?? ""
-        return "SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id \(join) WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)"
+        return "SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)"
     }
 
     /// Runs an assembled task query and attaches the tags.

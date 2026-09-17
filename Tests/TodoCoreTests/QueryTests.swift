@@ -83,19 +83,111 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     #expect(page.sections[0].groups[1].tasks.map(\.title) == ["later", "loose", "much later", "overdue"])
 }
 
+/// The case this thread of the review found: a task dragged to the top of its own group must not carry the
+/// group with it. Groups take their order from the sort, and the manual list orders tasks inside a group —
+/// pinning `b2` used to put it at the head of the flat list, which lifted the whole of its day above the
+/// earlier one and brought `b1` along.
+@Test func aPinOrdersInsideItsGroupAndLeavesTheGroupWhereTheSortPutIt() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "a1", when: today))
+    _ = try store.createTask(NewTask(title: "a2", when: today))
+    _ = try store.createTask(NewTask(title: "b1", when: today.advanced(by: 1)))
+    let b2 = try store.createTask(NewTask(title: "b2", when: today.advanced(by: 1)))
+    let view = try store.createView(NewTaskView(title: "Days", filter: .status([.open]), sort: [SortKey(.when)], groupBy: .whenDay))
+    try store.pin(task: b2, in: view, at: .start)
+
+    let groups = try store.page(of: view, today: today).sections[0].groups
+    #expect(groups.map(\.key) == [.day(today), .day(today.advanced(by: 1))], "the pin does not reorder the days")
+    #expect(groups[0].tasks.map(\.title) == ["a1", "a2"])
+    #expect(groups[1].tasks.map(\.title) == ["b2", "b1"], "it reorders the day it is in")
+}
+
+/// One rule and not two: no grouping is one group, so the flat list of a view is the groups of its own
+/// section laid end to end. A page and the picker behind it would otherwise show a person two different
+/// orders for the same view, and the two are asserted against each other here as well as against the answer,
+/// so they cannot drift apart while both stay self-consistent.
+@Test func theFlatListOfAGroupedViewIsItsOwnGroupsInOrder() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "a1", when: today))
+    _ = try store.createTask(NewTask(title: "b1", when: today.advanced(by: 1)))
+    let b2 = try store.createTask(NewTask(title: "b2", when: today.advanced(by: 1)))
+    let view = try store.createView(NewTaskView(title: "Days", filter: .status([.open]), sort: [SortKey(.when)], groupBy: .whenDay))
+    try store.pin(task: b2, in: view, at: .start)
+
+    #expect(try store.tasks(in: view, today: today).map(\.title) == ["a1", "b2", "b1"])
+    let page = try store.page(of: view, today: today)
+    #expect(try store.tasks(in: view, today: today) == page.sections[0].groups.flatMap(\.tasks))
+}
+
+/// The manual list is an order and not a flag: inside a group it decides the order of the tasks in it, so a
+/// list that contradicts the sort wins. Pinning in the order `b`, `a` under a sort by title is the smallest
+/// case that tells the two apart.
+@Test func theManualListOrdersAgainstTheSortInsideAGroup() throws {
+    let store = try makeStore()
+    let a = try store.createTask(NewTask(title: "a", when: today))
+    let b = try store.createTask(NewTask(title: "b", when: today))
+    _ = try store.createTask(NewTask(title: "c", when: today))
+    let view = try store.createView(NewTaskView(title: "Days", filter: .status([.open]), sort: [SortKey(.title)], groupBy: .whenDay))
+    try store.pin(task: b, in: view, at: .end)
+    try store.pin(task: a, in: view, at: .end)
+
+    let groups = try store.page(of: view, today: today).sections[0].groups
+    #expect(groups.count == 1)
+    #expect(groups[0].tasks.map(\.title) == ["b", "a", "c"], "the manual order, then what the sort brings")
+}
+
+/// A section is drawn by its own view: its grouping and its manual list, not the ones of the page around it.
+/// A task pinned in the parent is claimed by the child and shows where the child puts it.
+@Test func aSectionGroupsAndOrdersByItsOwnViewAndNotThePagesView() throws {
+    let store = try makeStore()
+    let project = try store.createTask(NewTask(title: "Project"))
+    let early = try store.createTask(NewTask(title: "early", when: today, parent: project))
+    let late = try store.createTask(NewTask(title: "late", when: today.advanced(by: 1), parent: project))
+    let view = try store.createView(NewTaskView(title: "Project", filter: .parent(project), sort: [SortKey(.when)]))
+    let phase = try store.createView(NewTaskView(title: "Phase 1", parent: view, sort: [SortKey(.when)], groupBy: .whenDay))
+    try store.update(view: phase, [.filter(.listedIn(phase))])
+    try store.pin(task: early, in: phase, at: .end)
+    try store.pin(task: late, in: phase, at: .start)
+    // The page's own view groups by nothing and pins the other way round, so a section that read the page's
+    // view instead of its own would draw one group in the opposite order.
+    try store.pin(task: early, in: view, at: .start)
+
+    let section = try store.page(of: view, today: today).sections[0]
+    #expect(section.view?.id == phase)
+    #expect(section.groups.map(\.key) == [.day(today), .day(today.advanced(by: 1))], "the child's grouping")
+    #expect(section.groups.flatMap(\.tasks).map(\.title) == ["early", "late"], "the child's manual list")
+}
+
+/// A pin is a position in a list, not a claim on a view: a task the filter does not select stays out, and a
+/// task in the list that has been trashed or deleted leaves it on the way out, so neither shifts the rest.
+@Test func aPinnedTaskTheViewDoesNotSelectChangesNothing() throws {
+    let store = try makeStore()
+    let ids = try seeded(store)
+    let view = try store.createView(NewTaskView(title: "Open", filter: .status([.open]), sort: [SortKey(.title)]))
+    let before = try store.tasks(in: view, today: today).map(\.title)
+    try store.pin(task: ids["done"]!, in: view, at: .start)
+    try store.pin(task: ids["binned"]!, in: view, at: .start)
+    #expect(try store.tasks(in: view, today: today).map(\.title) == before)
+
+    try store.pin(task: ids["later"]!, in: view, at: .start)
+    try store.trash(task: ids["later"]!)
+    #expect(try store.tasks(in: view, today: today).map(\.title) == before.filter { $0 != "later" }, "a pinned task that leaves the view leaves its list")
+}
+
 /// The guard the spec promises under "Cost": a built-in view that degrades into a full scan of a table with
 /// one row per task fails here instead of surprising a person with a large list.
 ///
-/// `SCAN` of `tasks` or of `task_tree` is what it refuses; a `SCAN` of `view_items` or of a small temporary
-/// would not be the same thing, so the assertion names the two tables that grow with the list. The statement
-/// is the one `tasks(in:today:)` runs, built by the same function, not a copy of it.
+/// `SCAN` of `tasks` or of `task_tree` is what it refuses; a `SCAN` of a small temporary would not be the
+/// same thing, so the assertion names the two tables that grow with the list. Both statements a view read
+/// runs are explained — its own, and the read of its manual list, which every grouped page runs once per
+/// section — and both come from the function the store calls rather than from a copy of the SQL.
 @Test func builtInViewsUseIndexes() throws {
     let store = try makeStore()
     _ = try seeded(store)
     for id in [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash] {
         let view = try #require(try store.view(id))
         let filter = try #require(view.filter)
-        let statement = Store.viewStatement(filter: filter, sort: view.sort, of: view.id, today: today)
+        let statement = Store.viewStatement(filter: filter, sort: view.sort, today: today)
         let plan = try store.sql { () throws(SQLiteError) in
             try store.db.rows("EXPLAIN QUERY PLAN " + statement.sql, statement.params).map { $0[3].string ?? "" }
         }
@@ -115,6 +207,14 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
         } else {
             #expect(driver.hasPrefix("SEARCH t "), "\(view.title) is driven by \(driver)")
         }
+
+        // The manual list is a read of its own, so it needs its own guard: it is driven by the view it
+        // belongs to, and reading every pin of every view to answer for one of them is the failure here.
+        let manual = try store.sql { () throws(SQLiteError) in
+            try store.db.rows("EXPLAIN QUERY PLAN " + Store.manualListQuery, [.text(view.id.rawValue), .text("")]).map { $0[3].string ?? "" }
+        }
+        #expect(try #require(manual.first).hasPrefix("SEARCH v USING PRIMARY KEY (view_id=?)"), "the manual list of \(view.title) is read by \(manual)")
+        #expect(!manual.contains { $0.hasPrefix("SCAN t ") || $0 == "SCAN t" }, "the manual list of \(view.title) walks the tasks table: \(manual)")
     }
 }
 
