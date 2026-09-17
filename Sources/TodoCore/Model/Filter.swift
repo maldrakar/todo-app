@@ -89,10 +89,16 @@ private func makeEncoder() -> JSONEncoder {
     return encoder
 }
 
-/// What a `Codable` value of this file encodes to is a string, a number, a bool or an array of those, and
-/// `JSONEncoder` fails on none of them, so the encode cannot throw for any value that exists.
-private func jsonString<T: Encodable>(_ value: T) -> String {
-    String(decoding: try! makeEncoder().encode(value), as: UTF8.self)
+/// `JSONEncoder` refuses two things: a value that encodes nothing at all, and a `Double` that is not a
+/// number. Neither can happen here \u2014 every case below writes its `kind` first, and nothing in a filter is a
+/// `Double` \u2014 but the failure is reported rather than trapped, because a proof that a trap cannot fire is
+/// worth less than a caller that can say what went wrong (`docs/style.md`, "A trap is a bug").
+private func jsonString<T: Encodable>(_ value: T) throws(FilterError) -> String {
+    do {
+        return String(decoding: try makeEncoder().encode(value), as: UTF8.self)
+    } catch {
+        throw .malformed(String(describing: error))
+    }
 }
 
 private func decodeJSON<T: Decodable>(_ type: T.Type, from json: String) throws(FilterError) -> T {
@@ -123,7 +129,9 @@ private func nestingDepth(of json: String) -> Int {
         }
         switch byte {
         case UInt8(ascii: "\""): inString = true
-        case UInt8(ascii: "{"), UInt8(ascii: "["): depth += 1; deepest = max(deepest, depth)
+        case UInt8(ascii: "{"), UInt8(ascii: "["):
+            depth += 1
+            deepest = max(deepest, depth)
         case UInt8(ascii: "}"), UInt8(ascii: "]"): depth -= 1
         default: break
         }
@@ -139,7 +147,7 @@ extension Filter {
     /// filter this app wrote and can never open again. A caller reports it where the filter was built; a
     /// refusal at the write is a message, a refusal at the read is a view that is gone.
     func json() throws(FilterError) -> String {
-        let json = jsonString(self)
+        let json = try jsonString(self)
         guard nestingDepth(of: json) <= maximumDepth else {
             throw .malformed("nested deeper than \(maximumDepth) levels")
         }
@@ -152,7 +160,7 @@ extension Filter {
 }
 
 extension SortKey {
-    static func json(_ keys: [SortKey]) -> String { jsonString(keys) }
+    static func json(_ keys: [SortKey]) throws(FilterError) -> String { try jsonString(keys) }
 
     /// An unknown sort field reads as an unsupported kind that names it; anything else that is not a list of
     /// sort keys is malformed.
@@ -180,11 +188,21 @@ extension DayCondition: Codable {
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .empty: try c.encode("empty", forKey: .kind)
-        case .on(let n): try c.encode("on", forKey: .kind); try c.encode(n, forKey: .offset)
-        case .onOrBefore(let n): try c.encode("on_or_before", forKey: .kind); try c.encode(n, forKey: .offset)
-        case .onOrAfter(let n): try c.encode("on_or_after", forKey: .kind); try c.encode(n, forKey: .offset)
-        case .between(let a, let b): try c.encode("between", forKey: .kind); try c.encode(a, forKey: .from); try c.encode(b, forKey: .to)
+        case .empty:
+            try c.encode("empty", forKey: .kind)
+        case .on(let n):
+            try c.encode("on", forKey: .kind)
+            try c.encode(n, forKey: .offset)
+        case .onOrBefore(let n):
+            try c.encode("on_or_before", forKey: .kind)
+            try c.encode(n, forKey: .offset)
+        case .onOrAfter(let n):
+            try c.encode("on_or_after", forKey: .kind)
+            try c.encode(n, forKey: .offset)
+        case .between(let a, let b):
+            try c.encode("between", forKey: .kind)
+            try c.encode(a, forKey: .from)
+            try c.encode(b, forKey: .to)
         }
     }
 }
@@ -224,18 +242,38 @@ extension Filter: Codable {
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .status(let statuses): try c.encode("status", forKey: .kind); try c.encode(statuses.map(\.rawValue), forKey: .statuses)
-        case .when(let day): try c.encode("when", forKey: .kind); try c.encode(day, forKey: .day)
-        case .deadline(let day): try c.encode("deadline", forKey: .kind); try c.encode(day, forKey: .day)
-        case .hasTag(let tag): try c.encode("has_tag", forKey: .kind); try c.encode(tag.rawValue, forKey: .tag)
+        case .status(let statuses):
+            try c.encode("status", forKey: .kind)
+            try c.encode(statuses.map(\.rawValue), forKey: .statuses)
+        case .when(let day):
+            try c.encode("when", forKey: .kind)
+            try c.encode(day, forKey: .day)
+        case .deadline(let day):
+            try c.encode("deadline", forKey: .kind)
+            try c.encode(day, forKey: .day)
+        case .hasTag(let tag):
+            try c.encode("has_tag", forKey: .kind)
+            try c.encode(tag.rawValue, forKey: .tag)
         // `encode` of an optional writes the key with `null`, which is what tells the root apart from a
         // parent this version cannot read when the filter is decoded again.
-        case .parent(let task): try c.encode("parent", forKey: .kind); try c.encode(task?.rawValue, forKey: .task)
-        case .listedIn(let view): try c.encode("listed_in", forKey: .kind); try c.encode(view.rawValue, forKey: .view)
-        case .trashed(let flag): try c.encode("trashed", forKey: .kind); try c.encode(flag, forKey: .value)
-        case .and(let filters): try c.encode("and", forKey: .kind); try c.encode(filters, forKey: .filters)
-        case .or(let filters): try c.encode("or", forKey: .kind); try c.encode(filters, forKey: .filters)
-        case .not(let filter): try c.encode("not", forKey: .kind); try c.encode(filter, forKey: .filter)
+        case .parent(let task):
+            try c.encode("parent", forKey: .kind)
+            try c.encode(task?.rawValue, forKey: .task)
+        case .listedIn(let view):
+            try c.encode("listed_in", forKey: .kind)
+            try c.encode(view.rawValue, forKey: .view)
+        case .trashed(let flag):
+            try c.encode("trashed", forKey: .kind)
+            try c.encode(flag, forKey: .value)
+        case .and(let filters):
+            try c.encode("and", forKey: .kind)
+            try c.encode(filters, forKey: .filters)
+        case .or(let filters):
+            try c.encode("or", forKey: .kind)
+            try c.encode(filters, forKey: .filters)
+        case .not(let filter):
+            try c.encode("not", forKey: .kind)
+            try c.encode(filter, forKey: .filter)
         }
     }
 }

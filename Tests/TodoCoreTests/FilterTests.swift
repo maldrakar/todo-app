@@ -51,7 +51,7 @@ private let today = Day(year: 2026, month: 9, day: 11)
 
 @Test func sortKeysRoundTripAndRejectUnknownFields() throws {
     let keys = [SortKey(.when), SortKey(.completed, descending: true)]
-    let json = SortKey.json(keys)
+    let json = try SortKey.json(keys)
     #expect(json == "[{\"descending\":false,\"field\":\"when\"},{\"descending\":true,\"field\":\"completed\"}]")
     #expect(try SortKey.parse(json: json) == keys)
     var caught: FilterError?
