@@ -44,8 +44,8 @@
 | `Sources/TodoCore/Model/Placement.swift` | `Placement`: where a created or moved item lands among its siblings |
 | `Sources/TodoCore/Model/TodoTask.swift` | `TodoTask`, `TaskStatus`, `NewTask`, `TaskChange` |
 | `Sources/TodoCore/Model/Tag.swift` | `Tag`, `TagChange` |
-| `Sources/TodoCore/Model/View.swift` | `View`, `NewView`, `ViewChange`, `SortKey`, `SortField`, `GroupBy` |
-| `Sources/TodoCore/Model/Filter.swift` | `Filter`, `DayCondition`, JSON codec, `FilterError` |
+| `Sources/TodoCore/Model/View.swift` | `View`, `NewView`, `ViewChange` |
+| `Sources/TodoCore/Model/Filter.swift` | `Filter`, `DayCondition`, `SortKey`, `SortField`, `GroupBy`, JSON codec, `FilterError` |
 | `Sources/TodoCore/Storage/Schema.swift` | DDL of schema version 1 |
 | `Sources/TodoCore/Storage/Migrations.swift` | Ordered migration steps, `Migrations.run` |
 | `Sources/TodoCore/Storage/Store.swift` | `Store`, `StoreError`, `ChangeSet`, open, snapshot, meta, built-in views seed |
@@ -3847,6 +3847,21 @@ git commit -m "feat(core): add the filter model with its JSON format and SQL com
 - Create: `Tests/TodoCoreTests/ViewTests.swift`, `Tests/TodoCoreTests/QueryTests.swift`
 
 **Interfaces:**
+- Departure carried from Task 8 (PR for #18), which this task has to follow: `Filter.json()`, `SortKey.json(_:)` and `SortKey.parse(json:)` are `internal`, not `public`, and the two encoders are `throws(FilterError)`. `Filter.json()` refuses a filter nested deeper than 32 levels, the same bound `init(json:)` refuses on the read, so a write cannot leave a view this app can never open again, and neither encoder traps on a failure it cannot produce. Every write that puts a filter or a sort into a column goes through the two helpers below, which give `StoreError.invalidFilter` its first caller. A `changes.map` over a throwing call needs a `for` loop or `try changes.map`.
+
+```swift
+/// The one place a filter becomes a column value. A filter too deep to read back is refused here, where it
+/// is a message about the filter the caller just built rather than a view that no longer opens.
+private func filterValue(_ filter: Filter?) throws(StoreError) -> Value {
+    guard let filter else { return .null }
+    do { return .text(try filter.json()) } catch { throw .invalidFilter(String(describing: error)) }
+}
+
+private func sortValue(_ keys: [SortKey]) throws(StoreError) -> Value {
+    do { return .text(try SortKey.json(keys)) } catch { throw .invalidFilter(String(describing: error)) }
+}
+```
+
 - Consumes: `Filter`, `SortKey`, `GroupBy`, `FilterCompiler` (Task 8); `loadTasks`, `siblingRank`, `setFlag`, `Placement` (Task 7); `TreeRules` (Task 6); `apply`, `op` (Task 5).
 - Produces:
   - `public struct View: Equatable, Sendable { id, title, parent: ViewID? (effective), rank, filter: Filter? (nil: folder), sort: [SortKey], groupBy: GroupBy?, needsNewerApp: String? (the unsupported kind), createdAt, updatedAt }`
@@ -4104,8 +4119,8 @@ extension Store {
             op(.view, id.rawValue, "title", .text(new.title), stamp),
             op(.view, id.rawValue, "parent", Value(new.parent?.rawValue), stamp),
             op(.view, id.rawValue, "rank", .text(rank), stamp),
-            op(.view, id.rawValue, "filter", Value(new.filter?.json()), stamp),
-            op(.view, id.rawValue, "sort", .text(SortKey.json(new.sort)), stamp),
+            op(.view, id.rawValue, "filter", try filterValue(new.filter), stamp),
+            op(.view, id.rawValue, "sort", try sortValue(new.sort), stamp),
             op(.view, id.rawValue, "group_by", Value(new.groupBy?.rawValue), stamp),
             op(.view, id.rawValue, "deleted", Value(false), stamp),
             op(.view, id.rawValue, "created_at", .integer(stamp.millis), stamp),
@@ -4120,8 +4135,8 @@ extension Store {
         let ops: [Operation] = changes.map { change in
             switch change {
             case .title(let title): return op(.view, id.rawValue, "title", .text(title), stamp)
-            case .filter(let filter): return op(.view, id.rawValue, "filter", Value(filter?.json()), stamp)
-            case .sort(let sort): return op(.view, id.rawValue, "sort", .text(SortKey.json(sort)), stamp)
+            case .filter(let filter): return op(.view, id.rawValue, "filter", try filterValue(filter), stamp)
+            case .sort(let sort): return op(.view, id.rawValue, "sort", try sortValue(sort), stamp)
             case .groupBy(let group): return op(.view, id.rawValue, "group_by", Value(group?.rawValue), stamp)
             }
         }
@@ -4233,8 +4248,8 @@ extension Store {
         var ops: [Operation] = []
         for d in BuiltInViews.definitions {
             let fields: [(String, Value)] = [
-                ("title", .text(d.title)), ("parent", .null), ("rank", .text(d.rank)), ("filter", .text(d.filter.json())),
-                ("sort", .text(SortKey.json(d.sort))), ("group_by", Value(d.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(0)),
+                ("title", .text(d.title)), ("parent", .null), ("rank", .text(d.rank)), ("filter", try filterValue(d.filter)),
+                ("sort", try sortValue(d.sort)), ("group_by", Value(d.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(0)),
             ]
             ops += fields.map { Operation(entity: .view, entityID: d.id.rawValue, field: $0.0, value: $0.1, clock: zero, device: "seed") }
         }
