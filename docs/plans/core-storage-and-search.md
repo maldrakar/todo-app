@@ -4378,7 +4378,7 @@ git commit -m "feat(core): add nested views, built-in views, manual lists and pa
 **Interfaces:**
 - Consumes: the FTS5 tables and triggers (Task 4); `loadTasks(where:_:orderBy:join:limit:)`, `tags()`, `views()` (Tasks 7 and 9).
 - Produces:
-  - `public enum QuickFindHit: Equatable, Sendable { case task(TodoTask); case tag(Tag); case view(View) }`
+  - `public enum QuickFindHit: Equatable, Sendable { case task(TodoTask); case tag(Tag); case view(TodoView) }`
   - `public struct NoteHit: Equatable, Sendable { public var task: TodoTask; public var snippet: String; public var score: Double }`
   - `extension Store { public func quickFind(_ query: String, limit: Int = 20) throws(StoreError) -> [QuickFindHit]; public func searchNotes(_ query: String, limit: Int = 20) throws(StoreError) -> [NoteHit]; static func trigramQuery(_ text: String) -> String?; static func wordsQuery(_ text: String) -> String? }`
 
@@ -4498,7 +4498,7 @@ import SQLiteKit
 public enum QuickFindHit: Equatable, Sendable {
     case task(TodoTask)
     case tag(Tag)
-    case view(View)
+    case view(TodoView)
 }
 
 public struct NoteHit: Equatable, Sendable {
@@ -4594,7 +4594,7 @@ extension Store {
     }
 
     private static func byTitle(_ a: Tag, _ b: Tag) -> Bool { (a.title.lowercased(), a.id.rawValue) < (b.title.lowercased(), b.id.rawValue) }
-    private static func byTitle(_ a: View, _ b: View) -> Bool { (a.title.lowercased(), a.id.rawValue) < (b.title.lowercased(), b.id.rawValue) }
+    private static func byTitle(_ a: TodoView, _ b: TodoView) -> Bool { (a.title.lowercased(), a.id.rawValue) < (b.title.lowercased(), b.id.rawValue) }
 }
 ```
 
@@ -4684,8 +4684,7 @@ private func exchange(_ a: Store, _ b: Store, _ relay: InMemoryRelay) throws {
     let kid = try a.createTask(child)
     let tag = try a.createTag(title: "work")
     try a.add(tag: tag, to: kid)
-    var heading = NewView(title: "H"); heading.filter = nil
-    let view = try a.createView(heading)
+    let view = try a.createView(NewView(title: "H"))
     try a.update(view: view, [.filter(.listedIn(view))])
     try a.pin(task: kid, in: view)
     try exchange(a, b, relay)
@@ -5020,7 +5019,7 @@ enum Format {
         }
     }
 
-    static func views(_ views: [View]) -> String {
+    static func views(_ views: [TodoView]) -> String {
         var depth: [ViewID: Int] = [:]
         return views.map { view in
             let level = view.parent.flatMap { depth[$0] }.map { $0 + 1 } ?? 0
@@ -5116,15 +5115,19 @@ public enum CLI {
             guard positionals.first == "add" else { throw CLIError("view supports: add") }
             let title = positionals.dropFirst().joined(separator: " ")
             guard !title.isEmpty else { throw CLIError("view add needs a title") }
-            var new = NewView(title: title)
-            if let json = options["filter"]?.last { new.filter = try Filter(json: json) }
-            if let parent = options["parent"]?.last { new.parent = try resolveView(parent, store).id }
-            new.sort = try (options["sort"] ?? []).map(sortKey)
+            var groupBy: GroupBy?
             if let group = options["group"]?.last {
                 guard let key = GroupBy(rawValue: group) else { throw CLIError("unknown group key \(group)") }
-                new.groupBy = key
+                groupBy = key
             }
-            let id = try store.createView(new)
+            // `NewView`'s fields are `let` (Task 9), so every option is resolved before the value is built.
+            let id = try store.createView(NewView(
+                title: title,
+                parent: try options["parent"]?.last.map { try resolveView($0, store).id },
+                filter: try options["filter"]?.last.map { try Filter(json: $0) },
+                sort: try (options["sort"] ?? []).map(sortKey),
+                groupBy: groupBy
+            ))
             return "added view \(id) \(title)"
         case "show":
             let task = try resolveTask(positionals.first, store)
@@ -5232,7 +5235,7 @@ public enum CLI {
         }
     }
 
-    static func resolveView(_ text: String, _ store: Store) throws -> View {
+    static func resolveView(_ text: String, _ store: Store) throws -> TodoView {
         let views = try store.views()
         if let byTitle = views.first(where: { $0.title.lowercased() == text.lowercased() }) { return byTitle }
         let byPrefix = views.filter { $0.id.rawValue.hasPrefix(text.lowercased()) }

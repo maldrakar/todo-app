@@ -5,6 +5,7 @@ import SQLiteKit
 enum Migrations {
     static let steps: [(version: Int32, sql: String)] = [
         (1, Schema.version1),
+        (2, Schema.version2),
     ]
 
     /// Applies every step above the current user_version. Returns the versions before and after.

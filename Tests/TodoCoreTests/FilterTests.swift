@@ -78,10 +78,11 @@ private let today = Day(year: 2026, month: 9, day: 11)
     #expect(FilterCompiler.compile(.listedIn(ViewID("v")), today: today) == SQLFragment(
         sql: "EXISTS (SELECT 1 FROM view_items v WHERE v.view_id = ? AND v.task_id = t.id AND v.present = 1)",
         params: [.text("v")]))
-    #expect(FilterCompiler.compile(.trashed(true), today: today) == SQLFragment(sql: "tt.trashed = ?", params: [.integer(1)]))
+    #expect(FilterCompiler.compile(.trashed(true), today: today) == SQLFragment(sql: "tt.trashed = 1", params: []))
+    #expect(FilterCompiler.compile(.trashed(false), today: today) == SQLFragment(sql: "tt.trashed = 0", params: []))
     #expect(FilterCompiler.compile(.and([]), today: today).sql == "1")
     #expect(FilterCompiler.compile(.or([]), today: today).sql == "0")
-    #expect(FilterCompiler.compile(.not(.trashed(true)), today: today) == SQLFragment(sql: "NOT COALESCE((tt.trashed = ?), 0)", params: [.integer(1)]))
+    #expect(FilterCompiler.compile(.not(.trashed(true)), today: today) == SQLFragment(sql: "NOT COALESCE((tt.trashed = 1), 0)", params: []))
     let combined = FilterCompiler.compile(.and([.status([.open]), .or([.when(.empty), .deadline(.empty)])]), today: today)
     #expect(combined == SQLFragment(sql: "(t.status IN (?) AND (t.when_day IS NULL OR t.deadline_day IS NULL))", params: [.integer(0)]))
 }
@@ -105,7 +106,7 @@ private let today = Day(year: 2026, month: 9, day: 11)
     #expect(FilterCompiler.mentionsTrashed(.and([.status([.open]), .not(.trashed(false))])))
     #expect(!FilterCompiler.mentionsTrashed(.or([.status([.open]), .when(.empty)])))
     #expect(FilterCompiler.whereClause(.status([.open]), today: today) == SQLFragment(sql: "(t.status IN (?)) AND tt.trashed = 0", params: [.integer(0)]))
-    #expect(FilterCompiler.whereClause(.trashed(true), today: today) == SQLFragment(sql: "tt.trashed = ?", params: [.integer(1)]))
+    #expect(FilterCompiler.whereClause(.trashed(true), today: today) == SQLFragment(sql: "tt.trashed = 1", params: []))
 }
 
 @Test func orderByPutsEmptyDaysLastAndEndsWithRankAndID() {
@@ -158,7 +159,9 @@ private let today = Day(year: 2026, month: 9, day: 11)
     // At the bound everything the core does with a filter still works on both platforms.
     let deepest = try Filter(json: nested(31))
     #expect(try deepest.json() == nested(31))
-    #expect(FilterCompiler.whereClause(deepest, today: today).params == [.integer(1)])
+    // The trash flag is written into the SQL rather than bound, so what shows that the compiler's walk
+    // reached the innermost condition is the fragment it left there.
+    #expect(FilterCompiler.whereClause(deepest, today: today).sql.contains("tt.trashed = 1"))
     for json in [nested(32), nested(500), String(repeating: "[", count: 500)] {
         var caught: FilterError?
         do { _ = try Filter(json: json) } catch { caught = error }

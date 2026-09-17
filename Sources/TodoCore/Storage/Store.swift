@@ -126,9 +126,6 @@ public final class Store {
         do { try db.run("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [.text(key), value]) } catch { throw .sqlite(error) }
     }
 
-    /// Filled in by Task 9: inserts Inbox, Today, Upcoming, Logbook and Trash with fixed ids and a zero clock.
-    func seedBuiltInViews() throws(StoreError) {}
-
     /// Re-applies journal rows whose field became known after a migration.
     func replayUnapplied() throws(StoreError) {
         try sql { () throws(SQLiteError) in

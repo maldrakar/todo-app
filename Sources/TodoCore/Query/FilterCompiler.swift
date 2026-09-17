@@ -37,7 +37,14 @@ enum FilterCompiler {
         case .listedIn(let view):
             return SQLFragment(sql: "EXISTS (SELECT 1 FROM view_items v WHERE v.view_id = ? AND v.task_id = t.id AND v.present = 1)", params: [.text(view.rawValue)])
         case .trashed(let flag):
-            return SQLFragment(sql: "tt.trashed = ?", params: [Value(flag)])
+            // The flag is written into the SQL instead of bound, the way `whereClause` writes the implicit
+            // exclusion one screen above. It is a `Bool`, so there is nothing to inject, and it is what lets
+            // `task_tree`'s index be a partial one over the trashed rows alone: SQLite can see that a literal
+            // `1` implies the index's `WHERE trashed = 1`, while it cannot prove it of a parameter. A plain
+            // index over the whole column would be usable by the implicit `tt.trashed = 0` of every other
+            // view, and the planner takes it — driving the join from the 49,980 rows that are not trashed
+            // instead of from the status index, which cost the Logbook 1.8 ms against 15.8 ms at 50,000 tasks.
+            return SQLFragment(sql: "tt.trashed = \(flag ? 1 : 0)", params: [])
         // An empty group is the identity of its own operator, the way an empty sum is zero: nothing to
         // require matches everything, nothing to choose from matches nothing. Unlike the empty status list
         // above, neither is a list a person emptied \u2014 a view with no filter is `nil` and not `and([])`.

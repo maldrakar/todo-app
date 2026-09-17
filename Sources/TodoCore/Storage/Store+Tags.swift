@@ -70,26 +70,12 @@ extension Store {
         let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT id, title, parent, rank, created_at, updated_at, deleted FROM tags") }
         let nodes = rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[2].string, deleted: $0[6].bool) }
         let parents = TreeRules.effectiveParents(nodes)
-        var byParent: [String?: [Tag]] = [:]
-        for row in rows where !row[6].bool {
+        let tags = rows.compactMap { row -> Tag? in
+            guard !row[6].bool else { return nil }
             let id = row[0].string ?? ""
-            let tag = Tag(id: TagID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(TagID.init), rank: row[3].string ?? Rank.initial, createdAt: row[4].int64 ?? 0, updatedAt: row[5].int64 ?? 0)
-            byParent[parents[id] ?? nil, default: []].append(tag)
+            return Tag(id: TagID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(TagID.init), rank: row[3].string ?? Rank.initial, createdAt: row[4].int64 ?? 0, updatedAt: row[5].int64 ?? 0)
         }
-        // Parents before children without recursion: a chain thousands of links deep arrives from sync as
-        // easily as a shallow one, and a stack — 64 KiB of it on wasm32 — is not what should decide whether
-        // the tag tree reads. It is the rule `TreeRules` and `Store.inheritedTrash` already follow. Children
-        // go onto the stack in reverse, so they come off it in rank order.
-        func children(of parent: String?) -> [Tag] {
-            (byParent[parent] ?? []).sorted { ($0.rank, $0.id.rawValue) < ($1.rank, $1.id.rawValue) }
-        }
-        var ordered: [Tag] = []
-        var stack = Array(children(of: nil).reversed())
-        while let tag = stack.popLast() {
-            ordered.append(tag)
-            stack.append(contentsOf: children(of: tag.id.rawValue).reversed())
-        }
-        return ordered
+        return TreeRules.inTreeOrder(tags)
     }
 
     public func tag(_ id: TagID) throws(StoreError) -> Tag? {

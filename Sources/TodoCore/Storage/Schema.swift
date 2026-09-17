@@ -141,4 +141,28 @@ enum Schema {
         INSERT INTO views_title_fts(rowid, title) VALUES (new.rid, new.title);
     END;
     """
+
+    /// The Trash view selects on inherited trash, which lives only in `task_tree`, and version 1 indexed
+    /// that table by parent alone: the query walked every task in the database to find the few in the trash.
+    ///
+    /// Partial, and that is the whole point. Every other view carries the implicit `tt.trashed = 0` that
+    /// `FilterCompiler.whereClause` appends, and an index over the whole column is usable by it — so the
+    /// planner drives their join from the rows that are *not* trashed, which is nearly all of them, instead
+    /// of from the condition the view is about. Measured in a release build at 50,000 tasks, 2,000 of them
+    /// done: a plain index cost the Logbook 1.8 ms against 15.8 ms, an 8.9x loss, to buy Trash 0.6 ms. An
+    /// index restricted to the trashed rows cannot be used by `= 0` at all, so it buys Trash without
+    /// touching anyone else: Trash 0.64 ms to 0.066 ms, Logbook unchanged at 1.81 ms.
+    ///
+    /// It only works because `FilterCompiler` writes the flag as a literal: SQLite can see that `= 1`
+    /// implies this index's `WHERE trashed = 1`, and cannot prove it of a bound parameter. The two belong
+    /// together — the literal without this index makes Trash scan `tasks` instead, at 7.2 ms.
+    ///
+    /// What reaches it is a plain positive `tt.trashed = 1`, which is the Trash view and an `and` built on
+    /// it. The proof SQLite does is syntactic, so it does not see through `NOT COALESCE((tt.trashed = 0), 0)`
+    /// or through an `or`: a view a person edits into "cancelled or thrown away" scans instead, as it did
+    /// before this index existed. If that shape turns out to matter, the remedy is the spec's, a composite
+    /// index for it, and not widening this one.
+    static let version2 = """
+    CREATE INDEX task_tree_trashed ON task_tree(trashed) WHERE trashed = 1;
+    """
 }

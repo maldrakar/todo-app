@@ -134,10 +134,12 @@ Default built-in views, to be tuned in M3:
 | View | Filter | Sort, group |
 | ---- | ------ | ----------- |
 | Inbox | open, no `when`, no parent | rank |
-| Today | open, `when` on or before today | rank, manual order on top |
+| Today | open, `when` on or before today | `when`, so what is overdue comes first |
 | Upcoming | open, `when` after today | `when`, grouped by day |
-| Logbook | done or canceled | completed, newest first, grouped by day |
+| Logbook | done or canceled | completed, newest first; the UI groups by local day |
 | Trash | trashed | updated, newest first |
+
+Every view puts the tasks of its manual list before the ones its sort brings, so this column describes the rest of the list. Grouping by the day of completion happens in the UI, which knows the time zone; the core groups only by the calendar-day fields, `when` and `deadline`, since a completion timestamp becomes a day only in a time zone the core never has.
 
 **Trash and hierarchy.** A task is in the Trash if it is marked itself or any ancestor is. That is computed in the query rather than pushed down to children as operations; otherwise moving a child on one device and trashing its parent on another would conflict.
 

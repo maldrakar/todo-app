@@ -69,3 +69,34 @@ enum TreeRules {
         return result
     }
 }
+
+/// What the sidebar order needs of an item: where it sits and how it sorts among its siblings. Tags and views
+/// are two tables with one shape, and `inTreeOrder` is the one reading of it.
+protocol TreeOrdered {
+    var id: EntityID { get }
+    var parent: EntityID? { get }
+    var rank: String { get }
+}
+
+extension TreeRules {
+    /// Parents before children, siblings by rank and then by id, out of items whose `parent` is already the
+    /// effective one from `effectiveParents`.
+    ///
+    /// Without recursion: a chain thousands of links deep arrives from sync as easily as a shallow one, and a
+    /// stack — 64 KiB of it on wasm32 — is not what should decide whether a tree reads. Children go onto the
+    /// stack in reverse, so they come off it in rank order.
+    static func inTreeOrder<Item: TreeOrdered>(_ items: [Item]) -> [Item] {
+        var byParent: [EntityID?: [Item]] = [:]
+        for item in items { byParent[item.parent, default: []].append(item) }
+        func children(of parent: EntityID?) -> [Item] {
+            (byParent[parent] ?? []).sorted { ($0.rank, $0.id.rawValue) < ($1.rank, $1.id.rawValue) }
+        }
+        var ordered: [Item] = []
+        var stack = Array(children(of: nil).reversed())
+        while let item = stack.popLast() {
+            ordered.append(item)
+            stack.append(contentsOf: children(of: item.id).reversed())
+        }
+        return ordered
+    }
+}
