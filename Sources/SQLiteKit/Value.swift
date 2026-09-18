@@ -12,11 +12,13 @@ public enum Value: Equatable, Sendable {
     public init(_ b: Bool) { self = .integer(b ? 1 : 0) }
 
     /// Reading a column without a `switch`. One accessor per case would be symmetric but idle: no column of
-    /// schema version 1 is `REAL` or `BLOB`, so `real` and `blob` are read by matching the case, and an
-    /// accessor for them is written when the first caller needs one.
+    /// schema version 1 is `BLOB`, so a blob is read by matching the case, and an accessor for it is written
+    /// when the first caller needs one. `double` has one since the search of Task 10: no column holds a real,
+    /// but `bm25()` returns one, and a ranked read is a row like any other.
     public var isNull: Bool { if case .null = self { return true } else { return false } }
     public var int64: Int64? { if case .integer(let v) = self { return v } else { return nil } }
     public var string: String? { if case .text(let v) = self { return v } else { return nil } }
+    public var double: Double? { if case .real(let v) = self { return v } else { return nil } }
 
     /// A boolean column, which SQLite has no type for and every schema stores as an integer: a non-zero
     /// integer is true, and zero is false. So is everything else — a null, or text, or a real — because a

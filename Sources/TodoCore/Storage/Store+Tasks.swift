@@ -312,10 +312,9 @@ extension Store {
     private func tagsByTask(_ ids: [String]) throws(StoreError) -> [String: Set<TagID>] {
         guard !ids.isEmpty else { return [:] }
         var tags: [String: Set<TagID>] = [:]
-        for chunk in stride(from: 0, to: ids.count, by: 500).map({ Array(ids[$0..<min($0 + 500, ids.count)]) }) {
-            let placeholders = Array(repeating: "?", count: chunk.count).joined(separator: ", ")
+        for chunk in Store.chunked(ids) {
             let rows = try sql { () throws(SQLiteError) in
-                try db.rows("SELECT x.task_id, x.tag_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.present = 1 AND x.task_id IN (\(placeholders))", chunk.map { .text($0) })
+                try db.rows("SELECT x.task_id, x.tag_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.present = 1 AND x.task_id IN (\(Store.placeholders(chunk.count)))", chunk.map { .text($0) })
             }
             for row in rows { tags[row[0].string ?? "", default: []].insert(TagID(row[1].string ?? "")) }
         }
