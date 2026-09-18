@@ -170,14 +170,21 @@ extension Store {
     /// do compute the same key. That is what `Rank.between` tolerates and what the `, id` in every order
     /// clause settles: equal ranks fall back to the id, and the list is stable everywhere.
     func siblingRank(in kind: EntityKind, parent: EntityID?, placement: Placement, excluding: EntityID?) throws(StoreError) -> String {
-        let siblings = try orderedSiblings(in: kind, parent: parent, excluding: excluding)
+        try Store.rank(among: try orderedSiblings(in: kind, parent: parent, excluding: excluding), placement: placement)
+    }
+
+    /// The fractional key a placement asks for in an ordered list, whatever the list is: the siblings of a
+    /// task, a tag or a view, or the manual list of a view (Task 9). The caller reads the list a read would
+    /// show and leaves out the item being placed, so `.after` finds its anchor among exactly the rows a
+    /// person sees, and a placement never ranks among a list nobody does.
+    static func rank(among ordered: [(id: String, rank: String)], placement: Placement) throws(StoreError) -> String {
         switch placement {
-        case .end: return Rank.between(siblings.last?.1, nil)
-        case .start: return Rank.between(nil, siblings.first?.1)
+        case .end: return Rank.between(ordered.last?.rank, nil)
+        case .start: return Rank.between(nil, ordered.first?.rank)
         case .after(let anchor):
-            guard let index = siblings.firstIndex(where: { $0.0 == anchor.rawValue }) else { throw .notFound(anchor) }
-            let upper = index + 1 < siblings.count ? siblings[index + 1].1 : nil
-            return Rank.between(siblings[index].1, upper)
+            guard let index = ordered.firstIndex(where: { $0.id == anchor.rawValue }) else { throw .notFound(anchor) }
+            let upper = index + 1 < ordered.count ? ordered[index + 1].rank : nil
+            return Rank.between(ordered[index].rank, upper)
         }
     }
 
@@ -256,14 +263,24 @@ extension Store {
         return order.compactMap { latest[$0] }
     }
 
-    /// Loads tasks with their tags. `clause` may use the aliases `t` (tasks) and `tt` (task_tree); `join` is
-    /// appended after the tree join, which is where Tasks 8 to 10 hang a filter, a manual list or an FTS
-    /// table off the same loader.
-    func loadTasks(where clause: String, _ params: [Value], orderBy: String, join: String = "", limit: Int? = nil) throws(StoreError) -> [TodoTask] {
+    /// Loads tasks with their tags. `clause` may use the aliases `t` (tasks) and `tt` (task_tree), which is
+    /// all a filter has needed: a view's manual list is a read of its own and the searches of Task 10 select
+    /// through a subquery, so the loader joins the tree and nothing else. `limit` is Task 10's.
+    func loadTasks(where clause: String, _ params: [Value], orderBy: String, limit: Int? = nil) throws(StoreError) -> [TodoTask] {
+        try loadTasks(sql: Store.taskQuery(where: clause, orderBy: orderBy, limit: limit), params)
+    }
+
+    /// The statement the loader above runs, assembled and not executed. A view's read builds it through
+    /// here and hands the same string to `EXPLAIN QUERY PLAN` in the suite: a plan explained from a second
+    /// copy of the SQL would keep passing while the copy drifted away from the query a person waits on.
+    static func taskQuery(where clause: String, orderBy: String, limit: Int?) -> String {
         let limitClause = limit.map { " LIMIT \($0)" } ?? ""
-        let rows = try sql { () throws(SQLiteError) in
-            try db.rows("SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id \(join) WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)", params)
-        }
+        return "SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)"
+    }
+
+    /// Runs an assembled task query and attaches the tags.
+    func loadTasks(sql: String, _ params: [Value]) throws(StoreError) -> [TodoTask] {
+        let rows = try self.sql { () throws(SQLiteError) in try db.rows(sql, params) }
         let tags = try tagsByTask(rows.map { $0[0].string ?? "" })
         return rows.map { Store.task(from: $0, tags: tags[$0[0].string ?? ""] ?? []) }
     }

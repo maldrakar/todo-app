@@ -26,3 +26,5 @@ extension TagChange {
         }
     }
 }
+
+extension Tag: TreeOrdered {}

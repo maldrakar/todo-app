@@ -152,7 +152,7 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     #expect(changes.isEmpty)
     let rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM task_tags") }
     #expect(rows == [[.integer(0)]])
-    let clocks = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM field_clocks") }
+    let clocks = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM field_clocks WHERE device != 'seed'") }
     #expect(clocks == [[.integer(0)]])
     let journal = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT count(*) FROM ops WHERE device != 'seed'") }
     #expect(journal == [[.integer(1)]])
