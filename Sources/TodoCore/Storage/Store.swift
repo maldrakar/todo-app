@@ -112,7 +112,9 @@ public final class Store {
 
     /// A lookup by a list of ids runs one statement per chunk: SQLite takes a bounded number of parameters in
     /// one statement, and the length of such a list is the caller's — a page of tasks, or a page of search
-    /// hits. Both callers want the same chunk, so the size is a constant here rather than an argument.
+    /// hits. Both callers want the same chunk, so the size is a constant here rather than an argument. The
+    /// vendored build allows 32,766 of them, and 500 sits far enough under any build's limit that the number
+    /// is about keeping one statement small rather than about the ceiling.
     static func chunked(_ ids: [String]) -> [[String]] {
         let size = 500
         return stride(from: 0, to: ids.count, by: size).map { Array(ids[$0..<min($0 + size, ids.count)]) }

@@ -110,3 +110,48 @@ private func titles(_ hits: [QuickFindHit]) -> [String] {
     #expect(try store.quickFind("chore", limit: -1).isEmpty)
     #expect(try store.searchNotes("chore", limit: -1).isEmpty)
 }
+
+@Test func hitsOfEveryKindAreAlphabeticalByOneRule() throws {
+    let store = try makeStore()
+    for title in ["Ялта zzz", "август zzz", "Берлин zzz"] {
+        _ = try store.createTask(NewTask(title: title))
+        _ = try store.createTag(title: title)
+    }
+    let alphabetical = ["август zzz", "Берлин zzz", "Ялта zzz"]
+    #expect(titles(try store.quickFind("zzz", limit: 50)) == alphabetical.map { "task:" + $0 } + alphabetical.map { "tag:" + $0 })
+    // The order decides which rows the limit keeps, so a rule that folds only the Latin letters would drop
+    // the title that comes first in the alphabet a person reads.
+    #expect(titles(try store.quickFind("zzz", limit: 2)) == ["task:август zzz", "task:Берлин zzz"])
+}
+
+@Test func aLastWordEndingInPunctuationIsAWholeWord() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "cs", notes: "Learn C# and F#"))
+    _ = try store.createTask(NewTask(title: "money", notes: "Costs 5% more"))
+    _ = try store.createTask(NewTask(title: "cake", notes: "Bake a cake"))
+    #expect(try store.searchNotes("C#").map(\.task.title) == ["cs"], "a star after a word the tokenizer ends at searches for every word beginning with c")
+    #expect(Store.wordsQuery("C#") == "\"C#\"")
+    #expect(Store.wordsQuery("план") == "\"план\"*")
+}
+
+@Test func aTitleIsFoundBySpellingItAsItIsWritten() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "Buy  milk"))
+    #expect(titles(try store.quickFind("buy  milk")) == ["task:Buy  milk"])
+    #expect(titles(try store.quickFind("  buy  milk  ")) == ["task:Buy  milk"], "the ends are trimmed, the middle is what the index holds")
+    #expect(try store.quickFind("buy milk").isEmpty, "a trigram match is literal: one space is not two")
+}
+
+@Test func deletedTagsAndViewsAndInheritedTrashStayOut() throws {
+    let store = try makeStore()
+    let tag = try store.createTag(title: "zebra tag")
+    let view = try store.createView(NewTaskView(title: "zebra view"))
+    let parent = try store.createTask(NewTask(title: "zebra parent", notes: "zebra in the notes"))
+    _ = try store.createTask(NewTask(title: "zebra child", notes: "zebra in the notes", parent: parent))
+    _ = try store.createTask(NewTask(title: "zebra loner", notes: "zebra in the notes"))
+    try store.delete(tag: tag)
+    try store.delete(view: view)
+    try store.trash(task: parent)
+    #expect(titles(try store.quickFind("zebra")) == ["task:zebra loner"])
+    #expect(try store.searchNotes("zebra").map(\.task.title) == ["zebra loner"])
+}

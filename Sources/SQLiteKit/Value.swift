@@ -11,10 +11,10 @@ public enum Value: Equatable, Sendable {
     public init(_ i: Int32?) { self = i.map { .integer(Int64($0)) } ?? .null }
     public init(_ b: Bool) { self = .integer(b ? 1 : 0) }
 
-    /// Reading a column without a `switch`. One accessor per case would be symmetric but idle: no column of
-    /// schema version 1 is `BLOB`, so a blob is read by matching the case, and an accessor for it is written
-    /// when the first caller needs one. `double` has one since the search of Task 10: no column holds a real,
-    /// but `bm25()` returns one, and a ranked read is a row like any other.
+    /// Reading a column without a `switch`. One accessor per case would be symmetric but idle: no column the
+    /// core's schema declares is a `BLOB`, so a blob is read by matching the case, and an accessor for it is
+    /// written when the first caller needs one. `double` has one since the search of Task 10: no column holds
+    /// a real either, but `bm25()` returns one, and a ranked read is a row like any other.
     public var isNull: Bool { if case .null = self { return true } else { return false } }
     public var int64: Int64? { if case .integer(let v) = self { return v } else { return nil } }
     public var string: String? { if case .text(let v) = self { return v } else { return nil } }
