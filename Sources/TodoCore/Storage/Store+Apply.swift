@@ -9,29 +9,38 @@ extension Store {
     /// to stay ahead of, so it arrives through `receive`, which observes the stamp before handing it here.
     @discardableResult
     public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet {
-        guard !ops.isEmpty else { return ChangeSet() }
-        let changes = try sql { () throws(SQLiteError) in
+        try applyBatch(ops).changes
+    }
+
+    /// Everything `apply` does, and the number it drops: the operations the state could not take. `receive`
+    /// is the caller with somewhere to put that number, and it hands over a peer's operations alone, so a
+    /// count that reaches a consumer is a peer's doing. `apply` drops it, because a refusal of our own is a
+    /// bug in the write API rather than something to survive — for the null over a NOT NULL column, which is
+    /// the one our own typed values could produce, the assertion below is where that bug stops being silent.
+    func applyBatch(_ ops: [Operation]) throws(StoreError) -> SyncReport {
+        guard !ops.isEmpty else { return SyncReport() }
+        let report = try sql { () throws(SQLiteError) in
             try db.transaction { () throws(SQLiteError) in try applyRows(ops) }
         }
-        if !changes.isEmpty { onChange?(changes) }
-        return changes
+        if !report.changes.isEmpty { onChange?(report.changes) }
+        return report
     }
 
     /// Everything `apply` does to the database, inside a transaction the caller has already opened. The replay
     /// of the journal builds its operations out of rows and comes through here, so there is one loop and not
     /// two: journaling an operation that is already in the journal is the `INSERT OR IGNORE` doing nothing.
     @discardableResult
-    func applyRows(_ ops: [Operation]) throws(SQLiteError) -> ChangeSet {
-        var changes = ChangeSet()
+    func applyRows(_ ops: [Operation]) throws(SQLiteError) -> SyncReport {
+        var report = SyncReport()
         var treeDirty = false
         for op in ops {
             let known = FieldMap.isKnown(op.entity, op.field)
             try journal(op, applied: known)
             guard known else { continue }
-            try applyToState(op, changes: &changes, treeDirty: &treeDirty)
+            try applyToState(op, into: &report, treeDirty: &treeDirty)
         }
         if treeDirty { try rebuildTreeRows() }
-        return changes
+        return report
     }
 
     /// The three task fields `task_tree` is derived from, and the reason a change to one of them costs a
@@ -58,8 +67,17 @@ extension Store {
     /// Writes one field of one entity into the state, inside the transaction its caller opened. The field name
     /// is interpolated into the SQL, so the `FieldMap` whitelist is what keeps that safe, and it is checked
     /// here rather than trusted from the two callers.
-    func applyToState(_ op: Operation, changes: inout ChangeSet, treeDirty: inout Bool) throws(SQLiteError) {
+    func applyToState(_ op: Operation, into report: inout SyncReport, treeDirty: inout Bool) throws(SQLiteError) {
         guard FieldMap.isKnown(op.entity, op.field) else { return }
+        // An operation names the entity it edits, and an empty id names none. Nothing this device writes can
+        // produce one — every id comes from `EntityID()` or from a row that already exists — but a peer's can,
+        // and it would insert a row that reads as a task in the Inbox which nobody created and no read can
+        // address. A pair id that does not split, below, is the same fault one level down, and the two are
+        // refused and counted the same way.
+        guard !op.entityID.isEmpty else {
+            report.refused += 1
+            return
+        }
         // A NOT NULL column refuses a null instead of falling back to its default, and that failure would roll
         // back the whole transaction — every operation delivered alongside this one would lose its journal row
         // too, on this delivery and on every retry. So the operation is journaled and skipped instead, and the
@@ -71,6 +89,7 @@ extension Store {
         // their own; what covers those is the test that holds `FieldMap` and the schema together.
         if op.value.isNull, !FieldMap.acceptsNull(op.entity, op.field) {
             assert(op.device != deviceID, "a null for \(op.entity.rawValue).\(op.field), which the schema keeps NOT NULL")
+            report.refused += 1
             return
         }
         // Last write wins, per field, with the device id breaking a tie: this comparison is that rule, and
@@ -87,26 +106,32 @@ extension Store {
         switch op.entity {
         case .task:
             let created = try writeEntityRow(table, op)
-            changes.tasks.insert(TaskID(op.entityID))
+            report.changes.tasks.insert(TaskID(op.entityID))
             // A task this operation brought into being has to reach task_tree even when the field that created
             // it says nothing about the tree: every read joins the tree from Task 6 on, and a task missing from
             // it is invisible until the next open rebuilds it.
             if created || Store.treeFields.contains(op.field) { treeDirty = true }
         case .tag:
             try writeEntityRow(table, op)
-            changes.tags.insert(TagID(op.entityID))
+            report.changes.tags.insert(TagID(op.entityID))
         case .view:
             try writeEntityRow(table, op)
-            changes.views.insert(ViewID(op.entityID))
+            report.changes.views.insert(ViewID(op.entityID))
         case .taskTag:
-            guard let (taskID, tagID) = Operation.splitPair(op.entityID) else { return }
+            guard let (taskID, tagID) = Operation.splitPair(op.entityID) else {
+                report.refused += 1
+                return
+            }
             try writePairRow(table, ("task_id", "tag_id"), (taskID, tagID), op)
-            changes.tasks.insert(TaskID(taskID))
+            report.changes.tasks.insert(TaskID(taskID))
         case .viewItem:
-            guard let (viewID, taskID) = Operation.splitPair(op.entityID) else { return }
+            guard let (viewID, taskID) = Operation.splitPair(op.entityID) else {
+                report.refused += 1
+                return
+            }
             try writePairRow(table, ("view_id", "task_id"), (viewID, taskID), op)
-            changes.views.insert(ViewID(viewID))
-            changes.tasks.insert(TaskID(taskID))
+            report.changes.views.insert(ViewID(viewID))
+            report.changes.tasks.insert(TaskID(taskID))
         }
         try db.run(
             "INSERT INTO field_clocks (entity, entity_id, field, clock, device) VALUES (?, ?, ?, ?, ?) ON CONFLICT(entity, entity_id, field) DO UPDATE SET clock = excluded.clock, device = excluded.device",

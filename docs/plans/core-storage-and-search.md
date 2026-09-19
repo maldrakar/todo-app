@@ -58,7 +58,7 @@
 | `Sources/TodoCore/Query/FilterCompiler.swift` | `Filter` to SQL fragment, sort to `ORDER BY` |
 | `Sources/TodoCore/Query/Store+Query.swift` | `tasks(in:today:)`, `page(of:today:)`, grouping |
 | `Sources/TodoCore/Search/Store+Search.swift` | `quickFind`, `searchNotes`, FTS query escaping |
-| `Sources/TodoCore/Sync/Sync.swift` | `JournalEntry`, `SyncTransport`, `SyncError`, `InMemoryRelay`, `SyncEngine`, `Store.journal(after:)`, `Store.receive` |
+| `Sources/TodoCore/Sync/Sync.swift` | `SyncReport`, `SyncTransport`, `SyncError`, `InMemoryRelay`, `SyncEngine`, `Store.journal(after:)`, `Store.receive` |
 | `Sources/todo/main.swift` | CLI entry: argument parsing and commands |
 | `Tests/SQLiteKitTests/ConnectionTests.swift` | Wrapper tests |
 | `Tests/TodoCoreTests/*.swift` | One file per task, named below |
