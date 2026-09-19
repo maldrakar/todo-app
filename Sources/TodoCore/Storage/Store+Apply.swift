@@ -69,6 +69,15 @@ extension Store {
     /// here rather than trusted from the two callers.
     func applyToState(_ op: Operation, into report: inout SyncReport, treeDirty: inout Bool) throws(SQLiteError) {
         guard FieldMap.isKnown(op.entity, op.field) else { return }
+        // An operation names the entity it edits, and an empty id names none. Nothing this device writes can
+        // produce one — every id comes from `EntityID()` or from a row that already exists — but a peer's can,
+        // and it would insert a row that reads as a task in the Inbox which nobody created and no read can
+        // address. A pair id that does not split, below, is the same fault one level down, and the two are
+        // refused and counted the same way.
+        guard !op.entityID.isEmpty else {
+            report.refused += 1
+            return
+        }
         // A NOT NULL column refuses a null instead of falling back to its default, and that failure would roll
         // back the whole transaction — every operation delivered alongside this one would lose its journal row
         // too, on this delivery and on every retry. So the operation is journaled and skipped instead, and the

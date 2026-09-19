@@ -243,3 +243,11 @@ private final class PullFailsOnce: SyncTransport {
     #expect(Operation(journalRow: []) == nil)
     #expect(Operation(journalRow: [.integer(1), .text("task")]) == nil)
 }
+
+@Test func anOperationThatNamesNoEntityIsRefused() throws {
+    let a = try makeStore()
+    let report = try a.receive([foreign(.task, "", "title", .text("ghost"), 1_757_500_100_000)])
+    #expect(report.refused == 1)
+    #expect(report.changes.isEmpty)
+    #expect(try a.allTasks().isEmpty, "a row whose id no read can name is not a task anyone created")
+}

@@ -131,7 +131,7 @@ public enum SyncEngine {
     /// drop anyway when the round is rolled back, while saving it late costs the whole journal again on every
     /// retry of a transport that is up for a push and down for a pull.
     @discardableResult
-    public static func sync(_ store: Store, via transport: any SyncTransport) throws(SyncError) -> SyncReport {
+    public static func sync(_ store: Store, via transport: some SyncTransport) throws(SyncError) -> SyncReport {
         do {
             let cursors = try store.syncCursors()
             var pushed = cursors.pushed
