@@ -8,7 +8,7 @@ extension Store {
     /// It never touches this device's clock. An operation from another device carries a stamp this device has
     /// to stay ahead of, so it arrives through `receive`, which observes the stamp before handing it here.
     @discardableResult
-    public func apply(_ ops: [Operation]) throws(StoreError) -> ChangeSet {
+    public func apply(_ ops: [JournalOperation]) throws(StoreError) -> ChangeSet {
         try applyBatch(ops).changes
     }
 
@@ -17,7 +17,7 @@ extension Store {
     /// count that reaches a consumer is a peer's doing. `apply` drops it, because a refusal of our own is a
     /// bug in the write API rather than something to survive — for the null over a NOT NULL column, which is
     /// the one our own typed values could produce, the assertion below is where that bug stops being silent.
-    func applyBatch(_ ops: [Operation]) throws(StoreError) -> SyncReport {
+    func applyBatch(_ ops: [JournalOperation]) throws(StoreError) -> SyncReport {
         guard !ops.isEmpty else { return SyncReport() }
         let report = try sql { () throws(SQLiteError) in
             try db.transaction { () throws(SQLiteError) in try applyRows(ops) }
@@ -30,7 +30,7 @@ extension Store {
     /// of the journal builds its operations out of rows and comes through here, so there is one loop and not
     /// two: journaling an operation that is already in the journal is the `INSERT OR IGNORE` doing nothing.
     @discardableResult
-    func applyRows(_ ops: [Operation]) throws(SQLiteError) -> SyncReport {
+    func applyRows(_ ops: [JournalOperation]) throws(SQLiteError) -> SyncReport {
         var report = SyncReport()
         var treeDirty = false
         for op in ops {
@@ -50,14 +50,14 @@ extension Store {
     static let treeFields: Set<String> = ["parent", "trashed", "deleted"]
 
     /// Builds an operation stamped by this device.
-    func op(_ kind: EntityKind, _ id: String, _ field: String, _ value: Value, _ stamp: HLC) -> Operation {
-        Operation(entity: kind, entityID: id, field: field, value: value, clock: stamp, device: deviceID)
+    func op(_ kind: EntityKind, _ id: String, _ field: String, _ value: Value, _ stamp: HLC) -> JournalOperation {
+        JournalOperation(entity: kind, entityID: id, field: field, value: value, clock: stamp, device: deviceID)
     }
 
     /// Appends to the journal. The unique index on (device, clock, entity, entity_id, field) drops duplicates.
     /// `applied` says that this version of the app knew the field, not that the operation reached the state: an
     /// operation that lost its field clock was considered and is never replayed.
-    func journal(_ op: Operation, applied: Bool) throws(SQLiteError) {
+    func journal(_ op: JournalOperation, applied: Bool) throws(SQLiteError) {
         try db.run(
             "INSERT OR IGNORE INTO ops (entity, entity_id, field, value, clock, device, applied) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [.text(op.entity.rawValue), .text(op.entityID), .text(op.field), op.value, .integer(op.clock.raw), .text(op.device), Value(applied)]
@@ -67,7 +67,7 @@ extension Store {
     /// Writes one field of one entity into the state, inside the transaction its caller opened. The field name
     /// is interpolated into the SQL, so the `FieldMap` whitelist is what keeps that safe, and it is checked
     /// here rather than trusted from the two callers.
-    func applyToState(_ op: Operation, into report: inout SyncReport, treeDirty: inout Bool) throws(SQLiteError) {
+    func applyToState(_ op: JournalOperation, into report: inout SyncReport, treeDirty: inout Bool) throws(SQLiteError) {
         guard FieldMap.isKnown(op.entity, op.field) else { return }
         // An operation names the entity it edits, and an empty id names none. Nothing this device writes can
         // produce one — every id comes from `EntityID()` or from a row that already exists — but a peer's can,
@@ -118,14 +118,14 @@ extension Store {
             try writeEntityRow(table, op)
             report.changes.views.insert(ViewID(op.entityID))
         case .taskTag:
-            guard let (taskID, tagID) = Operation.splitPair(op.entityID) else {
+            guard let (taskID, tagID) = JournalOperation.splitPair(op.entityID) else {
                 report.refused += 1
                 return
             }
             try writePairRow(table, ("task_id", "tag_id"), (taskID, tagID), op)
             report.changes.tasks.insert(TaskID(taskID))
         case .viewItem:
-            guard let (viewID, taskID) = Operation.splitPair(op.entityID) else {
+            guard let (viewID, taskID) = JournalOperation.splitPair(op.entityID) else {
                 report.refused += 1
                 return
             }
@@ -144,7 +144,7 @@ extension Store {
     /// `changes` counts the rows a statement matched, so zero of them means there is no such row yet and the
     /// insert that follows gives the update something to land on.
     @discardableResult
-    private func writeEntityRow(_ table: String, _ op: Operation) throws(SQLiteError) -> Bool {
+    private func writeEntityRow(_ table: String, _ op: JournalOperation) throws(SQLiteError) -> Bool {
         let millis = Value(op.clock.millis)
         let update = "UPDATE \(table) SET \(op.field) = ?, updated_at = max(updated_at, ?) WHERE id = ?"
         let parameters: [Value] = [op.value, millis, .text(op.entityID)]
@@ -159,7 +159,7 @@ extension Store {
     /// explicitly because the schema defaults it to 1, and the row that a `rank` operation creates must not
     /// read as a membership — ranking a task inside a manual list is not what puts it in the list, and
     /// out-of-order delivery is exactly when the two operations arrive apart.
-    private func writePairRow(_ table: String, _ keys: (String, String), _ ids: (String, String), _ op: Operation) throws(SQLiteError) {
+    private func writePairRow(_ table: String, _ keys: (String, String), _ ids: (String, String), _ op: JournalOperation) throws(SQLiteError) {
         let update = "UPDATE \(table) SET \(op.field) = ? WHERE \(keys.0) = ? AND \(keys.1) = ?"
         let parameters: [Value] = [op.value, .text(ids.0), .text(ids.1)]
         try db.run(update, parameters)

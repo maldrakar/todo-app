@@ -24,8 +24,8 @@ private func exchange(_ a: Store, _ b: Store, _ relay: InMemoryRelay) throws {
 }
 
 /// An operation the way one arrives from another device.
-private func foreign(_ entity: EntityKind, _ id: String, _ field: String, _ value: Value, _ millis: Int64) -> Operation {
-    Operation(entity: entity, entityID: id, field: field, value: value, clock: HLC(millis: millis, counter: 0), device: "B")
+private func foreign(_ entity: EntityKind, _ id: String, _ field: String, _ value: Value, _ millis: Int64) -> JournalOperation {
+    JournalOperation(entity: entity, entityID: id, field: field, value: value, clock: HLC(millis: millis, counter: 0), device: "B")
 }
 
 /// Starts counting every row `apply` offers to the journal, the ones the unique index drops included: a
@@ -200,11 +200,11 @@ private final class PullFailsOnce: SyncTransport {
     let relay = InMemoryRelay()
     private var failed = false
 
-    func push(_ ops: [Operation]) throws(SyncError) {
+    func push(_ ops: [JournalOperation]) throws(SyncError) {
         try relay.push(ops)
     }
 
-    func pull(after cursor: Int64) throws(SyncError) -> (ops: [Operation], cursor: Int64) {
+    func pull(after cursor: Int64) throws(SyncError) -> (ops: [JournalOperation], cursor: Int64) {
         if failed { return try relay.pull(after: cursor) }
         failed = true
         throw .transport("the relay is down")
@@ -223,7 +223,7 @@ private final class PullFailsOnce: SyncTransport {
 
 @Test func aCursorTheRelayCannotIndexIsPulledIntoItsLog() throws {
     let relay = InMemoryRelay()
-    let op = Operation(entity: .task, entityID: "t1", field: "title", value: .text("x"), clock: HLC(millis: 1, counter: 0), device: "B")
+    let op = JournalOperation(entity: .task, entityID: "t1", field: "title", value: .text("x"), clock: HLC(millis: 1, counter: 0), device: "B")
     try relay.push([op, op, op])
     #expect(try relay.pull(after: 99).ops.isEmpty, "a cursor past the end of the log asks for what is not there")
     #expect(try relay.pull(after: 99).cursor == 3)
@@ -240,8 +240,8 @@ private final class PullFailsOnce: SyncTransport {
 }
 
 @Test func aJournalRowWithFewerColumnsThanTheJournalHasIsNotAnOperation() throws {
-    #expect(Operation(journalRow: []) == nil)
-    #expect(Operation(journalRow: [.integer(1), .text("task")]) == nil)
+    #expect(JournalOperation(journalRow: []) == nil)
+    #expect(JournalOperation(journalRow: [.integer(1), .text("task")]) == nil)
 }
 
 @Test func anOperationThatNamesNoEntityIsRefused() throws {

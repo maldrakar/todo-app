@@ -160,10 +160,10 @@ public final class Store {
     /// same path a fresh operation takes, and marks them applied. Calling `apply` itself is not an option — it
     /// opens a transaction of its own, and SQLite has no nested one — so what it shares is `applyRows`.
     func replayUnappliedRows() throws(SQLiteError) {
-        var ops: [Operation] = []
+        var ops: [JournalOperation] = []
         var replayed: [Value] = []
-        for row in try db.rows("SELECT \(Operation.journalColumns) FROM ops WHERE applied = 0 ORDER BY clock, device, seq") {
-            guard let op = Operation(journalRow: row), FieldMap.isKnown(op.entity, op.field) else { continue }
+        for row in try db.rows("SELECT \(JournalOperation.journalColumns) FROM ops WHERE applied = 0 ORDER BY clock, device, seq") {
+            guard let op = JournalOperation(journalRow: row), FieldMap.isKnown(op.entity, op.field) else { continue }
             ops.append(op)
             replayed.append(row[0])
         }

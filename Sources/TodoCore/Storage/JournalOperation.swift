@@ -1,4 +1,4 @@
-// Sources/TodoCore/Storage/Operation.swift
+// Sources/TodoCore/Storage/JournalOperation.swift
 import SQLiteKit
 
 /// `Sendable` is not decoration here: `FieldMap` below keys two static lets by this type, and a global keyed
@@ -12,7 +12,7 @@ public enum EntityKind: String, Sendable, CaseIterable {
 
 /// One field of one entity set to one value at one clock by one device. The unit of the journal and of sync,
 /// and a record of something that already happened: nothing about it changes after it is built.
-public struct Operation: Equatable {
+public struct JournalOperation: Equatable {
     public let entity: EntityKind
     public let entityID: String
     public let field: String

@@ -44,12 +44,13 @@
 | `Sources/TodoCore/Model/Placement.swift` | `Placement`: where a created or moved item lands among its siblings |
 | `Sources/TodoCore/Model/TodoTask.swift` | `TodoTask`, `TaskStatus`, `NewTask`, `TaskChange` |
 | `Sources/TodoCore/Model/Tag.swift` | `Tag`, `TagChange` |
-| `Sources/TodoCore/Model/View.swift` | `View`, `NewTaskView`, `TaskViewChange` |
+| `Sources/TodoCore/Model/TaskView.swift` | `TaskView`, `NewTaskView`, `TaskViewChange`, `BuiltInTaskViews` |
 | `Sources/TodoCore/Model/Filter.swift` | `Filter`, `DayCondition`, `SortKey`, `SortField`, `GroupBy`, JSON codec, `FilterError` |
+| `Sources/TodoCore/Model/TreeRules.swift` | `TreeRules`: effective parent after a merge, `TreeOrdered` and tree order |
 | `Sources/TodoCore/Storage/Schema.swift` | DDL of schema version 1 |
 | `Sources/TodoCore/Storage/Migrations.swift` | Ordered migration steps, `Migrations.run` |
 | `Sources/TodoCore/Storage/Store.swift` | `Store`, `StoreError`, `ChangeSet`, open, snapshot, meta, built-in views seed |
-| `Sources/TodoCore/Storage/Operation.swift` | `Operation`, `EntityKind`, `FieldMap` |
+| `Sources/TodoCore/Storage/JournalOperation.swift` | `JournalOperation`, `EntityKind`, `FieldMap` |
 | `Sources/TodoCore/Storage/Store+Apply.swift` | `apply`, journal, field clocks, replay of unapplied operations |
 | `Sources/TodoCore/Storage/Store+Tree.swift` | `task_tree` rebuild: effective parent and trash |
 | `Sources/TodoCore/Storage/Store+Tasks.swift` | Task write API and reads |

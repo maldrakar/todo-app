@@ -55,7 +55,7 @@ import Testing
 @Test func aDeepViewChainReadsWithoutRecursion() throws {
     let store = try makeStore()
     let stamp = store.clock.next()
-    var ops: [Operation] = []
+    var ops: [JournalOperation] = []
     var ids: [String] = []
     for depth in 0..<1_000 {
         let id = "view-\(depth)"

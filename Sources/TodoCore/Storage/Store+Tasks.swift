@@ -25,7 +25,7 @@ extension Store {
             ("created_at", .integer(stamp.millis)),
         ]
         var ops = fields.map { op(.task, id.rawValue, $0.0, $0.1, stamp) }
-        for tag in new.tags { ops.append(op(.taskTag, Operation.pairID(id, tag), "present", Value(true), stamp)) }
+        for tag in new.tags { ops.append(op(.taskTag, JournalOperation.pairID(id, tag), "present", Value(true), stamp)) }
         try apply(ops)
         return id
     }
@@ -49,7 +49,7 @@ extension Store {
         guard let row = rows.first else { throw .notFound(id) }
         let current = TaskStatus(rawValue: row[0].int64 ?? 0) ?? .open
         let stamp = clock.next()
-        var ops: [Operation] = []
+        var ops: [JournalOperation] = []
         for change in Store.lastPerField(changes, by: { $0.field }) {
             switch change {
             case .title(let title): ops.append(op(.task, id.rawValue, "title", .text(title), stamp))
@@ -113,7 +113,7 @@ extension Store {
     public func add(tag: TagID, to task: TaskID) throws(StoreError) {
         try requireTask(task)
         try requireTag(tag)
-        try apply([op(.taskTag, Operation.pairID(task, tag), "present", Value(true), clock.next())])
+        try apply([op(.taskTag, JournalOperation.pairID(task, tag), "present", Value(true), clock.next())])
     }
 
     /// Detaching is a `present = 0` and not a deleted row, so that a peer that attached the same tag offline
@@ -121,7 +121,7 @@ extension Store {
     /// not required to be there: a tag deleted on another device is exactly one a person may be detaching.
     public func remove(tag: TagID, from task: TaskID) throws(StoreError) {
         try requireTask(task)
-        try apply([op(.taskTag, Operation.pairID(task, tag), "present", Value(false), clock.next())])
+        try apply([op(.taskTag, JournalOperation.pairID(task, tag), "present", Value(false), clock.next())])
     }
 
     // MARK: - Reads

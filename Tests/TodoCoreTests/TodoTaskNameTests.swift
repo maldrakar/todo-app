@@ -24,3 +24,19 @@ import TodoCore
     _ = TaskViewPage.Group.self
     #expect(ObjectIdentifier(TaskGroup<Void>.self) == ObjectIdentifier(_Concurrency.TaskGroup<Void>.self))
 }
+
+/// The unit of the journal is `JournalOperation`, because `Operation` is Foundation's `NSOperation` and every
+/// Apple consumer gets it through Foundation and through SwiftUI. The probe recorded in #49 — Swift 6.3.3
+/// against the macOS SDK, a consumer importing SwiftUI and a core exporting `public struct Operation` — fails
+/// at each use with "'Operation' is ambiguous for type lookup in this context" and names both candidates, so
+/// the consumer cannot spell the type at all without qualifying it.
+///
+/// This file cannot prove that the way the `Task` line above proves its own: the core builds for wasm32 and
+/// imports neither Foundation nor SwiftUI, and this file imports nothing but `Testing` and `TodoCore`. What it
+/// holds instead is the spelling, the way it holds `TaskView`, and naming the type is what binds the import,
+/// so a tidy pass cannot drop the one without the other. The `#expect` is not the tautology it looks like:
+/// reflection prints the name a type was declared with, so a `typealias JournalOperation = Operation` that left
+/// the ambiguous name exported would satisfy the spelling and fail here.
+@Test func theNameOperationIsLeftToFoundation() {
+    #expect(String(describing: JournalOperation.self) == "JournalOperation")
+}
