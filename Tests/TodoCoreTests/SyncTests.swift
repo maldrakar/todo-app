@@ -91,7 +91,7 @@ private func offers(_ store: Store) throws -> Int64 {
 @Test func receiveSkipsOwnOperationsAndDuplicates() throws {
     let (a, _, _) = try pair()
     let id = try a.createTask(NewTask(title: "mine"))
-    let own = try a.journal(after: 0).map(\.op).filter { $0.device == a.deviceID }
+    let own = try a.journal(after: 0).filter { $0.device == a.deviceID }
     var calls = 0
     a.onChange = { _ in calls += 1 }
     // Nothing in the state tells the two apart: an operation already in the journal is dropped by the unique
@@ -113,16 +113,16 @@ private func offers(_ store: Store) throws -> Int64 {
 @Test func journalExportIsOrderedAndCursorsPersist() throws {
     let (a, _, relay) = try pair()
     _ = try a.createTask(NewTask(title: "one"))
-    let entries = try a.journal(after: 0)
-    // `after` is exclusive and a page is the rows that follow it, which is what the push walks by. Asserting
-    // that the sequence numbers come back sorted would hold either way: `seq` is the rowid, and SQLite scans
-    // a range of it in order with or without the `ORDER BY`.
-    #expect(try a.journal(after: entries[0].seq, limit: 2).map(\.seq) == [entries[1].seq, entries[2].seq])
-    #expect(entries.contains { $0.op.device == "seed" }, "seed rows are in the journal and are never pushed")
+    let ops = try a.journal(after: 0)
+    #expect(ops.contains { $0.device == "seed" }, "seed rows are in the journal and are never pushed")
+    // `after` is exclusive and a page is the operations that follow it, which is what the push walks by. The
+    // sequence number is not on an operation, so the test reads it where it lives.
+    let seqs = try a.sql { () throws(SQLiteError) in try a.db.rows("SELECT seq FROM ops ORDER BY seq").compactMap { $0[0].int64 } }
+    #expect(try a.journal(after: seqs[0], limit: 2) == Array(ops[1...2]))
     try SyncEngine.sync(a, via: relay)
     #expect(relay.log.allSatisfy { $0.device == a.deviceID })
     let cursors = try a.syncCursors()
-    #expect(cursors.pushed == entries.last?.seq)
+    #expect(cursors.pushed == seqs.last)
     #expect(cursors.pulled == Int64(relay.log.count))
     try SyncEngine.sync(a, via: relay)
     #expect(relay.log.count == 10, "ten fields of one task, pushed once")

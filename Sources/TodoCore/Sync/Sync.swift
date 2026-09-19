@@ -1,14 +1,6 @@
 // Sources/TodoCore/Sync/Sync.swift
 import SQLiteKit
 
-/// One row of the journal: the operation and the sequence number that orders it in this store. The number is
-/// this device's own counting and means nothing on another one — what devices merge by is the clock inside
-/// the operation.
-public struct JournalEntry: Equatable {
-    public let seq: Int64
-    public let op: Operation
-}
-
 /// What a delivery of operations did to the store.
 ///
 /// `refused` counts the operations the journal kept and the state could not take: a value a column cannot
@@ -62,27 +54,29 @@ extension Store {
     private static let pushedSeqKey = "sync.pushed_seq"
     private static let pullCursorKey = "sync.pull_cursor"
 
-    /// Journal rows after a local sequence number, oldest first, this device's and other devices' alike.
+    /// The journal after a local sequence number, oldest first, this device's operations and other devices'
+    /// alike. An operation does not carry that number: it is this store's own counting and means nothing on
+    /// another device, so walking the journal is `SyncEngine`'s business and what a caller reads here is the
+    /// operations themselves.
     ///
-    /// A page of no rows is the answer to a limit of zero or less, the rule the two searches already follow:
-    /// SQLite reads a negative LIMIT as no limit at all, and a caller that asked for no room must not be
-    /// handed the whole journal instead.
-    public func journal(after seq: Int64, limit: Int = 1_000) throws(StoreError) -> [JournalEntry] {
-        try journalPage(after: seq, limit: limit).entries
+    /// A page of no operations is the answer to a limit of zero or less, the rule the two searches already
+    /// follow: SQLite reads a negative LIMIT as no limit at all, and a caller that asked for no room must not
+    /// be handed the whole journal instead.
+    public func journal(after seq: Int64, limit: Int = 1_000) throws(StoreError) -> [Operation] {
+        try journalPage(after: seq, limit: limit).ops
     }
 
-    /// One page of the journal and the sequence number the scan reached, which is not the last entry's.
+    /// One page of the journal and the sequence number the scan reached, which is not the last operation's.
     ///
-    /// A row naming an entity kind this version does not know is left out of `entries` and still moves
-    /// `scanned`, and the difference is what a caller paging through the journal has to walk by: paging by
-    /// the last entry stops at the first page that decodes to nothing and never passes it, so a device that
-    /// a newer app left such a page in would stop pushing its own later edits for the life of the file.
-    func journalPage(after seq: Int64, limit: Int) throws(StoreError) -> (entries: [JournalEntry], scanned: Int64?) {
+    /// A row naming an entity kind this version does not know is left out of `ops` and still moves `scanned`,
+    /// and the difference is what the walk has to advance by: advancing by the last operation stops at the
+    /// first page that decodes to nothing and never passes it, so a device that a newer app left such a page
+    /// in would stop pushing its own later edits for the life of the file.
+    func journalPage(after seq: Int64, limit: Int) throws(StoreError) -> (ops: [Operation], scanned: Int64?) {
         guard limit > 0 else { return ([], nil) }
         return try sql { () throws(SQLiteError) in
             let rows = try db.rows("SELECT \(Operation.journalColumns) FROM ops WHERE seq > ? ORDER BY seq LIMIT ?", [.integer(seq), .integer(Int64(limit))])
-            let entries = rows.compactMap { row in Operation(journalRow: row).map { JournalEntry(seq: row[0].int64 ?? 0, op: $0) } }
-            return (entries, rows.last?[0].int64)
+            return (rows.compactMap(Operation.init(journalRow:)), rows.last?[0].int64)
         }
     }
 
@@ -138,7 +132,7 @@ public enum SyncEngine {
             while true {
                 let page = try store.journalPage(after: pushed, limit: pageSize)
                 guard let scanned = page.scanned else { break }
-                let own = page.entries.filter { $0.op.device == store.deviceID }.map(\.op)
+                let own = page.ops.filter { $0.device == store.deviceID }
                 if !own.isEmpty { try transport.push(own) }
                 pushed = scanned
                 try store.setSyncCursors(pushed: pushed, pulled: cursors.pulled)
