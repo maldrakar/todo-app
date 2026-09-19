@@ -65,7 +65,7 @@ public struct SortKey: Equatable, Sendable, Codable {
 }
 
 /// The first caller is the view row of Task 9; a filter neither groups nor reads a group.
-public enum GroupBy: String, Sendable, Codable {
+public enum GroupBy: String, Sendable, Codable, CaseIterable {
     case whenDay = "when_day"
     case deadlineDay = "deadline_day"
     case tag, parent, status
