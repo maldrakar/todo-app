@@ -15,6 +15,8 @@ let SQLITE_OK_CODE: Int32 = 0
         [.integer(2), .null, .null, .null],
     ])
     #expect(db.lastInsertRowID == 2)
+    #expect(rows[0][2].double == 1.5)
+    #expect(rows[1][2].double == nil, "a null column has no number to read")
 }
 
 @Test func reportsErrorsWithCodeAndMessage() throws {
