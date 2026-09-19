@@ -59,9 +59,10 @@ public final class Store {
     /// opened with the clock its caller chose (`docs/style.md`, "A lower layer holds no policy of its
     /// client"), and this is what a platform passes when its own clock is the machine's.
     ///
-    /// On wasm32 under WasmKit it is not the wall clock — it reads about ten days after the epoch (#53) —
-    /// so a web entry point passes the host's time instead of this until that is settled. A device stamping
-    /// its edits from a clock that far behind loses every last-write-wins comparison in silence.
+    /// It is not the wall clock on every target: under WasmKit it reads days after the epoch instead of the
+    /// time of day (plan, Global Constraints), so a wasm entry point passes the host's time rather than this
+    /// until #53 settles what it should pass. A device stamping its edits from a clock that far behind loses
+    /// every last-write-wins comparison in silence.
     public static func systemNow() -> Int64 { millis(since: Date().timeIntervalSince1970) }
 
     /// Seconds since the epoch as whole milliseconds. Separate from the clock it reads so that the
