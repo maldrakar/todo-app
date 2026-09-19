@@ -53,7 +53,7 @@ extension Store {
         guard limit > 0, !needle.isEmpty else { return [] }
         var hits: [QuickFindHit] = []
         if let match = Store.trigramQuery(needle) {
-            let matched = try titleRows(where: "t.rid IN (SELECT rowid FROM tasks_title_fts WHERE tasks_title_fts MATCH ?)", [.text(match)])
+            let matched = try titleRows(matching: "t.rid IN (SELECT rowid FROM tasks_title_fts WHERE tasks_title_fts MATCH ?)", [.text(match)])
             hits += try taskHits(matched, limit: limit)
             let tagIDs = try titleMatches(in: "tags", match)
             hits += Store.byTitle(try tags().filter { tagIDs.contains($0.id) }).map(QuickFindHit.tag)
@@ -66,7 +66,7 @@ extension Store {
             // is still typing, so the answer is about to be replaced by the indexed one.
             let folded = needle.lowercased()
             func matches(_ title: String) -> Bool { title.lowercased().contains(folded) }
-            hits += try taskHits(try titleRows(where: "1", []).filter { matches($0.title) }, limit: limit)
+            hits += try taskHits(try titleRows().filter { matches($0.title) }, limit: limit)
             hits += Store.byTitle(try tags().filter { matches($0.title) }).map(QuickFindHit.tag)
             hits += Store.byTitle(try views().filter { matches($0.title) }).map(QuickFindHit.view)
         }
@@ -144,13 +144,17 @@ extension Store {
 
     // MARK: - Reads behind quick find
 
-    /// The id and title of the tasks a clause selects, with the deleted and the trashed already out —
-    /// inherited trash included, which is what the join on the tree is for. Two columns rather than whole
-    /// tasks: the scan under three characters reads every visible row here, and a task read whole brings its
-    /// tags with it, one more statement per five hundred rows for tasks the answer is about to drop.
-    private func titleRows(where clause: String, _ params: [Value]) throws(StoreError) -> [TitleRow] {
-        try sql { () throws(SQLiteError) in
-            let rows = try db.rows("SELECT t.id, t.title FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND tt.trashed = 0 AND (\(clause))", params)
+    /// The id and title of every task a person can see — the deleted and the trashed are out, inherited
+    /// trash included, which is what the join on the tree is for. Without a clause that is the whole visible
+    /// table, which is what the scan under three characters reads; with one it is the tasks the clause
+    /// selects, and the scan's `?` parameters go in beside it.
+    ///
+    /// Two columns rather than whole tasks: a task read whole brings its tags with it, one more statement per
+    /// five hundred rows, and the answer is about to drop all but a page of them.
+    private func titleRows(matching clause: String? = nil, _ params: [Value] = []) throws(StoreError) -> [TitleRow] {
+        let selection = clause.map { " AND (\($0))" } ?? ""
+        return try sql { () throws(SQLiteError) in
+            let rows = try db.rows("SELECT t.id, t.title FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND tt.trashed = 0\(selection)", params)
             return rows.map { TitleRow(id: EntityID($0[0].string ?? ""), title: $0[1].string ?? "") }
         }
     }
