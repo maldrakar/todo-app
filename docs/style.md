@@ -31,12 +31,14 @@ Each rule names the review that set it.
   `TodoTask` and not `Task`, which shadowed `_Concurrency.Task`;
   `TaskView` and not `View`, and `TaskViewPage.Section` and
   `TaskViewPage.Group` and not `Section` and `TaskGroup`, which SwiftUI
-  and the standard library own. The collision is invisible here, because
-  the core imports neither, and it costs every file in the app: an
-  ambiguous type is an error at each use, and a shadowed one fails with
-  something that does not name the cause. A candidate is settled by a
-  compiler probe against the real modules, and the name a consumer needs
-  is held by a test that spells it. (#42, PR #46)
+  and the standard library own; `JournalOperation` and not `Operation`,
+  which is Foundation's and reaches every Apple consumer through
+  Foundation and through SwiftUI. The collision is invisible here,
+  because the core imports neither, and it costs every file in the app:
+  an ambiguous type is an error at each use, and a shadowed one fails
+  with something that does not name the cause. A candidate is settled by
+  a compiler probe against the real modules, and the name a consumer
+  needs is held by a test that spells it. (#42, PR #46, #49)
 
 ## Shape
 

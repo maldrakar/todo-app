@@ -14,7 +14,7 @@ private func tree(_ store: Store) throws(StoreError) -> [String: (parent: String
 
 /// Builds each task out of the three fields the tree is derived from, the way a merge delivers them.
 private func setup(_ store: Store, _ rows: [(id: String, parent: String?, trashed: Bool, deleted: Bool)]) throws(StoreError) {
-    var ops: [Operation] = []
+    var ops: [JournalOperation] = []
     for (i, r) in rows.enumerated() {
         let stamp = HLC(millis: 1_000 + Int64(i), counter: 0)
         ops.append(store.op(.task, r.id, "parent", Value(r.parent), stamp))

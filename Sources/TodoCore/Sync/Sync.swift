@@ -25,24 +25,24 @@ public enum SyncError: Error, Equatable, Sendable {
 
 /// Moves journal rows between devices. Two actions, as the spec says, and everything else is the store's.
 public protocol SyncTransport: AnyObject {
-    func push(_ ops: [Operation]) throws(SyncError)
-    func pull(after cursor: Int64) throws(SyncError) -> (ops: [Operation], cursor: Int64)
+    func push(_ ops: [JournalOperation]) throws(SyncError)
+    func pull(after cursor: Int64) throws(SyncError) -> (ops: [JournalOperation], cursor: Int64)
 }
 
 /// A relay in memory: every device's pushes in arrival order, and the cursor into it is a position in that
 /// order. The only transport in M1, and the one the convergence tests exchange through.
 public final class InMemoryRelay: SyncTransport {
-    public private(set) var log: [Operation] = []
+    public private(set) var log: [JournalOperation] = []
 
     public init() {}
 
-    public func push(_ ops: [Operation]) throws(SyncError) {
+    public func push(_ ops: [JournalOperation]) throws(SyncError) {
         log += ops
     }
 
     /// A cursor from a device that has been away, or from one that never pulled, is a number this relay's log
     /// may no longer cover in either direction, so it is pulled into the log rather than trusted as an index.
-    public func pull(after cursor: Int64) throws(SyncError) -> (ops: [Operation], cursor: Int64) {
+    public func pull(after cursor: Int64) throws(SyncError) -> (ops: [JournalOperation], cursor: Int64) {
         let start = Int(min(max(cursor, 0), Int64(log.count)))
         return (Array(log[start...]), Int64(log.count))
     }
@@ -62,7 +62,7 @@ extension Store {
     /// A page of no operations is the answer to a limit of zero or less, the rule the two searches already
     /// follow: SQLite reads a negative LIMIT as no limit at all, and a caller that asked for no room must not
     /// be handed the whole journal instead.
-    public func journal(after seq: Int64, limit: Int = 1_000) throws(StoreError) -> [Operation] {
+    public func journal(after seq: Int64, limit: Int = 1_000) throws(StoreError) -> [JournalOperation] {
         try journalPage(after: seq, limit: limit).ops
     }
 
@@ -72,11 +72,11 @@ extension Store {
     /// and the difference is what the walk has to advance by: advancing by the last operation stops at the
     /// first page that decodes to nothing and never passes it, so a device that a newer app left such a page
     /// in would stop pushing its own later edits for the life of the file.
-    func journalPage(after seq: Int64, limit: Int) throws(StoreError) -> (ops: [Operation], scanned: Int64?) {
+    func journalPage(after seq: Int64, limit: Int) throws(StoreError) -> (ops: [JournalOperation], scanned: Int64?) {
         guard limit > 0 else { return ([], nil) }
         return try sql { () throws(SQLiteError) in
-            let rows = try db.rows("SELECT \(Operation.journalColumns) FROM ops WHERE seq > ? ORDER BY seq LIMIT ?", [.integer(seq), .integer(Int64(limit))])
-            return (rows.compactMap(Operation.init(journalRow:)), rows.last?[0].int64)
+            let rows = try db.rows("SELECT \(JournalOperation.journalColumns) FROM ops WHERE seq > ? ORDER BY seq LIMIT ?", [.integer(seq), .integer(Int64(limit))])
+            return (rows.compactMap(JournalOperation.init(journalRow:)), rows.last?[0].int64)
         }
     }
 
@@ -88,7 +88,7 @@ extension Store {
     /// was given — the relay below does, and so does a server that echoes a push — and applying our own
     /// operations again would cost a journal statement and a field-clock read each for no change at all.
     @discardableResult
-    public func receive(_ ops: [Operation]) throws(StoreError) -> SyncReport {
+    public func receive(_ ops: [JournalOperation]) throws(StoreError) -> SyncReport {
         let foreign = ops.filter { $0.device != deviceID }
         for op in foreign { clock.observe(op.clock) }
         return try applyBatch(foreign)

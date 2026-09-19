@@ -3,8 +3,8 @@ import Testing
 @testable import SQLiteKit
 
 /// An operation from another device, the way one arrives from sync.
-private func foreign(_ device: String, _ field: String, _ value: Value, _ clock: HLC, task id: String = "t1") -> Operation {
-    Operation(entity: .task, entityID: id, field: field, value: value, clock: clock, device: device)
+private func foreign(_ device: String, _ field: String, _ value: Value, _ clock: HLC, task id: String = "t1") -> JournalOperation {
+    JournalOperation(entity: .task, entityID: id, field: field, value: value, clock: clock, device: device)
 }
 
 private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) -> (String, Int64)? {
@@ -94,7 +94,7 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
 
 @Test func pairEntitiesUpsertTheirRows() throws {
     let store = try makeStore()
-    let pair = Operation.pairID(TaskID("t1"), TagID("g1"))
+    let pair = JournalOperation.pairID(TaskID("t1"), TagID("g1"))
     try store.apply([store.op(.taskTag, pair, "present", .integer(1), HLC(millis: 1_000, counter: 0))])
     var rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT task_id, tag_id, present FROM task_tags") }
     #expect(rows == [[.text("t1"), .text("g1"), .integer(1)]])
@@ -116,7 +116,7 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
 
 @Test func aViewItemUpsertsItsRowAndReportsBothSides() throws {
     let store = try makeStore()
-    let pair = Operation.pairID(ViewID("v1"), TaskID("t1"))
+    let pair = JournalOperation.pairID(ViewID("v1"), TaskID("t1"))
     let changes = try store.apply([
         store.op(.viewItem, pair, "present", .integer(1), HLC(millis: 1_000, counter: 0)),
         store.op(.viewItem, pair, "rank", .text("m"), HLC(millis: 1_000, counter: 1)),
@@ -173,7 +173,7 @@ private func titleAndCreated(_ store: Store, _ id: String) throws(StoreError) ->
     let store = try makeStore()
     // `present` defaults to 1 in the schema, and the two operations arrive apart when delivery is out of
     // order, so the row a lone `rank` creates must not read as a membership.
-    let pair = Operation.pairID(ViewID("v1"), TaskID("t1"))
+    let pair = JournalOperation.pairID(ViewID("v1"), TaskID("t1"))
     try store.apply([store.op(.viewItem, pair, "rank", .text("m"), HLC(millis: 1_000, counter: 0))])
     var rows = try store.sql { () throws(SQLiteError) in try store.db.rows("SELECT present, rank FROM view_items") }
     #expect(rows == [[.integer(0), .text("m")]])

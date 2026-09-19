@@ -83,7 +83,7 @@ extension Store {
         let stamp = clock.next()
         // A `map` over a throwing call would need `try` on the whole expression and would still hide which
         // change failed, so the loop builds the list and the two encoders report the filter they refused.
-        var ops: [Operation] = []
+        var ops: [JournalOperation] = []
         for change in Store.lastPerField(changes, by: { $0.field }) {
             switch change {
             case .title(let title): ops.append(op(.view, id.rawValue, "title", .text(title), stamp))
@@ -128,7 +128,7 @@ extension Store {
         try requireView(view)
         let rank = try Store.rank(among: try pinnedItems(of: view, excluding: task), placement: placement)
         let stamp = clock.next()
-        let id = Operation.pairID(view, task)
+        let id = JournalOperation.pairID(view, task)
         try apply([op(.viewItem, id, "present", Value(true), stamp), op(.viewItem, id, "rank", .text(rank), stamp)])
     }
 
@@ -138,7 +138,7 @@ extension Store {
     /// tag is not when a tag is detached; the view is, because it is what the caller is editing.
     public func unpin(task: TaskID, from view: ViewID) throws(StoreError) {
         try requireView(view)
-        try apply([op(.viewItem, Operation.pairID(view, task), "present", Value(false), clock.next())])
+        try apply([op(.viewItem, JournalOperation.pairID(view, task), "present", Value(false), clock.next())])
     }
 
     /// The pinned tasks of a view in their manual order.
@@ -193,14 +193,14 @@ extension Store {
     /// for the same five views and sync merges them instead of racing to create two Inboxes.
     func seedBuiltInViews() throws(StoreError) {
         let zero = HLC(millis: 0, counter: 0)
-        var ops: [Operation] = []
+        var ops: [JournalOperation] = []
         for definition in BuiltInTaskViews.definitions {
             let fields: [(String, Value)] = [
                 ("title", .text(definition.title)), ("parent", .null), ("rank", .text(definition.rank)),
                 ("filter", try filterValue(definition.filter)), ("sort", try sortValue(definition.sort)),
                 ("group_by", Value(definition.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(0)),
             ]
-            ops += fields.map { Operation(entity: .view, entityID: definition.id.rawValue, field: $0.0, value: $0.1, clock: zero, device: "seed") }
+            ops += fields.map { JournalOperation(entity: .view, entityID: definition.id.rawValue, field: $0.0, value: $0.1, clock: zero, device: "seed") }
         }
         try apply(ops)
     }
