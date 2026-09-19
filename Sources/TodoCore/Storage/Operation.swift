@@ -35,6 +35,23 @@ public struct Operation: Equatable {
         "\(first.rawValue)/\(second.rawValue)"
     }
 
+    /// The `ops` columns every reader of the journal selects, in the order `init(journalRow:)` reads them.
+    /// `seq` is the first of them and belongs to the row rather than to the operation, so a reader that needs
+    /// it takes it from the row.
+    static let journalColumns = "seq, entity, entity_id, field, value, clock, device"
+
+    /// One journal row as an operation, or nothing when the row names an entity kind this version does not
+    /// know, which is what a newer app writing into the same file leaves behind. Both readers of the journal,
+    /// the replay at open and the export to a peer, step over such a row rather than fail the scan over it.
+    /// Everything else is decoded the way `HLC(raw:)` decodes a stamp, without a check: a value another
+    /// version stored has to read back as something rather than stop the process. The row is counted for the
+    /// same reason — the two callers interpolate `journalColumns` and cannot hand over a short one, but the
+    /// next one selecting its own columns would index past the end of an array instead of being told.
+    init?(journalRow row: [Value]) {
+        guard row.count == 7, let kind = EntityKind(rawValue: row[1].string ?? "") else { return nil }
+        self.init(entity: kind, entityID: row[2].string ?? "", field: row[3].string ?? "", value: row[4], clock: HLC(raw: row[5].int64 ?? 0), device: row[6].string ?? "")
+    }
+
     static func splitPair(_ id: String) -> (String, String)? {
         let parts = id.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
         guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }

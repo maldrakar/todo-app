@@ -80,10 +80,10 @@ public final class Store {
         // The scan used to bound itself away from the top of the encoding, because seeding from a row up there
         // pushed the clock to the one millisecond `next()` could not represent and trapped the process on the
         // very next stamp. `HybridClock` saturates inside its range instead (#34), so that rule lives in the
-        // clock alone, where `Store.receive` will meet it in Task 11, and the scan keeps only the rule that is
-        // its own: `clock` is declared INTEGER, but SQLite takes a column's type as a preference, and anything
-        // else stored there sorts above every number. Without `typeof` a single such row would answer `max`,
-        // fail to read back as a stamp, and turn the seed into no seed at all — #32 again, without a sound.
+        // clock alone, where `Store.receive` meets it when a peer's stamp arrives, and the scan keeps only the
+        // rule that is its own: `clock` is declared INTEGER, but SQLite takes a column's type as a preference,
+        // and anything else stored there sorts above every number. Without `typeof` one such row would answer
+        // `max`, fail to read back as a stamp, and turn the seed into no seed at all — #32 again, in silence.
         if let seen = try sql({ () throws(SQLiteError) in
             try db.rows("SELECT max(clock) FROM ops WHERE typeof(clock) = 'integer'").first?.first?.int64
         }) {
@@ -162,13 +162,16 @@ public final class Store {
     func replayUnappliedRows() throws(SQLiteError) {
         var ops: [Operation] = []
         var replayed: [Value] = []
-        for row in try db.rows("SELECT seq, entity, entity_id, field, value, clock, device FROM ops WHERE applied = 0 ORDER BY clock, device, seq") {
-            guard let kind = EntityKind(rawValue: row[1].string ?? ""), let field = row[3].string, FieldMap.isKnown(kind, field) else { continue }
-            ops.append(Operation(entity: kind, entityID: row[2].string ?? "", field: field, value: row[4], clock: HLC(raw: row[5].int64 ?? 0), device: row[6].string ?? ""))
+        for row in try db.rows("SELECT \(Operation.journalColumns) FROM ops WHERE applied = 0 ORDER BY clock, device, seq") {
+            guard let op = Operation(journalRow: row), FieldMap.isKnown(op.entity, op.field) else { continue }
+            ops.append(op)
             replayed.append(row[0])
         }
         // The change set goes nowhere: the only caller is `Store.init`, where no observer can have been set
-        // yet. A replay that ever runs mid-session has to hand it to `onChange` instead of dropping it.
+        // yet. A replay that ever runs mid-session has to hand it to `onChange` instead of dropping it. The
+        // count of what the state refused goes nowhere for the same reason, and this is the second place one
+        // can be refused — a peer's operation for a field the migration has just made known reaches the state
+        // here for the first time. If the replay ever moves out of `init`, both numbers move with it.
         try applyRows(ops)
         for seq in replayed { try db.run("UPDATE ops SET applied = 1 WHERE seq = ?", [seq]) }
     }
