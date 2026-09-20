@@ -9,7 +9,7 @@ import Testing
     #expect(try store.view(BuiltInTaskViews.today)?.filter == .and([.status([.open]), .when(.onOrBefore(0))]))
     try store.update(view: BuiltInTaskViews.today, [.title("Сегодня")])
     try store.delete(view: BuiltInTaskViews.trash)
-    let reopened = try Store.openInMemory(snapshot: try store.snapshot(), now: clock.now)
+    let reopened = try Store.openInMemory(snapshot: try store.snapshot(), device: store.deviceID, now: clock.now)
     #expect(try reopened.views().map(\.title) == ["Inbox", "Сегодня", "Upcoming", "Logbook"])
     let seeded = try reopened.sql { () throws(SQLiteError) in try reopened.db.rows("SELECT count(*) FROM ops WHERE device = 'seed'") }
     #expect(seeded == [[.integer(40)]], "eight fields for five views, journaled once")

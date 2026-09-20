@@ -9,7 +9,7 @@ private let today = Day(year: 2026, month: 9, day: 11)
 
 private func makeStore() throws -> Store {
     var millis: Int64 = 1_757_500_000_000
-    return try Store.openInMemory(now: { millis += 1; return millis })
+    return try Store.openInMemory(device: Store.newDeviceID(), now: { millis += 1; return millis })
 }
 
 /// One command line, split on spaces the way a shell splits an unquoted one. A value that holds a space
@@ -230,4 +230,35 @@ private func message(of body: () throws -> String) -> String {
     #expect(message(of: { try run(store, "add Groceries --tag --notes urgent") }) == "--tag needs a value")
     #expect(try run(store, "add Buy milk --when 2026-09-11").hasPrefix("added "))
     #expect(try run(store, "list Today").contains("Buy milk"))
+}
+
+@Test func theDemoKeepsOneIdentityPerDatabase() throws {
+    // The identity belongs to the installation and not to the bytes (ADR-0005), so the demo keeps it in a
+    // file next to the database: a `todo.sqlite` copied without that file is another device, which is what
+    // #51 asks of whoever copies one.
+    let path = ".build/todo-cli-test-\(EntityID().rawValue).sqlite"
+    let first = CLI.device(for: path, [:])
+    #expect(!first.kept, "nothing holds it yet")
+    try CLI.keep(first.id, for: path)
+
+    let second = CLI.device(for: path, [:])
+    #expect(second.id == first.id, "a second run over the same database is the same device")
+    #expect(second.kept)
+    #expect(CLI.device(for: path + ".copy", [:]).id != first.id, "a copy without the file beside it is another device")
+
+    let given = CLI.device(for: path, ["TODO_DEVICE": "given"])
+    #expect(given.id == "given", "the environment outranks the file, the way TODO_DB outranks the default")
+    #expect(given.kept)
+    #expect(CLI.device(for: ":memory:", [:]).kept, "a database that keeps nothing keeps no identity either")
+}
+
+@Test func aRunThatMintsAnIdentityKeepsIt() throws {
+    // `CLI.main` is what wires the two together, and the wiring is one line: without it every command is a
+    // new device, which is what the demo's own database would then show as a row per run in `own_devices`.
+    let path = ".build/todo-cli-main-\(EntityID().rawValue).sqlite"
+    #expect(CLI.main(["todo", "--db", path, "add", "kept"], environment: [:]) == 0)
+    let after = CLI.device(for: path, [:])
+    #expect(after.kept, "the run that minted the id wrote it beside the database")
+    #expect(CLI.main(["todo", "--db", path, "add", "again"], environment: [:]) == 0)
+    #expect(CLI.device(for: path, [:]).id == after.id, "the second run is the same device as the first")
 }

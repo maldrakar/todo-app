@@ -31,7 +31,13 @@ public struct ChangeSet: Equatable, Sendable {
 }
 
 /// The core's data layer. Synchronous, single-connection, not thread-safe: the platform confines it.
+///
+/// One store per database, and one database per device: two stores over one file hold two hybrid clocks and
+/// two change callbacks over one journal, so an edit can lose a tie the other store never saw, and two
+/// stores over two copies of one file are two devices and are opened with two ids (ADR-0005).
 public final class Store {
+    /// The identity this store stamps its operations with. It belongs to the installation and not to the
+    /// database: a database can be copied, and the copy is another device (ADR-0005).
     public let deviceID: String
 
     /// Called after a transaction that changed something commits, with everything it touched. It lives in the
@@ -41,19 +47,30 @@ public final class Store {
     let db: Connection
     let clock: HybridClock
 
-    /// The `meta` row that holds this device's identity in the journal.
-    private static let deviceIDKey = "device_id"
+    /// The ids this database has written under, this store's own among them. What a push sends is the rows
+    /// of every one of them, which is `SyncEngine`'s reason to read it.
+    let ownDevices: Set<String>
+
+    /// The device id on the journal rows of the built-in views. They are written by every device and are the
+    /// same rows everywhere, so they carry no device's identity and no device ever pushes them.
+    static let seedDevice = "seed"
 
     /// How the core opens a database. `SQLiteKit` sets no pragmas of its own, so the policy lives here and
     /// travels with the store. On an in-memory database `journal_mode` is accepted and ignored, so one list
     /// serves the file and the web target alike.
     private static let pragmas = ["foreign_keys = OFF", "journal_mode = WAL", "synchronous = NORMAL"]
 
-    public static func open(path: String, now: @escaping () -> Int64) throws(StoreError) -> Store {
+    public static func open(path: String, device: String, now: @escaping () -> Int64) throws(StoreError) -> Store {
         let db: Connection
         do { db = try Connection.open(path: path, pragmas: pragmas) } catch { throw .sqlite(error) }
-        return try Store(db: db, now: now)
+        return try Store(db: db, device: device, now: now)
     }
+
+    /// An identity for a device that has none yet, for a platform with nowhere better to take one from. Where
+    /// it is kept afterwards is the platform's: it has to outlive the database and not travel with it, since
+    /// a restored copy that keeps the identity of the machine it came from is invisible to that machine
+    /// (#51), and one that mints a new identity at every open never finishes pushing what it wrote.
+    public static func newDeviceID() -> String { EntityID().rawValue }
 
     /// The wall clock in milliseconds since the epoch, for a caller that has no better one: the store is
     /// opened with the clock its caller chose (`docs/style.md`, "A lower layer holds no policy of its
@@ -74,29 +91,27 @@ public final class Store {
         return millis < Double(Int64.max) ? Int64(millis) : Int64.max
     }
 
-    public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store {
+    public static func openInMemory(snapshot: [UInt8]? = nil, device: String, now: @escaping () -> Int64) throws(StoreError) -> Store {
         let db: Connection
         do {
             db = try Connection.openInMemory(pragmas: pragmas)
             if let snapshot { try db.deserialize(snapshot) }
         } catch { throw .sqlite(error) }
-        return try Store(db: db, now: now)
+        return try Store(db: db, device: device, now: now)
     }
 
-    init(db: Connection, now: @escaping () -> Int64) throws(StoreError) {
+    init(db: Connection, device: String, now: @escaping () -> Int64) throws(StoreError) {
+        // The identity arrives from outside like any other data, and the two values it may not take are worth
+        // a refusal here rather than a fault much later: an empty id names no device, and `seed` is the core's
+        // own, whose rows every device writes and none pushes, so a device stamping under it would push
+        // nothing it wrote.
+        guard !device.isEmpty else { throw .invalid("a device id cannot be empty") }
+        guard device != Store.seedDevice else { throw .invalid("the device id \"\(Store.seedDevice)\" is the core's own") }
         self.db = db
         self.clock = HybridClock(now: now)
+        self.deviceID = device
         do { _ = try Migrations.run(on: db) } catch { throw .sqlite(error) }
-        if let stored = try Store.readMeta(db, Store.deviceIDKey).string {
-            deviceID = stored
-        } else {
-            // The identity is this device's only claim in the journal, so nothing keeps it until the row is in
-            // the database: a write that fails takes the whole open with it rather than leave a store whose id
-            // no reopen would agree with.
-            let minted = EntityID().rawValue
-            try Store.writeMeta(db, Store.deviceIDKey, .text(minted))
-            deviceID = minted
-        }
+        self.ownDevices = try Store.recordOwnDevice(db, device)
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
         // comparison in silence (#32). This runs before anything below issues a stamp.
@@ -149,20 +164,27 @@ public final class Store {
         Array(repeating: "?", count: count).joined(separator: ", ")
     }
 
+    /// The `meta` pair the sync cursors read and write. It was a pair of `private static` twins behind these
+    /// two lines while `init` read the device id before `deviceID` was assigned, which Swift forbids an
+    /// instance call to do (review of PR #35); the id comes from the caller now, and the twins had one caller
+    /// each left.
     func meta(_ key: String) throws(StoreError) -> Value {
-        try Store.readMeta(db, key)
-    }
-
-    func setMeta(_ key: String, _ value: Value) throws(StoreError) {
-        try Store.writeMeta(db, key, value)
-    }
-
-    private static func readMeta(_ db: Connection, _ key: String) throws(StoreError) -> Value {
         do { return try db.rows("SELECT value FROM meta WHERE key = ?", [.text(key)]).first?.first ?? .null } catch { throw .sqlite(error) }
     }
 
-    private static func writeMeta(_ db: Connection, _ key: String, _ value: Value) throws(StoreError) {
+    func setMeta(_ key: String, _ value: Value) throws(StoreError) {
         do { try db.run("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [.text(key), value]) } catch { throw .sqlite(error) }
+    }
+
+    /// Adds this device to the ids the database has written under and reads the whole set back. It is one
+    /// row on a database that has only ever been opened on one machine, and it grows by one when a copy is
+    /// opened under an identity of its own: what the predecessor wrote and never pushed is still in the
+    /// journal under the old id, and the push has to keep sending it (#51).
+    private static func recordOwnDevice(_ db: Connection, _ device: String) throws(StoreError) -> Set<String> {
+        do {
+            try db.run("INSERT OR IGNORE INTO own_devices (id) VALUES (?)", [.text(device)])
+            return Set(try db.rows("SELECT id FROM own_devices").compactMap { $0.first?.string })
+        } catch { throw .sqlite(error) }
     }
 
     /// Re-applies journal rows whose field became known after a migration.

@@ -7,6 +7,7 @@ enum Migrations {
         (1, Schema.version1),
         (2, Schema.version2),
         (3, Schema.version3),
+        (4, Schema.version4),
     ]
 
     /// Applies every step above the current user_version. Returns the versions before and after.

@@ -268,4 +268,25 @@ enum Schema {
         INSERT INTO views_title_fts(rowid, title_fold) VALUES (new.rid, new.title_fold);
     END;
     """
+
+    /// The device ids this database has written under, which is not the set of devices it has heard from: it
+    /// is what a push answers "is this row mine to send" with. One row for a database that never left its
+    /// machine, and one more after every restore, because the copy opens under an identity of its own (#51)
+    /// while the operations its predecessor never managed to push are still in the journal under the old id.
+    /// A push filtered by the current id alone would strand those edits on the copy forever and in silence.
+    ///
+    /// The `device_id` row that held the one identity moves in here and is then gone: the id comes from the
+    /// platform at every open (ADR-0005), so a row in the database that still looks like the answer is a
+    /// trap for whoever reads it next. It moves only if it is text, the rule the clock's seed scan follows
+    /// for the same reason: `meta` declares no type for its value, and a null there would fail the NOT NULL
+    /// of a primary key and take this step with it — on this open and, since a step that failed is a step
+    /// still to run, on every open after it.
+    static let version4 = """
+    CREATE TABLE own_devices (
+        id TEXT PRIMARY KEY
+    ) WITHOUT ROWID;
+
+    INSERT INTO own_devices (id) SELECT value FROM meta WHERE key = 'device_id' AND typeof(value) = 'text';
+    DELETE FROM meta WHERE key = 'device_id';
+    """
 }

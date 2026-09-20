@@ -13,10 +13,10 @@ extension Store {
     }
 
     /// Everything `apply` does, and the number it drops: the operations the state could not take. `receive`
-    /// is the caller with somewhere to put that number, and it hands over a peer's operations alone, so a
-    /// count that reaches a consumer is a peer's doing. `apply` drops it, because a refusal of our own is a
-    /// bug in the write API rather than something to survive — for the null over a NOT NULL column, which is
-    /// the one our own typed values could produce, the assertion below is where that bug stops being silent.
+    /// is the caller with somewhere to put that number, and what it hands over arrived from a transport, so a
+    /// count that reaches a consumer is what came in over the wire. `apply` drops the number, because a
+    /// refusal of our own is a bug in the write API rather than something to survive, and its assertion is
+    /// where that bug stops being silent.
     func applyBatch(_ ops: [JournalOperation]) throws(StoreError) -> SyncReport {
         guard !ops.isEmpty else { return SyncReport() }
         let report = try sql { () throws(SQLiteError) in
@@ -49,9 +49,15 @@ extension Store {
     /// the operation never named, and no other field can move any.
     static let treeFields: Set<String> = ["parent", "trashed", "deleted"]
 
-    /// Builds an operation stamped by this device.
+    /// Builds an operation stamped by this device. Every operation the write API makes comes through here,
+    /// and nothing a peer sent does, which is what makes this the place for the one refusal our own typed
+    /// values can produce: a null over a NOT NULL column, which takes a `Value(someOptional)` over such a
+    /// column to write and is a bug in the write API rather than something to survive. `applyToState`, where
+    /// the assertion used to live, cannot tell ours from a peer's any more — it read the device id for that,
+    /// and `receive` no longer treats our own id as a claim about anything.
     func op(_ kind: EntityKind, _ id: String, _ field: String, _ value: Value, _ stamp: HLC) -> JournalOperation {
-        JournalOperation(entity: kind, entityID: id, field: field, value: value, clock: stamp, device: deviceID)
+        assert(!value.isNull || FieldMap.acceptsNull(kind, field), "a null for \(kind.rawValue).\(field), which the schema keeps NOT NULL")
+        return JournalOperation(entity: kind, entityID: id, field: field, value: value, clock: stamp, device: deviceID)
     }
 
     /// Appends to the journal. The unique index on (device, clock, entity, entity_id, field) drops duplicates.
@@ -82,13 +88,10 @@ extension Store {
         // back the whole transaction — every operation delivered alongside this one would lose its journal row
         // too, on this delivery and on every retry. So the operation is journaled and skipped instead, and the
         // field stays open for the next well-formed one, which is what an operation from another device has
-        // earned. From our own code the same value is a bug rather than something to survive: the write API
-        // builds operations out of typed values, and it takes a `Value(someOptional)` over a NOT NULL column to
-        // produce this. The assertion is where that bug stops being silent, in every test run and every debug
-        // build. It does not reach the built-in view seed of Task 9, whose operations carry a device id of
-        // their own; what covers those is the test that holds `FieldMap` and the schema together.
+        // earned. The same value out of our own write API is a bug instead, and `apply` is where it stops
+        // being silent: what reaches here carries a device id a peer chose, so nothing here can tell the two
+        // apart.
         if op.value.isNull, !FieldMap.acceptsNull(op.entity, op.field) {
-            assert(op.device != deviceID, "a null for \(op.entity.rawValue).\(op.field), which the schema keeps NOT NULL")
             report.refused += 1
             return
         }

@@ -88,25 +88,26 @@ private func offers(_ store: Store) throws -> Int64 {
     #expect(try b.task(kid) == nil)
 }
 
-@Test func receiveSkipsOwnOperationsAndDuplicates() throws {
+@Test func receiveChangesNothingForAnOperationTheStoreAlreadyHolds() throws {
     let (a, _, _) = try pair()
     let id = try a.createTask(NewTask(title: "mine"))
     let own = try a.journal(after: 0).filter { $0.device == a.deviceID }
     var calls = 0
     a.onChange = { _ in calls += 1 }
-    // Nothing in the state tells the two apart: an operation already in the journal is dropped by the unique
-    // index, and one already applied loses its own field clock, so either way the store ends where it was.
-    // What skipping them saves is the work, and the work is what the count below can see.
+    // Our own operation coming back and a peer's duplicate are the same thing to the state: the unique index
+    // drops the row and the field clock drops the value, so either way the store ends where it was. Both are
+    // offered, and that is the price of not reading a device id as a claim about what the journal holds —
+    // the store that lost its database is the one that needs its own rows offered back to it.
     try countJournalOffers(a)
     #expect(try a.receive(own).changes.isEmpty)
-    #expect(try offers(a) == 0, "an operation this device wrote is not offered to the journal a second time")
+    #expect(try offers(a) == Int64(own.count), "what this device wrote is offered to the journal, and the index refuses it")
     #expect(calls == 0)
 
     let mine = try #require(own.first { $0.field == "title" })
     let theirs = foreign(.task, mine.entityID, "title", .text("theirs"), mine.clock.millis + 10)
     #expect(try a.receive([theirs]).changes.tasks == [id])
     #expect(try a.receive([theirs]).changes.isEmpty, "a duplicate is dropped by the journal index and the field clock")
-    #expect(try offers(a) == 2, "a peer's operation is offered to the journal every time it arrives")
+    #expect(try offers(a) == Int64(own.count) + 2, "a peer's operation is offered to the journal every time it arrives")
     #expect(try a.task(id)?.title == "theirs")
 }
 
@@ -133,7 +134,7 @@ private func offers(_ store: Store) throws -> Int64 {
     _ = try a.createTask(NewTask(title: "one"))
     try SyncEngine.sync(a, via: relay)
     let before = try a.syncCursors()
-    let again = try Store.openInMemory(snapshot: try a.snapshot(), now: TestClock().now)
+    let again = try Store.openInMemory(snapshot: try a.snapshot(), device: a.deviceID, now: TestClock().now)
     #expect(try again.syncCursors() == before)
     try SyncEngine.sync(again, via: relay)
     #expect(relay.log.count == 10, "the store that reopened pushes nothing it had pushed before")
@@ -250,4 +251,61 @@ private final class PullFailsOnce: SyncTransport {
     #expect(report.refused == 1)
     #expect(report.changes.isEmpty)
     #expect(try a.allTasks().isEmpty, "a row whose id no read can name is not a task anyone created")
+}
+
+@Test func twoStoresFromOneSnapshotAreTwoDevices() throws {
+    let relay = InMemoryRelay()
+    let origin = try makeStore()
+    let id = try origin.createTask(NewTask(title: "shared"))
+    let snapshot = try origin.snapshot()
+    // One database on two machines, which is what a restored backup and the web target's snapshot both make.
+    // Each opens under an identity of its own, because the bytes cannot tell a copy from the original (#51).
+    let a = try Store.openInMemory(snapshot: snapshot, device: Store.newDeviceID(), now: TestClock().now)
+    let b = try Store.openInMemory(snapshot: snapshot, device: Store.newDeviceID(), now: TestClock(start: 1_757_500_100_000).now)
+
+    try a.update(task: id, [.title("from A")])
+    try b.update(task: id, [.notes("from B")])
+    try exchange(a, b, relay)
+    #expect(try a.notes(of: id) == "from B")
+    #expect(try b.task(id)?.title == "from A")
+}
+
+@Test func aStoreThatChangedItsIDStillPushesWhatItWroteBefore() throws {
+    let relay = InMemoryRelay()
+    let origin = try makeStore()
+    _ = try origin.createTask(NewTask(title: "written before the copy"))
+    // Copied before what it holds ever reached a transport: those operations are in the journal under the
+    // old id, and a push that sent only the current one would leave them on this machine forever.
+    let restored = try Store.openInMemory(snapshot: try origin.snapshot(), device: Store.newDeviceID(), now: TestClock().now)
+    try SyncEngine.sync(restored, via: relay)
+    #expect(relay.log.count == 10, "ten fields of one task, written under the id this database used to have")
+    #expect(relay.log.allSatisfy { $0.device == origin.deviceID })
+}
+
+@Test func anEditFromTheDeviceWeWereCopiedFromIsNotTakenForOurOwn() throws {
+    let origin = try makeStore()
+    let id = try origin.createTask(NewTask(title: "shared"))
+    let restored = try Store.openInMemory(snapshot: try origin.snapshot(), device: Store.newDeviceID(), now: TestClock(start: 1_757_500_100_000).now)
+    #expect(restored.ownDevices == [origin.deviceID, restored.deviceID])
+    // The machine the copy came from goes on writing under the id the copy inherited. What arrives under an
+    // inherited id is another device's work, and dropping it as our own is #51 one turn later.
+    try origin.update(task: id, [.title("from the original")])
+    let ops = try origin.journal(after: 0).filter { $0.device == origin.deviceID }
+    #expect(try restored.receive(ops).changes.tasks == [id])
+    #expect(try restored.task(id)?.title == "from the original")
+}
+
+@Test func aDeviceThatLostItsDatabaseTakesItsOwnOperationsBack() throws {
+    let relay = InMemoryRelay()
+    let device = Store.newDeviceID()
+    let origin = try makeStore(device: device)
+    let id = try origin.createTask(NewTask(title: "Pay rent"))
+    try SyncEngine.sync(origin, via: relay)
+    // The identity outlives the database now (ADR-0005), so it can outlive the data too: a deleted file
+    // beside a kept `.device`, or a web page whose IndexedDB was cleared while `localStorage` was not. What
+    // this device wrote is on the peer and comes back under this device's own id, and dropping it as ours
+    // would lose every row it ever wrote, with nothing to show for it.
+    let replacement = try makeStore(device: device, clock: TestClock(start: 1_757_500_100_000))
+    try SyncEngine.sync(replacement, via: relay)
+    #expect(try replacement.task(id)?.title == "Pay rent")
 }
