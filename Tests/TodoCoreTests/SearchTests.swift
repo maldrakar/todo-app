@@ -1,5 +1,6 @@
 import Testing
 @testable import TodoCore
+@testable import SQLiteKit
 
 private func titles(_ hits: [QuickFindHit]) -> [String] {
     hits.map { hit in
@@ -154,4 +155,113 @@ private func titles(_ hits: [QuickFindHit]) -> [String] {
     try store.trash(task: parent)
     #expect(titles(try store.quickFind("zebra")) == ["task:zebra loner"])
     #expect(try store.searchNotes("zebra").map(\.task.title) == ["zebra loner"])
+}
+
+@Test func yoAndYeAreOneLetterToQuickFind() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "Квартальный отчёт"))
+    _ = try store.createTask(NewTask(title: "Годовой отчет"))
+    _ = try store.createTag(title: "Отчётность")
+    _ = try store.createView(NewTaskView(title: "Ёлки-палки"))
+    // Issue #47: `ё` is the letter a person types as `е` and writes as `ё`, so a search spelled either way
+    // answers the same. The fold is the index's, and the title keeps the spelling it was given.
+    let both = ["task:Годовой отчет", "task:Квартальный отчёт", "tag:Отчётность"]
+    #expect(titles(try store.quickFind("отчет")) == both)
+    #expect(titles(try store.quickFind("отчёт")) == both)
+    #expect(titles(try store.quickFind("ёлки")) == ["view:Ёлки-палки"])
+    #expect(titles(try store.quickFind("елки")) == ["view:Ёлки-палки"])
+}
+
+@Test func yoAndYeAreOneLetterToTheNotesSearch() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "a", notes: "сдать отчёт вовремя"))
+    _ = try store.createTask(NewTask(title: "b", notes: "черновик отчета"))
+    #expect(Set(try store.searchNotes("отчет").map(\.task.title)) == ["a", "b"])
+    #expect(Set(try store.searchNotes("отчёт").map(\.task.title)) == ["a", "b"])
+}
+
+@Test func shortQueriesFoldYoInTheScanAsWell() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "Ёж"))
+    // Under three characters the answer comes from the scan in Swift, and it folds the same letters as the
+    // index, so the two paths do not disagree on the word a person is halfway through typing.
+    #expect(titles(try store.quickFind("еж")) == ["task:Ёж"])
+    #expect(titles(try store.quickFind("ёж")) == ["task:Ёж"])
+}
+
+@Test func aRenameKeepsTheFoldedIndexInStep() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "alpha", notes: "bravo"))
+    try store.update(task: id, [.title("Ёлка"), .notes("под ёлкой")])
+    #expect(titles(try store.quickFind("елка")) == ["task:Ёлка"])
+    #expect(try store.searchNotes("елкой").map(\.task.id) == [id])
+    #expect(try store.quickFind("alpha").isEmpty)
+}
+
+@Test func theFoldOfTheQueryIsTheFoldOfTheSchema() throws {
+    let store = try makeStore()
+    // `е` with a combining diaeresis is not `ё` to SQLite's `replace`, and Swift's `String.replacing` would
+    // fold it anyway because it compares canonically. The two would then disagree about what the index
+    // holds, so the fold walks unicode scalars.
+    let written = "Ёж, ёлка, Е и е, е\u{0308}, Café"
+    let id = try store.createTask(NewTask(title: written))
+    let stored = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT title_fold FROM tasks WHERE id = ?", [.text(id.rawValue)])
+    }
+    #expect(Store.folded(written) == "Еж, елка, Е и е, е\u{0308}, Café")
+    // Scalar by scalar, because `==` on two strings folds canonical equivalence away and this is the one
+    // test where the difference between `ё` and `е` plus a mark is the whole point.
+    #expect(stored.first?[0].string?.unicodeScalars.map(\.value) == Store.folded(written).unicodeScalars.map(\.value),
+            "the column the index is built from and the fold the query uses are one rule")
+    #expect(Store.trigramQuery(" Ёлка ") == "\"Елка\"")
+    #expect(Store.wordsQuery("ёж и ёлка") == "\"еж\" \"и\" \"елка\"*")
+}
+
+@Test func theNotesSnippetShowsTheNoteAsItWasWritten() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "a", notes: "Сдать [квартальный] отчёт вовремя, а ещё позвонить."))
+    let hit = try #require(try store.searchNotes("отчет").first)
+    // The index holds a folded copy, so the snippet fts5 builds is folded too. What the person reads is
+    // their own note: the window is cut out of the original text, and the brackets land where the index
+    // put them.
+    #expect(hit.snippet.contains("[отчёт]"))
+    #expect(hit.snippet.contains("ещё"))
+    #expect(hit.snippet.contains("[квартальный]"), "the square brackets of the note itself are not mistaken for the ones the search adds")
+}
+
+@Test func aLongNoteIsStillCutOutOfTheOriginal() throws {
+    let store = try makeStore()
+    let filler = String(repeating: "слово ", count: 40)
+    _ = try store.createTask(NewTask(title: "a", notes: filler + "найти ёлку " + filler))
+    let hit = try #require(try store.searchNotes("елку").first)
+    #expect(hit.snippet.contains("[ёлку]"))
+    #expect(hit.snippet.hasPrefix("…") && hit.snippet.hasSuffix("…"), "a window in the middle of a long note is elided on both sides")
+}
+
+@Test func aNoteThatHoldsTheMarksTheSearchUsesIsShownFolded() throws {
+    let store = try makeStore()
+    _ = try store.createTask(NewTask(title: "a", notes: "Сдать \u{1}отчёт\u{2} вовремя"))
+    let hit = try #require(try store.searchNotes("отчет").first)
+    // The marks are how fts5 says where the brackets belong, and a note that holds them itself — from a
+    // person or from a peer, which is the same thing here — cannot be told apart from them. The folded
+    // window is shown then, and never a window slid by a character or a mark passed on to the caller.
+    #expect(hit.snippet == "Сдать [[отчет]] вовремя", "the note's own marks read back as brackets, and the window does not move")
+    #expect(!hit.snippet.unicodeScalars.contains { $0.value < 0x20 })
+}
+
+@Test func aRenameAwayFromYoLeavesNothingBehindInTheIndex() throws {
+    let store = try makeStore()
+    let task = try store.createTask(NewTask(title: "Ёлка", notes: "под ёлкой"))
+    let tag = try store.createTag(title: "Ёлочное")
+    let view = try store.createView(NewTaskView(title: "Ёлочные дела"))
+    try store.update(task: task, [.title("Сосна"), .notes("под сосной")])
+    try store.update(tag: tag, [.title("Сосновое")])
+    try store.update(view: view, [.title("Сосновые дела")])
+    // The half of a trigger that deletes has to hand the index the same text the half that inserts gave it,
+    // which is the folded copy. Handing it the original deletes nothing, and the old rows answer for ever:
+    // `'integrity-check'` says nothing either, because an index with rows the content no longer has is
+    // well formed to fts5.
+    #expect(try store.quickFind("елоч").isEmpty)
+    #expect(try store.searchNotes("елкой").isEmpty)
+    #expect(titles(try store.quickFind("сосно")) == ["tag:Сосновое", "view:Сосновые дела"])
 }

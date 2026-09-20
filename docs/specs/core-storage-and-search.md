@@ -60,6 +60,8 @@ Two full-text indexes, maintained by triggers together with the tables:
 
 Queries shorter than three characters cannot use the trigram index and fall back to a scan over a folded copy of the titles; thousands of titles make that instant. Both tokenizers are built into SQLite and need no ICU.
 
+What SQLite folds by itself is the Latin ranges, where "ё" is a letter of its own rather than an "е" with a mark, so a person who typed "отчет" did not find "Квартальный отчёт" (#47). The indexes are therefore built over a generated copy of each indexed column in which "ё" is written "е", and a query is folded the same way before it is asked; the copy is computed on read and costs nothing on disk. The snippet a notes search returns is cut out of the original text, so what a person reads back is the spelling they wrote.
+
 ### 4. Data model: flat tasks, tags, views
 
 Three entities. The Things container hierarchy (areas, projects, headings) is deliberately absent: the owner finds fixed containers inflexible. Grouping is the user's choice, expressed as a view.
