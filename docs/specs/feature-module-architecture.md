@@ -1,6 +1,6 @@
 # Spec: Feature-module architecture
 
-- Status: Approved 2026-09-20
+- Status: Revision 6 for approval (revision 5 approved 2026-09-20)
 - Owner review: https://claude.ai/artifact/CnGxEhqK4jDubEmcxgTZJF
 - Issue: #63
 
@@ -31,7 +31,8 @@ Non-goals:
 
 - The web host, and the format the model takes on the way to JavaScript. JSON, protobuf or something of our own is decided by measurement on a real bundle, together with the web host.
 - The UIKit host. Designed for, not built: the contract makes it a second adapter over the same protocol.
-- Every module but the sidebar: task lists, the task editor, quick entry, search, settings. The stack of pushed screens and modal presentations are designed for in the navigation section and built with the first screen that pushes, in M3; what M2 navigates is "the sidebar chose a view and the app shows its title".
+- Every module but the sidebar: task lists, the task editor, quick entry, search, settings.
+- The stack of pushed screens, modal presentations, windows and deep links. The principle they obey is in the navigation section; their mechanics are the navigation epic's, #67, after M3 (open questions). What M2 navigates is "the sidebar chose a view and the app shows its title".
 - The product behaviour of the sidebar beyond what M2 needs to exercise the contract: drag and reorder, collapsing folders, deleting views, task counts, projects in the sidebar.
 - Today's day and the change of the calendar day. No module in M2 makes a query by date; the door it will enter through is named below.
 - The formatting service and its platform implementations. No module in M2 spells a date or a number; the door is described below and the first list module in M3 builds it.
@@ -101,29 +102,27 @@ An `Output` is the one-shot fact "the person chose this", which the parent acts 
 
 ### 4. Navigation: state in the root, screens as child modules
 
-A screen is a child module, and which screens exist is data, so it lives in the root's model: the tree of live modules is the navigation state. The root model holds `sidebar`; `detail`, the pane beside it, in M2 a placeholder with the selected view's title and in M3 the list module's model; and `path`, the stack of pushed screens such as a task editor, which arrives with the first screen that pushes.
+A screen is a child module, and which screens are open is data, so it lives in the root's model: the tree of live modules is the navigation state. This is the principle, and it is decided. How that state is shaped once there is more than one screen is not: that is the navigation epic's, #67, after M3, with the real screens at hand (open questions). In M2 the root model holds `sidebar` and `detail`, the pane beside it, a placeholder with the selected view's title now and the list module's model in M3.
 
-**A child never navigates; it asks.** The sidebar answers `.selected(id)`, a list will answer `.open(taskID)`, an editor `.dismiss`. The root creates the module of the new screen with the store, puts its model into its own, and the view draws it; when the screen closes, the root drops the module. A module does not know where it stands, in a column, in a stack or in a URL route, and that is what makes it the same module on every platform.
+**A child never navigates; it asks.** The sidebar answers `.selected(id)`, a list will answer `.open(taskID)`, an editor `.dismiss`. The root creates the module of the new screen with the store, puts its model into its own, and the view draws it; when the screen closes, the root drops the module. A module does not know where it stands, in a column, in a stack, in a window or in a URL route, and that is what makes it the same module on every platform.
 
-**The way back from the platform is an action of the root.** The back button, a swipe, `Esc` and a closed window arrive as `.pop` or `.dismissed(screen)` and do what a child's request does. Every SwiftUI binding has the one shape `TextField` has: `NavigationStack(path:)`, `List(selection:)` and `.sheet(item:)` read from the model, and their set sends an action.
+**The way back from the platform is an action of the root.** The back button, a swipe, `Esc` and a closed window arrive as actions of the root and do what a child's request does. Every SwiftUI binding has the one shape `TextField` has: `NavigationStack(path:)`, `List(selection:)` and `.sheet(item:)` read from the model, and their set sends an action.
 
 **The platform decides how to show it**, and that is rendering, not a decision. On macOS and iPadOS the root view puts `detail` into a `NavigationSplitView`; on iPhone and the watch the same model becomes a stack; on the web a route. One model, three containers.
 
-**Pushes live in the root's stack, modals with their presenter.** `path` is flat and the root's: any screen may ask to open any other, and a flat array is restored after a relaunch, or turned into a deep link, without walking a tree. A sheet or a popover is part of the screen that shows it, so a `sheet` field belongs to the model of the module that presented it.
-
 What follows costs nothing: a screen's module lives exactly as long as it is in the model; nothing is unsubscribed, since modules subscribe to nothing, and the root fans `.changed` out to the children that exist. Navigation state is a value, so restoring it and opening a deep link are its serialisation, when they are wanted.
 
-In M2 this exists in its smallest form: a selection in the sidebar changes `detail`, which is this mechanism with a placeholder for a screen. `path` and sheets are designed for, not built.
+**The mechanics are the navigation epic's.** Revision 5 of this section fixed them: a flat `path` of pushed screens in the root, a modal's module inside the module that presents it, `.pop` and `.dismissed(screen)` as the root's actions. They were written before any screen existed, and revision 6 withdraws them to candidates: they still name the shape the design leans to, but the epic weighs them against nested ownership by the opener, against sheets on the same path, and against what windows, deep links and restoration need, and the epic decides. Until then the first screen that needs a stack or a sheet is not built. M2 navigates in the smallest form, a selection in the sidebar changes `detail`, and M3 is planned so that its screens on macOS live in the split view.
 
 ```mermaid
 flowchart LR
-  Child[Child module<br/>sidebar, later a list] -- "Output: .selected, .open" --> Root[AppModule<br/>creates the screen's module,<br/>puts its model in detail or path]
+  Child[Child module<br/>sidebar, later a list] -- "Output: .selected, .open" --> Root[AppModule<br/>creates the screen's module,<br/>puts its model into its own]
   Root -- "model" --> Mac[macOS, iPadOS<br/>NavigationSplitView]
   Root -- "model" --> Phone[iPhone, watchOS<br/>NavigationStack]
   Root -- "model" --> Web[Web<br/>route]
-  Mac -- "Action: .pop, .dismissed" --> Root
-  Phone -- "Action: .pop, .dismissed" --> Root
-  Web -- "Action: .pop, .dismissed" --> Root
+  Mac -- "Action: the way back" --> Root
+  Phone -- "Action: the way back" --> Root
+  Web -- "Action: the way back" --> Root
 ```
 
 ### 5. Hosting on Apple: one host, the main actor, one event at a time
@@ -207,7 +206,6 @@ None. The sidebar needs nothing the store does not already have. The first revis
 | Views observing the store directly, SwiftData-style | No boundary at all: every view queries, every platform re-implements every list, and nothing is testable without a screen. |
 | A navigator or coordinator service injected into the modules, `navigator.push(...)` | The familiar coordinator, but the set of screens leaves the model: it cannot be tested as a value or restored, and a module gains a side effect where the design gives it none. |
 | Navigation in the views, `NavigationLink` and a `@State` path | The view decides which screen to show, and would have to create that screen's module without a store. |
-| Nested ownership of pushed screens, a list holding the editor it opened | Deeper models on every push and a `path` computed by walking the tree; a flat stack in the root restores and deep-links as an array. |
 | One package holding the Apple targets too | A SwiftUI import in the root package fails on the Linux job and under wasm32, and `swift test` builds every target. |
 | One `TodoFeatures` target for every module | The boundary between features would hold by discipline instead of by the manifest. |
 | An Xcode project from M2, or iOS first | A second build system in the milestone whose point is the module contract; SwiftPM cannot produce an iOS bundle, so iOS first means the project first. |
@@ -286,6 +284,7 @@ flowchart TB
 
 ## Open questions
 
+- **The mechanics of navigation.** The navigation epic's, #67, after M3, once a list, an editor and quick entry exist to try them on: whether pushed screens are a flat `path` in the root or nested in their opener; where a modal's module lives, with its presenter or on the same path, given that push or sheet is the platform's rendering choice and a module's home cannot depend on it; how the root's `Model` and `Action` grow with every screen; windows on macOS and iPadOS, where one host and one root per process no longer hold; deep links, restoration, routes on the web and the stack on the watch. The principle of section 4 holds throughout, and the first screen that needs a stack or a sheet waits for the epic.
 - **The wire format for wasm.** JSON, protobuf or an own encoding, and whether a model crosses whole or as a diff. Decided by measurement on a real bundle when the web host is built; the contract asks only for plain data, and the conformance the winner needs is added then.
 - **The cost of a whole-app model per event.** Every `send` rebuilds the root model and SwiftUI diffs the tree. Measured with the first list module, where the model has hundreds of rows; the remedies, if needed, are equatable subviews and a per-page model.
 - **A store off the main thread.** Not needed until a query is measured blocking the UI; the design keeps the door open through `Sendable` models.
