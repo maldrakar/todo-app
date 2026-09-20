@@ -1,0 +1,23 @@
+# ADR-0006: Structure every feature as a module with unidirectional data flow, and give views no logic
+
+- Status: Proposed
+- Date: 2026-09-20
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, ADR-0001, ADR-0004
+
+## Context
+
+The core of M1 stores, queries, searches and journals, and reports a `ChangeSet` after every commit; nothing puts it on a screen. The brief asks for the architecture of every feature module to be chosen before product work, and the product runs on iOS, macOS, iPadOS, watchOS and the web through WASM, with SwiftUI for most of the Apple interface, UIKit where performance needs it, and React likely on the web. Whatever a feature's logic is written in has to be tested on the host and on wasm32 before a web page exists, and whatever crosses to a view has to survive a wire. The discussion is in the spec's sections 1 to 4.
+
+## Decision
+
+A feature is a module in the shared core: a `final class` conforming to `FeatureModule`, holding a reference to the `Store` and private state, and exposing a value `Model` and a synchronous `send(Event) -> Output?`. `Model` is exactly what a view draws, with every decision made and every string about the data finished. `Event` is the one door: `.action(Action)` for what a view may send, and beside it the events of the world, `.changed(ChangeSet)` from the store, later the change of the day, of the locale, a sync result. `Output` is what the module asks its parent for because it cannot do it itself. `send` never throws: what the store refuses becomes part of the model. A module publishes nothing and subscribes to nothing; the fan-out of a `ChangeSet` lives in the composition root, and a host takes one event at a time, queueing what arrives while one is in flight. A module spells dates and numbers through a formatting service whose protocol is shared and whose implementation is the platform's, since the core has no ICU. Navigation is state in the root module: a screen is a child module that asks through its output, the root creates it with the store and drops it when the screen closes, pushed screens live in the root's flat path and modal presentations with the module that presents them, and the way back from the platform is an action of the root. A view renders a model and sends actions: it holds no condition over a domain value, every `if` in it is over a `Bool` or an optional of the model, it formats nothing, its own labels are its vocabulary localised by the platform, and it keeps only what is its own, scroll, focus, hover, the window size, a drag in progress.
+
+Alternatives. Logic on the UI side of each platform lost because every feature would be written and tested twice and nothing would run on wasm32 before a web page exists. A pure reducer with the store reached through effects lost because the store is synchronous and local, and every read would become an effect plus an answering event. A module that subscribes to the store and pushes its model through a callback lost because it opens a second door and makes the model something that arrives rather than something returned. A coordinator service injected into modules lost because the set of screens would leave the model and could not be tested as a value. A unidirectional-data-flow library such as The Composable Architecture lost because it is a large dependency that would have to build for wasm32, for what is one function per module here.
+
+## Consequences
+
+Easier: a module's tests are a store in memory, a sequence of events and a model compared whole, on the host and on wasm32; the watch, the command line and the web get the same feature; a view that decides something shows in a diff as an `if` over a domain value, so the rule is reviewable; a screen's module lives exactly as long as it is in the model and nothing has to be unsubscribed; navigation state is a value, so restoring it and opening a deep link are its serialisation.
+
+Harder: every keystroke is a round trip through the module, which holds only because the round trip is synchronous; every event rebuilds the root model and the UI diffs it, to be measured on the first large list; a change of the locale is an event and a rebuild rather than a redraw; every module carries four nested types.
+
+Constrained: no feature target imports a UI framework; no `send` throws; no module subscribes to the store or navigates on its own; a `Codable` or any other wire conformance is added with the wire and not before; a view formats nothing. Reversing this decision means moving state and decisions into views or view models per platform, which is cheap for one module and a rewrite of every feature afterwards.
