@@ -34,6 +34,7 @@ Non-goals:
 - Every module but the sidebar: task lists, the task editor, quick entry, search, settings. Navigation beyond "the sidebar chose a view and the app shows its title".
 - The product behaviour of the sidebar beyond what M2 needs to exercise the contract: drag and reorder, collapsing folders, deleting views, task counts, projects in the sidebar.
 - Today's day and the change of the calendar day. No module in M2 makes a query by date; the door it will enter through is named below.
+- The formatting service and its platform implementations. No module in M2 spells a date or a number; the door is described below and the first list module in M3 builds it.
 - Asynchronous effects such as sync over a network, and reactive frameworks in the core (Combine, Observation, a UDF library).
 - The Xcode project, signing and App Store distribution; the identity in the Keychain; recovery from a database that fails to open.
 - The three gaps between the public API and a web client that the wasm size probe found (#23): `Filter.json()` internal, `JournalOperation` unbuildable without `SQLiteKit`, no public way to get today's `Day`. The sidebar needs none of them; they belong with the web host.
@@ -48,7 +49,7 @@ A feature module is a Swift type that holds the state of one feature, answers ev
 
 This is the pattern known as unidirectional data flow, the Elm architecture or MVI, and it is chosen for three reasons. It is the only arrangement in which a feature's tests run on wasm32 before a web page exists, because the tests need a store in memory and a sequence of events and nothing else. It gives the watch, the command line and the web the same feature for free, since a module has no idea what draws it. And it makes "the view holds no logic" a rule that a review can check, because a view that decides anything is a view with an `if` over a domain value, and that is visible in a diff.
 
-Views are therefore deliberately "dumb", in the good sense. What a view keeps is what only it can know: scroll position, focus, hover, the window size, a drag in progress. What a view does beyond drawing is spelling: the core has no ICU (ADR-0001), so a model carries meaning, a `Day` or a count or a flag, and the platform writes "Tomorrow" or "Mon 22 Sep" in the person's locale. That is formatting, not a decision.
+Views are therefore deliberately "dumb", in the good sense. What a view keeps is what only it can know: scroll position, focus, hover, the window size, a drag in progress. It does nothing beyond drawing, formatting included: a model carries "Tomorrow" or "Mon 22 Sep" as a finished string, not a `Day` for the view to spell. The core has no ICU (ADR-0001), so the spelling itself cannot live in the shared code; it lives behind a formatting service whose protocol is shared and whose implementation is the platform's, and the module calls it while building the model (section 4). The view then decides nothing at all, and the web page receives strings it can draw without knowing what a day since 1970 is.
 
 ### 2. The module contract
 
@@ -69,7 +70,7 @@ Three types per module, nested so that their names never collide with SwiftUI's 
 
 | Type | What it is |
 | ---- | ---------- |
-| `Model` | A value: exactly what the view draws, with every decision made. Strings, flags, lists of rows with ids so that an event can name a row. Never a `TodoTask` or a `TaskView`, only their reflection for one screen. Dates and numbers in their meaning, spelled by the platform. |
+| `Model` | A value: exactly what the view draws, with every decision made. Strings, flags, lists of rows with ids so that an event can name a row. Never a `TodoTask` or a `TaskView`, only their reflection for one screen. Dates and numbers already spelled, through the formatting service, so the view and the wire get finished strings. |
 | `Event` | An enumeration with associated values, and the one door for everything that reaches the module: a tap, a keystroke, `.changed(ChangeSet)` from the store, later a sync result or the change of the day. |
 | `Output` | What the module tells its parent because it cannot do it itself. The sidebar's is `.selected(ViewID)`: showing the list is the app's business. The root's `Output` is `Never`. |
 
@@ -82,7 +83,7 @@ Rules, each with its reason:
 - **One door.** An event from a person and an event from the world enter the same `send`. A module with two entry points grows logic in both.
 - **Local UI state stays in the view**: scroll, focus, hover, the window size, a drag in progress. The draft text in a field is not local: every keystroke is an event and the model carries the text back, which works because the round trip is synchronous.
 - **Wire readiness is held by a test, not by a host.** `Model` and `Event` round-trip through JSON in every module's suite. The format for wasm stays open; what the contract requires is only that both are plain data with a stable schema.
-- **The view rule**, to be recorded in the ADR and pointed at from `docs/style.md`: a view holds no condition over a domain value. Every `if` in a view is over a `Bool` or an optional of the model. The only work a view does besides drawing is writing a `Day` or a number in the locale.
+- **The view rule**, to be recorded in the ADR and pointed at from `docs/style.md`: a view holds no condition over a domain value and formats nothing. Every `if` in a view is over a `Bool` or an optional of the model, and every string it draws arrives finished.
 
 ### 3. Composition: a tree of modules, a tree of views
 
@@ -104,6 +105,8 @@ The host is the only object in the app that a view observes. There is one per ap
 
 **Today.** No module in M2 needs the current day. The door is the same as for everything else: the root takes `today` when it is created and gets `.dayChanged(Day)` when the platform sees the calendar day change. It arrives with the first list module in M3.
 
+**Formatting.** A module spells dates and numbers through a service the platform implements: a protocol in the root package beside `FeatureModule`, with operations of the shape "this day, relative to today, as a string" and "this count of that thing, as a string", whose exact set the first list module fixes. The implementation is the platform's, because the core has no ICU (ADR-0001): Foundation's formatters in `Apps/Apple`, the browser's `Intl` reached through JavaScript in `Apps/Web`, and in tests a fixed stand-in that writes a day as its number, which also makes a model compared whole independent of the machine's locale. The composition root hands the service to the modules at creation, the way it hands them the store and `today`; the service is pure and stateless, since "tomorrow" is computed from the `today` the module already holds. One consequence is named now so that it is not discovered later: a change of the system locale or of the date format is no longer a redraw of the view but an event to the module, `.localeChanged`, after which the model is rebuilt. Not needed by the sidebar, designed here so that M3 does not invent it twice.
+
 ### 5. Two packages: shared modules in the root, platform hosts under `Apps/`
 
 Everything that runs everywhere stays in the root package; everything that runs only on Apple platforms moves to a second package, `Apps/Apple/Package.swift`, which depends on the root by a local path. The reason is mechanical: a target that imports SwiftUI builds neither on the Linux job nor for wasm32, and `swift test` builds the whole package, so one Apple target in the root package would break both checks M1 set up. The web host will live beside it, `Apps/Web`, in the same arrangement. swiftly reads `.swift-version` from a parent directory, so `Apps/Apple` builds with the pinned toolchain without a second pin (verified 2026-09-20).
@@ -111,7 +114,7 @@ Everything that runs everywhere stays in the root package; everything that runs 
 | Package | Target | Holds | Builds for |
 | ------- | ------ | ----- | ---------- |
 | root | `TodoCore` | the data layer, unchanged | everywhere |
-| root | `FeatureModule` | the protocol and nothing else | everywhere |
+| root | `FeatureModule` | the module protocol and nothing else; the formatting service's protocol joins it in M3 | everywhere |
 | root | `SidebarFeature` (`Sources/Features/Sidebar`) | the sidebar module | everywhere |
 | root | `AppFeature` (`Sources/Features/App`) | the root module, depends on the children | everywhere |
 | root | one test target per feature | swift-testing, run on the host and on wasm32 | everywhere |
@@ -167,6 +170,7 @@ Two, both bounded, in the plan as the first task with their first caller: `Entit
 | The parent reads the child's model instead of receiving outputs | Enough for a selection, which is state, but a one-shot "open this task" or "dismiss" has no state to read, and the parent would have to interpret the child's events, duplicating its logic. |
 | A UDF library such as The Composable Architecture | A dependency in the core that has to build for wasm32, a large one, for what is one function per module here. |
 | Models made of domain entities handed to the view | The view then decides what a `TaskView` looks like and which tasks are overdue, and it holds logic again. |
+| Views spelling dates and numbers in the locale themselves, the model carrying a `Day` | Formatting is a decision the view would own, so the rule stops being literal; the web page would have to know what a day since 1970 is; and the locale would reach the model from two sides. A shared service protocol with a platform implementation keeps the view at drawing. |
 | Views observing the store directly, SwiftData-style | No boundary at all: every view queries, every platform re-implements every list, and nothing is testable without a screen. |
 | One package holding the Apple targets too | A SwiftUI import in the root package fails on the Linux job and under wasm32, and `swift test` builds every target. |
 | One `TodoFeatures` target for every module | The boundary between features would hold by discipline instead of by the manifest. |
@@ -263,7 +267,7 @@ flowchart TB
 
 ## Decisions to record as ADRs after approval
 
-1. A feature module is a class with a synchronous `send`, a value model, one door for events and an output to its parent, written in the shared core; views hold no logic and keep only what is theirs.
+1. A feature module is a class with a synchronous `send`, a value model, one door for events and an output to its parent, written in the shared core; views hold no logic, format nothing and keep only what is theirs, and a module spells dates and numbers through a service the platform implements.
 2. Feature modules are shared code under ADR-0001, one SwiftPM target per feature in the root package; platform hosts are separate packages under `Apps/`.
 3. The Apple app is a two-line `@main` over a library, built by SwiftPM alone until iOS, watchOS or the store needs an Xcode project, and the code builds with Xcode's toolchain as well as the pinned one.
 
@@ -287,6 +291,8 @@ flowchart TB
 | `@MainActor` | Swift concurrency | the actor of the main thread; a type marked with it is used from there only |
 | `App`, `Scene`, `WindowGroup` | SwiftUI | the entry protocol of a SwiftUI app, a unit of its interface, and the scene that opens windows |
 | `TextField` | SwiftUI | the editable text control; marked text is input a keyboard has composed but not committed |
+| FoundationInternationalization | swift-foundation | the ICU-backed half of Foundation with locale-aware formatting; outside ADR-0001, so formatting lives on the platforms |
+| `Intl` | Web platform | the browser's locale-aware formatting API for dates, numbers and plurals |
 | Unidirectional data flow, the Elm architecture, MVI | UI architecture literature | a model rendered by a view, events sent to an update function, a new model; no other path |
 | The Composable Architecture | Point-Free, open source | a Swift library for unidirectional data flow with reducers, effects and composition |
 | protobuf | Google, open source | a compact binary serialisation with a schema; one candidate for the wasm wire |
