@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-20
+
 ### Added
 
 - The wasm size budget in CI and the Apple compile checks. `scripts/wasm-size.sh` builds `wasm-size-probe` for wasm32 in release mode and fails over 6.5 MiB after `gzip -9`; CI runs that script and so does a person, because a budget enforced by a command nobody can run locally is a budget argued about in a pull request. The probe is an executable that exists to be measured and ships nowhere: it calls the public API of `TodoCore` the way a web entry point will, since the linker keeps what a client calls and a size measured on calls that were dead-stripped is the size of a binary nobody runs. What is no longer measured is the `todo` demo, which the plan named: the budget is about what a browser downloads, and the demo carries an argument parser, a formatter and a usage text no browser loads. The budget is the core as it stands with four percent to spare and not the 4.5 MiB the spec first named, which was never measured: that figure is the floor measured in the toolchain spike, 3,743,306 bytes of standard library, FoundationEssentials and SQLite with no core code reachable, plus half a megabyte of slack for the code the core would add — and that code, with the JSON coding it pulls in, costs 2.8 MB instead. SQLite and FoundationEssentials sit inside the floor, on both sides of that comparison, so a milestone that has to fit a web bundle goes after the core's own weight first and the spec's table now says so. The second job compiles `TodoCore` against the iOS and watchOS SDKs on a macOS runner, on `main` and on demand and never on a pull request, because macOS minutes cost tenfold on a private repository.
