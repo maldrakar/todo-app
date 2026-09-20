@@ -190,13 +190,24 @@ The API, at the level that matters for review:
 
 - One swift-testing suite. It runs on the host and, unchanged, on wasm32 under WasmKit. The second run checks 32-bit `Int`, the FoundationEssentials boundary, and that SQLite really builds and works inside wasm.
 - CI: build, host tests and wasm tests on a Linux runner; a macOS runner only compiles for the iOS and watchOS SDKs, no tests there. This keeps macOS minutes, which cost tenfold, to a minimum.
-- Size budget for the web build after gzip, reported and enforced by CI:
+- Size budget for the web build after gzip, reported and enforced by CI. The 4.5 MB this document first
+  named was an estimate made before the core existed: the floor measured in #3 plus half a megabyte for the
+  code the core would add. Measured, that code costs four times the guess, so the table now holds bytes that
+  were weighed rather than expected. What CI weighs is `wasm-size-probe`, an executable that calls the public
+  API the way a web client will and carries no demo code, since the linker keeps only what a client calls
+  (#23):
 
-| Item | Expected |
-| ---- | -------- |
-| Standard library and FoundationEssentials (measured in #3) | 3.4 MB |
-| SQLite | about 0.5 MB |
-| Budget, CI fails above it | 4.5 MB |
+| Item | Bytes after `gzip -9` |
+| ---- | --------------------- |
+| Standard library, FoundationEssentials and SQLite, no core code reachable (#3, 2026-09-11) | 3,743,306 |
+| The whole public API of the core reachable (`wasm-size-probe`, 2026-09-20) | 6,541,190 |
+| Ceiling, CI fails above it (`scripts/wasm-size.sh`) | 6,815,744 |
+
+The ceiling is a regression guard on the core as it stands, not a target to shrink towards. A budget for the
+web build proper — the core plus the client's own part, against a real bundle — is set in the milestone that
+builds that client. Reaching a number like the original 4.5 MB means going after what the second row added
+over the first: the core's own code and the JSON coding it pulls in, whose only user is the filter codec.
+SQLite and FoundationEssentials are inside the floor and are not the difference between the two rows.
 
 - The demo is a `todo` command-line tool over a database file: add, list a view, complete, tag, search, move under a parent. It is the runnable deliverable of M1 and a living example of the API for the UI layers. It is also the seed of a future command-line client of the app, for people and for AI agents acting on their behalf, so it uses only the public API of the core and prints output that scripts can consume.
 
