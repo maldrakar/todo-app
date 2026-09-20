@@ -76,10 +76,18 @@ public final class Store {
     /// opened with the clock its caller chose (`docs/style.md`, "A lower layer holds no policy of its
     /// client"), and this is what a platform passes when its own clock is the machine's.
     ///
-    /// It is not the wall clock on every target: under WasmKit it reads days after the epoch instead of the
-    /// time of day (plan, Global Constraints), so a wasm entry point passes the host's time rather than this
-    /// until #53 settles what it should pass. A device stamping its edits from a clock that far behind loses
-    /// every last-write-wins comparison in silence.
+    /// It is the wall clock on every target this ships on, wasm among them: a browser has no WASI, and the
+    /// JS host standing in for one answers the realtime clock out of the browser's own — `Date.now()`, in
+    /// `@bjorn3/browser_wasi_shim`, which JavaScriptKit and carton build on — so a web entry point passes
+    /// this like any other platform does, and an entry point that wires that one import to a stub instead
+    /// is how the reading goes wrong there. The one host that lies today is the test runner: the WasmKit
+    /// the toolchain carries answers the clock from the machine's last boot, days rather than decades after
+    /// the epoch, and FoundationEssentials reports nothing about it, because it is told a time and repeats
+    /// it. WasmKit answers the wall clock from 0.3.0 on, and the measurements are in #53. So no test on
+    /// wasm32 asserts a real wall-clock value (plan, Global Constraints), and what that runner answers
+    /// instead is held as a bound by a test in `StoreOpenTests`, which fails on the first host that tells
+    /// the truth. A device that did stamp its edits from a clock that far behind would lose every
+    /// last-write-wins comparison in silence, which is why the fact is written here and not only in the plan.
     public static func systemNow() -> Int64 { millis(since: Date().timeIntervalSince1970) }
 
     /// Seconds since the epoch as whole milliseconds. Separate from the clock it reads so that the
