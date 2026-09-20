@@ -159,7 +159,7 @@ private func treeWasRebuilt(_ store: Store) throws(StoreError) -> Bool {
     let store = try makeStore()
     try setup(store, [("p", nil, true, false), ("c", "p", false, false)])
     try store.sql { () throws(SQLiteError) in try store.db.run("DELETE FROM task_tree") }
-    let again = try Store.openInMemory(snapshot: try store.snapshot(), now: TestClock().now)
+    let again = try Store.openInMemory(snapshot: try store.snapshot(), device: store.deviceID, now: TestClock().now)
     let t = try tree(again)
     #expect(t["c"]?.parent == "p" && t["c"]?.trashed == true)
 }

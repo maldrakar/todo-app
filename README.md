@@ -52,3 +52,9 @@ are all refused by name rather than folded into a title. `TODO_DB` says which da
 `--db PATH` outranks it; without either, the demo opens `todo.sqlite` in the working directory.
 `TODO_TODAY=YYYY-MM-DD` says what day the query is made on, so that `Today` and `Upcoming` answer the same
 thing when the demo is run again tomorrow. A command the demo refuses exits 2, one the core refuses exits 1.
+
+Beside the database the demo keeps one more file, `<database>.device`, holding the device this copy writes
+under. It is not in the database on purpose: a database carries its contents to every machine it is copied
+to, and the journal needs two copies of one database to be two devices, or they stop seeing each other's
+edits. So copy `demo.sqlite` on its own and the copy becomes a device of its own; copy the pair and both
+machines claim one identity. `TODO_DEVICE` names it instead, which is how one machine plays two.

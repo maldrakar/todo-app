@@ -8,6 +8,8 @@ final class TestClock {
     func jump(by ms: Int64) { millis += ms }
 }
 
-func makeStore(clock: TestClock = TestClock()) throws(StoreError) -> Store {
-    try Store.openInMemory(now: clock.now)
+/// A store with an identity of its own, the way a platform opens one. Two calls are two devices, which is
+/// what the sync tests exchange between; a test that reopens the same database passes the first store's id.
+func makeStore(device: String = Store.newDeviceID(), clock: TestClock = TestClock()) throws(StoreError) -> Store {
+    try Store.openInMemory(device: device, now: clock.now)
 }

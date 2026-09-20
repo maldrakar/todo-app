@@ -1,0 +1,23 @@
+# ADR-0005: Take the device identity from the platform at every open
+
+- Status: Proposed
+- Date: 2026-09-20
+- Related: #51, `docs/specs/core-storage-and-search.md`, ADR-0003 (amends where the device id comes from)
+
+## Context
+
+Three things in the journal rest on the device id: last-write-wins breaks a tie on it, `Store.receive` tells this device's operations from a peer's by it, and a push selects what to send by it. Until now the core minted the id at the first open and kept it in the database (ADR-0003), which makes it a property of the bytes. Nothing inside a database distinguishes the original from a copy, and M1 already makes copies: `snapshot()` and `openInMemory(snapshot:)` are how the web target persists and restores its database, and a restored backup is the same thing on a file. Two live replicas holding one id never merge — each drops the other's operations as its own, and a tie on the clock is broken the same way on both sides — so they diverge without an error, a refusal or a report (#51).
+
+## Decision
+
+The device identity belongs to the installation and the platform hands it to the core: `Store.open(path:device:now:)` and `Store.openInMemory(snapshot:device:now:)` take it, the core mints nothing behind the caller's back, and `Store.newDeviceID()` is there for a platform that has nowhere better to take one from. An empty id and `seed`, which is the identity of the built-in view rows every device writes, are refused. A device is one live replica: one database, opened by one store at a time, writing under one id. Copying a database is therefore giving the copy an identity of its own, and that is what the platform owes the core. The database keeps the ids it has written under in `own_devices` (schema version 4, which takes the `meta.device_id` of the older schema with it), and a push sends the rows of all of them, so a restored copy still delivers what its predecessor never managed to send. What arrives is applied whatever id it carries, this device's own included: an identity that outlives its database can outlive its data as well, and a device that kept its id and lost the database — a deleted file beside a kept one, a page whose IndexedDB was cleared while `localStorage` was not — opens empty and has to be able to take its whole history back from its peers. An operation the store already holds costs it one insert the unique index refuses and one field clock that refuses the value, which is the work the device id used to save and no longer honestly can.
+
+Alternatives. Minting an identity at every open lost because the set of devices would grow without bound, and journal compaction and per-device cursors both need it finite; it would also need a separate mark on every journal row for "written here", since the id would no longer answer it. Having the core detect a copy by itself lost because the bytes cannot tell one: any signal that they are a copy comes from the platform, which is this decision in a worse shape. Keeping the id in the database and documenting that a copy must reset it lost because the default stays the broken one and its failure is silent.
+
+## Consequences
+
+Easier: every platform decides where identity lives — the Keychain, `localStorage`, a file beside the database, which is what the demo does; a restored backup goes on pushing what the machine it came from never sent, because `own_devices` travels with the bytes; the core holds no policy of its client here, the way it already takes its clock from the caller.
+
+Harder: every round of sync re-offers to the journal whatever the transport echoes back, since nothing is dropped by its id any more — two statements per operation that changes nothing, against a device that would otherwise lose its own history in silence. Every caller now passes an id, and a platform can pass a wrong one. The core cannot check it — two live stores under one id would still diverge — so uniqueness is a contract, not a guarantee. Catching a violation is possible (an operation under our own id that our journal does not hold can only come from a twin) and costs a journal lookup per incoming operation on the path that a transport's echo takes, which is why it is written down here rather than implemented.
+
+Constrained: nothing may derive identity from the bytes of a database, and no core code path may mint one; a platform that stores the id next to the database, as the demo does with `<db>.device`, has to say so where it tells a user how to move their data. Reversing the decision is cheap while no transport exists — one migration and one signature — and expensive afterwards, because the id is in every journal row on every device.

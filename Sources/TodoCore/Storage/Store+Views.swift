@@ -189,8 +189,9 @@ extension Store {
     /// second open writes nothing. Any edit a person made outranks clock zero, and a built-in view a person
     /// deleted stays deleted.
     ///
-    /// The device id is `seed` and not this device's, so that two devices produce byte-identical journal rows
-    /// for the same five views and sync merges them instead of racing to create two Inboxes.
+    /// The device id is `Store.seedDevice` and not this device's, so that two devices produce byte-identical
+    /// journal rows for the same five views and sync merges them instead of racing to create two Inboxes. It
+    /// is outside `own_devices`, which is what keeps these rows out of every push.
     func seedBuiltInViews() throws(StoreError) {
         let zero = HLC(millis: 0, counter: 0)
         var ops: [JournalOperation] = []
@@ -200,7 +201,7 @@ extension Store {
                 ("filter", try filterValue(definition.filter)), ("sort", try sortValue(definition.sort)),
                 ("group_by", Value(definition.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(0)),
             ]
-            ops += fields.map { JournalOperation(entity: .view, entityID: definition.id.rawValue, field: $0.0, value: $0.1, clock: zero, device: "seed") }
+            ops += fields.map { JournalOperation(entity: .view, entityID: definition.id.rawValue, field: $0.0, value: $0.1, clock: zero, device: Store.seedDevice) }
         }
         try apply(ops)
     }

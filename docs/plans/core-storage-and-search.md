@@ -66,7 +66,7 @@
 | `scripts/wasm-size.sh` | Release wasm build and gzip size budget |
 | `.github/workflows/ci.yml` | Linux job for build, tests, wasm tests (Task 1) and size (Task 13); macOS job for Apple SDK compile checks (Task 13) |
 
-Every test creates its own `Store.openInMemory(now:)` with a deterministic clock, so tests run in parallel without shared state. The helper below is defined once in `Tests/TodoCoreTests/TestSupport.swift` (Task 4) and used by every later test file:
+Every test creates its own `Store.openInMemory(snapshot:device:now:)` with a deterministic clock and an identity of its own, so tests run in parallel without shared state; a test that reopens the same database passes the first store's id, and one that wants a second device lets the helper mint another (#51, ADR-0005). The helper below is defined once in `Tests/TodoCoreTests/TestSupport.swift` (Task 4) and used by every later test file:
 
 ```swift
 import TodoCore
@@ -79,8 +79,8 @@ final class TestClock {
     func jump(by ms: Int64) { millis += ms }
 }
 
-func makeStore(clock: TestClock = TestClock()) throws(StoreError) -> Store {
-    try Store.openInMemory(now: clock.now)
+func makeStore(device: String = Store.newDeviceID(), clock: TestClock = TestClock()) throws(StoreError) -> Store {
+    try Store.openInMemory(device: device, now: clock.now)
 }
 ```
 

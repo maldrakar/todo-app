@@ -84,14 +84,22 @@ extension Store {
     /// clock has observed their stamps: the next local edit then sorts after everything the peer sent, which
     /// is what makes an edit made in answer to what arrived win over it.
     ///
-    /// Operations this device wrote are dropped before anything else happens. A transport hands back what it
-    /// was given — the relay below does, and so does a server that echoes a push — and applying our own
-    /// operations again would cost a journal statement and a field-clock read each for no change at all.
+    /// Nothing is dropped here for carrying this device's own id, and the id is no longer read as a claim
+    /// about what the journal holds. Operations that came back from a transport used to be, to save the
+    /// journal statement and the field-clock read that an echo of a push costs — a transport hands back what
+    /// it was given, and a server that echoes does the same — but the identity outlives the database it was
+    /// opened on (ADR-0005), and the two come apart exactly where a device needs its journal most. A database
+    /// lost while its identity was kept — a deleted file beside a kept `.device`, a page whose IndexedDB was
+    /// cleared while `localStorage` was not — opens empty under the same id, and everything that device ever
+    /// wrote comes back from the peer under it: dropping that is a device that never sees its own history
+    /// again, and nothing anywhere says so. Against that, an operation the store already holds costs one
+    /// `INSERT OR IGNORE` the unique index refuses and one field clock that refuses the value, and moves
+    /// nothing. The same reasoning covers an id the database inherited from the machine a copy was taken
+    /// from, which that machine goes on writing under (#51).
     @discardableResult
     public func receive(_ ops: [JournalOperation]) throws(StoreError) -> SyncReport {
-        let foreign = ops.filter { $0.device != deviceID }
-        for op in foreign { clock.observe(op.clock) }
-        return try applyBatch(foreign)
+        for op in ops { clock.observe(op.clock) }
+        return try applyBatch(ops)
     }
 
     /// Where the last sync stopped. Zero from a store that has never synced, which is the cursor that pushes
@@ -116,9 +124,15 @@ public enum SyncEngine {
     /// One round of sync: push the rows this device wrote that the transport has not seen, then pull what the
     /// other devices pushed and hand it to the store.
     ///
-    /// The pushed cursor is a local sequence number, so rows this device received from others are behind it
-    /// and the device filter keeps them from being pushed back; the pulled cursor is the transport's. Both
-    /// live in `meta`, so a restart resumes where the last round stopped.
+    /// The pushed cursor is a local sequence number and the pulled one belongs to the transport; both live in
+    /// `meta`, so a restart resumes where the last round stopped.
+    ///
+    /// What the filter sends is the rows of every id this database has written under and not only the current
+    /// one: a copy opens under an identity of its own (ADR-0005) and still holds what its predecessor never
+    /// managed to push, and those edits reach nobody otherwise. What another device wrote stays where it
+    /// arrived, its id being outside the set — with one exception, the id a copy inherited, under which the
+    /// machine it was taken from goes on writing: those rows arrive here and are pushed a second time, which
+    /// is #57 and costs a delivery the unique index drops where it lands.
     ///
     /// The pushed cursor is written as each page is taken rather than once at the end, because the pull that
     /// follows can fail after the transport already has the page: saving it costs a re-push the peers would
@@ -132,7 +146,7 @@ public enum SyncEngine {
             while true {
                 let page = try store.journalPage(after: pushed, limit: pageSize)
                 guard let scanned = page.scanned else { break }
-                let own = page.ops.filter { $0.device == store.deviceID }
+                let own = page.ops.filter { store.ownDevices.contains($0.device) }
                 if !own.isEmpty { try transport.push(own) }
                 pushed = scanned
                 try store.setSyncCursors(pushed: pushed, pulled: cursors.pulled)

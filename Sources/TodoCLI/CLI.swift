@@ -37,12 +37,20 @@ public enum CLI {
       find QUERY
     D is YYYY-MM-DD. ID is a task id or any prefix of one that names a single task; VIEW is a view's title
     or a prefix of its id. FIELD is \(oneOf(SortField.allCases.map(\.rawValue))). KEY is \(oneOf(GroupBy.allCases.map(\.rawValue))).
-    TODO_DB and TODO_TODAY override the database and the day the query is made.
+    TODO_DB, TODO_TODAY and TODO_DEVICE override the database, the day the query is made and the device
+    this copy of the database writes under.
     """
 
     /// The database a run opens when nothing names one: in the working directory, because a demo that writes
     /// into a home directory is a demo that is hard to throw away.
     private static let defaultDatabase = "todo.sqlite"
+
+    /// Where the demo keeps the identity it writes under: beside the database and not in it, since a database
+    /// carries its identity to every machine it is copied to and a copy is another device (ADR-0005).
+    private static let deviceSuffix = ".device"
+
+    /// The database that keeps nothing between runs. It has no file to put a device file next to.
+    private static let inMemoryDatabase = ":memory:"
 
     /// What clears a field that has one: `--when none` and `--parent none` say in one word what an empty
     /// value cannot say on a command line.
@@ -69,7 +77,14 @@ public enum CLI {
     public static func main(_ arguments: [String], environment: [String: String]) -> Int32 {
         do {
             let call = try invocation(arguments, environment)
-            let store = try Store.open(path: call.path, now: Store.systemNow)
+            let identity = device(for: call.path, environment)
+            let store = try Store.open(path: call.path, device: identity.id, now: Store.systemNow)
+            // Kept after the database opened and before the command runs: a path that cannot be opened at all
+            // is the core's to refuse, and an identity that cannot be kept is this one's, because the run
+            // after it would be another device. The open has already recorded the minted id in `own_devices`,
+            // so a run that fails here leaves a row behind and the next one mints another — the price of this
+            // order, against an exit code that would otherwise blame the demo for a database it never opened.
+            if !identity.kept { try keep(identity.id, for: call.path) }
             print(try run(call.command, store: store, today: call.today))
             return 0
         } catch let error as CLIError {
@@ -92,6 +107,36 @@ public enum CLI {
             args.removeSubrange(flag...(flag + 1))
         }
         return Invocation(path: path, today: try day(set(environment["TODO_TODAY"])) ?? currentDay(), command: args)
+    }
+
+    /// The device this run writes under, and whether anything already holds it. `TODO_DEVICE` first, so that
+    /// one machine can play two with two exports; then the file beside the database; then a new id, which is
+    /// what the first run over a database mints — and what a copy of `todo.sqlite` taken without that file
+    /// mints too, which is the point of keeping it outside (#51).
+    ///
+    /// A database that keeps nothing between runs has nowhere to keep an identity either, so `:memory:` reads
+    /// as held: there is no next run of it to be the same device as.
+    static func device(for database: String, _ environment: [String: String]) -> (id: String, kept: Bool) {
+        if let given = set(environment["TODO_DEVICE"]) { return (given, true) }
+        if database == inMemoryDatabase { return (Store.newDeviceID(), true) }
+        let kept = try? String(contentsOfFile: database + deviceSuffix, encoding: .utf8)
+        if let line = kept?.split(whereSeparator: \.isNewline).first { return (String(line), true) }
+        return (Store.newDeviceID(), false)
+    }
+
+    /// Writes the minted identity beside the database. A failure stops the run: a demo that cannot keep the
+    /// id is a demo that is a new device on every command, and silence about that is the shape of #51.
+    ///
+    /// The write is not the atomic one, which `FoundationEssentials` on WASI answers with "the requested
+    /// operation is not supported" — measured, and the whole wasm32 suite passes without it. The demo is
+    /// built and tested on both targets, and a torn write of these 36 bytes costs no data: what it leaves is
+    /// a prefix, the next run reads that prefix back as the id and goes on under it, and a prefix of a UUID
+    /// names no other device. What this run wrote is still pushed, because `own_devices` holds the id it
+    /// wrote under whatever the file beside the database ends up saying.
+    static func keep(_ device: String, for database: String) throws {
+        let path = database + deviceSuffix
+        do { try device.write(toFile: path, atomically: false, encoding: .utf8) }
+        catch { throw CLIError("cannot keep the device id in \(path): \(error)") }
     }
 
     /// A variable a shell exported without a value names neither a database nor a day, and refusing every
