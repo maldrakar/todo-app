@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "TodoCore", targets: ["TodoCore"]),
         .executable(name: "todo", targets: ["todo"]),
+        .executable(name: "wasm-size-probe", targets: ["WasmSizeProbe"]),
     ],
     targets: [
         .target(
@@ -29,6 +30,7 @@ let package = Package(
         .target(name: "TodoCore", dependencies: ["SQLiteKit"]),
         .target(name: "TodoCLI", dependencies: ["TodoCore"]),
         .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
+        .executableTarget(name: "WasmSizeProbe", dependencies: ["TodoCore"]),
         .testTarget(name: "SQLiteKitTests", dependencies: ["SQLiteKit"]),
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),

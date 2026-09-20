@@ -12,7 +12,7 @@ env:
 
 jobs:
   core:
-    name: Build and test on the host and on wasm32
+    name: Build, test, wasm32 and the size budget
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -59,3 +59,43 @@ jobs:
 
       - name: Test on wasm32 under WasmKit
         run: swift test --swift-sdk swift-6.3.3-RELEASE_wasm
+
+      - name: Run the size probe on the host
+        run: swift run wasm-size-probe
+
+      - name: Release wasm build and size budget
+        run: scripts/wasm-size.sh
+
+  apple:
+    # macOS minutes cost tenfold, so this job runs on main and on demand, not on every pull request.
+    name: Compile for the iOS and watchOS SDKs
+    if: github.event_name != 'pull_request'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.swiftly
+            ~/Library/Developer/Toolchains
+          key: swiftly-${{ runner.os }}-${{ hashFiles('.swift-version') }}-v1
+
+      - name: Install swiftly and the pinned toolchain
+        run: |
+          set -eu
+          if [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
+            curl -fsSL -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+            "$HOME/.swiftly/bin/swiftly" init --quiet-shell-followup --assume-yes --skip-install --no-modify-profile
+          fi
+          . "$HOME/.swiftly/env.sh"
+          swiftly install
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+
+      - name: Compile the core for iOS
+        run: swift build --target TodoCore --triple arm64-apple-ios17.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)"
+
+      - name: Compile the core for watchOS
+        run: swift build --target TodoCore --triple arm64_32-apple-watchos10.0 --sdk "$(xcrun --sdk watchos --show-sdk-path)"
