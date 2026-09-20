@@ -147,7 +147,10 @@ public enum CLI {
     }
 
     /// Today in the local time zone: the one place in the demo that asks the platform what day it is, which
-    /// is why `TODO_TODAY` exists — a test says the day instead of asking.
+    /// is why `TODO_TODAY` exists — a test says the day instead of asking. It reads the clock
+    /// `Store.systemNow` reads, so under the test runner on wasm32 it answers a day counted from the
+    /// machine's last boot rather than today (#53); the two tests that reach it there assert a database
+    /// path and an exit code, never a day.
     private static func currentDay() -> Day {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone.current
