@@ -1,6 +1,6 @@
 # Spec: Feature-module architecture
 
-- Status: Revision 6 for approval (revision 5 approved 2026-09-20)
+- Status: Approved 2026-09-20 (revision 6)
 - Owner review: https://claude.ai/artifact/CnGxEhqK4jDubEmcxgTZJF
 - Issue: #63
 
