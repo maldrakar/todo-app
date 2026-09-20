@@ -1,5 +1,10 @@
 // Sources/TodoCore/Storage/Store.swift
 import SQLiteKit
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 
 public enum StoreError: Error, Equatable, Sendable {
     case sqlite(SQLiteError)
@@ -48,6 +53,25 @@ public final class Store {
         let db: Connection
         do { db = try Connection.open(path: path, pragmas: pragmas) } catch { throw .sqlite(error) }
         return try Store(db: db, now: now)
+    }
+
+    /// The wall clock in milliseconds since the epoch, for a caller that has no better one: the store is
+    /// opened with the clock its caller chose (`docs/style.md`, "A lower layer holds no policy of its
+    /// client"), and this is what a platform passes when its own clock is the machine's.
+    ///
+    /// It is not the wall clock on every target: under WasmKit it reads days after the epoch instead of the
+    /// time of day (plan, Global Constraints), so a wasm entry point passes the host's time rather than this
+    /// until #53 settles what it should pass. A device stamping its edits from a clock that far behind loses
+    /// every last-write-wins comparison in silence.
+    public static func systemNow() -> Int64 { millis(since: Date().timeIntervalSince1970) }
+
+    /// Seconds since the epoch as whole milliseconds. Separate from the clock it reads so that the
+    /// saturation is a value a test can hand in: a machine set far enough ahead, or a clock that answers
+    /// with nothing at all, is data from outside like any other.
+    static func millis(since seconds: Double) -> Int64 {
+        let millis = seconds * 1000
+        guard millis > 0 else { return 0 }
+        return millis < Double(Int64.max) ? Int64(millis) : Int64.max
     }
 
     public static func openInMemory(snapshot: [UInt8]? = nil, now: @escaping () -> Int64) throws(StoreError) -> Store {

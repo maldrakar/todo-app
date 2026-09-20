@@ -31,3 +31,24 @@ swift run todo --help                # command-line demo
 ```
 
 The WebAssembly SDK is installed once with `swift sdk install <url> --checksum <sha256>`; the URL and checksum are in `.github/workflows/ci.yml`.
+
+## Trying the core
+
+`todo` is the command-line demo of the core and the runnable part of `M1`: every command goes through the
+public API of `TodoCore` and prints one fact per line.
+
+```sh
+export TODO_DB=/tmp/demo.sqlite
+swift run todo add "Write the plan" --when 2026-09-11 --tag work --notes "before the review"
+swift run todo list Today
+swift run todo find plan
+swift run todo --help                # every command, with its options
+```
+
+A task is named by any prefix of its id that names a single task and a view by its title or by a prefix of
+its id, and every line that names one of them ends with the id to type next; a tag is named by its name. An
+option a command does not take, one with no value, and a word left over from a value that lost its quotes
+are all refused by name rather than folded into a title. `TODO_DB` says which database to open and
+`--db PATH` outranks it; without either, the demo opens `todo.sqlite` in the working directory.
+`TODO_TODAY=YYYY-MM-DD` says what day the query is made on, so that `Today` and `Upcoming` answer the same
+thing when the demo is run again tomorrow. A command the demo refuses exits 2, one the core refuses exits 1.

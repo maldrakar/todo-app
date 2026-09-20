@@ -1,4 +1,18 @@
-import TodoCore
+import TodoCLI
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(WASILibc)
+import WASILibc
+#endif
 
-// The real command-line demo arrives in Task 12; until then the executable only proves the library links.
-print("todo demo, the epoch day is \(Day(year: 1970, month: 1, day: 1)), Int is \(Int.bitWidth)-bit")
+// The whole executable: `CommandLine` is the standard library's, `ProcessInfo` is Foundation's and `exit` is
+// libc's, which is why the imports outnumber the statement. Everything else is `TodoCLI`, so that the demo
+// is tested the way the core is.
+exit(CLI.main(CommandLine.arguments, environment: ProcessInfo.processInfo.environment))

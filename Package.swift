@@ -27,9 +27,11 @@ let package = Package(
         ),
         .target(name: "SQLiteKit", dependencies: ["CSQLite"]),
         .target(name: "TodoCore", dependencies: ["SQLiteKit"]),
-        .executableTarget(name: "todo", dependencies: ["TodoCore"]),
+        .target(name: "TodoCLI", dependencies: ["TodoCore"]),
+        .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
         .testTarget(name: "SQLiteKitTests", dependencies: ["SQLiteKit"]),
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore"]),
+        .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
     ],
     swiftLanguageModes: [.v6]
 )
