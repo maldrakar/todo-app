@@ -8,11 +8,11 @@ A reminders app in the spirit of Things 3, with one shared core and native UI pe
 
 ## Status
 
-Every task of `M1 Core architecture` is merged; the version tag and the release that close the milestone
-follow, and `CHANGELOG.md` is where they land. The core stores tasks, tags and views, resolves the tree their
-parent links describe, filters, sorts and groups them into pages, searches titles and notes, and exchanges a
-journal with another copy of itself; it builds and passes its suite on the host and on wasm32, and `todo`
-drives all of it from a command line. `M2 Feature-module architecture` is next.
+Milestones `M0 Process` and `M1 Core architecture` are complete, the second released as `v0.1.0`. The core
+stores tasks, tags and views, resolves the tree their parent links describe, filters, sorts and groups them
+into pages, searches titles and notes, and exchanges a journal with another copy of itself; it builds and
+passes its suite on the host and on wasm32, and `todo` drives all of it from a command line.
+`M2 Feature-module architecture` is next.
 
 ## Documents
 
