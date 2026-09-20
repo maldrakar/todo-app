@@ -31,7 +31,7 @@ Non-goals:
 
 - The web host, and the format the model takes on the way to JavaScript. JSON, protobuf or something of our own is decided by measurement on a real bundle, together with the web host.
 - The UIKit host. Designed for, not built: the contract makes it a second adapter over the same protocol.
-- Every module but the sidebar: task lists, the task editor, quick entry, search, settings. Navigation beyond "the sidebar chose a view and the app shows its title".
+- Every module but the sidebar: task lists, the task editor, quick entry, search, settings. The stack of pushed screens and modal presentations are designed for in the navigation section and built with the first screen that pushes, in M3; what M2 navigates is "the sidebar chose a view and the app shows its title".
 - The product behaviour of the sidebar beyond what M2 needs to exercise the contract: drag and reorder, collapsing folders, deleting views, task counts, projects in the sidebar.
 - Today's day and the change of the calendar day. No module in M2 makes a query by date; the door it will enter through is named below.
 - The formatting service and its platform implementations. No module in M2 spells a date or a number; the door is described below and the first list module in M3 builds it.
@@ -41,7 +41,7 @@ Non-goals:
 
 ## Chosen approach
 
-Five decisions, in the order they were made, then the sidebar, the changes to the core, and how it is all tested.
+Six decisions, in the order they were made, then the sidebar, the changes to the core, and how it is all tested.
 
 ### 1. Logic lives in the shared core, as unidirectional data flow
 
@@ -49,7 +49,7 @@ A feature module is a Swift type that holds the state of one feature, answers ev
 
 This is the pattern known as unidirectional data flow, the Elm architecture or MVI, and it is chosen for three reasons. It is the only arrangement in which a feature's tests run on wasm32 before a web page exists, because the tests need a store in memory and a sequence of events and nothing else. It gives the watch, the command line and the web the same feature for free, since a module has no idea what draws it. And it makes "the view holds no logic" a rule that a review can check, because a view that decides anything is a view with an `if` over a domain value, and that is visible in a diff.
 
-Views are therefore deliberately "dumb", in the good sense. What a view keeps is what only it can know: scroll position, focus, hover, the window size, a drag in progress. It does nothing beyond drawing, formatting included: a model carries "Tomorrow" or "Mon 22 Sep" as a finished string, not a `Day` for the view to spell. The core has no ICU (ADR-0001), so the spelling itself cannot live in the shared code; it lives behind a formatting service whose protocol is shared and whose implementation is the platform's, and the module calls it while building the model (section 4). The view then decides nothing at all, and the web page receives strings it can draw without knowing what a day since 1970 is.
+Views are therefore deliberately "dumb", in the good sense. What a view keeps is what only it can know: scroll position, focus, hover, the window size, a drag in progress. It does nothing beyond drawing, formatting included: a model carries "Tomorrow" or "Mon 22 Sep" as a finished string, not a `Day` for the view to spell. The core has no ICU (ADR-0001), so the spelling itself cannot live in the shared code; it lives behind a formatting service whose protocol is shared and whose implementation is the platform's, and the module calls it while building the model (section 5). The view then decides nothing at all, and the web page receives strings it can draw without knowing what a day since 1970 is.
 
 ### 2. The module contract
 
@@ -99,7 +99,34 @@ The tree of views mirrors the tree of modules. The root view receives the root m
 
 An `Output` is the one-shot fact "the person chose this", which the parent acts on once. The current data the parent needs, such as the title of the selected view, it reads from the child's model after the send. Both exist because neither covers the other: a selection is state and a "open this task" or "dismiss me" is not.
 
-### 4. Hosting on Apple: one host, the main actor, one event at a time
+### 4. Navigation: state in the root, screens as child modules
+
+A screen is a child module, and which screens exist is data, so it lives in the root's model: the tree of live modules is the navigation state. The root model holds `sidebar`; `detail`, the pane beside it, in M2 a placeholder with the selected view's title and in M3 the list module's model; and `path`, the stack of pushed screens such as a task editor, which arrives with the first screen that pushes.
+
+**A child never navigates; it asks.** The sidebar answers `.selected(id)`, a list will answer `.open(taskID)`, an editor `.dismiss`. The root creates the module of the new screen with the store, puts its model into its own, and the view draws it; when the screen closes, the root drops the module. A module does not know where it stands, in a column, in a stack or in a URL route, and that is what makes it the same module on every platform.
+
+**The way back from the platform is an action of the root.** The back button, a swipe, `Esc` and a closed window arrive as `.pop` or `.dismissed(screen)` and do what a child's request does. Every SwiftUI binding has the one shape `TextField` has: `NavigationStack(path:)`, `List(selection:)` and `.sheet(item:)` read from the model, and their set sends an action.
+
+**The platform decides how to show it**, and that is rendering, not a decision. On macOS and iPadOS the root view puts `detail` into a `NavigationSplitView`; on iPhone and the watch the same model becomes a stack; on the web a route. One model, three containers.
+
+**Pushes live in the root's stack, modals with their presenter.** `path` is flat and the root's: any screen may ask to open any other, and a flat array is restored after a relaunch, or turned into a deep link, without walking a tree. A sheet or a popover is part of the screen that shows it, so a `sheet` field belongs to the model of the module that presented it.
+
+What follows costs nothing: a screen's module lives exactly as long as it is in the model; nothing is unsubscribed, since modules subscribe to nothing, and the root fans `.changed` out to the children that exist. Navigation state is a value, so restoring it and opening a deep link are its serialisation, when they are wanted.
+
+In M2 this exists in its smallest form: a selection in the sidebar changes `detail`, which is this mechanism with a placeholder for a screen. `path` and sheets are designed for, not built.
+
+```mermaid
+flowchart LR
+  Child[Child module<br/>sidebar, later a list] -- "Output: .selected, .open" --> Root[AppModule<br/>creates the screen's module,<br/>puts its model in detail or path]
+  Root -- "model" --> Mac[macOS, iPadOS<br/>NavigationSplitView]
+  Root -- "model" --> Phone[iPhone, watchOS<br/>NavigationStack]
+  Root -- "model" --> Web[Web<br/>route]
+  Mac -- "Action: .pop, .dismissed" --> Root
+  Phone -- "Action: .pop, .dismissed" --> Root
+  Web -- "Action: .pop, .dismissed" --> Root
+```
+
+### 5. Hosting on Apple: one host, the main actor, one event at a time
 
 The host is the only object in the app that a view observes. There is one per app, in the Apple UI target, `@MainActor` and `@Observable`, generic over the protocol: it holds the root module and publishes `model`. It has two entrances and hands out only one of them: `send(Action)` is what views get, and `deliver(Event)` is what the composition root gets for the events of the world. Both lift into the module's `send`, copy the model out, and SwiftUI redraws from observation. A UIKit adapter is a second host over the same protocol, designed for and not built in M2. Verified 2026-09-20 with the pinned toolchain in language mode 6: the host compiles as a `@MainActor @Observable` generic class holding a non-`Sendable` module, an enum case satisfies the static requirement of `FeatureEvent`, and a view holding the sidebar's `send` cannot name `.changed`.
 
@@ -113,7 +140,7 @@ The host is the only object in the app that a view observes. There is one per ap
 
 **Formatting.** A module spells dates and numbers through a service the platform implements: a protocol in the root package beside `FeatureModule`, with operations of the shape "this day, relative to today, as a string" and "this count of that thing, as a string", whose exact set the first list module fixes. The implementation is the platform's, because the core has no ICU (ADR-0001): Foundation's formatters in `Apps/Apple`, the browser's `Intl` reached through JavaScript in `Apps/Web`, and in tests a fixed stand-in that writes a day as its number, which also makes a model compared whole independent of the machine's locale. The composition root hands the service to the modules at creation, the way it hands them the store and `today`; the service is pure and stateless, since "tomorrow" is computed from the `today` the module already holds. One consequence is named now so that it is not discovered later: a change of the system locale or of the date format is no longer a redraw of the view but an event to the module, `.localeChanged`, after which the model is rebuilt. Not needed by the sidebar, designed here so that M3 does not invent it twice.
 
-### 5. Two packages: shared modules in the root, platform hosts under `Apps/`
+### 6. Two packages: shared modules in the root, platform hosts under `Apps/`
 
 Everything that runs everywhere stays in the root package; everything that runs only on Apple platforms moves to a second package, `Apps/Apple/Package.swift`, which depends on the root by a local path. The reason is mechanical: a target that imports SwiftUI builds neither on the Linux job nor for wasm32, and `swift test` builds the whole package, so one Apple target in the root package would break both checks M1 set up. The web host will live beside it, `Apps/Web`, in the same arrangement. swiftly reads `.swift-version` from a parent directory, so `Apps/Apple` builds with the pinned toolchain without a second pin (verified 2026-09-20).
 
@@ -178,6 +205,9 @@ None. The sidebar needs nothing the store does not already have. The first revis
 | Models made of domain entities handed to the view | The view then decides what a `TaskView` looks like and which tasks are overdue, and it holds logic again. |
 | Views spelling dates and numbers in the locale themselves, the model carrying a `Day` | Formatting is a decision the view would own, so the rule stops being literal; the web page would have to know what a day since 1970 is; and the locale would reach the model from two sides. A shared service protocol with a platform implementation keeps the view at drawing. |
 | Views observing the store directly, SwiftData-style | No boundary at all: every view queries, every platform re-implements every list, and nothing is testable without a screen. |
+| A navigator or coordinator service injected into the modules, `navigator.push(...)` | The familiar coordinator, but the set of screens leaves the model: it cannot be tested as a value or restored, and a module gains a side effect where the design gives it none. |
+| Navigation in the views, `NavigationLink` and a `@State` path | The view decides which screen to show, and would have to create that screen's module without a store. |
+| Nested ownership of pushed screens, a list holding the editor it opened | Deeper models on every push and a `path` computed by walking the tree; a flat stack in the root restores and deep-links as an array. |
 | One package holding the Apple targets too | A SwiftUI import in the root package fails on the Linux job and under wasm32, and `swift test` builds every target. |
 | One `TodoFeatures` target for every module | The boundary between features would hold by discipline instead of by the manifest. |
 | An Xcode project from M2, or iOS first | A second build system in the milestone whose point is the module contract; SwiftPM cannot produce an iOS bundle, so iOS first means the project first. |
@@ -272,7 +302,7 @@ flowchart TB
 
 ## Decisions to record as ADRs after approval
 
-1. A feature module is a class with a synchronous `send`, a value model, one door for events of which the view holds only the actions, and an output to its parent, written in the shared core; views hold no logic, format nothing and keep only what is theirs, and a module spells dates and numbers through a service the platform implements.
+1. A feature module is a class with a synchronous `send`, a value model, one door for events of which the view holds only the actions, and an output to its parent, written in the shared core; navigation is state in the root, a screen is a child module that asks through its output; views hold no logic, format nothing and keep only what is theirs, and a module spells dates and numbers through a service the platform implements.
 2. Feature modules are shared code under ADR-0001, one SwiftPM target per feature in the root package; platform hosts are separate packages under `Apps/`.
 3. The Apple app is a two-line `@main` over a library, built by SwiftPM alone until iOS, watchOS or the store needs an Xcode project, and the code builds with Xcode's toolchain as well as the pinned one.
 
@@ -297,6 +327,8 @@ flowchart TB
 | `@MainActor` | Swift concurrency | the actor of the main thread; a type marked with it is used from there only |
 | `App`, `Scene`, `WindowGroup` | SwiftUI | the entry protocol of a SwiftUI app, a unit of its interface, and the scene that opens windows |
 | `TextField` | SwiftUI | the editable text control; marked text is input a keyboard has composed but not committed |
+| `NavigationSplitView`, `NavigationStack` | SwiftUI | the two- or three-column container of macOS and iPadOS, and the push-and-pop container of iPhone and watchOS; both bind their state to a value |
+| deep link | platforms | a URL that opens the app at a given screen; here the serialisation of the navigation state |
 | FoundationInternationalization | swift-foundation | the ICU-backed half of Foundation with locale-aware formatting; outside ADR-0001, so formatting lives on the platforms |
 | `Intl` | Web platform | the browser's locale-aware formatting API for dates, numbers and plurals |
 | Unidirectional data flow, the Elm architecture, MVI | UI architecture literature | a model rendered by a view, events sent to an update function, a new model; no other path |
