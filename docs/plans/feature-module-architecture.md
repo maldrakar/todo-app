@@ -381,7 +381,7 @@ extension Composition { public static let host: ModuleHost<AppModule> }   // lau
 | 1. Logic lives in the shared core | 1, 2 (the sidebar), 3 (the root) |
 | 2. The module contract | 1 (the protocols, the sidebar's types), 2 (the writes), 5 (`selection` and `Identifiable`, with their callers) |
 | 3. Composition | 3 |
-| 4. Navigation | 3 (`Detail` created from the output, where M3's list module goes); `path` and sheets not built, as the spec says |
+| 4. Navigation | 3 (`Detail` created from the output, where M3's list module goes); the mechanics, a stack or sheets, are the navigation epic's #67 and no task builds them, as the spec says |
 | 5. Hosting on Apple: the host, one event at a time, the composition root, the thread | 4; `Composition.host` once per launch in 5 |
 | 5. Formatting, Today | not built, as the spec says; no task touches them |
 | 6. Two packages, one target per feature, ADR-0001 extended, names, toolchains | 1 (targets), 4 (`Apps/Apple`), 6 (the toolchain check in CI) |
