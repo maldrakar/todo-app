@@ -111,7 +111,8 @@ public final class Store {
         self.clock = HybridClock(now: now)
         self.deviceID = device
         do { _ = try Migrations.run(on: db) } catch { throw .sqlite(error) }
-        self.ownDevices = try Store.recordOwnDevice(db, device)
+        try Store.writeOwnDevice(db, device)
+        self.ownDevices = try Store.readOwnDevices(db)
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its
         // maximum, a restart would let a local edit land behind a remote one and lose the last-write-wins
         // comparison in silence (#32). This runs before anything below issues a stamp.
@@ -176,15 +177,17 @@ public final class Store {
         do { try db.run("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [.text(key), value]) } catch { throw .sqlite(error) }
     }
 
-    /// Adds this device to the ids the database has written under and reads the whole set back. It is one
-    /// row on a database that has only ever been opened on one machine, and it grows by one when a copy is
-    /// opened under an identity of its own: what the predecessor wrote and never pushed is still in the
-    /// journal under the old id, and the push has to keep sending it (#51).
-    private static func recordOwnDevice(_ db: Connection, _ device: String) throws(StoreError) -> Set<String> {
-        do {
-            try db.run("INSERT OR IGNORE INTO own_devices (id) VALUES (?)", [.text(device)])
-            return Set(try db.rows("SELECT id FROM own_devices").compactMap { $0.first?.string })
-        } catch { throw .sqlite(error) }
+    /// Adds this device to the ids the database has written under. Nothing to do on every open after the
+    /// first one under this id, which is what `OR IGNORE` says.
+    private static func writeOwnDevice(_ db: Connection, _ device: String) throws(StoreError) {
+        do { try db.run("INSERT OR IGNORE INTO own_devices (id) VALUES (?)", [.text(device)]) } catch { throw .sqlite(error) }
+    }
+
+    /// The ids the database has written under. One on a database that has only ever been opened on one
+    /// machine, and one more after a copy is opened under an identity of its own: what the predecessor wrote
+    /// and never pushed is still in the journal under the old id, and the push has to keep sending it (#51).
+    private static func readOwnDevices(_ db: Connection) throws(StoreError) -> Set<String> {
+        do { return Set(try db.rows("SELECT id FROM own_devices").compactMap { $0.first?.string }) } catch { throw .sqlite(error) }
     }
 
     /// Re-applies journal rows whose field became known after a migration.
