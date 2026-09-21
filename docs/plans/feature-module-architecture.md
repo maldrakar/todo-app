@@ -66,12 +66,12 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | | The module contract and the sidebar's read path | `feature`, `core` | |
-| 2 | | The sidebar's writes: rename and a new folder | `feature`, `core` | 1 |
-| 3 | | The root module, and the size probe drives it | `feature`, `core` | 2 |
-| 4 | | The Apple package: the host and the composition root | `feature`, `ui-apple` | 3 |
-| 5 | | The views, the scene and the executable | `feature`, `ui-apple` | 4 |
-| 6 | | CI for the Apple package, and the documentation that closes the epic | `infra`, `ui-apple` | 5 |
+| 1 | #68 | The module contract and the sidebar's read path | `feature`, `core` | |
+| 2 | #69 | The sidebar's writes: rename and a new folder | `feature`, `core` | 1 |
+| 3 | #70 | The root module, and the size probe drives it | `feature`, `core` | 2 |
+| 4 | #71 | The Apple package: the host and the composition root | `feature`, `ui-apple` | 3 |
+| 5 | #72 | The views, the scene and the executable | `feature`, `ui-apple` | 4 |
+| 6 | #73 | CI for the Apple package, and the documentation that closes the epic | `infra`, `ui-apple` | 5 |
 
 The owner reviews this table and the interface of every task below.
 
