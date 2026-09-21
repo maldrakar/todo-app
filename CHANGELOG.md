@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- Implementation plan `docs/plans/feature-module-architecture.md`, the first written from `docs/plans/TEMPLATE.md`: six tasks, the module contract and the sidebar's read path, the sidebar's writes, the root module and the size probe that drives it, the Apple package with the host and the composition root, the views and the executable, and CI with the documentation that closes the epic. Its review on #66 settled the names: what a view sends is a `UserAction` whose cases name the control and the gesture, never the operation, and the composition root is `TodoApp`.
+- ADR-0006 (a feature is a module with unidirectional data flow and views hold no logic), ADR-0007 (feature modules are shared code in the root package and every platform host lives in a package under `Apps/`) and ADR-0008 (the Apple app is a two-line `@main` over a library built by SwiftPM alone until the store needs an Xcode project), extracted from the spec.
+- Spec `docs/specs/feature-module-architecture.md`, approved by the owner on 2026-09-20: the logic of a feature lives once in the shared core as a module with `Model`, `UserAction`, `Event` and `Output`, `send` is synchronous and never throws, views render a model and decide nothing, the root module composes its children and navigation is state in the root, one host on the Apple side takes one event at a time, and platform hosts live under `Apps/`. The mechanics of navigation went to epic #67.
+
 ## [0.1.0] - 2026-09-20
 
 ### Added
