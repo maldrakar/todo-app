@@ -35,20 +35,33 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
 }
 
 @Test func selectionMovesTheHighlightAndReportsTheChoice() throws {
-    let sidebar = try Sidebar(store: try makeStore())
+    let store = try makeStore()
+    let folder = try store.createView(NewTaskView(title: "Work"))
+    try store.createView(NewTaskView(title: "Reviews", parent: folder))
+    let sidebar = try Sidebar(store: store)
+    let before = sidebar.model
     #expect(sidebar.send(.action(.rowSelected(BuiltInTaskViews.today))) == .selected(BuiltInTaskViews.today))
     #expect(sidebar.model.rows.filter(\.isSelected).map(\.id) == [BuiltInTaskViews.today])
     // Choosing the row that is already chosen is still a choice: the root opens the view again, where an
     // answer withheld would leave a person tapping a highlighted row and watching nothing happen.
     #expect(sidebar.send(.action(.rowSelected(BuiltInTaskViews.today))) == .selected(BuiltInTaskViews.today))
+    // The highlight moved back leaves the model as it was, which is what says that a move carries every
+    // other field of every row along: the title a row draws, and the depth a nested one is drawn at.
+    #expect(sidebar.send(.action(.rowSelected(BuiltInTaskViews.inbox))) == .selected(BuiltInTaskViews.inbox))
+    #expect(sidebar.model == before)
 }
 
 @Test func changedWithAViewRereadsTheTree() throws {
     let store = try makeStore()
     let sidebar = try Sidebar(store: store)
+    #expect(sidebar.send(.action(.rowSelected(BuiltInTaskViews.today))) == .selected(BuiltInTaskViews.today))
     let created = try changeSet(of: store) { try store.createView(NewTaskView(title: "Docs")) }
     #expect(sidebar.send(.changed(created)) == nil)
     #expect(sidebar.model.rows.map(\.title) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash", "Docs"])
+    // A view that appeared elsewhere is no reason to lose the row the person is on, and no reason to say
+    // that anything went wrong.
+    #expect(sidebar.model.rows.filter(\.isSelected).map(\.id) == [BuiltInTaskViews.today])
+    #expect(sidebar.model.problem == nil)
 }
 
 @Test func changedWithoutAViewLeavesTheModelAlone() throws {
@@ -73,8 +86,8 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
 
 /// A chain thousands of links deep arrives from sync as easily as a shallow one, and a stack — 64 KiB of it
 /// on wasm32 — is not what should decide whether the sidebar draws (`docs/style.md`, "No recursion over
-/// data-shaped depth"). The chain is journaled straight into the store, the way one arrives from a peer,
-/// because a thousand calls to `createView` would rank a thousand siblings and measure the write instead.
+/// data-shaped depth"). The chain is journaled straight into the store, because a thousand calls to
+/// `createView` would rank a thousand siblings and measure the write instead of the read.
 @Test func aThousandNestedFoldersReadWithoutRecursion() throws {
     let store = try makeStore()
     let stamp = HLC(millis: 1, counter: 0)
