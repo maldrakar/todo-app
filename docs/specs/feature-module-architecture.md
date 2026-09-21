@@ -1,6 +1,6 @@
 # Spec: Feature-module architecture
 
-- Status: Approved 2026-09-20 (revision 6)
+- Status: Approved 2026-09-20 (revision 6); revision 7 of 2026-09-21 carries the names settled in the plan review on #66 and changes no decision
 - Owner review: https://claude.ai/artifact/CnGxEhqK4jDubEmcxgTZJF
 - Issue: #63
 
@@ -58,8 +58,8 @@ One protocol for every module, the root included, because it has exactly one cal
 
 ```swift
 public protocol FeatureEvent: Equatable, Sendable {
-    associatedtype Action: Equatable & Sendable
-    static func action(_ action: Action) -> Self
+    associatedtype UserAction: Equatable & Sendable
+    static func action(_ action: UserAction) -> Self
 }
 
 public protocol FeatureModule: AnyObject {
@@ -77,8 +77,8 @@ Four types per module, nested so that their names never collide with SwiftUI's o
 | Type | What it is |
 | ---- | ---------- |
 | `Model` | A value: exactly what the view draws, with every decision made. Strings, flags, lists of rows with ids so that an action can name a row. Never a `TodoTask` or a `TaskView`, only their reflection for one screen. Dates and numbers already spelled, through the formatting service, so the view and the wire get finished strings. |
-| `Action` | What a view may send, and nothing else: a tap, a keystroke, a choice. An enumeration with associated values. |
-| `Event` | The one door of the module: `.action(Action)` for what the view sent, and beside it the events of the world, `.changed(ChangeSet)` from the store, later a sync result, the change of the day, the change of the locale. The enum case `action(_:)` is the witness of the protocol's static requirement, which is how a host lifts an action into an event without knowing the module's type. |
+| `UserAction` | What a view may send, and nothing else: a tap, a keystroke, a choice. An enumeration with associated values, each case named for the control and the gesture, `createFolderButtonTapped`, `titleFieldSubmitted`, never for the operation it triggers: what a gesture means is the module's, and a view that could spell `commitRename` would know that a rename exists. |
+| `Event` | The one door of the module: `.action(UserAction)` for what the view sent, and beside it the events of the world, `.changed(ChangeSet)` from the store, later a sync result, the change of the day, the change of the locale. The enum case `action(_:)` is the witness of the protocol's static requirement, which is how a host lifts an action into an event without knowing the module's type. |
 | `Output` | What the module tells its parent because it cannot do it itself. The sidebar's is `.selected(ViewID)`: showing the list is the app's business. The root's `Output` is `Never`. |
 
 A module is a `final class`, because it has a lifetime and a reference to the `Store` (the core's data layer, one per database), and its state beyond `model` is private. `send` is synchronous and runs on the store's thread: when it returns, `model` is already the new one.
@@ -87,16 +87,16 @@ Rules, each with its reason:
 
 - **`send` never throws.** What the store refuses becomes part of the model, and the view shows it. An error thrown outward reaches the view, which would then have to decide something, and it holds no logic.
 - **The model is a value returned, not a value pushed.** A module publishes nothing and subscribes to nothing. The store's `onChange` is one closure, so the fan-out of a `ChangeSet` to the modules lives in the composition root, not in the modules.
-- **One door for the module, a narrower one for the view.** Everything reaches the module through `send(Event)` and one update function, so nothing grows logic in a second path. What a view holds is a `send` over `Action` alone: it cannot spell `.changed`, because the closure it was given does not take it. The world's events enter through the host, from the composition root.
+- **One door for the module, a narrower one for the view.** Everything reaches the module through `send(Event)` and one update function, so nothing grows logic in a second path. What a view holds is a `send` over `UserAction` alone: it cannot spell `.changed`, because the closure it was given does not take it. The world's events enter through the host, from the composition root.
 - **Local UI state stays in the view**: scroll, focus, hover, the window size, a drag in progress. The draft text in a field is not local: every keystroke is an event and the model carries the text back, which works because the round trip is synchronous.
-- **Plain data, no codec yet.** `Model`, `Action` and `Event` are value types with no closure and no reference in them; `Sendable` enforces most of that and review the rest. They carry no `Codable`: the wire format for wasm is open, and the conformance it needs, `Codable` if JSON wins or a generated mapping if protobuf does, is added with its first caller, the web host (`docs/style.md`, no API without a caller).
+- **Plain data, no codec yet.** `Model`, `UserAction` and `Event` are value types with no closure and no reference in them; `Sendable` enforces most of that and review the rest. They carry no `Codable`: the wire format for wasm is open, and the conformance it needs, `Codable` if JSON wins or a generated mapping if protobuf does, is added with its first caller, the web host (`docs/style.md`, no API without a caller).
 - **The view rule**, to be recorded in the ADR and pointed at from `docs/style.md`: a view holds no condition over a domain value and formats nothing. Every `if` in a view is over a `Bool` or an optional of the model, and every string about the data arrives finished. The labels a view has of its own, a button's title or the placeholder of an empty pane, are its vocabulary, localised by the platform's string catalogue, not decisions.
 
 ### 3. Composition: a tree of modules, a tree of views
 
-The root module is a `FeatureModule` like any other. Its `Model` composes the models of its children; its `Action` wraps their actions, `.sidebar(Sidebar.Action)`; its `Event` is `.action(Action)` and the events of the world, `.changed(ChangeSet)`. Its `send` hands a wrapped action to the child as `.action`, hands a world event to every child that takes it, takes the child's `Output` and reacts to it, then rebuilds its own model from the children's. In M2 the root holds the sidebar and a placeholder for the detail: the title of the selected view, or nothing.
+The root module is a `FeatureModule` like any other. Its `Model` composes the models of its children; its `UserAction` wraps their actions, `.sidebar(Sidebar.UserAction)`; its `Event` is `.action(UserAction)` and the events of the world, `.changed(ChangeSet)`. Its `send` hands a wrapped action to the child as `.action`, hands a world event to every child that takes it, takes the child's `Output` and reacts to it, then rebuilds its own model from the children's. In M2 the root holds the sidebar and a placeholder for the detail: the title of the selected view, or nothing.
 
-The tree of views mirrors the tree of modules. The root view receives the root model and a `send` over the root's actions; the sidebar view receives `model.sidebar` and a closure that takes a `Sidebar.Action` and wraps it in `.sidebar`. Nothing else crosses that boundary: no module instance and no store reaches a view.
+The tree of views mirrors the tree of modules. The root view receives the root model and a `send` over the root's actions; the sidebar view receives `model.sidebar` and a closure that takes a `Sidebar.UserAction` and wraps it in `.sidebar`. Nothing else crosses that boundary: no module instance and no store reaches a view.
 
 An `Output` is the one-shot fact "the person chose this", which the parent acts on once. The current data the parent needs, such as the title of the selected view, it reads from the child's model after the send. Both exist because neither covers the other: a selection is state and a "open this task" or "dismiss me" is not.
 
@@ -120,14 +120,14 @@ flowchart LR
   Root -- "model" --> Mac[macOS, iPadOS<br/>NavigationSplitView]
   Root -- "model" --> Phone[iPhone, watchOS<br/>NavigationStack]
   Root -- "model" --> Web[Web<br/>route]
-  Mac -- "Action: the way back" --> Root
-  Phone -- "Action: the way back" --> Root
-  Web -- "Action: the way back" --> Root
+  Mac -- "UserAction: the way back" --> Root
+  Phone -- "UserAction: the way back" --> Root
+  Web -- "UserAction: the way back" --> Root
 ```
 
 ### 5. Hosting on Apple: one host, the main actor, one event at a time
 
-The host is the only object in the app that a view observes. There is one per app, in the Apple UI target, `@MainActor` and `@Observable`, generic over the protocol: it holds the root module and publishes `model`. It has two entrances and hands out only one of them: `send(Action)` is what views get, and `deliver(Event)` is what the composition root gets for the events of the world. Both lift into the module's `send`, copy the model out, and SwiftUI redraws from observation. A UIKit adapter is a second host over the same protocol, designed for and not built in M2. Verified 2026-09-20 with the pinned toolchain in language mode 6: the host compiles as a `@MainActor @Observable` generic class holding a non-`Sendable` module, an enum case satisfies the static requirement of `FeatureEvent`, and a view holding the sidebar's `send` cannot name `.changed`.
+The host is the only object in the app that a view observes. There is one per app, in the Apple UI target, `@MainActor` and `@Observable`, generic over the protocol: it holds the root module and publishes `model`. It has two entrances and hands out only one of them: `send(UserAction)` is what views get, and `deliver(Event)` is what the composition root gets for the events of the world. Both lift into the module's `send`, copy the model out, and SwiftUI redraws from observation. A UIKit adapter is a second host over the same protocol, designed for and not built in M2. Verified 2026-09-20 with the pinned toolchain in language mode 6: the host compiles as a `@MainActor @Observable` generic class holding a non-`Sendable` module, an enum case satisfies the static requirement of `FeatureEvent`, and a view holding the sidebar's `send` cannot name `.changed`.
 
 **One event at a time.** The chain "send to the root, send to the sidebar, write to the store, `onChange`, deliver `.changed` to the root" enters the root a second time while the first call has not returned. The host therefore takes one event at a time: whatever is handed to it through either entrance while one is in flight is queued and sent after the current one returns. Everything runs on one thread, so this is a flag and an array, not a lock. Without the rule a module sees its own write in the middle of its own update; with it, the same probe shows the change set of a write delivered after the `send` that caused it.
 
@@ -168,9 +168,9 @@ The sidebar does exactly enough to walk every path of the contract once.
 | Path | What happens |
 | ---- | ------------ |
 | Read | The tree of views from the store, flattened into rows with a depth, in `rank` order inside each parent. Flat and not recursive: the walk is iterative (`docs/style.md`), and a chain of a thousand nested folders from sync must neither overflow the stack nor fold a recursive view. The five built-in views are ordinary rows. The Inbox is selected at first. |
-| Select | The action `.select(id)`: the model highlights the row, the output `.selected(id)` goes to the root, and the root shows the title in the detail placeholder. |
-| Rename | The actions `.beginRename(id)`, `.draft(text)` on every keystroke, `.commitRename` and `.cancelRename`. The draft lives in the model; this is the synchronous round trip of a text field. An empty title the module refuses by itself, without the store. |
-| Create | The action `.createFolder`: a view without a filter at the root of the tree. One write through the store, so that an event from a person goes the whole way and comes back through a `ChangeSet`. |
+| Select | The action `.rowSelected(id)`: the model highlights the row, the output `.selected(id)` goes to the root, and the root shows the title in the detail placeholder. |
+| Rename | The actions `.renameMenuItemChosen(id)`, `.titleFieldChanged(text)` on every keystroke, `.titleFieldSubmitted` and `.titleFieldCancelled`. The draft lives in the model; this is the synchronous round trip of a text field. An empty title the module refuses by itself, without the store. |
+| Create | The action `.createFolderButtonTapped`: a view without a filter at the root of the tree. One write through the store, so that an event from a person goes the whole way and comes back through a `ChangeSet`. |
 | World | The event `.changed(ChangeSet)` with views in it rereads the tree; with tasks only it does nothing. No action can carry it: the view's `send` does not take events. |
 | Refusal | What the store refuses, for example renaming a view a peer has deleted, lands in `model.problem` and the view shows it, until the next event. |
 
@@ -246,9 +246,9 @@ sequenceDiagram
   participant Root as AppModule
   participant Sidebar as Sidebar module
   participant Store as Store
-  View->>Host: send(.sidebar(.commitRename)) as an Action
-  Host->>Root: send(.action(.sidebar(.commitRename)))
-  Root->>Sidebar: send(.action(.commitRename))
+  View->>Host: send(.sidebar(.titleFieldSubmitted)) as a UserAction
+  Host->>Root: send(.action(.sidebar(.titleFieldSubmitted)))
+  Root->>Sidebar: send(.action(.titleFieldSubmitted))
   Sidebar->>Store: update(view:, [.title])
   Store-->>Host: onChange, deliver(.changed(ChangeSet))
   Note over Host: a send is in flight: queued
@@ -267,13 +267,13 @@ The tree of modules and the tree of views that mirrors it:
 ```mermaid
 flowchart TB
   subgraph modules["Modules (root package)"]
-    AM[AppModule<br/>Model: sidebar, detail<br/>Action: .sidebar(_)<br/>Event: .action(_), .changed(_)]
-    SM[Sidebar<br/>Model: rows, rename, problem<br/>Action: select, rename, createFolder<br/>Event: .action(_), .changed(_)<br/>Output: .selected]
+    AM[AppModule<br/>Model: sidebar, detail<br/>UserAction: .sidebar(_)<br/>Event: .action(_), .changed(_)]
+    SM[Sidebar<br/>Model: rows, rename, problem<br/>UserAction: rowSelected, renameMenuItemChosen,<br/>the title field, createFolderButtonTapped<br/>Event: .action(_), .changed(_)<br/>Output: .selected]
     AM --> SM
   end
   subgraph views["Views (Apps/Apple)"]
     AV[Root view<br/>gets model and send]
-    SV[Sidebar view<br/>gets model.sidebar and a send over Sidebar.Action]
+    SV[Sidebar view<br/>gets model.sidebar and a send over Sidebar.UserAction]
     DV[Detail placeholder<br/>gets model.detail]
     AV --> SV
     AV --> DV
@@ -284,7 +284,7 @@ flowchart TB
 
 ## Open questions
 
-- **The mechanics of navigation.** The navigation epic's, #67, after M3, once a list, an editor and quick entry exist to try them on: whether pushed screens are a flat `path` in the root or nested in their opener; where a modal's module lives, with its presenter or on the same path, given that push or sheet is the platform's rendering choice and a module's home cannot depend on it; how the root's `Model` and `Action` grow with every screen; windows on macOS and iPadOS, where one host and one root per process no longer hold; deep links, restoration, routes on the web and the stack on the watch. The principle of section 4 holds throughout, and the first screen that needs a stack or a sheet waits for the epic.
+- **The mechanics of navigation.** The navigation epic's, #67, after M3, once a list, an editor and quick entry exist to try them on: whether pushed screens are a flat `path` in the root or nested in their opener; where a modal's module lives, with its presenter or on the same path, given that push or sheet is the platform's rendering choice and a module's home cannot depend on it; how the root's `Model` and `UserAction` grow with every screen; windows on macOS and iPadOS, where one host and one root per process no longer hold; deep links, restoration, routes on the web and the stack on the watch. The principle of section 4 holds throughout, and the first screen that needs a stack or a sheet waits for the epic.
 - **The wire format for wasm.** JSON, protobuf or an own encoding, and whether a model crosses whole or as a diff. Decided by measurement on a real bundle when the web host is built; the contract asks only for plain data, and the conformance the winner needs is added then.
 - **The cost of a whole-app model per event.** Every `send` rebuilds the root model and SwiftUI diffs the tree. Measured with the first list module, where the model has hundreds of rows; the remedies, if needed, are equatable subviews and a per-page model.
 - **A store off the main thread.** Not needed until a query is measured blocking the UI; the design keeps the door open through `Sendable` models.
