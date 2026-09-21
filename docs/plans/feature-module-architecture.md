@@ -25,11 +25,12 @@ The rules every task obeys, each with the spec section or ADR it comes
 from.
 
 - A feature target imports `TodoCore`, `FeatureModule`, the standard library and FoundationEssentials under `#if canImport(FoundationEssentials)`, and nothing else; no SwiftUI, no Observation, no Foundation proper in the root package. The wasm32 build in CI is the enforcement (ADR-0001, ADR-0007).
-- A module is a `final class` conforming to `FeatureModule`: `Model`, `Action`, `Event` and `Output` nested, all `Equatable & Sendable`, no `Codable`; `send` is synchronous and never throws, and what the store refuses becomes part of the model (spec section 2, ADR-0006).
+- A module is a `final class` conforming to `FeatureModule`: `Model`, `UserAction`, `Event` and `Output` nested, all `Equatable & Sendable`, no `Codable`; `send` is synchronous and never throws, and what the store refuses becomes part of the model (spec section 2, ADR-0006).
 - A module publishes nothing and subscribes to nothing. It rereads the store after its own write and on `.changed`; the fan-out of a `ChangeSet` is the composition root's (spec section 2).
 - A view holds no condition over a domain value and formats nothing: every `if` in a view is over a `Bool` or an optional of the model; a button's title or a placeholder is the view's vocabulary (spec section 2). A reviewing agent reads every view for this rule.
-- The host takes one event at a time; the world's entrance is handed to the composition root in `init` and is private otherwise; views get `send(Action)` and `model` and nothing else (spec section 5).
-- Every exported name was probed unqualified in a file importing SwiftUI and Foundation on 2026-09-20: `FeatureModule`, `FeatureEvent`, `Sidebar`, `AppModule`, `ModuleHost` and the nested `Model`, `Row`, `Action`, `Event`, `Output` compile, and `State`, `WindowGroup`, `Operation` and `Task` still resolve to SwiftUI's and Foundation's. A name a task adds beyond these gets the same probe before it is fixed (`docs/style.md`).
+- A user action is named for the control and the gesture, `createFolderButtonTapped`, `titleFieldSubmitted`, never for the operation it triggers: what a gesture means is the module's, and a view that could spell `commitRename` would know that a rename exists (spec section 2, settled in the review of #66).
+- The host takes one event at a time; the world's entrance is handed to the composition root in `init` and is private otherwise; views get `send(UserAction)` and `model` and nothing else (spec section 5).
+- Every exported name was probed unqualified in a file importing SwiftUI and Foundation: on 2026-09-20 `FeatureModule`, `FeatureEvent`, `Sidebar`, `AppModule`, `ModuleHost` and the nested `Model`, `Row`, `Event`, `Output`, on 2026-09-21 `UserAction` and `TodoApp`; all compile, and `State`, `WindowGroup`, `Operation` and `Task` still resolve to SwiftUI's and Foundation's. `App` failed the probe: a library exporting it makes the executable's `TodoMac: App` ambiguous. A name a task adds beyond these gets the same probe before it is fixed (`docs/style.md`).
 - Tests are swift-testing. A module test opens `Store.openInMemory(device:now:)` through `makeStore` with a deterministic clock, sends events and compares the model whole; the root package's suite runs on the host with `swift test` and on wasm32 with `swift test --swift-sdk swift-6.3.3-RELEASE_wasm`, both green before a PR; no test asserts a wall-clock value on wasm32 (#53).
 - `Apps/Apple` is a package of its own, built and tested from its directory with the pinned toolchain, which swiftly finds through the parent's `.swift-version`; it must also build with Xcode's toolchain, `/usr/bin/swift build`, which the macOS job runs on `main` from Task 6 on (ADR-0008).
 - Toolchain: always the swiftly-managed `swift`; every command assumes `export PATH="$HOME/.swiftly/bin:$PATH"`. A `.build` produced by Xcode's toolchain in the same directory has to be deleted before the pinned one builds there again.
@@ -41,8 +42,8 @@ from.
 | ---- | ---- | ----- |
 | `Package.swift` | 1, 3 | targets `FeatureModule`, `SidebarFeature`, `AppFeature`, `TestSupport`, the feature test targets; `WasmSizeProbe` depends on `AppFeature` |
 | `Sources/FeatureModule/FeatureModule.swift` | 1 | `FeatureEvent`, `FeatureModule` |
-| `Sources/Features/Sidebar/Sidebar.swift` | 1, 2, 5 | `Sidebar` with `Model`, `Row`, `Action`, `Event`, `Output`, `send` |
-| `Sources/Features/App/AppModule.swift` | 3 | `AppModule` with `Model`, `Detail`, `Action`, `Event`, `send` |
+| `Sources/Features/Sidebar/Sidebar.swift` | 1, 2, 5 | `Sidebar` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send` |
+| `Sources/Features/App/AppModule.swift` | 3 | `AppModule` with `Model`, `Detail`, `UserAction`, `Event`, `send` |
 | `Sources/WasmSizeProbe/main.swift` | 3 | drives `AppModule` as a web client will |
 | `scripts/wasm-size.sh` | 3 | the ceiling, re-measured |
 | `Tests/Support/TestSupport.swift` | 1 | `TestClock`, `makeStore`, moved out of `TodoCoreTests` |
@@ -52,12 +53,12 @@ from.
 | `Sources/TodoCLI/CLI.swift` | 4 | calls `DeviceFile` instead of its own copy |
 | `Apps/Apple/Package.swift` | 4, 5 | `TodoAppleUI`, `TodoAppleUITests`, `todo-mac` |
 | `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift` | 4 | `ModuleHost` |
-| `Apps/Apple/Sources/TodoAppleUI/Composition.swift` | 4, 5 | `Composition.launch`, `Composition.host` |
+| `Apps/Apple/Sources/TodoAppleUI/TodoApp.swift` | 4, 5 | `TodoApp.launch`, `TodoApp.host` |
 | `Apps/Apple/Sources/TodoAppleUI/SidebarView.swift` | 5 | `SidebarView` |
 | `Apps/Apple/Sources/TodoAppleUI/RootView.swift` | 5 | `RootView` |
 | `Apps/Apple/Sources/TodoAppleUI/AppScene.swift` | 5 | `AppScene` |
 | `Apps/Apple/Sources/todo-mac/TodoMac.swift` | 5 | `@main` |
-| `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `CompositionTests.swift` | 4 | the host's queue and the launch |
+| `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `TodoAppTests.swift` | 4 | the host's queue and the launch |
 | `.github/workflows/ci.yml` | 6 | the macOS job builds and tests `Apps/Apple`, and builds with Xcode's toolchain |
 | `README.md`, `docs/style.md`, `CHANGELOG.md` | 6 | how to run the app; the view rule; the epic's summary |
 
@@ -85,8 +86,8 @@ The owner reviews this table and the interface of every task below.
 ```swift
 // FeatureModule
 public protocol FeatureEvent: Equatable, Sendable {
-    associatedtype Action: Equatable & Sendable
-    static func action(_ action: Action) -> Self
+    associatedtype UserAction: Equatable & Sendable
+    static func action(_ action: UserAction) -> Self
 }
 
 public protocol FeatureModule: AnyObject {
@@ -109,11 +110,11 @@ public final class Sidebar: FeatureModule {
         public let rows: [Row]
         public let problem: String?
     }
-    public enum Action: Equatable, Sendable {
-        case select(ViewID)
+    public enum UserAction: Equatable, Sendable {
+        case rowSelected(ViewID)
     }
     public enum Event: FeatureEvent {
-        case action(Action)
+        case action(UserAction)
         case changed(ChangeSet)
     }
     public enum Output: Equatable, Sendable {
@@ -132,7 +133,7 @@ public func makeStore(device: String = Store.newDeviceID(), clock: TestClock = T
 **Rules.**
 
 - The rows are `store.views()` flattened: it already answers in tree order with effective parents, so the depth of a row is its parent's depth plus one, kept in a dictionary as the walk goes; no recursion, and a chain a thousand deep from sync reads like a flat list (`docs/style.md`, "No recursion over data-shaped depth").
-- The Inbox is selected at first, by `BuiltInTaskViews.inbox`. A `.select` sets the highlight and answers `.selected(id)` every time, since choosing the row already chosen is still a choice the root may act on. When `.changed` finds the selected view gone, no row is selected and nothing is answered: it was not a choice.
+- The Inbox is selected at first, by `BuiltInTaskViews.inbox`. A `.rowSelected` sets the highlight and answers `.selected(id)` every time, since choosing the row already chosen is still a choice the root may act on. When `.changed` finds the selected view gone, no row is selected and nothing is answered: it was not a choice.
 - `.changed` whose `views` is empty does nothing at all, not even a read; one that names a view rereads the whole tree, because views number in the tens and the order needs every row (spec, "The sidebar in M2").
 - `init` throws, because a store that cannot be read at launch is the composition root's to refuse (spec section 5); `send` never throws, and a read that fails inside it keeps the rows it has and writes the failure into `problem`, which Task 2 gives its first test through a refused write and this task names in its PR.
 - `TestSupport` is an ordinary target under `Tests/Support` so that `TodoCoreTests`, `SidebarFeatureTests` and later `AppFeatureTests` share one `makeStore`; it is in no product and builds for wasm32 like the core.
@@ -141,7 +142,7 @@ public func makeStore(device: String = Store.newDeviceID(), clock: TestClock = T
 
 - `initialModelListsTheBuiltInViewsInRankOrderWithInboxSelected`: five rows at depth 0, Inbox `isSelected`, `problem` nil.
 - `nestedViewsGetTheirDepthInTreeOrder`: a folder with two children and a grandchild reads as parent, children in rank order, grandchild at depth 2.
-- `selectMovesTheHighlightAndReportsTheChoice`: `.select(today)` answers `.selected(today)`, exactly one row `isSelected`.
+- `selectionMovesTheHighlightAndReportsTheChoice`: `.rowSelected(today)` answers `.selected(today)`, exactly one row `isSelected`.
 - `changedWithAViewRereadsTheTree`: a view created through the store appears after `.changed` naming it.
 - `changedWithoutAViewLeavesTheModelAlone`: a view created through the store does not appear after `.changed` naming only a task, which is the proof that no read happened.
 - `theSelectionIsDroppedWhenTheSelectedViewDisappears`: delete the selected view through the store, send `.changed`, no row selected, no output.
@@ -149,7 +150,7 @@ public func makeStore(device: String = Store.newDeviceID(), clock: TestClock = T
 
 **Verified facts and traps.**
 
-- 2026-09-20: the contract as written compiles under Swift 6.3.3 and under Xcode 26.3's 6.2.4 in language mode 6, and an enum case `case action(Action)` is accepted as the witness of the static requirement (SE-0280).
+- 2026-09-20: the contract as written compiles under Swift 6.3.3 and under Xcode 26.3's 6.2.4 in language mode 6, and an enum case `case action(_:)` is accepted as the witness of the static requirement (SE-0280); the associated type was then spelled `Action`, and its rename changes nothing the compiler sees.
 - 2026-09-20: an ordinary target declared with `path: "Tests/Support"` and depended on by a test target builds and its test passes with `swift test`.
 - `store.views()` returns every undeleted view in tree order with the effective parent already resolved (`Store+Views.swift`); `children(ofView:)` is a filter over it, so calling it per level would read the table once per level.
 - Trap: `TestSupport` becoming `public` widens `TestClock` and `makeStore`; nothing else in it may widen, and `@testable import TodoCore` stays in `TodoCoreTests` only.
@@ -160,7 +161,7 @@ public func makeStore(device: String = Store.newDeviceID(), clock: TestClock = T
 
 **Files.** `Sources/Features/Sidebar/Sidebar.swift`; `Tests/SidebarFeatureTests/SidebarTests.swift`.
 
-**Interface.** `Row` gains `draft`, `Action` gains five cases; the rest of Task 1's interface is unchanged.
+**Interface.** `Row` gains `draft`, `UserAction` gains five cases; the rest of Task 1's interface is unchanged.
 
 ```swift
 public struct Row: Equatable, Sendable {
@@ -171,22 +172,22 @@ public struct Row: Equatable, Sendable {
     public let draft: String?          // the rename in progress on this row, nil on every other
 }
 
-public enum Action: Equatable, Sendable {
-    case select(ViewID)
-    case beginRename(ViewID)
-    case draft(String)
-    case commitRename
-    case cancelRename
-    case createFolder
+public enum UserAction: Equatable, Sendable {
+    case rowSelected(ViewID)            // the list's selection changed
+    case renameMenuItemChosen(ViewID)   // the row's Rename menu item
+    case titleFieldChanged(String)      // the text of the open field
+    case titleFieldSubmitted            // Return in the open field
+    case titleFieldCancelled            // Esc in the open field
+    case createFolderButtonTapped       // the toolbar button
 }
 ```
 
 **Rules.**
 
-- `.beginRename(id)` opens the field on that row with the current title as the draft; `.draft(text)` replaces the draft and is ignored when no rename is open; `.cancelRename` closes the field and changes nothing; `.commitRename` with a draft that is empty after trimming whitespace sets `problem` to "A title cannot be empty" and leaves the field open, without touching the store, which a count of journal rows proves; otherwise it writes `update(view: id, [.title(draft)])`, closes the field and rereads (spec, "The sidebar in M2").
-- `.createFolder` writes `createView(NewTaskView(title: "New folder"))` at the end of the root level, rereads, selects the new row and opens its rename, so that the person types the name straight away. The default title is a constant of the module; its localisation belongs with the formatting service question of M3 and is raised in chat, not decided here.
+- `.renameMenuItemChosen(id)` opens the field on that row with the current title as the draft; `.titleFieldChanged(text)` replaces the draft; `.titleFieldCancelled` closes the field and changes nothing; `.titleFieldSubmitted` with a draft that is empty after trimming whitespace sets `problem` to "A title cannot be empty" and leaves the field open, without touching the store, which a count of journal rows proves; otherwise it writes `update(view: id, [.title(draft)])`, closes the field and rereads (spec, "The sidebar in M2"). The three field actions are ignored when no field is open: what a gesture means is the module's, and the view does not know whether a rename exists.
+- `.createFolderButtonTapped` writes `createView(NewTaskView(title: "New folder"))` at the end of the root level, rereads, selects the new row and opens its rename, so that the person types the name straight away. The default title is a constant of the module; its localisation belongs with the formatting service question of M3 and is raised in chat, not decided here.
 - A write that the store refuses, `StoreError.notFound` when a peer deleted the view underneath the rename, lands in `problem` as the error's description, closes the field and rereads. `problem` is cleared by the next action of any kind and survives `.changed`.
-- One rename at a time: `.beginRename` on another row moves the field there and drops the old draft.
+- One rename at a time: `.renameMenuItemChosen` on another row moves the field there and drops the old draft.
 
 **Tests.**
 
@@ -194,8 +195,8 @@ public enum Action: Equatable, Sendable {
 - `cancelRenameLeavesTheTitleAndClosesTheField`.
 - `anEmptyTitleIsRefusedByTheModuleAndTheFieldStaysOpen`: `problem` set, the journal's row count unchanged, `draft` still there.
 - `createFolderAddsARowAtTheEndSelectsItAndOpensItsRename`.
-- `aStoreRefusalLandsInTheProblemAndTheNextActionClearsIt`: delete the view through the store during the rename, commit, `problem` names the view; `.select` clears it.
-- `draftWithoutAnOpenRenameIsIgnored`.
+- `aStoreRefusalLandsInTheProblemAndTheNextActionClearsIt`: delete the view through the store during the rename, commit, `problem` names the view; `.rowSelected` clears it.
+- `fieldActionsWithoutAnOpenRenameAreIgnored`: `.titleFieldChanged`, `.titleFieldSubmitted` and `.titleFieldCancelled` with no field open leave the model and the journal's row count unchanged.
 - `problemSurvivesAChangedEvent`.
 
 **Verified facts and traps.**
@@ -221,11 +222,11 @@ public final class AppModule: FeatureModule {
         public let sidebar: Sidebar.Model
         public let detail: Detail?
     }
-    public enum Action: Equatable, Sendable {
-        case sidebar(Sidebar.Action)
+    public enum UserAction: Equatable, Sendable {
+        case sidebar(Sidebar.UserAction)
     }
     public enum Event: FeatureEvent {
-        case action(Action)
+        case action(UserAction)
         case changed(ChangeSet)
     }
     public typealias Output = Never
@@ -244,7 +245,7 @@ public final class AppModule: FeatureModule {
 
 **Tests.**
 
-- `theDetailFollowsTheSelection`: `.sidebar(.select(today))` gives a detail titled "Today".
+- `theDetailFollowsTheSelection`: `.sidebar(.rowSelected(today))` gives a detail titled "Today".
 - `theDetailFollowsARenameOfTheSelectedView`: rename through the sidebar's actions, detail title follows.
 - `theDetailIsDroppedWhenTheSelectedViewDisappears`: delete through the store, `.changed`, detail nil.
 - `changedReachesTheSidebar`: a view created through the store appears in `model.sidebar` after `.changed`.
@@ -259,7 +260,7 @@ public final class AppModule: FeatureModule {
 
 **Goal.** `Apps/Apple` exists with the host that views observe, tested for the one rule it holds, and the composition root that opens the database, keeps the device identity beside it and wires the store to the host.
 
-**Files.** `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift`, `Composition.swift`; `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `CompositionTests.swift`; `Package.swift` and `Sources/DeviceFile/DeviceFile.swift` in the root package; `Sources/TodoCLI/CLI.swift`.
+**Files.** `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift`, `TodoApp.swift`; `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `TodoAppTests.swift`; `Package.swift` and `Sources/DeviceFile/DeviceFile.swift` in the root package; `Sources/TodoCLI/CLI.swift`.
 
 **Interface.**
 
@@ -269,11 +270,11 @@ public final class AppModule: FeatureModule {
 public final class ModuleHost<M: FeatureModule> {
     public private(set) var model: M.Model
     public init(_ module: M, world: (@escaping @MainActor (M.Event) -> Void) -> Void)
-    public func send(_ action: M.Event.Action)
+    public func send(_ action: M.Event.UserAction)
 }
 
 @MainActor
-public enum Composition {
+public enum TodoApp {
     /// The store at its path, the root module, the host, and the store's onChange wired to the host.
     public static func launch(environment: [String: String]) throws -> ModuleHost<AppModule>
 }
@@ -288,8 +289,8 @@ public enum DeviceFile {
 
 **Rules.**
 
-- The host's `send(Action)` lifts into `.action` and `deliver(Event)`, which is private: whatever arrives while an event is in flight waits in an array and is sent after the current one returns, on one thread, so a module never sees its own write in the middle of its own update (spec section 5). `world` runs inside `init` after every property is set and receives `deliver` once; the composition root is its only caller.
-- `Composition.launch` reads `TODO_DB` and `TODO_DEVICE` the way the demo does, so one machine runs two copies as two devices; without them the database is `todo.sqlite` under Application Support in a `todo` directory created if missing, and the identity is `DeviceFile.read` beside it or a minted one kept there (ADR-0005). It opens the store with `Store.systemNow`, builds `AppModule`, the host, and assigns `store.onChange` to deliver `.changed`. It throws whatever the store or the file system throws; the scene decides that this is fatal (Task 5).
+- The host's `send(UserAction)` lifts into `.action` and `deliver(Event)`, which is private: whatever arrives while an event is in flight waits in an array and is sent after the current one returns, on one thread, so a module never sees its own write in the middle of its own update (spec section 5). `world` runs inside `init` after every property is set and receives `deliver` once; the composition root is its only caller.
+- `TodoApp.launch` reads `TODO_DB` and `TODO_DEVICE` the way the demo does, so one machine runs two copies as two devices; without them the database is `todo.sqlite` under Application Support in a `todo` directory created if missing, and the identity is `DeviceFile.read` beside it or a minted one kept there (ADR-0005). It opens the store with `Store.systemNow`, builds `AppModule`, the host, and assigns `store.onChange` to deliver `.changed`. It throws whatever the store or the file system throws; the scene decides that this is fatal (Task 5).
 - `DeviceFile` is the demo's `device(for:)` and `keep` written once and called from both, so that the app and the demo agree on where an identity lives; `TodoCLI` keeps `TODO_DEVICE` and `:memory:` as its own concerns.
 - `TodoAppleUI` depends on `AppFeature`, `FeatureModule`, `TodoCore` and `DeviceFile` by the local package path `../..`; the manifest pins `macOS(.v14)`; the executable comes in Task 5.
 
@@ -305,14 +306,14 @@ public enum DeviceFile {
 **Verified facts and traps.**
 
 - 2026-09-20: the host as written compiles under 6.3.3 and Xcode's 6.2.4 in language mode 6 as a `@MainActor @Observable` generic class holding a non-`Sendable` module, and the run shows a change set fired inside a write delivered after the send that caused it.
-- 2026-09-20: assigning a closure that calls the host to `Store.onChange`, whose type is not actor-isolated, compiled from main-actor top-level code; `Composition.launch` is `@MainActor` and is expected to be the same case, checked first thing.
+- 2026-09-20: assigning a closure that calls the host to `Store.onChange`, whose type is not actor-isolated, compiled from main-actor top-level code; `TodoApp.launch` is `@MainActor` and is expected to be the same case, checked first thing.
 - Trap: the demo writes the device file non-atomically on purpose (`CLI.keep`, FoundationEssentials on WASI refuses the atomic write); `DeviceFile` keeps that and its comment, since it builds for wasm32 with the rest of the root package.
 
 ### Task 5: The views, the scene and the executable
 
 **Goal.** `swift run todo-mac` opens a window with the sidebar over a real database: selecting shows the title in the detail pane, renaming goes through the module, a folder is created, and a problem is shown. The views hold no logic.
 
-**Files.** `Sources/Features/Sidebar/Sidebar.swift` and its tests; `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/SidebarView.swift`, `RootView.swift`, `AppScene.swift`, `Composition.swift`; `Apps/Apple/Sources/todo-mac/TodoMac.swift`.
+**Files.** `Sources/Features/Sidebar/Sidebar.swift` and its tests; `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/SidebarView.swift`, `RootView.swift`, `AppScene.swift`, `TodoApp.swift`; `Apps/Apple/Sources/todo-mac/TodoMac.swift`.
 
 **Interface.**
 
@@ -322,10 +323,10 @@ extension Sidebar.Model { public let selection: ViewID? }     // a stored field:
 extension Sidebar.Model.Row: Identifiable {}
 
 // TodoAppleUI
-struct SidebarView: View { init(model: Sidebar.Model, send: @escaping (Sidebar.Action) -> Void) }
+struct SidebarView: View { init(model: Sidebar.Model, send: @escaping (Sidebar.UserAction) -> Void) }
 struct RootView: View { init(host: ModuleHost<AppModule>) }
 public struct AppScene: Scene { public init(); public var body: some Scene }
-extension Composition { public static let host: ModuleHost<AppModule> }   // launched once; fatal with the reason if it cannot
+extension TodoApp { public static let host: ModuleHost<AppModule> }   // launched once; fatal with the reason if it cannot
 
 // todo-mac
 @main struct TodoMac: App { var body: some Scene { AppScene() } }
@@ -333,9 +334,9 @@ extension Composition { public static let host: ModuleHost<AppModule> }   // lau
 
 **Rules.**
 
-- `SidebarView` draws `List(model.rows, selection:)` with a binding whose get is `model.selection` and whose set sends `.select`; a row with a `draft` draws a `TextField` whose binding gets the draft and sets `.draft`, submits `.commitRename` and exits with `.cancelRename`; a context menu sends `.beginRename`; a toolbar button sends `.createFolder`; `problem` draws below the list when present. Every `if` is over a `Bool` or an optional of the model, and the only strings the view owns are its labels (spec section 2).
+- `SidebarView` draws `List(model.rows, selection:)` with a binding whose get is `model.selection` and whose set sends `.rowSelected`; a row with a `draft` draws a `TextField` whose binding gets the draft and sets `.titleFieldChanged`, whose `onSubmit` sends `.titleFieldSubmitted` and whose `onExitCommand` sends `.titleFieldCancelled`; a context menu item sends `.renameMenuItemChosen`; a toolbar button sends `.createFolderButtonTapped`; `problem` draws below the list when present. Every `if` is over a `Bool` or an optional of the model, and the only strings the view owns are its labels (spec section 2).
 - `RootView` gives the sidebar `host.model.sidebar` and `{ host.send(.sidebar($0)) }`, and draws `detail` in the second column of a `NavigationSplitView`, with a placeholder label when it is nil (spec sections 3 and 4).
-- `Composition.host` is a `@MainActor static let`, initialised once by the runtime on first use, which is how the composition happens once per launch without a `@State` whose initial value is evaluated on every creation of its struct (spec, Risks); a failed launch is `fatalError` with the store's message, the recovery flow being M3's.
+- `TodoApp.host` is a `@MainActor static let`, initialised once by the runtime on first use, which is how the composition happens once per launch without a `@State` whose initial value is evaluated on every creation of its struct (spec, Risks); a failed launch is `fatalError` with the store's message, the recovery flow being M3's.
 - The executable is `@main` and one line of body; nothing else may live in its target (ADR-0008).
 - Checked by hand and reported in the PR: the window opens and takes keyboard focus, or the activation the risk names is added; a rename with a Russian layout and with an input method that composes text; two instances under two `TODO_DB` paths.
 
@@ -382,7 +383,7 @@ extension Composition { public static let host: ModuleHost<AppModule> }   // lau
 | 2. The module contract | 1 (the protocols, the sidebar's types), 2 (the writes), 5 (`selection` and `Identifiable`, with their callers) |
 | 3. Composition | 3 |
 | 4. Navigation | 3 (`Detail` created from the output, where M3's list module goes); the mechanics, a stack or sheets, are the navigation epic's #67 and no task builds them, as the spec says |
-| 5. Hosting on Apple: the host, one event at a time, the composition root, the thread | 4; `Composition.host` once per launch in 5 |
+| 5. Hosting on Apple: the host, one event at a time, the composition root, the thread | 4; `TodoApp.host` once per launch in 5 |
 | 5. Formatting, Today | not built, as the spec says; no task touches them |
 | 6. Two packages, one target per feature, ADR-0001 extended, names, toolchains | 1 (targets), 4 (`Apps/Apple`), 6 (the toolchain check in CI) |
 | The sidebar in M2 | 1 (read, select, world), 2 (rename, create, refusal) |
