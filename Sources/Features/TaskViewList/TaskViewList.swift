@@ -20,7 +20,9 @@ public final class TaskViewList: FeatureModule {
 
             /// The text of the rename in progress on this row, and nil on every other row and whenever no
             /// field is open at all: a view puts a text field where this is not nil, draws the title
-            /// everywhere else, and that is the whole of what it knows about renaming.
+            /// everywhere else, and that is the whole of what it knows about renaming. It is what the
+            /// person typed, down to the spaces at its ends; what the store keeps is that text trimmed
+            /// (`commit`), since a caret is no place for the module to be moving text about.
             ///
             /// The draft is the module's, put on the row when the model is assembled and never kept in one.
             /// A read replaces every row, so a draft that lived in a row would be emptied by a peer's edit
@@ -188,26 +190,26 @@ public final class TaskViewList: FeatureModule {
     /// (`docs/style.md`). The field stays open on the refusal, because the person is mid-word and the text
     /// they typed is the only place the name exists.
     private func commit(_ rename: Rename) {
-        // "Empty after trimming", asked directly: `allSatisfy` is true of "" as well, and it answers the
-        // question without building a trimmed string that would be measured and thrown away. The standard
-        // library could trim — `trimmingPrefix(while:)` compiles at this package's deployment floor, probed
-        // rather than remembered (`docs/style.md`) — so this is the shorter way and not the only one.
-        // Nothing else in the state moves, which is what leaves the field open on what was typed.
-        guard !rename.draft.allSatisfy(\.isWhitespace) else {
+        // Trimmed once, and the one value both the refusal and the write work off: a draft that is nothing
+        // but whitespace trims to nothing, which is what empty means here, and no second rule has to agree
+        // with this one. Nothing else in the state moves, which is what leaves the field open on the raw
+        // text a person is still looking at.
+        let title = TaskViewList.trimmed(rename.draft)
+        guard !title.isEmpty else {
             state.problem = Problem.emptyTitle.sentence
             return
         }
         // The name a refusal would use, read before the write: the reread below drops the row, and by then
         // there is nothing left to call the view.
-        let title = state.rows.first { $0.id == rename.id }?.title
+        let viewName = state.rows.first { $0.id == rename.id }?.title
         var problem: String?
         do {
             // One change and no other: two changes to one field in one call keep only the last (#40), and a
-            // rename has nothing else to say. The raw draft goes in, spaces at the ends included: they are
-            // what the person typed, and a title is their word for the view.
-            try store.update(view: rename.id, [.title(rename.draft)])
+            // rename has nothing else to say. The trimmed title goes in: what the person typed is what the
+            // field shows them, and what a view is called is what the store keeps — padding is neither.
+            try store.update(view: rename.id, [.title(title)])
         } catch {
-            problem = TaskViewList.problem(error, renaming: title).sentence
+            problem = TaskViewList.problem(error, renaming: viewName).sentence
         }
         // The field closes either way. On the refusal the view it was open on is gone or unwritable, and a
         // field left open over it would invite the same person to type the same name again.
@@ -218,6 +220,18 @@ public final class TaskViewList: FeatureModule {
         state.rename = nil
         state.problem = problem
         reread()
+    }
+
+    /// The draft as the store keeps it: the same text with the whitespace at either end gone, and the
+    /// whitespace between words untouched, because that is part of the name.
+    ///
+    /// The standard library trims a prefix and has no suffix to match it — probed, not remembered
+    /// (`docs/style.md`) — so the tail is trimmed as the prefix of the reverse. Both passes are `while`
+    /// loops over the characters and neither recurses: a run of spaces in a title that arrived from sync is
+    /// as data-shaped as a chain of parents.
+    private static func trimmed(_ draft: String) -> String {
+        let head = draft.trimmingPrefix(while: \.isWhitespace)
+        return String(head.reversed().trimmingPrefix(while: \.isWhitespace).reversed())
     }
 
     /// The sentence a refused write reads as.

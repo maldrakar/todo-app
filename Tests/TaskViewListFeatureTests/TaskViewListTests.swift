@@ -301,3 +301,18 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
     let stored = try store.view(BuiltInTaskViews.inbox)?.title
     #expect(stored == "Inbox", "the dropped draft was never written, since nothing committed it")
 }
+
+@Test func aDraftIsStoredWithoutTheWhitespaceAtItsEnds() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store)
+    #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.upcoming))) == nil)
+    #expect(list.send(.action(.titleFieldChanged("  Work in progress \t "))) == nil)
+    // What the person typed is what the field shows, padding and all: the trim is about what the store
+    // keeps, not about moving text under a caret while it is still being typed.
+    #expect(list.model.rows[2].draft == "  Work in progress \t ")
+    #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    let stored = try store.view(BuiltInTaskViews.upcoming)?.title
+    #expect(stored == "Work in progress", "the ends go, and the space between the words stays")
+    #expect(list.model.rows.map(\.title) == ["Inbox", "Today", "Work in progress", "Logbook", "Trash"])
+    #expect(list.model.problem == nil)
+}
