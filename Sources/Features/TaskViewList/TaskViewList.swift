@@ -115,7 +115,7 @@ public final class TaskViewList: FeatureModule {
 
         var sentence: String {
             switch self {
-            case .couldNotRead: "The views could not be read, so this list is the last one that could be."
+            case .couldNotRead: "The views could not be read, so this list may be out of date."
             }
         }
     }
