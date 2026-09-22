@@ -235,8 +235,9 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
     #expect(list.model.rows.first?.draft == " ", "the field a person is typing in outlives a peer's edit")
 }
 
-/// The selection and the draft are kept opposite ways round — the selection read back out of the rows, the
-/// draft projected onto them — and this is where the two meet: a row a peer deleted takes both with it.
+/// The selection and the rename are the module's own state, and a reread is what holds them to the rows it
+/// just read: whichever of them names a row that did not come back goes with it. This is the rename's half,
+/// and the half a person is told about, because a name being typed is a thing to interrupt.
 @Test func aRenameEndsWhenThePeerDeletesTheRowItIsOn() throws {
     let store = try makeStore()
     let folder = try store.createView(NewTaskView(title: "Work"))
@@ -309,7 +310,8 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
     #expect(list.send(.action(.titleFieldChanged("  Work in progress \t "))) == nil)
     // What the person typed is what the field shows, padding and all: the trim is about what the store
     // keeps, not about moving text under a caret while it is still being typed.
-    #expect(list.model.rows[2].draft == "  Work in progress \t ")
+    let renaming = list.model.rows.first { $0.id == BuiltInTaskViews.upcoming }
+    #expect(renaming?.draft == "  Work in progress \t ")
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
     let stored = try store.view(BuiltInTaskViews.upcoming)?.title
     #expect(stored == "Work in progress", "the ends go, and the space between the words stays")

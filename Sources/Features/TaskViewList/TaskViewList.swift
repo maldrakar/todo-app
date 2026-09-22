@@ -26,8 +26,8 @@ public final class TaskViewList: FeatureModule {
             ///
             /// The draft is the module's, put on the row when the model is assembled and never kept in one.
             /// A read replaces every row, so a draft that lived in a row would be emptied by a peer's edit
-            /// arriving while a person was typing — where a highlight that outlived its row must vanish,
-            /// which is why the two are dropped by different rules (`reread`).
+            /// arriving while a person was typing. What ends it is its row going, which `reread` decides
+            /// for the draft and for the highlight alike.
             public let draft: String?
         }
 
@@ -256,13 +256,19 @@ public final class TaskViewList: FeatureModule {
     private func createFolder() -> Output? {
         do {
             let id = try store.createView(NewTaskView(title: TaskViewList.newFolderTitle))
-            state.selection = id
             state.rename = Rename(id: id, draft: TaskViewList.newFolderTitle)
             state.problem = nil
             reread()
+            // A stored selection names a row this list holds, and the read that just ran is the only thing
+            // that can say whether this one does: the write landed, but a read that failed behind it leaves
+            // the rows as they were, and a highlight moved to a row nobody holds is no highlight at all.
+            // So the selection moves only into rows that came back, and on a failed read it stays where the
+            // person last put it, which is what shipped before the state became one value.
+            if state.rows.contains(where: { $0.id == id }) { state.selection = id }
             // The selection moved without anybody choosing a row. The root does not read this model
             // (ADR-0006), so it is told the same thing a click would have told it, or its detail pane keeps
-            // the view from before the button.
+            // the view from before the button. It is told about the folder either way: the folder exists,
+            // and what the root shows for it is the root's business.
             return .selected(id)
         } catch {
             // The rows stand: nothing was written, so there is nothing to reread and nothing has moved.
@@ -287,8 +293,8 @@ public final class TaskViewList: FeatureModule {
 
     /// The name a new folder is born with. A constant because the row a person reads and the draft in the
     /// field are one word and two copies of it would drift apart. It is English here: a string a person
-    /// reads is the formatting service's to localise, which arrives with M3, and the owner has settled that
-    /// it stays English until then.
+    /// reads is the formatting service's to localise, and that service is M3's; until it arrives, a string
+    /// this module writes is English.
     private static let newFolderTitle = "New folder"
 
     /// Everything this module holds between two events: the rows as the last read produced them, the row a
@@ -302,8 +308,8 @@ public final class TaskViewList: FeatureModule {
     private struct State {
         var rows: [ReadRow]
         var selection: ViewID?
-        var rename: Rename? = nil
-        var problem: String? = nil
+        var rename: Rename?
+        var problem: String?
 
         /// The model a view draws: the rows with this person's session projected onto them — the highlight
         /// on the row they chose, the draft on the row they are renaming — and the sentence, if any.
