@@ -1,13 +1,16 @@
-// Sources/Features/Sidebar/Sidebar.swift
+// Sources/Features/TaskViewList/TaskViewList.swift
 import FeatureModule
 import TodoCore
 
-/// The tree of views as a list a sidebar can draw, and the row the person chose.
+/// The views a person keeps, flattened out of the store's tree into the list they are chosen from.
+///
+/// Named for what it holds and not for where it is put: the same list is a sidebar beside a Mac window and a
+/// screen of its own on a phone, and a module that knew which one it was would be two modules.
 ///
 /// The rows are flat and carry a depth instead of holding their children: a view drawing them indents by a
 /// number and decides nothing, and the walk that builds them never recurses over a chain that arrived from
 /// sync (`docs/style.md`).
-public final class Sidebar: FeatureModule {
+public final class TaskViewList: FeatureModule {
     public struct Model: Equatable, Sendable {
         public struct Row: Equatable, Sendable {
             public let id: ViewID
@@ -40,11 +43,11 @@ public final class Sidebar: FeatureModule {
 
     private let store: Store
 
-    /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a sidebar
-    /// that came up empty would look like a database with nothing in it (spec section 5).
+    /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
+    /// came up empty would look like a database with nothing in it (spec section 5).
     public init(store: Store) throws(StoreError) {
         self.store = store
-        self.model = Model(rows: try Sidebar.rows(of: store, selecting: BuiltInTaskViews.inbox), problem: nil)
+        self.model = Model(rows: try TaskViewList.rows(of: store, selecting: BuiltInTaskViews.inbox), problem: nil)
     }
 
     public func send(_ event: Event) -> Output? {
@@ -53,10 +56,10 @@ public final class Sidebar: FeatureModule {
             // Answered every time, the same id twice included: choosing the row that is already chosen is
             // still a choice, and what the root does with it — open the view, close a column behind it — is
             // the root's. The problem goes with the event that produced it (spec, "The sidebar in M2").
-            model = Model(rows: Sidebar.rows(model.rows, selecting: id), problem: nil)
+            model = Model(rows: TaskViewList.rows(model.rows, selecting: id), problem: nil)
             return .selected(id)
         case .changed(let changes):
-            // Every edit to a task is a commit that touched no view, and the sidebar is the same afterwards,
+            // Every edit to a task is a commit that touched no view, and this list is the same afterwards,
             // so the guard is what keeps a person typing in a list out of the views table. A commit that did
             // touch a view rereads the whole tree rather than the branch it names, because views number in
             // the tens and the tree order needs every row anyway (spec, "The sidebar in M2").
@@ -73,7 +76,7 @@ public final class Sidebar: FeatureModule {
     /// (ADR-0006) and rows cleared by a failed read would take with them the only thing left to act on.
     private func reread() {
         do {
-            model = Model(rows: try Sidebar.rows(of: store, selecting: selection), problem: nil)
+            model = Model(rows: try TaskViewList.rows(of: store, selecting: selection), problem: nil)
         } catch {
             model = Model(rows: model.rows, problem: String(describing: error))
         }
@@ -87,7 +90,7 @@ public final class Sidebar: FeatureModule {
     /// resolved, so a row's depth is its parent's plus one and the depths the walk has passed are all it
     /// carries: one pass, no stack, and a chain a thousand deep from sync reads like a flat list
     /// (`docs/style.md`, "No recursion over data-shaped depth"). A parent the walk has not passed reads as
-    /// no parent, the way the core resolves a link it cannot use, rather than as a row left out of a sidebar.
+    /// no parent, the way the core resolves a link it cannot use, rather than as a row left out of the list.
     private static func rows(of store: Store, selecting selection: ViewID?) throws(StoreError) -> [Model.Row] {
         var depths: [ViewID: Int] = [:]
         return try store.views().map { view in

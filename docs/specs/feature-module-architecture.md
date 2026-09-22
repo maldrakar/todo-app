@@ -94,9 +94,9 @@ Rules, each with its reason:
 
 ### 3. Composition: a tree of modules, a tree of views
 
-The root module is a `FeatureModule` like any other. Its `Model` composes the models of its children; its `UserAction` wraps their actions, `.sidebar(Sidebar.UserAction)`; its `Event` is `.action(UserAction)` and the events of the world, `.changed(ChangeSet)`. Its `send` hands a wrapped action to the child as `.action`, hands a world event to every child that takes it, takes the child's `Output` and reacts to it, then rebuilds its own model from the children's. In M2 the root holds the sidebar and a placeholder for the detail: the title of the selected view, or nothing.
+The root module is a `FeatureModule` like any other. Its `Model` composes the models of its children; its `UserAction` wraps their actions, `.taskViewList(TaskViewList.UserAction)`; its `Event` is `.action(UserAction)` and the events of the world, `.changed(ChangeSet)`. Its `send` hands a wrapped action to the child as `.action`, hands a world event to every child that takes it, takes the child's `Output` and reacts to it, then rebuilds its own model from the children's. In M2 the root holds the sidebar and a placeholder for the detail: the title of the selected view, or nothing.
 
-The tree of views mirrors the tree of modules. The root view receives the root model and a `send` over the root's actions; the sidebar view receives `model.sidebar` and a closure that takes a `Sidebar.UserAction` and wraps it in `.sidebar`. Nothing else crosses that boundary: no module instance and no store reaches a view.
+The tree of views mirrors the tree of modules. The root view receives the root model and a `send` over the root's actions; the list of views receives `model.taskViewList` and a closure that takes a `TaskViewList.UserAction` and wraps it in `.taskViewList`. Nothing else crosses that boundary: no module instance and no store reaches a view.
 
 An `Output` is the one-shot fact "the person chose this", which the parent acts on once. The current data the parent needs, such as the title of the selected view, it reads from the child's model after the send. Both exist because neither covers the other: a selection is state and a "open this task" or "dismiss me" is not.
 
@@ -147,7 +147,7 @@ Everything that runs everywhere stays in the root package; everything that runs 
 | ------- | ------ | ----- | ---------- |
 | root | `TodoCore` | the data layer, unchanged | everywhere |
 | root | `FeatureModule` | the module protocol and nothing else; the formatting service's protocol joins it in M3 | everywhere |
-| root | `SidebarFeature` (`Sources/Features/Sidebar`) | the sidebar module | everywhere |
+| root | `TaskViewListFeature` (`Sources/Features/TaskViewList`) | the sidebar module | everywhere |
 | root | `AppFeature` (`Sources/Features/App`) | the root module, depends on the children | everywhere |
 | root | one test target per feature | swift-testing, run on the host and on wasm32 | everywhere |
 | `Apps/Apple` | `TodoAppleUI` | SwiftUI views, the host, the composition root, the scene | Apple |
@@ -157,7 +157,7 @@ Everything that runs everywhere stays in the root package; everything that runs 
 
 **ADR-0001 extends to features.** A feature module imports `TodoCore`, the standard library and FoundationEssentials under the same `canImport` guard, and nothing else. The wasm build in CI is the enforcement, as it is for the core.
 
-**Names** are fixed in the plan, each after a compiler probe against SwiftUI and Foundation (`docs/style.md`). The candidates are `FeatureModule`, `Sidebar`, `AppModule` and `ModuleHost`; the nested `Model`, `Event` and `Output` are always qualified from outside.
+**Names** are fixed in the plan, each after a compiler probe against SwiftUI and Foundation (`docs/style.md`). The candidates are `FeatureModule`, `TaskViewList`, `AppModule` and `ModuleHost`; the nested `Model`, `Event` and `Output` are always qualified from outside.
 
 **Toolchains.** The Apple app is built by SwiftPM alone in M2: an executable target with a SwiftUI `App` builds and launches without a bundle (verified 2026-09-20 with the pinned 6.3.3, a library holding the `Scene` and a two-line executable). An Xcode project arrives when iOS, watchOS or the store needs a bundle, and it will be a thin shell: an app target with `@main`, Info.plist, assets, entitlements and signing, importing the same library. Apple accepts store builds made with Xcode's toolchain, which in Xcode 26.3 is Swift 6.2.4 against the pinned 6.3.3; the root package builds with it today without a change (verified 2026-09-20), and the macOS job keeps it that way. When the Xcode project arrives, the pinned version and Xcode's are brought to one, so that a single toolchain builds everything; the double build is the arrangement until then, not the plan.
 
@@ -219,12 +219,12 @@ flowchart LR
   subgraph root["Root package (builds everywhere)"]
     Core[TodoCore<br/>store, model, journal]
     Proto[FeatureModule<br/>the protocol]
-    Sidebar[SidebarFeature<br/>the sidebar module]
+    TaskViewList[TaskViewListFeature<br/>the sidebar module]
     App[AppFeature<br/>the root module]
-    Core --> Sidebar
-    Proto --> Sidebar
+    Core --> TaskViewList
+    Proto --> TaskViewList
     Proto --> App
-    Sidebar --> App
+    TaskViewList --> App
     Core --> App
   end
   subgraph apple["Apps/Apple (Apple only)"]
@@ -273,7 +273,7 @@ flowchart TB
   end
   subgraph views["Views (Apps/Apple)"]
     AV[Root view<br/>gets model and send]
-    SV[Sidebar view<br/>gets model.sidebar and a send over Sidebar.UserAction]
+    SV[Sidebar view<br/>gets model.taskViewList and a send over TaskViewList.UserAction]
     DV[Detail placeholder<br/>gets model.detail]
     AV --> SV
     AV --> DV
