@@ -195,15 +195,26 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
 
 @Test func fieldActionsWithoutAnOpenRenameAreIgnored() throws {
     let store = try makeStore()
+    let folder = try store.createView(NewTaskView(title: "Work"))
     let list = try TaskViewList(store: store)
+    // A sentence on the model with no field left open: the refusal below closes the field itself, which is
+    // the state these actions arrive in and the reason the model is left alone in it.
+    #expect(list.send(.action(.renameMenuItemChosen(folder))) == nil)
+    try store.delete(view: folder)
+    #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    let sentence = try #require(list.model.problem, "the refusal is the setup; without it this test proves nothing")
     let before = list.model
     let written = try store.journal(after: 0).count
     // What a gesture means is the module's to know: a view sends what the person did to a text field and
     // has no way of telling whether one is open, so a keystroke with no rename behind it is nothing at all
-    // — and not a rename of whichever row happens to be highlighted.
+    // — and not a rename of whichever row happens to be highlighted. Nothing at all includes the sentence:
+    // the field that just closed behind the refusal sends its cancellation here, and a sentence cleared by
+    // it would go between the person being told and reading it.
     #expect(list.send(.action(.titleFieldChanged("Anything at all"))) == nil)
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    #expect(list.send(.action(.titleFieldLostFocus)) == nil)
     #expect(list.send(.action(.titleFieldCancelled)) == nil)
+    #expect(list.model.problem == sentence, "the sentence outlives the gestures that were ignored")
     #expect(list.model == before)
     #expect(try store.journal(after: 0).count == written)
 }
@@ -240,4 +251,48 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
     #expect(list.model == after, "the rename ended with its row, so Return has nothing to submit")
     #expect(try store.journal(after: 0).count == written, "and nothing to write to a view that is gone")
+}
+
+@Test func aFieldThatLosesFocusKeepsWhatWasTyped() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store)
+    #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.logbook))) == nil)
+    #expect(list.send(.action(.titleFieldChanged("Done"))) == nil)
+    // Clicking away settles a name, the way it does in the Finder: the person wrote it and then went on
+    // with their work, and a name thrown away there is a name they have to type twice.
+    #expect(list.send(.action(.titleFieldLostFocus)) == nil)
+    let stored = try store.view(BuiltInTaskViews.logbook)?.title
+    #expect(stored == "Done")
+    #expect(list.model.rows.map(\.title) == ["Inbox", "Today", "Upcoming", "Done", "Trash"])
+    #expect(list.model.rows.allSatisfy { $0.draft == nil }, "the field is closed, the way Return closes it")
+    #expect(list.model.problem == nil)
+}
+
+@Test func aFieldThatLosesFocusOnAnEmptyTitleIsRefusedTheWayReturnIs() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store)
+    let written = try store.journal(after: 0).count
+    #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
+    #expect(list.send(.action(.titleFieldChanged("  "))) == nil)
+    // One draft ended two ways is one draft: a refusal that depended on which gesture ended it would make
+    // the same two spaces mean two different things.
+    #expect(list.send(.action(.titleFieldLostFocus)) == nil)
+    #expect(list.model.problem == "A title cannot be empty.")
+    #expect(list.model.rows.first?.draft == "  ", "the field stays open on the text, as it does for Return")
+    #expect(list.model.rows.first?.title == "Inbox")
+    #expect(try store.journal(after: 0).count == written)
+}
+
+@Test func choosingRenameOnASecondRowMovesTheFieldAndDropsTheFirstDraft() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store)
+    #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
+    #expect(list.send(.action(.titleFieldChanged("Later"))) == nil)
+    #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.trash))) == nil)
+    // One field at a time, and the one a person walked away from takes its draft with it: a name typed
+    // into a row nobody is looking at would be written by the next Return, wherever the field had moved.
+    #expect(list.model.rows.map(\.draft) == [nil, nil, nil, nil, "Trash"])
+    #expect(list.model.rows.first?.title == "Inbox")
+    let stored = try store.view(BuiltInTaskViews.inbox)?.title
+    #expect(stored == "Inbox", "the dropped draft was never written, since nothing committed it")
 }

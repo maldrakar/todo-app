@@ -42,7 +42,7 @@ public final class TaskViewList: FeatureModule {
     /// it triggers, so that what a gesture means is decided here: a second way to start a rename is another
     /// case beside these, not a view that works out what to ask for (ADR-0006).
     public enum UserAction: Equatable, Sendable {
-        /// The list's selection changed.
+        /// A row of the list, clicked or moved onto with the arrow keys.
         case rowSelected(ViewID)
         /// The row's Rename menu item.
         case renameMenuItemChosen(ViewID)
@@ -52,6 +52,8 @@ public final class TaskViewList: FeatureModule {
         case titleFieldSubmitted
         /// Esc in the open field.
         case titleFieldCancelled
+        /// The field lost focus, because the person went somewhere else on screen.
+        case titleFieldLostFocus
         /// The toolbar button.
         case createFolderButtonTapped
     }
@@ -88,9 +90,10 @@ public final class TaskViewList: FeatureModule {
             // still a choice, and what the root does with it — open the view, close a column behind it — is
             // the root's. The problem goes with the event that produced it (spec, "The sidebar in M2").
             //
-            // An open field stays open where it is. No action says that a field lost focus, and throwing a
-            // person's half-typed name away because the highlight moved would be this module inventing a
-            // gesture nobody made; the rename ends when they end it, or when its row does.
+            // An open field stays open where it is. Losing focus is an action of its own, and the view is
+            // what knows whether the field lost it: a module that read a selection change as a focus change
+            // would settle or drop a person's half-typed name on a gesture they need not have made. The
+            // owner settled this in chat on 2026-09-22, and `.titleFieldLostFocus` is the other half of it.
             model = Model(rows: TaskViewList.rows(model.rows, selecting: id, renaming: rename), problem: nil)
             return .selected(id)
         case .action(.renameMenuItemChosen(let id)):
@@ -102,7 +105,7 @@ public final class TaskViewList: FeatureModule {
             showRename()
             return nil
         case .action(.titleFieldChanged(let text)):
-            // The three field actions are ignored when no field is open: what a gesture means is the
+            // The four field actions are ignored when no field is open: what a gesture means is the
             // module's to know, and a view sending a keystroke cannot tell whether a rename exists. Ignored
             // to the letter, the model included — a field closing behind a refusal sends its cancellation
             // here, and clearing the problem on it would take away the sentence that explains the closing.
@@ -110,7 +113,11 @@ public final class TaskViewList: FeatureModule {
             self.rename = Rename(id: rename.id, draft: text)
             showRename()
             return nil
-        case .action(.titleFieldSubmitted):
+        case .action(.titleFieldSubmitted), .action(.titleFieldLostFocus):
+            // Two gestures, one line: Return says "this is the name" and clicking away says it too, the way
+            // the Finder settles a name that was typed and left. A module that told them apart would be
+            // guessing at a difference the person did not make, and one draft ended two ways would mean two
+            // things — an empty title included, which is refused here whichever gesture ended it.
             guard let rename else { return nil }
             commit(rename)
             return nil
@@ -140,14 +147,14 @@ public final class TaskViewList: FeatureModule {
     ///
     /// A read that fails keeps the rows on screen and says what happened, because `send` cannot throw
     /// (ADR-0006) and rows cleared by a failed read would take with them the only thing left to act on.
-    /// The problem to keep is the caller's: nil after an action, which answers for itself, and the one on
-    /// screen after a `.changed`, which answers for nobody.
+    /// The problem is the caller's to give: nil where the action answers for itself, the sentence a refused
+    /// write produced, or the one already on screen after a `.changed`, which answered nobody.
     private func reread(selecting selection: ViewID?, problem: String?) {
         do {
             let rows = try TaskViewList.rows(of: store, selecting: selection, renaming: rename)
             // A rename whose row is gone ends here, the way the selection does: the field has nothing left
             // to be drawn on, and a draft kept behind the rows would write a name to a view a person can no
-            // longer see. It is the one place the draft is dropped without the person saying so.
+            // longer see. Ending it is the read's to do: nothing the person did here says it is over.
             if let rename, !rows.contains(where: { $0.id == rename.id }) { self.rename = nil }
             model = Model(rows: rows, problem: problem)
         } catch {
@@ -162,9 +169,12 @@ public final class TaskViewList: FeatureModule {
     /// (`docs/style.md`). The field stays open on the refusal, because the person is mid-word and the text
     /// they typed is the only place the name exists.
     private func commit(_ rename: Rename) {
-        // Whitespace alone is empty, and `allSatisfy` says so of "" as well: a feature module imports no
-        // Foundation and has nothing to trim with (ADR-0001). The rows are the ones already on screen, the
-        // draft on them included, which is what leaves the field open.
+        // "Empty after trimming", asked directly: `allSatisfy` is true of "" as well, and it answers the
+        // question without building a trimmed string that would be measured and thrown away. The standard
+        // library could trim — `trimmingPrefix(while:)` compiles at this package's deployment floor, probed
+        // rather than remembered (`docs/style.md`) — so this is the shorter way and not the only one. The
+        // rows are the ones already on screen, the draft on them included, which is what leaves the field
+        // open.
         guard !rename.draft.allSatisfy(\.isWhitespace) else {
             model = Model(rows: model.rows, problem: Problem.emptyTitle.sentence)
             return
