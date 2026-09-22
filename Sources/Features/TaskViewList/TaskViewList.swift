@@ -21,8 +21,9 @@ public final class TaskViewList: FeatureModule {
 
         public let rows: [Row]
 
-        /// What the store refused, in the words the view shows until the next event. `send` cannot throw,
-        /// so a failure inside it has nowhere else to go.
+        /// What went wrong, as the finished sentence the view shows until the next event, and nil when
+        /// there is nothing to say: `send` cannot throw, so a failure inside it has nowhere else to go,
+        /// and a view that had to spell one would be a view holding logic (spec section 2).
         public let problem: String?
     }
 
@@ -78,7 +79,7 @@ public final class TaskViewList: FeatureModule {
         do {
             model = Model(rows: try TaskViewList.rows(of: store, selecting: selection), problem: nil)
         } catch {
-            model = Model(rows: model.rows, problem: String(describing: error))
+            model = Model(rows: model.rows, problem: Problem.couldNotRead.sentence)
         }
     }
 
@@ -104,5 +105,18 @@ public final class TaskViewList: FeatureModule {
     /// costs no read: a reread would answer with the tree the rows already are.
     private static func rows(_ rows: [Model.Row], selecting selection: ViewID) -> [Model.Row] {
         rows.map { Model.Row(id: $0.id, title: $0.title, depth: $0.depth, isSelected: $0.id == selection) }
+    }
+
+    /// What can go wrong in this module, with the sentence each one reads as. The store's own error stays
+    /// here: it names SQLite codes and journal rows, which is what a bug report is made of and not what a
+    /// person can do anything about, and spelling it in the model would put that text on a screen.
+    private enum Problem {
+        case couldNotRead
+
+        var sentence: String {
+            switch self {
+            case .couldNotRead: "The views could not be read, so this list is the last one that could be."
+            }
+        }
     }
 }

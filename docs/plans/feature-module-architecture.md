@@ -184,9 +184,9 @@ public enum UserAction: Equatable, Sendable {
 
 **Rules.**
 
-- `.renameMenuItemChosen(id)` opens the field on that row with the current title as the draft; `.titleFieldChanged(text)` replaces the draft; `.titleFieldCancelled` closes the field and changes nothing; `.titleFieldSubmitted` with a draft that is empty after trimming whitespace sets `problem` to "A title cannot be empty" and leaves the field open, without touching the store, which a count of journal rows proves; otherwise it writes `update(view: id, [.title(draft)])`, closes the field and rereads (spec, "The sidebar in M2"). The three field actions are ignored when no field is open: what a gesture means is the module's, and the view does not know whether a rename exists.
+- `.renameMenuItemChosen(id)` opens the field on that row with the current title as the draft; `.titleFieldChanged(text)` replaces the draft; `.titleFieldCancelled` closes the field and changes nothing; `.titleFieldSubmitted` with a draft that is empty after trimming whitespace sets `problem` to the sentence of `Problem.emptyTitle` ("A title cannot be empty.") and leaves the field open, without touching the store, which a count of journal rows proves; otherwise it writes `update(view: id, [.title(draft)])`, closes the field and rereads (spec, "The sidebar in M2"). The three field actions are ignored when no field is open: what a gesture means is the module's, and the view does not know whether a rename exists.
 - `.createFolderButtonTapped` writes `createView(NewTaskView(title: "New folder"))` at the end of the root level, rereads, selects the new row and opens its rename, so that the person types the name straight away. The default title is a constant of the module; its localisation belongs with the formatting service question of M3 and is raised in chat, not decided here.
-- A write that the store refuses, `StoreError.notFound` when a peer deleted the view underneath the rename, lands in `problem` as the error's description, closes the field and rereads. `problem` is cleared by the next action of any kind and survives `.changed`.
+- A write that the store refuses, `StoreError.notFound` when a peer deleted the view underneath the rename, lands in `problem` as the sentence of `Problem.viewIsGone(title:)`, which names the view the rename was on, closes the field and rereads. The store's error does not travel: `Problem` is the module's own private enum, added in Task 1 with `couldNotRead` and gaining these two cases here, and what reaches the model is always its finished sentence, because a view spells nothing (owner's review of #75). `problem` is cleared by the next action of any kind and survives `.changed`.
 - One rename at a time: `.renameMenuItemChosen` on another row moves the field there and drops the old draft.
 
 **Tests.**
@@ -195,7 +195,7 @@ public enum UserAction: Equatable, Sendable {
 - `cancelRenameLeavesTheTitleAndClosesTheField`.
 - `anEmptyTitleIsRefusedByTheModuleAndTheFieldStaysOpen`: `problem` set, the journal's row count unchanged, `draft` still there.
 - `createFolderAddsARowAtTheEndSelectsItAndOpensItsRename`.
-- `aStoreRefusalLandsInTheProblemAndTheNextActionClearsIt`: delete the view through the store during the rename, commit, `problem` names the view; `.rowSelected` clears it.
+- `aStoreRefusalLandsInTheProblemAndTheNextActionClearsIt`: delete the view through the store during the rename, commit, `problem` is the sentence of `.viewIsGone` and names the view; `.rowSelected` clears it.
 - `fieldActionsWithoutAnOpenRenameAreIgnored`: `.titleFieldChanged`, `.titleFieldSubmitted` and `.titleFieldCancelled` with no field open leave the model and the journal's row count unchanged.
 - `problemSurvivesAChangedEvent`.
 
