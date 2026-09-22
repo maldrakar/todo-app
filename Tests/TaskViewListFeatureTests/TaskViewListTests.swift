@@ -247,6 +247,11 @@ private func changeSet(of store: Store, from write: () throws -> Void) throws ->
     #expect(list.send(.changed(deleted)) == nil)
     let after = list.model
     #expect(after.rows.allSatisfy { $0.draft == nil }, "no row is left for the field to be on")
+    // The same fact by another route says the same thing: a person interrupted mid-name is told why the
+    // field went, whether the news came back with their Return or arrived from the peer first.
+    let sentence = try #require(after.problem)
+    #expect(sentence.contains("Work"), "the sentence names the view the field was open on")
+    #expect(!sentence.contains("Work in progress"), "it names the view, not the name that never took")
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
     #expect(list.model == after, "the rename ended with its row, so Return has nothing to submit")
