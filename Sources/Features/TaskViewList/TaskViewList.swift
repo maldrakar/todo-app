@@ -150,9 +150,11 @@ public final class TaskViewList: FeatureModule {
             do {
                 try reread()
             } catch {
-                // Nothing of this person's is in flight, so "the list may be out of date" is the whole of
-                // what there is to say about a read that failed.
-                state.problem = Problem.couldNotRead.sentence
+                // Only when there is nothing on screen already. A `.changed` neither clears a sentence nor
+                // replaces one, because it answers for nobody: the field can be open with a refusal on it
+                // when a peer's edit arrives, and "the list may be out of date" would take the place of
+                // what the person was actually told.
+                if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
             }
             return nil
         }
@@ -232,9 +234,9 @@ public final class TaskViewList: FeatureModule {
         do {
             try reread()
         } catch {
-            // Only when there is nothing better to say. A refusal answered what the person asked for and
-            // named the view it was about; a read that failed afterwards says the list may be stale, which
-            // is the smaller of the two facts and must not take the place of the larger.
+            // Only when there is nothing better to say. A refusal answered what the person asked for, and
+            // named the view where it could; a read that failed afterwards says the list may be stale,
+            // which is the smaller of the two facts and must not take the place of the larger.
             if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
         }
     }
@@ -282,25 +284,28 @@ public final class TaskViewList: FeatureModule {
         state.problem = nil
         do {
             try reread()
-            // The invariant that holds this shut: nothing about this person's session — the highlight
-            // moved for them, the field opened for them — is put on a row this list does not hold, and a
-            // read is the only thing that can say whether it holds one. Hence both are set here and not a
-            // line earlier: the write landed, but a peer can have deleted the folder before this read saw
-            // it, and a rename set on a row that never came back would open a text field on a folder made
-            // minutes ago, the moment any unrelated `.changed` brought the row in.
-            if state.rows.contains(where: { $0.id == id }) {
-                state.selection = id
-                state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
-            }
         } catch {
-            // The folder is written and cannot be shown yet. Neither the highlight nor the field moves to
-            // it, by the same invariant: the rows here are the ones from before the button.
+            // The folder is written and cannot be shown yet, so neither the highlight nor the field moves
+            // onto it: the rows here are the ones from before the button, and a rename left on a row this
+            // list does not hold would be waiting there when the next unrelated `.changed` brought the row
+            // in, opening a text field on a folder made minutes ago.
             state.problem = Problem.couldNotRead.sentence
+            return nil
         }
-        // The selection moved without anybody choosing a row. The root does not read this model
-        // (ADR-0006), so it is told the same thing a click would have told it, or its detail pane keeps
-        // the view from before the button. It is told about the folder either way: the folder exists, and
-        // what the root shows for it is the root's business.
+        // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
+        // of its own accord, after a write of its own, goes onto a row the list holds, and the read that
+        // just ran is the only thing that can say whether it holds one. It does not cover `.rowSelected`,
+        // which stores the id a view names without asking the rows (left as it shipped, see #77).
+        //
+        // A peer can have deleted the folder between the write and this read, and a highlight on a row
+        // that came back deleted is a highlight on nothing.
+        guard state.rows.contains(where: { $0.id == id }) else { return nil }
+        state.selection = id
+        state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
+        // The selection moved without anybody choosing a row, and the root does not read this model
+        // (ADR-0006), so it is told what a click would have told it. It is told only where the highlight
+        // actually moved: the root builds its detail from this alone, and a detail pane on a folder the
+        // sidebar is not highlighting is the divergence this output exists to prevent.
         return .selected(id)
     }
 
