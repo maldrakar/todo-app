@@ -110,7 +110,7 @@ public final class TaskViewList: FeatureModule {
             guard let row = state.rows.first(where: { $0.id == id }) else { return nil }
             // One field at a time: the rename that was open is replaced, draft and all, which is what makes
             // the menu item on a second row move the field rather than open another one.
-            state.rename = Rename(id: id, draft: row.title)
+            state.rename = State.Rename(id: id, draft: row.title)
             state.problem = nil
             return nil
         case .action(.titleFieldChanged(let text)):
@@ -119,7 +119,7 @@ public final class TaskViewList: FeatureModule {
             // to the letter, the sentence included — a field closing behind a refusal sends its cancellation
             // here, and clearing the sentence on it would take away what explains the closing.
             guard let rename = state.rename else { return nil }
-            state.rename = Rename(id: rename.id, draft: text)
+            state.rename = State.Rename(id: rename.id, draft: text)
             state.problem = nil
             return nil
         case .action(.titleFieldSubmitted), .action(.titleFieldLostFocus):
@@ -147,7 +147,13 @@ public final class TaskViewList: FeatureModule {
             // The sentence stands unless the reread replaces it. It answered what a person did, and what
             // another device did is no answer to it: a sentence cleared by a peer's edit would go between
             // the person being told and reading it.
-            reread()
+            do {
+                try reread()
+            } catch {
+                // Nothing of this person's is in flight, so "the list may be out of date" is the whole of
+                // what there is to say about a read that failed.
+                state.problem = Problem.couldNotRead.sentence
+            }
             return nil
         }
     }
@@ -160,27 +166,31 @@ public final class TaskViewList: FeatureModule {
     /// refused write gives for the same fact, since a peer's delete is that fact arriving by another route
     /// (owner's review of #77). Both are dropped here rather than left to be discovered by the next write.
     ///
-    /// A read that fails keeps the rows on screen and says what happened, because `send` cannot throw
-    /// (ADR-0006) and rows cleared by a failed read would take with them the only thing left to act on.
-    private func reread() {
-        do {
-            let rows = try TaskViewList.rows(of: store)
-            if let selection = state.selection, !rows.contains(where: { $0.id == selection }) {
-                state.selection = nil
-            }
-            if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
-                // The name comes off the rows as they still are: the ones being read in no longer hold the
-                // view, and after the assignment below there is nothing left to call it. A row already gone
-                // from those too cannot be named at all, and an invented name is worse than silence.
-                if let title = state.rows.first(where: { $0.id == rename.id })?.title {
-                    state.problem = Problem.viewIsGone(title: title).sentence
-                }
-                state.rename = nil
-            }
-            state.rows = rows
-        } catch {
-            state.problem = Problem.couldNotRead.sentence
+    /// The rows on screen are never cleared by a read that failed, because they are assigned last and a
+    /// throw leaves them where they were: `send` cannot throw (ADR-0006), and a list emptied by a failed
+    /// read would take with it the only thing left to act on.
+    ///
+    /// What a failed read means is the caller's to say, which is why this throws instead of writing a
+    /// sentence of its own. It means three different things: after a `.changed` nothing else is in flight,
+    /// after a refused write there is already something more specific to say, and after a folder was
+    /// written it means the folder cannot be shown yet — and a reread that swallowed the error had to pick
+    /// one of the three for all of them, which is what left the corner this closes (owner's review of #77,
+    /// 2026-09-24).
+    private func reread() throws(StoreError) {
+        let rows = try TaskViewList.rows(of: store)
+        if let selection = state.selection, !rows.contains(where: { $0.id == selection }) {
+            state.selection = nil
         }
+        if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
+            // The name comes off the rows as they still are: the ones being read in no longer hold the
+            // view, and after the assignment below there is nothing left to call it. A row already gone
+            // from those too cannot be named at all, and an invented name is worse than silence.
+            if let title = state.rows.first(where: { $0.id == rename.id })?.title {
+                state.problem = Problem.viewIsGone(title: title).sentence
+            }
+            state.rename = nil
+        }
+        state.rows = rows
     }
 
     /// Writes the draft and closes the field, or refuses it and leaves the field where it is.
@@ -189,7 +199,7 @@ public final class TaskViewList: FeatureModule {
     /// this list's rule, and a core that had an opinion about it would hold the policy of its client
     /// (`docs/style.md`). The field stays open on the refusal, because the person is mid-word and the text
     /// they typed is the only place the name exists.
-    private func commit(_ rename: Rename) {
+    private func commit(_ rename: State.Rename) {
         // Trimmed once, and the one value both the refusal and the write work off: a draft that is nothing
         // but whitespace trims to nothing, which is what empty means here, and no second rule has to agree
         // with this one. Nothing else in the state moves, which is what leaves the field open on the raw
@@ -219,7 +229,14 @@ public final class TaskViewList: FeatureModule {
         // one.
         state.rename = nil
         state.problem = problem
-        reread()
+        do {
+            try reread()
+        } catch {
+            // Only when there is nothing better to say. A refusal answered what the person asked for and
+            // named the view it was about; a read that failed afterwards says the list may be stale, which
+            // is the smaller of the two facts and must not take the place of the larger.
+            if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
+        }
     }
 
     /// The draft as the store keeps it: the same text with the whitespace at either end gone, and the
@@ -254,27 +271,37 @@ public final class TaskViewList: FeatureModule {
     /// The write goes first and the rows come back out of the store: the id, the rank and the place in the
     /// tree are the store's to decide, and a row put together here would be this module's guess at them.
     private func createFolder() -> Output? {
+        let id: ViewID
         do {
-            let id = try store.createView(NewTaskView(title: TaskViewList.newFolderTitle))
-            state.rename = Rename(id: id, draft: TaskViewList.newFolderTitle)
-            state.problem = nil
-            reread()
-            // A stored selection names a row this list holds, and the read that just ran is the only thing
-            // that can say whether this one does: the write landed, but a read that failed behind it leaves
-            // the rows as they were, and a highlight moved to a row nobody holds is no highlight at all.
-            // So the selection moves only into rows that came back, and on a failed read it stays where the
-            // person last put it, which is what shipped before the state became one value.
-            if state.rows.contains(where: { $0.id == id }) { state.selection = id }
-            // The selection moved without anybody choosing a row. The root does not read this model
-            // (ADR-0006), so it is told the same thing a click would have told it, or its detail pane keeps
-            // the view from before the button. It is told about the folder either way: the folder exists,
-            // and what the root shows for it is the root's business.
-            return .selected(id)
+            id = try store.createView(NewTaskView(title: TaskViewList.newFolderTitle))
         } catch {
             // The rows stand: nothing was written, so there is nothing to reread and nothing has moved.
             state.problem = Problem.couldNotSave.sentence
             return nil
         }
+        state.problem = nil
+        do {
+            try reread()
+            // The invariant that holds this shut: nothing about this person's session — the highlight
+            // moved for them, the field opened for them — is put on a row this list does not hold, and a
+            // read is the only thing that can say whether it holds one. Hence both are set here and not a
+            // line earlier: the write landed, but a peer can have deleted the folder before this read saw
+            // it, and a rename set on a row that never came back would open a text field on a folder made
+            // minutes ago, the moment any unrelated `.changed` brought the row in.
+            if state.rows.contains(where: { $0.id == id }) {
+                state.selection = id
+                state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
+            }
+        } catch {
+            // The folder is written and cannot be shown yet. Neither the highlight nor the field moves to
+            // it, by the same invariant: the rows here are the ones from before the button.
+            state.problem = Problem.couldNotRead.sentence
+        }
+        // The selection moved without anybody choosing a row. The root does not read this model
+        // (ADR-0006), so it is told the same thing a click would have told it, or its detail pane keeps
+        // the view from before the button. It is told about the folder either way: the folder exists, and
+        // what the root shows for it is the root's business.
+        return .selected(id)
     }
 
     /// The tree as one read produced it. `views()` answers parents before children with the effective parent
@@ -282,12 +309,12 @@ public final class TaskViewList: FeatureModule {
     /// it carries: one pass, no stack, and a chain a thousand deep from sync reads like a flat list
     /// (`docs/style.md`, "No recursion over data-shaped depth"). A parent the walk has not passed reads as
     /// no parent, the way the core resolves a link it cannot use, rather than as a row left out of the list.
-    private static func rows(of store: Store) throws(StoreError) -> [ReadRow] {
+    private static func rows(of store: Store) throws(StoreError) -> [State.ReadRow] {
         var depths: [ViewID: Int] = [:]
         return try store.views().map { view in
             let depth = view.parent.flatMap { depths[$0] }.map { $0 + 1 } ?? 0
             depths[view.id] = depth
-            return ReadRow(id: view.id, title: view.title, depth: depth)
+            return State.ReadRow(id: view.id, title: view.title, depth: depth)
         }
     }
 
@@ -324,24 +351,24 @@ public final class TaskViewList: FeatureModule {
                 problem: problem
             )
         }
-    }
 
-    /// One row of the list as a read of the store produced it, before anything about this person's session
-    /// is projected onto it. It is what the store answered and nothing else, which is what lets the same
-    /// read serve a highlight that moves and a field that opens without being read again.
-    private struct ReadRow {
-        let id: ViewID
-        let title: String
-        let depth: Int
-    }
+        /// One row of the list as a read of the store produced it, before anything about this person's
+        /// session is projected onto it. It is what the store answered and nothing else, which is what lets
+        /// the same read serve a highlight that moves and a field that opens without being read again.
+        struct ReadRow {
+            let id: ViewID
+            let title: String
+            let depth: Int
+        }
 
-    /// The rename a person has open: the row the field is on, and the text in it.
-    private struct Rename {
-        let id: ViewID
-        let draft: String
+        /// The rename a person has open: the row the field is on, and the text in it.
+        struct Rename {
+            let id: ViewID
+            let draft: String
 
-        /// The draft as a row carries it, which is the projection `Model.Row.draft` is documented as.
-        func text(on row: ViewID) -> String? { row == id ? draft : nil }
+            /// The draft as a row carries it, which is the projection `Model.Row.draft` is documented as.
+            func text(on row: ViewID) -> String? { row == id ? draft : nil }
+        }
     }
 
     /// What can go wrong in this module, with the sentence each one reads as. The store's own error stays
