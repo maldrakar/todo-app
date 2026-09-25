@@ -302,10 +302,11 @@ public final class TaskViewList: FeatureModule {
         guard state.rows.contains(where: { $0.id == id }) else { return nil }
         state.selection = id
         state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
-        // The selection moved without anybody choosing a row, and the root does not read this model
-        // (ADR-0006), so it is told what a click would have told it. It is told only where the highlight
-        // actually moved: the root builds its detail from this alone, and a detail pane on a folder the
-        // sidebar is not highlighting is the divergence this output exists to prevent.
+        // The selection moved without anybody choosing a row, and the root carries this model to the view
+        // and learns what was chosen from the output alone (spec section 4), so it is told what a click
+        // would have told it. It is told only where the highlight actually moved: the root builds its
+        // detail from this alone, and a detail pane on a folder the sidebar is not highlighting is the
+        // divergence this output exists to prevent.
         return .selected(id)
     }
 

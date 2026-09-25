@@ -34,15 +34,19 @@ let package = Package(
         // is read here rather than taken on trust: a feature depends on the core and the contract, never on
         // another feature and never on the root module (ADR-0007).
         .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskViewList"),
+        // The root module, the one feature that depends on others, since composing them is what it is for;
+        // no feature depends on it (ADR-0007).
+        .target(name: "AppFeature", dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature"], path: "Sources/Features/App"),
         // The test helpers as an ordinary target: a test target cannot be depended on, and every feature's
         // tests open a store the same way. It is in no product, so nothing ships it.
         .target(name: "TestSupport", dependencies: ["TodoCore"], path: "Tests/Support"),
         .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
-        .executableTarget(name: "WasmSizeProbe", dependencies: ["TodoCore"]),
+        .executableTarget(name: "WasmSizeProbe", dependencies: ["TodoCore", "AppFeature", "TaskViewListFeature"]),
         .testTarget(name: "SQLiteKitTests", dependencies: ["SQLiteKit"]),
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "TaskViewListFeatureTests", dependencies: ["TaskViewListFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
+        .testTarget(name: "AppFeatureTests", dependencies: ["AppFeature", "TaskViewListFeature", "TodoCore", "TestSupport"]),
     ],
     swiftLanguageModes: [.v6]
 )

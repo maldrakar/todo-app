@@ -4,17 +4,6 @@ import TaskViewListFeature
 import TodoCore
 import SQLiteKit
 
-/// The change set a write produced, taken the way the composition root takes it: from `Store.onChange`, the
-/// core's only push towards the UI and the only source of a `ChangeSet` there is, since nothing outside the
-/// core can build one.
-private func changeSet(of store: Store, from write: () throws -> Void) throws -> ChangeSet {
-    var captured: ChangeSet?
-    store.onChange = { captured = $0 }
-    defer { store.onChange = nil }
-    try write()
-    return try #require(captured)
-}
-
 @Test func initialModelListsTheBuiltInViewsInRankOrderWithInboxSelected() throws {
     let model = try TaskViewList(store: try makeStore()).model
     #expect(model.rows.map(\.title) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash"])

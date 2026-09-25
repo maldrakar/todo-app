@@ -1,3 +1,4 @@
+import Testing
 import TodoCore
 
 /// A clock that starts at a fixed millisecond and advances by one on every call.
@@ -12,4 +13,15 @@ public final class TestClock {
 /// what the sync tests exchange between; a test that reopens the same database passes the first store's id.
 public func makeStore(device: String = Store.newDeviceID(), clock: TestClock = TestClock()) throws(StoreError) -> Store {
     try Store.openInMemory(device: device, now: clock.now)
+}
+
+/// The change set a write produced, taken the way the composition root takes it: from `Store.onChange`, the
+/// core's only push towards the UI and the only source of a `ChangeSet` there is, since nothing outside the
+/// core can build one.
+public func changeSet(of store: Store, from write: () throws -> Void) throws -> ChangeSet {
+    var captured: ChangeSet?
+    store.onChange = { captured = $0 }
+    defer { store.onChange = nil }
+    try write()
+    return try #require(captured)
 }

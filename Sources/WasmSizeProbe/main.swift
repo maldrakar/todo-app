@@ -1,4 +1,6 @@
 // Sources/WasmSizeProbe/main.swift
+import AppFeature
+import TaskViewListFeature
 import TodoCore
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -13,15 +15,17 @@ import Glibc
 import WASILibc
 #endif
 
-/// What the wasm size job measures: a client of `TodoCore` and nothing else.
+/// What the wasm size job measures: the root module and the core a web client ships with it.
 ///
 /// It is not part of the product, nothing imports it and no platform ships it. The budget is about the web
 /// client, and the `todo` demo is the wrong stand-in for one: the demo carries an argument parser, a
 /// formatter and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about
-/// the core. This executable calls the public API the way a web entry point will — open a store in memory,
-/// write through it, read a page, search, round-trip a filter, exchange a journal, take a snapshot — and
-/// what a client calls is what the linker has to keep. The number the job prints is therefore the core a
-/// web client cannot dead-strip its way out of shipping.
+/// the core. This executable does what a web entry point will: it builds the root module over a store in
+/// memory and drives it — a selection, a rename, a new folder, and the change each write produced — and it
+/// calls the rest of the core's public API itself — write through a store, read a page, search, round-trip
+/// a filter, exchange a journal, take a snapshot — because that is the API the modules M3 adds will call.
+/// What a client calls is what the linker has to keep, so the number the job prints is the root module and
+/// the core a web client cannot dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.
@@ -108,6 +112,30 @@ private enum WasmSizeProbe {
         if let seen = exported.last?.clock { clock.observe(seen) }
         let stamp = clock.next()
 
+        // The root module, driven as a web client will drive it. The store is its own, because a host owns
+        // its store's `onChange` and the first store's is already counting. A change a write produces is
+        // queued and delivered after the `send` that wrote it has returned, which is the one rule the host
+        // holds (spec section 5): delivered from inside `onChange`, it would reach the root in the middle
+        // of the update that caused it.
+        let appStore = try Store.openInMemory(device: Store.newDeviceID(), now: { fixedNow })
+        var pending: [ChangeSet] = []
+        appStore.onChange = { pending.append($0) }
+        let app = try AppModule(store: appStore)
+        func perform(_ action: AppModule.UserAction) {
+            app.send(.action(action))
+            while !pending.isEmpty { app.send(.changed(pending.removeFirst())) }
+        }
+        perform(.taskViewList(.rowSelected(BuiltInTaskViews.today)))
+        perform(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today)))
+        perform(.taskViewList(.titleFieldChanged("Today, open")))
+        perform(.taskViewList(.titleFieldSubmitted))
+        // Read between the two writes: after the folder the pane shows the folder, and the title the rename
+        // put there would not reach a `print` at all.
+        let renamed = app.model.detail?.title ?? "none"
+        perform(.taskViewList(.createFolderButtonTapped))
+        let root = app.model
+        let newFolder = root.taskViewList.rows.first(where: \.isSelected)
+
         print("tasks \(restoredTasks.count), tags \(try store.tags().count), views \(try store.views().count) of \(sidebar.count) at the root, roots \(roots.count)")
         print("page \(page.view.title): \(page.sections.count) sections, groups \(page.sections.flatMap(\.groups).map { label($0.key) }.joined(separator: "/")), listed \(listed.count), inbox \(inbox.sections.count)")
         print("task \(title) of \(reread) (\(tagTitle), notes \(notes.count) characters), pinned \(pinned.count), today \(today) to \(today.advanced(by: 7)) is \(today.advanced(by: 7) - today) days")
@@ -116,6 +144,7 @@ private enum WasmSizeProbe {
         print("journal \(exported.count) operations, first \(exported.first.map { "\($0.entity.rawValue).\($0.field) at \($0.clock.raw)" } ?? "none"), pair \(JournalOperation.pairID(view, review))")
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
+        print("root \(root.taskViewList.rows.count) views, detail \(renamed) then \(root.detail?.title ?? "none"), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
     }
 
