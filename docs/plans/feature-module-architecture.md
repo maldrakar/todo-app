@@ -334,7 +334,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 **Rules.**
 
-- `TaskViewListView` draws `List(model.rows, selection:)` with a binding whose get is `model.selection` and whose set sends `.rowSelected`; a row with a `draft` draws a `TextField` whose binding gets the draft and sets `.titleFieldChanged`, whose `onSubmit` sends `.titleFieldSubmitted` and whose `onExitCommand` sends `.titleFieldCancelled`; a context menu item sends `.renameMenuItemChosen`; a toolbar button sends `.createFolderButtonTapped`; `problem` draws below the list when present. Every `if` is over a `Bool` or an optional of the model, and the only strings the view owns are its labels (spec section 2).
+- `TaskViewListView` draws `List(model.rows, selection:)` with a binding whose get is `model.selection` and whose set sends `.rowSelected`; a row with a `draft` draws a `TextField` whose binding gets the draft and sets `.titleFieldChanged`, whose `onSubmit` sends `.titleFieldSubmitted`, whose `onExitCommand` sends `.titleFieldCancelled` and which sends `.titleFieldLostFocus` when focus leaves it, the mechanism being Task 5's to find and report; a context menu item sends `.renameMenuItemChosen`; a toolbar button sends `.createFolderButtonTapped`; `problem` draws below the list when present. Every `if` is over a `Bool` or an optional of the model, and the only strings the view owns are its labels (spec section 2).
 - `RootView` gives `TaskViewListView` `host.model.taskViewList` and `{ host.send(.taskViewList($0)) }`, and draws `detail` in the second column of a `NavigationSplitView`, with a placeholder label when it is nil (spec sections 3 and 4).
 - `TodoApp.host` is a `@MainActor static let`, initialised once by the runtime on first use, which is how the composition happens once per launch without a `@State` whose initial value is evaluated on every creation of its struct (spec, Risks); a failed launch is `fatalError` with the store's message, the recovery flow being M3's.
 - The executable is `@main` and one line of body; nothing else may live in its target (ADR-0008).
@@ -349,6 +349,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 - 2026-09-20: a SwiftUI app whose `Scene` lives in a library target builds and launches from a two-line executable of a bare SwiftPM package, with the pinned toolchain.
 - 2026-09-20: `TaskViewListView` and `RootView` as sketched above compile against the contract in language mode 6 under both toolchains.
+- Added by #69: `TaskViewList.UserAction` gained `titleFieldLostFocus`, which the module settles exactly as it settles Return, since the owner ruled on 2026-09-22 that clicking away states a name rather than drops it. This task is its first and only caller, so the view has to have a way of telling the module that focus left the field, and an empty draft is refused there with the field left open — which is a field the view will have to put the caret back into.
 - Trap: a `@State` in a `Scene` or `App` evaluates its initial value on every creation of the struct, and a composition held that way opens the store twice over one file, which is two stores over one journal (ADR-0005).
 - Trap: a bare executable has no bundle, so `Bundle.main` has no resources and no Info.plist; nothing in `TodoAppleUI` may rely on either.
 
