@@ -66,9 +66,22 @@ import TodoCore
     app.send(.changed(created))
     _ = twin.send(.changed(created))
     #expect(app.model.taskViewList == twin.model, "after a view created elsewhere")
+    // A change that names the pane's own view is the list's as much as the pane's: a root that took it for
+    // the pane's alone would close the pane on a deleted view and leave the list drawing the row, still
+    // highlighted. Renamed and then deleted elsewhere, so that the pane is checked open and closed.
+    let retitled = try changeSet(of: store) { try store.update(view: BuiltInTaskViews.today, [.title("Now")]) }
+    app.send(.changed(retitled))
+    _ = twin.send(.changed(retitled))
+    #expect(app.model.taskViewList == twin.model, "after the pane's view was renamed elsewhere")
+    #expect(app.model.detail?.title == "Now")
+    let deleted = try changeSet(of: store) { try store.delete(view: BuiltInTaskViews.today) }
+    app.send(.changed(deleted))
+    _ = twin.send(.changed(deleted))
+    #expect(app.model.taskViewList == twin.model, "after the pane's view was deleted elsewhere")
+    #expect(app.model.detail == nil)
 
     let docs = try #require(app.model.taskViewList.rows.last { $0.title == "Docs" }?.id)
-    let builtIn = ["Inbox", "Today", "Upcoming", "Logbook", "Trash"]
+    let builtIn = ["Inbox", "Upcoming", "Logbook", "Trash"]
     for (end, title) in [(TaskViewList.UserAction.titleFieldSubmitted, "Notes"), (.titleFieldLostFocus, "Drafts")] {
         app.send(.action(.taskViewList(.renameMenuItemChosen(docs))))
         app.send(.action(.taskViewList(.titleFieldChanged(title))))

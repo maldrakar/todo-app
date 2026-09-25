@@ -34,8 +34,8 @@ let package = Package(
         // is read here rather than taken on trust: a feature depends on the core and the contract, never on
         // another feature and never on the root module (ADR-0007).
         .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskViewList"),
-        // The root module, the one feature that depends on others, since composing them is what it is for;
-        // no feature depends on it (ADR-0007).
+        // The root module, which is the features' parent and not one of them: it depends on them, since
+        // composing them is what it is for, and none of them depends on it (ADR-0007).
         .target(name: "AppFeature", dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature"], path: "Sources/Features/App"),
         // The test helpers as an ordinary target: a test target cannot be depended on, and every feature's
         // tests open a store the same way. It is in no product, so nothing ships it.

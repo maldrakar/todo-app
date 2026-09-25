@@ -154,8 +154,9 @@ import SQLiteKit
     #expect(folder.depth == 0, "a folder from the toolbar belongs at the root and not under whatever was chosen")
     #expect(list.model.rows.filter(\.isSelected).map(\.id) == [folder.id])
     #expect(folder.draft == "New folder", "the field opens on the default name, so the first keystroke replaces it")
-    // The selection moved without anybody choosing a row, and the root cannot see a model it does not read:
-    // it is told what a click would have told it, or its detail pane keeps the view before this one.
+    // The selection moved without anybody choosing a row, and the root carries this model whole but learns
+    // what was chosen from the output alone: it is told what a click would have told it, or its detail pane
+    // keeps the view before this one.
     #expect(output == .selected(folder.id))
     let stored = try store.view(folder.id)
     #expect(stored?.title == "New folder")

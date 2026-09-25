@@ -21,11 +21,14 @@ import WASILibc
 /// client, and the `todo` demo is the wrong stand-in for one: the demo carries an argument parser, a
 /// formatter and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about
 /// the core. This executable does what a web entry point will: it builds the root module over a store in
-/// memory and drives it — a selection, a rename, a new folder, and the change each write produced — and it
-/// calls the rest of the core's public API itself — write through a store, read a page, search, round-trip
-/// a filter, exchange a journal, take a snapshot — because that is the API the modules M3 adds will call.
-/// What a client calls is what the linker has to keep, so the number the job prints is the root module and
-/// the core a web client cannot dead-strip its way out of shipping.
+/// memory and drives it — a selection, a rename, a new folder, and the change each write produced. Beside
+/// that it calls the core's public API directly, and each group of calls has a client that ships it. The
+/// writes, the reads, a page and search are what the modules M3 adds will call. The filter codec and the
+/// journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in them
+/// ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the platform clock a
+/// web entry point passes. A group dropped because no module makes its calls would take out code the web
+/// client still ships. What a client calls is what the linker has to keep, so the number the job prints is
+/// the root module and the core a web client cannot dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.
