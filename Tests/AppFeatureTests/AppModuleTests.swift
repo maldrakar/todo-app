@@ -102,16 +102,16 @@ import TodoCore
     #expect(app.model == written, "the field stays open on the folder, and the pane on it")
 }
 
-/// Two modules name the Inbox as the first choice, the list for its highlight and the root for its detail,
-/// and this is what holds the two together: a first choice moved in one of them and not the other fails
-/// here, rather than opening a pane beside a highlight on another row.
+/// The pane opens on the list's own first choice: the root reads which view the list starts on off the
+/// list's model instead of naming one itself, and this holds the first pane and the first highlight to the
+/// same view, so that a pane never opens beside a highlight on another row.
 @Test func theFirstDetailIsTheViewTheListHighlightsFirst() throws {
     let app = try AppModule(store: try makeStore())
     let highlighted = app.model.taskViewList.rows.first(where: \.isSelected)?.title
     #expect(highlighted == "Inbox")
     #expect(app.model.detail?.title == highlighted)
-    // A person who deleted the Inbox has no first choice in either: no row is highlighted, and the read
-    // answers nil, which is a view that is gone and not a read that failed, so the launch goes ahead.
+    // A person who deleted the Inbox leaves the list starting on nothing: no row is highlighted, so there is
+    // no view to read and no pane to open, and the launch goes ahead.
     let store = try makeStore()
     try store.delete(view: BuiltInTaskViews.inbox)
     let bare = try AppModule(store: store)
