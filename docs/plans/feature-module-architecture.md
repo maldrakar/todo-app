@@ -313,13 +313,13 @@ public enum DeviceFile {
 
 **Goal.** `swift run todo-mac` opens a window with the sidebar over a real database: selecting shows the title in the detail pane, renaming goes through the module, a folder is created, and a problem is shown. The views hold no logic.
 
-**Files.** `Sources/Features/TaskViewList/TaskViewList.swift` and its tests; `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`, `RootView.swift`, `AppScene.swift`, `TodoApp.swift`; `Apps/Apple/Sources/todo-mac/TodoMac.swift`.
+**Files.** `Sources/Features/TaskViewList/TaskViewList.swift`; `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`, `RootView.swift`, `AppScene.swift`, `TodoApp.swift`; `Apps/Apple/Sources/todo-mac/TodoMac.swift`.
 
 **Interface.**
 
 ```swift
 // TaskViewListFeature: what List needs, added with its first caller
-extension TaskViewList.Model { public let selection: ViewID? }     // a stored field: the id of the selected row
+// `TaskViewList.Model.selection: ViewID?` already exists: #70 added it, with the root's `init` as its first caller
 extension TaskViewList.Model.Row: Identifiable {}
 
 // TodoAppleUI
@@ -342,7 +342,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 **Tests.**
 
-- `selectionNamesTheSelectedRow` in `TaskViewListFeatureTests`: `model.selection` equals the id of the one row with `isSelected`, and is nil after the selected view disappears.
+- None in `TaskViewListFeatureTests`: `selectionNamesTheSelectedRow` shipped with the field in #70.
 - No view tests: by the rule there is nothing in them to test; the reviewing agent reads them for the rule instead.
 
 **Verified facts and traps.**
@@ -381,7 +381,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 | Spec section | Task |
 | ------------ | ---- |
 | 1. Logic lives in the shared core | 1, 2 (the sidebar), 3 (the root) |
-| 2. The module contract | 1 (the protocols, the sidebar's types), 2 (the writes), 5 (`selection` and `Identifiable`, with their callers) |
+| 2. The module contract | 1 (the protocols, the sidebar's types), 2 (the writes), 3 (`selection`, with the root's `init` as its first caller, #70), 5 (`Identifiable`, with its caller) |
 | 3. Composition | 3 |
 | 4. Navigation | 3 (`Detail` created from the output, where M3's list module goes); the mechanics, a stack or sheets, are the navigation epic's #67 and no task builds them, as the spec says |
 | 5. Hosting on Apple: the host, one event at a time, the composition root, the thread | 4; `TodoApp.host` once per launch in 5 |
@@ -393,7 +393,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 Deviations, each stated where it happens:
 
-- `TaskViewList.Model` carries `selection` beside the rows' `isSelected` (Task 5): SwiftUI's `List` binds to an id and a row draws from a flag, and computing one from the other in the view would be the view searching the model.
+- `TaskViewList.Model` carries `selection` beside the rows' `isSelected` (Task 3, #70; planned for Task 5): SwiftUI's `List` binds to an id and a row draws from a flag, and computing one from the other in the view would be the view searching the model.
 - `AppModule.Model.Detail` is a struct with a title rather than a bare string (Task 3): it is the seat of M3's list module and is created from the output, as section 4 says a screen is.
 - `DeviceFile` (Task 4) is a target the spec does not name: the demo already keeps an identity beside the database and the app needs the same rule, and `docs/style.md` asks for one shape where two would otherwise exist.
 - The default title of a new folder is a constant of the sidebar module (Task 2), which is a string a module writes about the data; its localisation is a question for the formatting service in M3, raised in chat.
