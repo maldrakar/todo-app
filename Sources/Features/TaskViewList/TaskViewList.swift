@@ -313,7 +313,7 @@ public final class TaskViewList: FeatureModule {
         state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
         // The selection moved without anybody choosing a row, and the root reads `Model.selection` only at
         // launch, before anybody has chosen anything: every move after that reaches it through the output
-        // alone (spec section 3), so it is told what a click would have told it. It is told only where the
+        // alone (spec section 4), so it is told what a click would have told it. It is told only where the
         // highlight actually moved: after launch the root builds its detail from this alone, and a detail
         // pane on a folder the sidebar is not highlighting is the divergence this output exists to prevent.
         return .selected(id)

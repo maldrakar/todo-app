@@ -42,12 +42,12 @@ from.
 | ---- | ---- | ----- |
 | `Package.swift` | 1, 3 | targets `FeatureModule`, `TaskViewListFeature`, `AppFeature`, `TestSupport`, the feature test targets; `WasmSizeProbe` depends on `AppFeature` |
 | `Sources/FeatureModule/FeatureModule.swift` | 1 | `FeatureEvent`, `FeatureModule` |
-| `Sources/Features/TaskViewList/TaskViewList.swift` | 1, 2, 5 | `TaskViewList` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send` |
+| `Sources/Features/TaskViewList/TaskViewList.swift` | 1, 2, 3, 5 | `TaskViewList` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send`; `Model.selection` (3, #70) |
 | `Sources/Features/App/AppModule.swift` | 3 | `AppModule` with `Model`, `Detail`, `UserAction`, `Event`, `send` |
 | `Sources/WasmSizeProbe/main.swift` | 3 | drives `AppModule` as a web client will |
 | `scripts/wasm-size.sh` | 3 | the ceiling, re-measured |
-| `Tests/Support/TestSupport.swift` | 1 | `TestClock`, `makeStore`, moved out of `TodoCoreTests` |
-| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift` | 1, 2 | the list module's tests |
+| `Tests/Support/TestSupport.swift` | 1, 3 | `TestClock`, `makeStore`, moved out of `TodoCoreTests`; `changeSet(of:from:)`, moved out of `TaskViewListTests` (3) |
+| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift` | 1, 2, 3 | the list module's tests |
 | `Tests/AppFeatureTests/AppModuleTests.swift` | 3 | the root's tests |
 | `Sources/DeviceFile/DeviceFile.swift` | 4 | the identity file beside a database, shared by the demo and the app |
 | `Sources/TodoCLI/CLI.swift` | 4 | calls `DeviceFile` instead of its own copy |

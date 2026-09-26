@@ -40,10 +40,10 @@ import SQLiteKit
     #expect(list.model == before)
 }
 
-/// `selection` is the highlight given as an id, for a parent that reads which view the list is on instead of
-/// waiting to be told: the root's first pane, and later a `List(selection:)`. It names the one row drawn
-/// highlighted or nothing, since a parent that opened a view the list is not showing would be a pane beside
-/// no highlight.
+/// `selection` is the highlight given as an id: for a parent that reads which view the list is on instead of
+/// waiting to be told, as the root does for its first pane, and for the list's own view, whose
+/// `List(selection:)` binds to it from Task 5 on. It names the one row drawn highlighted or nothing, since a
+/// parent that opened a view the list is not showing would be a pane beside no highlight.
 @Test func selectionNamesTheSelectedRow() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work"))
