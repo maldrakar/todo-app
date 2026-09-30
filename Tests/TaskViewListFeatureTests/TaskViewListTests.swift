@@ -40,30 +40,31 @@ import SQLiteKit
     #expect(list.model == before)
 }
 
-/// `selection` is the highlight given as an id: for a parent that reads which view the list is on instead of
-/// waiting to be told, as the root does for its first pane, and for the list's own view, whose
-/// `List(selection:)` binds to it from Task 5 on. It names the one row drawn highlighted or nothing, since a
-/// parent that opened a view the list is not showing would be a pane beside no highlight.
-@Test func selectionNamesTheSelectedRow() throws {
+/// Being created is the one event that nobody chose, and the list answers it with the view it starts on, so
+/// that its parent learns the first choice the way it learns every later one: from an answer.
+@Test func createdReportsTheViewTheListStartsOnAndLeavesTheModelAlone() throws {
+    let list = try TaskViewList(store: try makeStore())
+    let before = list.model
+    #expect(list.send(.created) == .selected(BuiltInTaskViews.inbox))
+    #expect(list.model == before, "the highlight was on the Inbox already, and being created moves nothing")
+    // A view with no row is not a choice to report: the Inbox the list starts on was deleted before launch.
     let store = try makeStore()
-    let work = try store.createView(NewTaskView(title: "Work"))
-    let list = try TaskViewList(store: store)
-    #expect(list.model.selection == BuiltInTaskViews.inbox, "at launch")
-    #expect(list.model.rows.filter(\.isSelected).map(\.id) == [BuiltInTaskViews.inbox])
-    #expect(list.send(.action(.rowSelected(work))) == .selected(work))
-    #expect(list.model.selection == work, "after a selection")
-    #expect(list.model.rows.filter(\.isSelected).map(\.id) == [work])
-    let deleted = try changeSet(of: store) { try store.delete(view: work) }
-    #expect(list.send(.changed(deleted)) == nil)
-    #expect(list.model.selection == nil, "the selected view was deleted elsewhere")
-    // The id the list stores and the id the model gives out part here: `.rowSelected` stores whatever id a
-    // view names (left as it shipped, see #77), and a model that passed on an id with no row would name a
-    // selection nobody can see.
-    #expect(list.send(.action(.rowSelected(work))) == .selected(work))
-    #expect(list.model.selection == nil, "a row selected that is not there")
-    let bare = try makeStore()
-    try bare.delete(view: BuiltInTaskViews.inbox)
-    #expect(try TaskViewList(store: bare).model.selection == nil, "the Inbox the list starts on was deleted before launch")
+    try store.delete(view: BuiltInTaskViews.inbox)
+    let bare = try TaskViewList(store: store)
+    let empty = bare.model
+    #expect(bare.send(.created) == nil)
+    #expect(bare.model == empty)
+    // Sent after a refusal, which is not where a parent sends it, so that there is a sentence to lose: an
+    // answer that took the road `.rowSelected` takes would clear it, and being created is no answer to
+    // what a person was told.
+    let refused = try TaskViewList(store: try makeStore())
+    _ = refused.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
+    _ = refused.send(.action(.titleFieldChanged(" ")))
+    _ = refused.send(.action(.titleFieldSubmitted))
+    let told = refused.model
+    #expect(told.problem != nil, "the refusal is the setup; without it this proves nothing")
+    #expect(refused.send(.created) == .selected(BuiltInTaskViews.inbox))
+    #expect(refused.model == told, "the sentence and the open field outlive it")
 }
 
 @Test func changedWithAViewRereadsTheTree() throws {
@@ -180,9 +181,9 @@ import SQLiteKit
     #expect(folder.depth == 0, "a folder from the toolbar belongs at the root and not under whatever was chosen")
     #expect(list.model.rows.filter(\.isSelected).map(\.id) == [folder.id])
     #expect(folder.draft == "New folder", "the field opens on the default name, so the first keystroke replaces it")
-    // The selection moved without anybody choosing a row, and the root reads `selection` off this model only
-    // at launch: a move after that reaches it through the output, the way a click's does, or its detail pane
-    // keeps the view before this one.
+    // The selection moved without anybody choosing a row, and the root learns every choice from the output,
+    // the first one included: it is told what a click would have told it, or its detail pane keeps the view
+    // before this one.
     #expect(output == .selected(folder.id))
     let stored = try store.view(folder.id)
     #expect(stored?.title == "New folder")

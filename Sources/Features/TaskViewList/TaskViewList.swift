@@ -33,15 +33,6 @@ public final class TaskViewList: FeatureModule {
 
         public let rows: [Row]
 
-        /// The view of the highlighted row, and nil when no row is highlighted: what a parent reads to know
-        /// which view the list is on without having been told, the way the root opens its first pane.
-        ///
-        /// It is taken off the rows once they are assembled, from the flag each one draws, so it can only
-        /// ever name a row this model draws. The id the list stores can name one it does not: an Inbox a
-        /// person deleted before launch, or an id `.rowSelected` named that has no row. A parent that opened
-        /// that id would open a pane beside no highlight.
-        public let selection: ViewID?
-
         /// What went wrong, as the finished sentence the view shows until the next event, and nil when
         /// there is nothing to say: `send` cannot throw, so a failure inside it has nowhere else to go,
         /// and a view that had to spell one would be a view holding logic (spec section 2).
@@ -71,6 +62,16 @@ public final class TaskViewList: FeatureModule {
     public enum Event: FeatureEvent {
         case action(UserAction)
         case changed(ChangeSet)
+
+        /// The parent has just created this list: sent once, by the module that holds it, right after `init`.
+        /// It is not the creation of a folder, which is `createFolderButtonTapped` and a write; it is this
+        /// module's own creation, and it writes nothing. It is an event of the world and not a `UserAction`,
+        /// because nobody did anything and a view has no way to send it (spec section 2).
+        ///
+        /// The list answers it with the view it starts on. A module publishes nothing (spec section 2) and
+        /// speaks only in answer to an event, so the first choice needs an event to answer, and as an answer
+        /// it reaches the parent by the road every later choice takes, through `Output`.
+        case created
     }
 
     public enum Output: Equatable, Sendable {
@@ -147,6 +148,14 @@ public final class TaskViewList: FeatureModule {
             return nil
         case .action(.createFolderButtonTapped):
             return createFolder()
+        case .created:
+            // Answered only for a row the list holds: the answer says which view is chosen, and a view with
+            // no row is not on screen to be chosen, as with an Inbox a person deleted before launch. Nothing
+            // moves, the sentence included, because being created answers nothing a person was told.
+            guard let selection = state.selection, state.rows.contains(where: { $0.id == selection }) else {
+                return nil
+            }
+            return .selected(selection)
         case .changed(let changes):
             // Every edit to a task is a commit that touched no view, and this list is the same afterwards,
             // so the guard is what keeps a person typing in a list out of the views table. A commit that did
@@ -311,11 +320,11 @@ public final class TaskViewList: FeatureModule {
         guard state.rows.contains(where: { $0.id == id }) else { return nil }
         state.selection = id
         state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
-        // The selection moved without anybody choosing a row, and the root reads `Model.selection` only at
-        // launch, before anybody has chosen anything: every move after that reaches it through the output
-        // alone (spec section 4), so it is told what a click would have told it. It is told only where the
-        // highlight actually moved: after launch the root builds its detail from this alone, and a detail
-        // pane on a folder the sidebar is not highlighting is the divergence this output exists to prevent.
+        // The selection moved without anybody choosing a row, and the root carries this model to the view
+        // and learns every choice from the output alone, the first one included as the answer to `.created`
+        // (spec section 4), so it is told what a click would have told it. It is told only where the
+        // highlight actually moved: the root builds its detail from this alone, and a detail pane on a
+        // folder the sidebar is not highlighting is the divergence this output exists to prevent.
         return .selected(id)
     }
 
@@ -354,16 +363,17 @@ public final class TaskViewList: FeatureModule {
         var problem: String?
 
         /// The model a view draws: the rows with this person's session projected onto them — the highlight
-        /// on the row they chose, the draft on the row they are renaming — the view the highlight is on, and
-        /// the sentence, if any.
+        /// on the row they chose, the draft on the row they are renaming — and the sentence, if any.
         var model: Model {
-            let drawn = rows.map {
-                Model.Row(
-                    id: $0.id, title: $0.title, depth: $0.depth,
-                    isSelected: $0.id == selection, draft: rename?.text(on: $0.id)
-                )
-            }
-            return Model(rows: drawn, selection: drawn.first(where: \.isSelected)?.id, problem: problem)
+            Model(
+                rows: rows.map {
+                    Model.Row(
+                        id: $0.id, title: $0.title, depth: $0.depth,
+                        isSelected: $0.id == selection, draft: rename?.text(on: $0.id)
+                    )
+                },
+                problem: problem
+            )
         }
 
         /// One row of the list as a read of the store produced it, before anything about this person's

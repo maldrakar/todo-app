@@ -7,10 +7,9 @@ import TodoCore
 /// it that shows the view chosen in the list (spec section 3).
 ///
 /// The pane is a placeholder in M2, the title of the chosen view, standing where M3's list module will. It is
-/// made from two things, the id of the view the list is on and the store: the id comes off the list's model at
-/// launch and out of the list's answer after that, and the title is a read of the root's own rather than the
-/// row's, so that the module replacing it is created in the same place from the same two things (spec
-/// section 4).
+/// made from two things, the id the list answers with and the store: the id is the list's answer, to `.created`
+/// at launch and to a choice after that, and the title is a read of the root's own rather than the row's, so
+/// that the module replacing it is created in the same place from the same two things (spec section 4).
 public final class AppModule: FeatureModule {
     /// What the root view draws: the list's model as the list assembled it, and the pane beside it.
     public struct Model: Equatable, Sendable {
@@ -57,22 +56,25 @@ public final class AppModule: FeatureModule {
 
     private var state: State
 
-    /// Throws what the list's `init` throws and what the first read of the pane throws. Later on, a failed
-    /// read keeps the pane that is open, and at launch there is none to keep: a store that cannot be read
-    /// then is the composition root's to refuse (spec section 5), as it is for the list.
+    /// Throws what the list's `init` throws, and nothing else: a store the list cannot read at launch is the
+    /// composition root's to refuse (spec section 5). A store the list has just read whole is trusted this
+    /// far, and the pane's first read is the same read of the same table, so one that fails leaves the root
+    /// with no pane rather than refusing the launch: there is no open pane to keep, which is the rule a failed
+    /// read follows after a click too (owner's review of #78).
     public init(store: Store) throws(StoreError) {
         let taskViewList = try TaskViewList(store: store)
-        // The pane opens on the view the list starts on, read off the list's model: which view that is, is
-        // the list's to decide and not this module's (owner's review of #78). It is read rather than
-        // answered because at launch nobody has chosen anything, so there is no answer to wait for: the
-        // first selection is state, which a parent reads from the child's model, and a click is still the
-        // output `.selected(id)`, the one-shot fact that the person chose this (spec section 3). A list that
-        // starts on nothing, as it does when a person deleted the Inbox, opens no pane.
-        let first = taskViewList.model.selection
-        let detail: State.Detail? = if let first { try AppModule.detail(of: first, in: store) } else { nil }
-        let state = State(taskViewList: taskViewList, detail: detail)
         self.store = store
-        self.state = state
+        self.state = State(taskViewList: taskViewList, detail: nil)
+        // Assembled here to finish the stored properties, because `react` is a method and Swift refuses a
+        // method call on `self` before every stored property holds a value, and assembled again below, once
+        // the answer has opened the pane.
+        self.model = state.model
+        // The list is told it has been created and answers with the view it starts on, which is the list's
+        // to choose. The answer goes through `react(to:)`, the line a click's answer goes through, so the
+        // first pane opens the way every later one does and this module names no view of its own. A list
+        // that starts on no row, as it does when a person deleted the Inbox, answers nothing and opens no
+        // pane.
+        react(to: state.taskViewList.send(.created))
         self.model = state.model
     }
 
@@ -117,7 +119,8 @@ public final class AppModule: FeatureModule {
     }
 
     /// Opens the pane on the view `id` names, or closes it when the store has no such view: that view is
-    /// gone, and a pane on it would be a pane on nothing.
+    /// gone, and a pane on it would be a pane on nothing. It is the one read of the pane, which every
+    /// answer, the first one included, and every change make.
     ///
     /// A read that fails leaves the pane as it was, id and title together: the root has no `problem` of its
     /// own in M2 to say it in, and a screen that could not be made leaves the one that was open, which is
@@ -126,16 +129,10 @@ public final class AppModule: FeatureModule {
     /// nil, and those two mean opposite things: keep the pane, and close it.
     private func readDetail(of id: ViewID) {
         do {
-            state.detail = try AppModule.detail(of: id, in: store)
+            state.detail = try store.view(id).map { State.Detail(id: $0.id, title: $0.title) }
         } catch {
             // Deliberately nothing, for the reason above.
         }
-    }
-
-    /// The pane for the view `id` names, or nil when the store holds no such view: the one read that the
-    /// launch, an answer and a change all make.
-    private static func detail(of id: ViewID, in store: Store) throws(StoreError) -> State.Detail? {
-        try store.view(id).map { State.Detail(id: $0.id, title: $0.title) }
     }
 
     /// Everything the root holds between two events: the list's module, and the pane that is open. One

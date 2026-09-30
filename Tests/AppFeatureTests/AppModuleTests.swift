@@ -44,10 +44,11 @@ import TodoCore
 }
 
 /// The root assembles its model out of the list's after every event, and the list inside it is private, so a
-/// twin list over the same store, sent the same events, is what the root's copy is held against. The twin
-/// can share only the events that write nothing: sent a Return of its own, it would write the name a second
-/// time. The writes are checked by what they leave in the root's model instead, which is what a path that
-/// assembled nothing would fail, since its model would still be the one from before it.
+/// twin list over the same store, sent the same events after launch, is what the root's copy is held against:
+/// the `.created` the root sends its list at launch moves no model, so the twin is not sent one. The twin can
+/// share only the events that write nothing: sent a Return of its own, it would write the name a second time.
+/// The writes are checked by what they leave in the root's model instead, which is what a path that assembled
+/// nothing would fail, since its model would still be the one from before it.
 @Test func theRootModelIsRebuiltAfterEveryEvent() throws {
     let store = try makeStore()
     let app = try AppModule(store: store)
@@ -102,16 +103,16 @@ import TodoCore
     #expect(app.model == written, "the field stays open on the folder, and the pane on it")
 }
 
-/// The pane opens on the list's own first choice: the root reads which view the list starts on off the
-/// list's model instead of naming one itself, and this holds the first pane and the first highlight to the
-/// same view, so that a pane never opens beside a highlight on another row.
+/// The pane opens on the list's own first choice, from the list's answer to `.created`: the root names no view
+/// of its own, and this holds the first pane and the first highlight to the same view, so that a pane never
+/// opens beside a highlight on another row.
 @Test func theFirstDetailIsTheViewTheListHighlightsFirst() throws {
     let app = try AppModule(store: try makeStore())
     let highlighted = app.model.taskViewList.rows.first(where: \.isSelected)?.title
     #expect(highlighted == "Inbox")
     #expect(app.model.detail?.title == highlighted)
-    // A person who deleted the Inbox leaves the list starting on nothing: no row is highlighted, so there is
-    // no view to read and no pane to open, and the launch goes ahead.
+    // A person who deleted the Inbox leaves the list starting on no row: nothing is highlighted, the list
+    // answers `.created` with nothing, no pane opens, and the launch goes ahead.
     let store = try makeStore()
     try store.delete(view: BuiltInTaskViews.inbox)
     let bare = try AppModule(store: store)
