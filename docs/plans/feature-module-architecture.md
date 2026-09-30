@@ -42,7 +42,7 @@ from.
 | ---- | ---- | ----- |
 | `Package.swift` | 1, 3 | targets `FeatureModule`, `TaskViewListFeature`, `AppFeature`, `TestSupport`, the feature test targets; `WasmSizeProbe` depends on `AppFeature` |
 | `Sources/FeatureModule/FeatureModule.swift` | 1 | `FeatureEvent`, `FeatureModule` |
-| `Sources/Features/TaskViewList/TaskViewList.swift` | 1, 2, 3, 5 | `TaskViewList` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send`; `Model.selection` (3, #70) |
+| `Sources/Features/TaskViewList/TaskViewList.swift` | 1, 2, 3, 5 | `TaskViewList` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send`; `Event.created`, which the root sends once after creating the list (3, #70) |
 | `Sources/Features/App/AppModule.swift` | 3 | `AppModule` with `Model`, `Detail`, `UserAction`, `Event`, `send` |
 | `Sources/WasmSizeProbe/main.swift` | 3 | drives `AppModule` as a web client will |
 | `scripts/wasm-size.sh` | 3 | the ceiling, re-measured |
@@ -313,13 +313,13 @@ public enum DeviceFile {
 
 **Goal.** `swift run todo-mac` opens a window with the sidebar over a real database: selecting shows the title in the detail pane, renaming goes through the module, a folder is created, and a problem is shown. The views hold no logic.
 
-**Files.** `Sources/Features/TaskViewList/TaskViewList.swift`; `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`, `RootView.swift`, `AppScene.swift`, `TodoApp.swift`; `Apps/Apple/Sources/todo-mac/TodoMac.swift`.
+**Files.** `Sources/Features/TaskViewList/TaskViewList.swift` and its tests; `Apps/Apple/Package.swift`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`, `RootView.swift`, `AppScene.swift`, `TodoApp.swift`; `Apps/Apple/Sources/todo-mac/TodoMac.swift`.
 
 **Interface.**
 
 ```swift
 // TaskViewListFeature: what List needs, added with its first caller
-// `TaskViewList.Model.selection: ViewID?` already exists: #70 added it, with the root's `init` as its first caller
+extension TaskViewList.Model { public let selection: ViewID? }     // a stored field: the id of the selected row
 extension TaskViewList.Model.Row: Identifiable {}
 
 // TodoAppleUI
@@ -342,7 +342,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 **Tests.**
 
-- None in `TaskViewListFeatureTests`: `selectionNamesTheSelectedRow` shipped with the field in #70.
+- `selectionNamesTheSelectedRow` in `TaskViewListFeatureTests`: `model.selection` equals the id of the one row with `isSelected`, and is nil after the selected view disappears.
 - No view tests: by the rule there is nothing in them to test; the reviewing agent reads them for the rule instead.
 
 **Verified facts and traps.**
@@ -350,6 +350,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 - 2026-09-20: a SwiftUI app whose `Scene` lives in a library target builds and launches from a two-line executable of a bare SwiftPM package, with the pinned toolchain.
 - 2026-09-20: `TaskViewListView` and `RootView` as sketched above compile against the contract in language mode 6 under both toolchains.
 - Added by #69: `TaskViewList.UserAction` gained `titleFieldLostFocus`, which the module settles exactly as it settles Return, since the owner ruled on 2026-09-22 that clicking away states a name rather than drops it. This task is its first and only caller, so the view has to have a way of telling the module that focus left the field, and an empty draft is refused there with the field left open — which is a field the view will have to put the caret back into.
+- Added by #70: `TaskViewList.Model.selection` was briefly added in #70 so that the root could read the list's first choice, and then removed on the owner's review of #78. `Model` is what a view draws, and a parent learns a child's choice only from its `Output`; the first choice arrives as the list's answer to `Event.created`. The field returns here with its only caller, the view's `List(selection:)`. Whether it belongs in the view's model at all is settled here, against the alternative of the view finding the row whose `isSelected` is true.
 - Trap: a `@State` in a `Scene` or `App` evaluates its initial value on every creation of the struct, and a composition held that way opens the store twice over one file, which is two stores over one journal (ADR-0005).
 - Trap: a bare executable has no bundle, so `Bundle.main` has no resources and no Info.plist; nothing in `TodoAppleUI` may rely on either.
 
@@ -381,7 +382,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 | Spec section | Task |
 | ------------ | ---- |
 | 1. Logic lives in the shared core | 1, 2 (the sidebar), 3 (the root) |
-| 2. The module contract | 1 (the protocols, the sidebar's types), 2 (the writes), 3 (`selection`, with the root's `init` as its first caller, #70), 5 (`Identifiable`, with its caller) |
+| 2. The module contract | 1 (the protocols, the sidebar's types), 2 (the writes), 5 (`selection` and `Identifiable`, with their callers) |
 | 3. Composition | 3 |
 | 4. Navigation | 3 (`Detail` created from the output, where M3's list module goes); the mechanics, a stack or sheets, are the navigation epic's #67 and no task builds them, as the spec says |
 | 5. Hosting on Apple: the host, one event at a time, the composition root, the thread | 4; `TodoApp.host` once per launch in 5 |
@@ -393,7 +394,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 Deviations, each stated where it happens:
 
-- `TaskViewList.Model` carries `selection` beside the rows' `isSelected` (Task 3, #70; planned for Task 5): SwiftUI's `List` binds to an id and a row draws from a flag, and computing one from the other in the view would be the view searching the model.
+- `TaskViewList.Model` carries `selection` beside the rows' `isSelected` (Task 5): SwiftUI's `List` binds to an id and a row draws from a flag, and computing one from the other in the view would be the view searching the model.
 - `AppModule.Model.Detail` is a struct with a title rather than a bare string (Task 3): it is the seat of M3's list module and is created from the output, as section 4 says a screen is.
 - `DeviceFile` (Task 4) is a target the spec does not name: the demo already keeps an identity beside the database and the app needs the same rule, and `docs/style.md` asks for one shape where two would otherwise exist.
 - The default title of a new folder is a constant of the sidebar module (Task 2), which is a string a module writes about the data; its localisation is a question for the formatting service in M3, raised in chat.
