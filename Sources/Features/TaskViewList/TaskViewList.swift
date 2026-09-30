@@ -68,9 +68,10 @@ public final class TaskViewList: FeatureModule {
         /// module's own creation, and it writes nothing. It is an event of the world and not a `UserAction`,
         /// because nobody did anything and a view has no way to send it (spec section 2).
         ///
-        /// The list answers it with the view it starts on. A module publishes nothing (spec section 2) and
-        /// speaks only in answer to an event, so the first choice needs an event to answer, and as an answer
-        /// it reaches the parent by the road every later choice takes, through `Output`.
+        /// The list answers it with the view it starts on when that view has a row, and with nothing when
+        /// it has none, as with an Inbox a person deleted before launch. A module publishes nothing (spec
+        /// section 2) and speaks only in answer to an event, so the first choice needs an event to answer,
+        /// and as an answer it reaches the parent by the road every later choice takes, through `Output`.
         case created
     }
 

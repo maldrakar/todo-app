@@ -8,15 +8,16 @@ import TodoCore
 ///
 /// The pane is a placeholder in M2, the title of the chosen view, standing where M3's list module will. It is
 /// made from two things, the id the list answers with and the store: the id is the list's answer, to `.created`
-/// at launch and to a choice after that, and the title is a read of the root's own rather than the row's, so
-/// that the module replacing it is created in the same place from the same two things (spec section 4).
+/// at launch and to what a person does after that, and the title is a read of the root's own rather than the
+/// row's, so that the module replacing it is created in the same place from the same two things (spec
+/// section 4).
 public final class AppModule: FeatureModule {
     /// What the root view draws: the list's model as the list assembled it, and the pane beside it.
     public struct Model: Equatable, Sendable {
         /// The pane beside the list: the chosen view's title, until M3's list module takes its place.
         public struct Detail: Equatable, Sendable {
-            /// The view's title as the last read of it answered: at launch, when the view was chosen, and
-            /// whenever a change names it.
+            /// The view's title as the last read of it answered: whenever the list answered with the view,
+            /// at launch or after, and whenever a change names it.
             public let title: String
         }
 
@@ -24,7 +25,7 @@ public final class AppModule: FeatureModule {
         public let taskViewList: TaskViewList.Model
 
         /// The pane beside the list, and nil when there is nothing to show in it: the view it would show is
-        /// gone.
+        /// gone, or it could not be read while no pane was open, as at launch, when there is none to keep.
         public let detail: Detail?
     }
 
@@ -120,7 +121,7 @@ public final class AppModule: FeatureModule {
 
     /// Opens the pane on the view `id` names, or closes it when the store has no such view: that view is
     /// gone, and a pane on it would be a pane on nothing. It is the one read of the pane, which every
-    /// answer, the first one included, and every change make.
+    /// answer, the first one included, and every change that names the pane's view make.
     ///
     /// A read that fails leaves the pane as it was, id and title together: the root has no `problem` of its
     /// own in M2 to say it in, and a screen that could not be made leaves the one that was open, which is
