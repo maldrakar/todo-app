@@ -47,7 +47,7 @@ from.
 | `Sources/WasmSizeProbe/main.swift` | 3 | drives `AppModule` as a web client will |
 | `scripts/wasm-size.sh` | 3 | the ceiling, re-measured |
 | `Tests/Support/TestSupport.swift` | 1, 3 | `TestClock`, `makeStore`, moved out of `TodoCoreTests`; `changeSet(of:from:)`, moved out of `TaskViewListTests` (3) |
-| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift` | 1, 2, 3 | the list module's tests |
+| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift` | 1, 2, 3, 5 | the list module's tests |
 | `Tests/AppFeatureTests/AppModuleTests.swift` | 3 | the root's tests |
 | `Sources/DeviceFile/DeviceFile.swift` | 4 | the identity file beside a database, shared by the demo and the app |
 | `Sources/TodoCLI/CLI.swift` | 4 | calls `DeviceFile` instead of its own copy |

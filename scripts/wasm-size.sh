@@ -6,7 +6,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.5625 MiB. The probe measures 6,595,179 bytes as this is written, so the budget is that with four percent
+# 6.5625 MiB. The probe measures 6,595,141 bytes as this is written, so the budget is that with four percent
 # to spare, rounded up to a whole 64 KiB. It is not the 4.5 MiB the spec first named, and that figure was
 # never measured: it was the floor measured in #3 — 3,743,306 bytes of standard library, FoundationEssentials
 # and SQLite with no core code reachable — plus half a megabyte of slack for the code the core would add. That
