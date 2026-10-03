@@ -13,6 +13,10 @@ All notable changes to this project are documented in this file. The format foll
 - ADR-0006 (a feature is a module with unidirectional data flow and views hold no logic), ADR-0007 (feature modules are shared code in the root package and every platform host lives in a package under `Apps/`) and ADR-0008 (the Apple app is a two-line `@main` over a library built by SwiftPM alone until the store needs an Xcode project), extracted from the spec.
 - Spec `docs/specs/feature-module-architecture.md`, approved by the owner on 2026-09-20: the logic of a feature lives once in the shared core as a module with `Model`, `UserAction`, `Event` and `Output`, `send` is synchronous and never throws, views render a model and decide nothing, the root module composes its children and navigation is state in the root, one host on the Apple side takes one event at a time, and platform hosts live under `Apps/`. The mechanics of navigation went to epic #67.
 
+### Changed
+
+- ADR-0006 gains an amendment from the owner's review of #78, and the spec follows it: a parent never reads a child's model to learn a choice, and a child's first choice is its answer to `.created`.
+
 ## [0.1.0] - 2026-09-20
 
 ### Added
