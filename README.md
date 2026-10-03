@@ -72,18 +72,19 @@ and a release wasm build measured against a size budget.
 What that last step measures is `wasm-size-probe`, an executable that exists to be measured and is no part of
 the product. The budget is about what a web client downloads, and the `todo` demo is the wrong stand-in for
 one: it carries an argument parser, a formatter and a usage text no browser will ever load. The probe instead
-calls the public API of `TodoCore` the way a web entry point will — open a store in memory, write through it,
-read a page, search, exchange a journal, take a snapshot — because the linker keeps what a client calls, and a
-number measured on calls that were dead-stripped is a number for a binary nobody ships.
+does what a web entry point will: it builds the root module over a store in memory and drives it — choose a
+view, rename it, make a folder — and beside it calls the public API of `TodoCore` directly — write through a
+store, read a page, search, exchange a journal, take a snapshot — because the linker keeps what a client calls,
+and a number measured on calls that were dead-stripped is a number for a binary nobody ships.
 
-The budget is 6.5 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command CI
-runs and the command to run locally. It is the core as it stands with four percent to spare: a guard against
-growing sideways, not a target to shrink towards. The 4.5 MiB the spec first named was never measured — it is
-the floor measured in the toolchain spike, 3,743,306 bytes of standard library, FoundationEssentials and
-SQLite with no core code reachable, plus half a megabyte of slack for the code the core would add. That code,
-with the JSON coding it pulls in, costs 2.8 MB instead, and SQLite and FoundationEssentials are inside the
-floor on both sides of the comparison rather than the difference between them. The ceiling that means
-something arrives with the web client, measured on its bundle.
+The budget is 6.5625 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
+CI runs and the command to run locally. It is the root module and the core as they stand with four percent to
+spare, rounded up to a whole 64 KiB: a guard against growing sideways, not a target to shrink towards. The
+4.5 MiB the spec first named was never measured — it is the floor measured in the toolchain spike, 3,743,306
+bytes of standard library, FoundationEssentials and SQLite with no core code reachable, plus half a megabyte of
+slack for the code the core would add. That code, with the JSON coding it pulls in, costs 2.8 MB instead, and
+SQLite and FoundationEssentials are inside the floor on both sides of the comparison rather than the difference
+between them. The ceiling that means something arrives with the web client, measured on its bundle.
 
 A second job compiles `TodoCore` against the iOS and watchOS SDKs on a macOS runner. It runs on `main` and on
 demand, never on a pull request, because macOS minutes cost tenfold on a private repository.

@@ -42,12 +42,12 @@ from.
 | ---- | ---- | ----- |
 | `Package.swift` | 1, 3 | targets `FeatureModule`, `TaskViewListFeature`, `AppFeature`, `TestSupport`, the feature test targets; `WasmSizeProbe` depends on `AppFeature` |
 | `Sources/FeatureModule/FeatureModule.swift` | 1 | `FeatureEvent`, `FeatureModule` |
-| `Sources/Features/TaskViewList/TaskViewList.swift` | 1, 2, 5 | `TaskViewList` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send` |
+| `Sources/Features/TaskViewList/TaskViewList.swift` | 1, 2, 3, 5 | `TaskViewList` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send`; `Event.created`, which the root sends once after creating the list (3, #70) |
 | `Sources/Features/App/AppModule.swift` | 3 | `AppModule` with `Model`, `Detail`, `UserAction`, `Event`, `send` |
 | `Sources/WasmSizeProbe/main.swift` | 3 | drives `AppModule` as a web client will |
 | `scripts/wasm-size.sh` | 3 | the ceiling, re-measured |
-| `Tests/Support/TestSupport.swift` | 1 | `TestClock`, `makeStore`, moved out of `TodoCoreTests` |
-| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift` | 1, 2 | the list module's tests |
+| `Tests/Support/TestSupport.swift` | 1, 3 | `TestClock`, `makeStore`, moved out of `TodoCoreTests`; `changeSet(of:from:)`, moved out of `TaskViewListTests` (3) |
+| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift` | 1, 2, 3, 5 | the list module's tests |
 | `Tests/AppFeatureTests/AppModuleTests.swift` | 3 | the root's tests |
 | `Sources/DeviceFile/DeviceFile.swift` | 4 | the identity file beside a database, shared by the demo and the app |
 | `Sources/TodoCLI/CLI.swift` | 4 | calls `DeviceFile` instead of its own copy |
@@ -350,6 +350,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 - 2026-09-20: a SwiftUI app whose `Scene` lives in a library target builds and launches from a two-line executable of a bare SwiftPM package, with the pinned toolchain.
 - 2026-09-20: `TaskViewListView` and `RootView` as sketched above compile against the contract in language mode 6 under both toolchains.
 - Added by #69: `TaskViewList.UserAction` gained `titleFieldLostFocus`, which the module settles exactly as it settles Return, since the owner ruled on 2026-09-22 that clicking away states a name rather than drops it. This task is its first and only caller, so the view has to have a way of telling the module that focus left the field, and an empty draft is refused there with the field left open — which is a field the view will have to put the caret back into.
+- Added by #70: `TaskViewList.Model.selection` was briefly added in #70 so that the root could read the list's first choice, and then removed on the owner's review of #78. `Model` is what a view draws, and a parent learns a child's choice only from its `Output`; the first choice arrives as the list's answer to `Event.created`. The field returns here with its only caller, the view's `List(selection:)`. Whether it belongs in the view's model at all is settled here, against the alternative of the view finding the row whose `isSelected` is true.
 - Trap: a `@State` in a `Scene` or `App` evaluates its initial value on every creation of the struct, and a composition held that way opens the store twice over one file, which is two stores over one journal (ADR-0005).
 - Trap: a bare executable has no bundle, so `Bundle.main` has no resources and no Info.plist; nothing in `TodoAppleUI` may rely on either.
 

@@ -62,6 +62,17 @@ public final class TaskViewList: FeatureModule {
     public enum Event: FeatureEvent {
         case action(UserAction)
         case changed(ChangeSet)
+
+        /// The parent has just created this list: sent once, by the module that holds it, right after `init`.
+        /// It is not the creation of a folder, which is `createFolderButtonTapped` and a write; it is this
+        /// module's own creation, and it writes nothing. It is an event of the world and not a `UserAction`,
+        /// because nobody did anything and a view has no way to send it (spec section 2).
+        ///
+        /// The list answers it with the view it starts on when that view has a row, and with nothing when
+        /// it has none, as with an Inbox a person deleted before launch. A module publishes nothing (spec
+        /// section 2) and speaks only in answer to an event, so the first choice needs an event to answer,
+        /// and as an answer it reaches the parent by the road every later choice takes, through `Output`.
+        case created
     }
 
     public enum Output: Equatable, Sendable {
@@ -138,6 +149,14 @@ public final class TaskViewList: FeatureModule {
             return nil
         case .action(.createFolderButtonTapped):
             return createFolder()
+        case .created:
+            // Answered only for a row the list holds: the answer says which view is chosen, and a view with
+            // no row is not on screen to be chosen, as with an Inbox a person deleted before launch. Nothing
+            // moves, the sentence included, because being created answers nothing a person was told.
+            guard let selection = state.selection, state.rows.contains(where: { $0.id == selection }) else {
+                return nil
+            }
+            return .selected(selection)
         case .changed(let changes):
             // Every edit to a task is a commit that touched no view, and this list is the same afterwards,
             // so the guard is what keeps a person typing in a list out of the views table. A commit that did
@@ -302,10 +321,11 @@ public final class TaskViewList: FeatureModule {
         guard state.rows.contains(where: { $0.id == id }) else { return nil }
         state.selection = id
         state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
-        // The selection moved without anybody choosing a row, and the root does not read this model
-        // (ADR-0006), so it is told what a click would have told it. It is told only where the highlight
-        // actually moved: the root builds its detail from this alone, and a detail pane on a folder the
-        // sidebar is not highlighting is the divergence this output exists to prevent.
+        // The selection moved without anybody choosing a row, and the root carries this model to the view
+        // and learns every choice from the output alone, the first one included as the answer to `.created`
+        // (spec section 4), so it is told what a click would have told it. It is told only where the
+        // highlight actually moved: the root builds its detail from this alone, and a detail pane on a
+        // folder the sidebar is not highlighting is the divergence this output exists to prevent.
         return .selected(id)
     }
 
