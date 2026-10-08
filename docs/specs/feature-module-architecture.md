@@ -1,6 +1,6 @@
 # Spec: Feature-module architecture
 
-- Status: Approved 2026-09-20 (revision 6); revision 7 of 2026-09-21 carries the names settled in the plan review on #66 and changes no decision
+- Status: Approved 2026-09-20 (revision 6); revision 7 of 2026-09-21 carries the names settled in the plan review on #66 and changes no decision; revision 8 of 2026-10-03 brings section 3, the sidebar's World row and the rejected alternative of a parent reading the child's model in line with the amendment of ADR-0006 made in #78: a parent never reads a child's model to learn a choice, and a child's first choice is its answer to `.created`
 - Owner review: https://claude.ai/artifact/CnGxEhqK4jDubEmcxgTZJF
 - Issue: #63
 
@@ -94,11 +94,11 @@ Rules, each with its reason:
 
 ### 3. Composition: a tree of modules, a tree of views
 
-The root module is a `FeatureModule` like any other. Its `Model` composes the models of its children; its `UserAction` wraps their actions, `.taskViewList(TaskViewList.UserAction)`; its `Event` is `.action(UserAction)` and the events of the world, `.changed(ChangeSet)`. Its `send` hands a wrapped action to the child as `.action`, hands a world event to every child that takes it, takes the child's `Output` and reacts to it, then rebuilds its own model from the children's. In M2 the root holds the sidebar and a placeholder for the detail: the title of the selected view, or nothing.
+The root module is a `FeatureModule` like any other. Its `Model` composes the models of its children; its `UserAction` wraps their actions, `.taskViewList(TaskViewList.UserAction)`; its `Event` is `.action(UserAction)` and the events of the world, `.changed(ChangeSet)`. Its `send` hands a wrapped action to the child as `.action`, hands a world event to every child that takes it, takes the child's `Output` and reacts to it, then rebuilds its own model from the children's. When it creates a child it sends it `.created` once, and the child's answer is its first choice. In M2 the root holds the sidebar and a placeholder for the detail: the title of the selected view, or nothing.
 
 The tree of views mirrors the tree of modules. The root view receives the root model and a `send` over the root's actions; the list of views receives `model.taskViewList` and a closure that takes a `TaskViewList.UserAction` and wraps it in `.taskViewList`. Nothing else crosses that boundary: no module instance and no store reaches a view.
 
-An `Output` is the one-shot fact "the person chose this", which the parent acts on once. The current data the parent needs, such as the title of the selected view, it reads from the child's model after the send. Both exist because neither covers the other: a selection is state and a "open this task" or "dismiss me" is not.
+An `Output` is the fact "this was chosen", which the parent acts on once, and it is the only way a parent learns of a choice. A parent carries a child's model into its own whole, for the view, and never reads it to decide anything: a model is what the child's view draws. A choice nobody made, such as the view a list starts on, reaches the parent the same way, as the child's answer to `.created`, the event the parent sends once right after creating it. The amendment of ADR-0006 records both rules.
 
 ### 4. Navigation: state in the root, screens as child modules
 
@@ -171,7 +171,7 @@ The sidebar does exactly enough to walk every path of the contract once.
 | Select | The action `.rowSelected(id)`: the model highlights the row, the output `.selected(id)` goes to the root, and the root shows the title in the detail placeholder. |
 | Rename | The actions `.renameMenuItemChosen(id)`, `.titleFieldChanged(text)` on every keystroke, `.titleFieldSubmitted` and `.titleFieldCancelled`. The draft lives in the model; this is the synchronous round trip of a text field. An empty title the module refuses by itself, without the store. |
 | Create | The action `.createFolderButtonTapped`: a view without a filter at the root of the tree. One write through the store, so that an event from a person goes the whole way and comes back through a `ChangeSet`. |
-| World | The event `.changed(ChangeSet)` with views in it rereads the tree; with tasks only it does nothing. No action can carry it: the view's `send` does not take events. |
+| World | The event `.changed(ChangeSet)` with views in it rereads the tree; with tasks only it does nothing. The event `.created`, which the root sends once after creating the sidebar, is answered with `.selected` for the view it starts on. No action can carry either: the view's `send` does not take events. |
 | Refusal | What the store refuses, for example renaming a view a peer has deleted, lands in `model.problem` and the view shows it, until the next event. |
 
 The model, at the level that matters for review: a list of rows, each with the view's id, its title, its depth and whether it is selected; the rename in progress, if any, with the row it is on, the draft and whether the draft can be committed; and the last problem, if any.
@@ -199,7 +199,7 @@ None. The sidebar needs nothing the store does not already have. The first revis
 | Shared use cases in the core, screen state and navigation per platform | The state of a screen is where the decisions are; the use cases would be thin and the duplication would be where it costs. |
 | A pure reducer returning state and effects, the store reached only through effects | Maximum purity and tests without a store, but the store is synchronous and local: every query becomes an effect plus an answering event, and the sidebar needs three rounds to draw. Ceremony for a problem this design does not have. |
 | A module that subscribes to the store itself and pushes its model through a callback | A second door for input and an output that is a closure: the model becomes something that may arrive at any time instead of the value a `send` returned, and `Store.onChange` is one closure anyway. |
-| The parent reads the child's model instead of receiving outputs | Enough for a selection, which is state, but a one-shot "open this task" or "dismiss" has no state to read, and the parent would have to interpret the child's events, duplicating its logic. |
+| The parent reads the child's model instead of receiving outputs | A model is what the child's view draws, so the parent would be deciding on the view's data; a one-shot "open this task" or "dismiss" has no state to read; and the parent would have to interpret the child's events, duplicating its logic (amendment of ADR-0006, #78). |
 | A UDF library such as The Composable Architecture | A dependency in the core that has to build for wasm32, a large one, for what is one function per module here. |
 | Models made of domain entities handed to the view | The view then decides what a `TaskView` looks like and which tasks are overdue, and it holds logic again. |
 | Views spelling dates and numbers in the locale themselves, the model carrying a `Day` | Formatting is a decision the view would own, so the rule stops being literal; the web page would have to know what a day since 1970 is; and the locale would reach the model from two sides. A shared service protocol with a platform implementation keeps the view at drawing. |

@@ -2,7 +2,8 @@
 
 - Status: Proposed
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, #67, ADR-0001, ADR-0004
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, #67, #78, ADR-0001, ADR-0004
+- Amended: 2026-10-03, after the owner's review of #78 (see the end)
 
 ## Context
 
@@ -21,3 +22,10 @@ Easier: a module's tests are a store in memory, a sequence of events and a model
 Harder: every keystroke is a round trip through the module, which holds only because the round trip is synchronous; every event rebuilds the root model and the UI diffs it, to be measured on the first large list; a change of the locale is an event and a rebuild rather than a redraw; every module carries four nested types.
 
 Constrained: no feature target imports a UI framework; no `send` throws; no module subscribes to the store or navigates on its own; a `Codable` or any other wire conformance is added with the wire and not before; a view formats nothing. Reversing this decision means moving state and decisions into views or view models per platform, which is cheap for one module and a rewrite of every feature afterwards.
+
+## Amendment, 2026-10-03
+
+Made in the owner's review of #78, where one module first composed another. Two rules follow from the decision above without being written in it, and spec section 3 had stated the first the other way round. Both bind every module from M3 on.
+
+1. **A parent never reads a child's model to learn a choice.** A `Model` is what the child's view draws, and nothing else. A parent carries a child's model into its own whole, for the view, and decides nothing in it. What the child chose, or asks its parent for, reaches the parent only as `Output`. The route this rules out was tried in #78: a `selection` field on the list's model, which the root read at launch. The owner turned it down because the model is the view's, and the list already reports what was chosen as its output `.selected`.
+2. **A child's first choice is its answer to `.created`.** A module publishes nothing and answers only the events it is given, so a choice nobody made, such as the view a list starts on, needs an event to answer. The parent sends `.created` to each child it creates, once, right after creating it and before anything else, and the child answers with its starting choice, or with nothing when it has none to report. The parent handles that answer on the same line every later answer takes, so the first choice and a click reach it the same way, and it names no choice of its own. `.created` is an event of the world, beside `.changed`, and no view can send it. It is named for what happened to the module (owner's naming in #78): its parent created it, which is not yet the same as putting it on screen. Whether more events of this kind follow is not decided here.
