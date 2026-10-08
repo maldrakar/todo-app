@@ -5,7 +5,10 @@ let package = Package(
     name: "todo-core",
     platforms: [.macOS(.v14), .iOS(.v17), .watchOS(.v10)],
     products: [
+        // A library for each target `Apps/Apple` imports and for no other: another package reaches a target
+        // only through a product, and a target in none stays this package's own.
         .library(name: "TodoCore", targets: ["TodoCore"]),
+        .library(name: "FeatureModule", targets: ["FeatureModule"]),
         .executable(name: "todo", targets: ["todo"]),
         .executable(name: "wasm-size-probe", targets: ["WasmSizeProbe"]),
     ],
