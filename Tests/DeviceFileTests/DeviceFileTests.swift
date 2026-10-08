@@ -14,19 +14,22 @@ import Foundation
     let device = Store.newDeviceID()
     try DeviceFile.keep(device, beside: database)
     #expect(DeviceFile.read(beside: database) == device)
-    #expect(try String(contentsOfFile: database + ".device", encoding: .utf8) == device)
+    #expect(try String(contentsOfFile: database + deviceSuffix, encoding: .utf8) == device)
 }
 
 /// `echo given > todo.sqlite.device` is how a person writes one, and it ends in a newline.
 @Test func aFileWrittenByHandIsReadByItsFirstLine() throws {
     let database = freshDatabase()
-    try "given\n".write(toFile: database + ".device", atomically: false, encoding: .utf8)
+    try "given\n".write(toFile: database + deviceSuffix, atomically: false, encoding: .utf8)
     #expect(DeviceFile.read(beside: database) == "given")
 }
 
 @Test func nothingIsReadBesideADatabaseThatHasNoIdentityKept() {
     #expect(DeviceFile.read(beside: freshDatabase()) == nil)
 }
+
+/// Spelled here rather than read from `DeviceFile`, because the test pins the file name the README documents.
+private let deviceSuffix = ".device"
 
 /// A database path no other test uses. Under `.build/`, the way the demo's tests write, because that is a
 /// directory the runner on wasm32 can reach too.
