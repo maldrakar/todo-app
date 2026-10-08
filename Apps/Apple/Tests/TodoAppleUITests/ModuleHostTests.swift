@@ -25,6 +25,26 @@ import TodoAppleUI
     #expect(host.model == Recorder.Model(count: 1), "the event that waited moved the model, and the host copied it")
 }
 
+/// The rule at full stretch: two events arrive during one `send`, and the first of them, sent in its turn,
+/// delivers a third. Each waits until the event in flight has returned, and they go in the order they arrived,
+/// which a queue of one slot breaks by losing one, and so does a drain that lets the delivery made by a queued
+/// event through at once. Each event also begins with the host holding the model the event before it left, so
+/// the model is copied after every event and not once at the end.
+@Test @MainActor func everyEventDeliveredInFlightWaitsItsTurnAndIsCopiedWhenItReturns() {
+    let recorder = Recorder()
+    let host = ModuleHost(recorder) { deliver in recorder.world = { deliver($0) } }
+    recorder.hostModel = { [unowned host] in host.model }
+    host.send(.relayedTwice)
+    #expect(recorder.steps == [
+        .began(.action(.relayedTwice)), .ended(.action(.relayedTwice)),
+        .began(.fromWorldRelaying), .ended(.fromWorldRelaying),
+        .began(.fromWorld), .ended(.fromWorld),
+        .began(.fromWorld), .ended(.fromWorld),
+    ])
+    #expect(recorder.heldByTheHost == [0, 1, 2, 3].map(Recorder.Model.init(count:)))
+    #expect(host.model == Recorder.Model(count: 4))
+}
+
 @Test @MainActor func theWorldEntranceReachesTheModuleAsAnEvent() throws {
     let recorder = Recorder()
     var entrance: (@MainActor (Recorder.Event) -> Void)?
@@ -37,7 +57,7 @@ import TodoAppleUI
     #expect(host.model == Recorder.Model(count: 1))
 }
 
-/// A module assembles its model again on every event, the many it ignores included, so most events leave the
+/// A module assembles its model again on every event, the many it ignores included, so many events leave the
 /// model equal, and a view told of each of them would redraw for nothing.
 @Test @MainActor func anEventThatLeavesTheModelEqualNotifiesNoObserver() {
     let recorder = Recorder()
@@ -69,12 +89,18 @@ private final class Recorder: FeatureModule {
         case ignored
         /// Calls the world's entrance from inside `send`, the way a write calls `Store.onChange`.
         case relayed
+        /// Moves the model and calls the world's entrance twice from inside `send`, first with an event that
+        /// calls it once more.
+        case relayedTwice
     }
 
     enum Event: FeatureEvent {
         case action(UserAction)
         /// Moves the model, the way a change from the store does.
         case fromWorld
+        /// Moves the model and calls the world's entrance from inside `send`, so that an event which waited
+        /// its turn delivers one of its own.
+        case fromWorldRelaying
     }
 
     typealias Output = Never
@@ -87,16 +113,28 @@ private final class Recorder: FeatureModule {
     private(set) var model = Model(count: 0)
     private(set) var steps: [Step] = []
 
+    /// What the host held as each event began, read through `hostModel` when a test sets it.
+    private(set) var heldByTheHost: [Model] = []
+    var hostModel: (() -> Model)?
+
     /// The world's entrance as the store holds it in the app: a plain closure property, assigned by `world`.
     var world: ((Event) -> Void)?
 
     func send(_ event: Event) -> Never? {
         steps.append(.began(event))
+        if let hostModel { heldByTheHost.append(hostModel()) }
         defer { steps.append(.ended(event)) }
         switch event {
         case .action(.counted), .fromWorld: model = Model(count: model.count + 1)
         case .action(.ignored): model = Model(count: model.count)
         case .action(.relayed): world?(.fromWorld)
+        case .action(.relayedTwice):
+            model = Model(count: model.count + 1)
+            world?(.fromWorldRelaying)
+            world?(.fromWorld)
+        case .fromWorldRelaying:
+            model = Model(count: model.count + 1)
+            world?(.fromWorld)
         }
         return nil
     }

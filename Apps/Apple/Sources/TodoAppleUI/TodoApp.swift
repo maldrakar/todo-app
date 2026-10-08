@@ -15,8 +15,8 @@ public enum TodoApp {
     /// devices. Without `TODO_DEVICE` the identity is the one kept beside the database, and the first launch
     /// over a database mints one and keeps it there (ADR-0005).
     ///
-    /// It throws whatever the store or the file system throws: what a launch that failed means is the
-    /// scene's to decide (spec section 5).
+    /// It throws whatever the store or the file system throws, and its caller acts on the throw: in M2 a
+    /// launch that failed is fatal and says why (spec section 5).
     public static func launch(environment: [String: String]) throws -> ModuleHost<AppModule> {
         let database = try set(environment["TODO_DB"]) ?? defaultDatabase()
         let held = set(environment["TODO_DEVICE"]) ?? DeviceFile.read(beside: database)

@@ -18,7 +18,7 @@ import Observation
 public final class ModuleHost<M: FeatureModule> {
     /// The module's model as it stood when the last event returned.
     ///
-    /// Assigned after every event, most of which leave it equal: a module assembles its model again on every
+    /// Assigned after every event, many of which leave it equal: a module assembles its model again on every
     /// event it gets, the ones it ignores included. The host does not compare the two itself, because the
     /// setter the `@Observable` macro writes already does: it skips notifying when an `Equatable` value is
     /// assigned an equal one (expanded and run under Swift 6.3.3 and Xcode's 6.2.4 on 2026-10-08). The
@@ -53,7 +53,8 @@ public final class ModuleHost<M: FeatureModule> {
         pending.append(event)
         guard pending.count == 1 else { return }
         while let next = pending.first {
-            // The answer is for a parent, and the host holds the root, which has none to give it to.
+            // The answer is a parent's, and a host has no parent to hand it to: in the app it holds the root,
+            // whose `Output` is `Never`.
             _ = module.send(next)
             model = module.model
             pending.removeFirst()

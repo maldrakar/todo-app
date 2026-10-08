@@ -14,7 +14,8 @@ public enum DeviceFile {
     /// What the file's name adds to the database's: `todo.sqlite` keeps its identity in `todo.sqlite.device`.
     private static let suffix = ".device"
 
-    /// The identity kept beside the database, or nil when nothing keeps one.
+    /// The identity kept beside the database, or nil when no readable line keeps one there: no file, a
+    /// directory, an empty file, or one that cannot be read as UTF-8.
     ///
     /// The first line is the identity, so a file written by hand, which ends in a newline, names the same
     /// device as one written here.
@@ -27,11 +28,11 @@ public enum DeviceFile {
     ///
     /// The write is not the atomic one, which `FoundationEssentials` on WASI answers with "the requested
     /// operation is not supported" — measured, and the whole wasm32 suite passes without it. This target is
-    /// built and tested on both, and a torn write of a minted identity's 36 bytes costs no data: what it
-    /// leaves is a prefix, the next open reads that prefix back as the id and goes on under it, and a prefix
-    /// of a UUID names no other device. What was written under the identity is still pushed, because
-    /// `own_devices` holds the id the store was opened with whatever the file beside the database ends up
-    /// saying.
+    /// built and tested on the host and on wasm32, and a torn write of a minted identity's 36 bytes costs no
+    /// data: what it leaves is a prefix, the next `read(beside:)` answers that prefix as the id, the store
+    /// opened with it goes on under it, and a prefix of a UUID names no other device. What was written under
+    /// the identity is still pushed, because `own_devices` holds the id the store was opened with whatever the
+    /// file beside the database ends up saying.
     public static func keep(_ device: String, beside database: String) throws {
         try device.write(toFile: database + suffix, atomically: false, encoding: .utf8)
     }
