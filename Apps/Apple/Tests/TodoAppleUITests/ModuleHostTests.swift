@@ -29,8 +29,8 @@ import TodoAppleUI
     let recorder = Recorder()
     var entrance: (@MainActor (Recorder.Event) -> Void)?
     let host = ModuleHost(recorder) { entrance = $0 }
-    // Two statements, because `try #require(entrance)(.fromWorld)` stops Swift 6.3.3's type checker on an
-    // assertion (`recordArgumentList`, ConstraintSystem.cpp) instead of compiling.
+    // Two statements, because `try #require(entrance)(.fromWorld)` stops the type checker of Swift 6.3.3 and of
+    // Xcode's 6.2.4 alike on an assertion (`recordArgumentList`, ConstraintSystem.cpp) instead of compiling.
     let deliver = try #require(entrance)
     deliver(.fromWorld)
     #expect(recorder.steps == [.began(.fromWorld), .ended(.fromWorld)])
@@ -57,7 +57,7 @@ import TodoAppleUI
 }
 
 /// A module that writes down when each event began and ended, so that one event inside another shows.
-final class Recorder: FeatureModule {
+private final class Recorder: FeatureModule {
     struct Model: Equatable, Sendable {
         let count: Int
     }

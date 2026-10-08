@@ -29,7 +29,8 @@ public final class ModuleHost<M: FeatureModule> {
     private let module: M
 
     /// The event in flight, first, and those that arrived while it ran, in the order they arrived. An empty
-    /// array is the one sign that nothing is in flight. No view reads it, so observation leaves it out.
+    /// array is the one sign that nothing is in flight. Left out of observation, which would otherwise send
+    /// every append and removal through the registrar for an observer that cannot exist, since it is private.
     @ObservationIgnored private var pending: [M.Event] = []
 
     /// Hands the world's entrance to `world`, once, after every property is set.

@@ -8,7 +8,10 @@ let package = Package(
         // A library for each target `Apps/Apple` imports and for no other: another package reaches a target
         // only through a product, and a target in none stays this package's own.
         .library(name: "TodoCore", targets: ["TodoCore"]),
+        .library(name: "DeviceFile", targets: ["DeviceFile"]),
         .library(name: "FeatureModule", targets: ["FeatureModule"]),
+        .library(name: "TaskViewListFeature", targets: ["TaskViewListFeature"]),
+        .library(name: "AppFeature", targets: ["AppFeature"]),
         .executable(name: "todo", targets: ["todo"]),
         .executable(name: "wasm-size-probe", targets: ["WasmSizeProbe"]),
     ],
