@@ -6,7 +6,11 @@ import SwiftUI
 /// root's model and a closure that wraps the list's actions in the root's, and draws the pane beside it (spec
 /// sections 3 and 4).
 struct RootView: View {
-    let host: ModuleHost<AppModule>
+    private let host: ModuleHost<AppModule>
+
+    init(host: ModuleHost<AppModule>) {
+        self.host = host
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -15,7 +19,7 @@ struct RootView: View {
             if let detail = host.model.detail {
                 Text(detail.title)
             } else {
-                Text("No view selected")
+                Text("Nothing to show")
                     .foregroundStyle(.secondary)
             }
         }

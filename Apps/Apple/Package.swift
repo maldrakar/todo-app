@@ -20,8 +20,8 @@ let package = Package(
             .product(name: "TaskViewListFeature", package: "todo-core"),
             .product(name: "TodoCore", package: "todo-core"),
         ]),
-        // The `@main` and nothing else: the app is the library, which the Xcode app target that arrives when the
-        // store needs a bundle imports the way this does (ADR-0008).
+        // The `@main` and nothing else: the app is `TodoAppleUI`, and the Xcode app target that arrives when iOS,
+        // watchOS or the store needs a bundle imports it the same way (ADR-0008).
         .executableTarget(name: "todo-mac", dependencies: ["TodoAppleUI"]),
         .testTarget(name: "TodoAppleUITests", dependencies: [
             "TodoAppleUI",
