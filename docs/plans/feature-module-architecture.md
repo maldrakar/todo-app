@@ -53,13 +53,13 @@ from.
 | `Sources/TodoCLI/CLI.swift` | 4 | calls `DeviceFile` instead of its own copy |
 | `Tests/DeviceFileTests/DeviceFileTests.swift` | 4 | the identity file's round trip, a file written by hand, and no file |
 | `Apps/Apple/Package.swift` | 4, 5 | `TodoAppleUI`, `TodoAppleUITests`, `todo-mac` |
-| `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift` | 4 | `ModuleHost` |
+| `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift` | 4, 5 | `ModuleHost`; internal from Task 5, whose views are its only callers |
 | `Apps/Apple/Sources/TodoAppleUI/TodoApp.swift` | 4, 5 | `TodoApp.launch`, `TodoApp.host` |
 | `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift` | 5 | `TaskViewListView` |
 | `Apps/Apple/Sources/TodoAppleUI/RootView.swift` | 5 | `RootView` |
 | `Apps/Apple/Sources/TodoAppleUI/AppScene.swift` | 5 | `AppScene` |
 | `Apps/Apple/Sources/todo-mac/TodoMac.swift` | 5 | `@main` |
-| `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `TodoAppTests.swift` | 4 | the host's queue and the launch |
+| `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `TodoAppTests.swift` | 4, 5 | the host's queue and the launch, through `@testable import` from Task 5 |
 | `.github/workflows/ci.yml` | 6 | the macOS job builds and tests `Apps/Apple`, and builds with Xcode's toolchain |
 | `README.md`, `docs/style.md`, `CHANGELOG.md` | 6 | how to run the app; the view rule; the epic's summary |
 
