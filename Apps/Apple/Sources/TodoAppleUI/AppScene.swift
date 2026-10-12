@@ -13,17 +13,13 @@ public struct AppScene: Scene {
     public var body: some Scene {
         Window("Todo", id: "main") {
             RootView(host: TodoApp.host)
-                // AppKit's header on the policy this app starts with: "The application does not appear in the
-                // Dock and may not create windows or be activated.  This corresponds to LSBackgroundOnly=1 in
-                // the Info.plist.  This is also the default for unbundled executables that do not have
-                // Info.plists." Launched from a shell on 2026-10-12 without the first call, it read as
-                // `BackgroundOnly`, opened its window all the same, and stayed behind the front application even
-                // with `activate(ignoringOtherApps: true)`; with the first call alone it read as `Foreground`
-                // and still stayed behind. With both, it came in front of the terminal it was launched from
-                // within a second, and stayed behind another application that was in front, as it also did with
-                // `activate(ignoringOtherApps: true)` in place of `activate()`: the header does not promise that
-                // `activate()` is granted, and the older call did no better. Both calls stand in for the bundle
-                // the app does not have yet, and go when it gets one (ADR-0008).
+                // An executable without an Info.plist starts `BackgroundOnly`, the policy AppKit's header
+                // describes as "The application does not appear in the Dock and may not create windows or be
+                // activated." (This one opened its window all the same.) The regular policy makes it
+                // `Foreground`, and `activate()` then brings it in front of the terminal that launched it;
+                // macOS's cooperative activation can still leave it behind an application that does not yield,
+                // as it did with Telegram and with Arc in front (2026-10-12). Both calls go when the app has a
+                // bundle (ADR-0008).
                 .onAppear {
                     NSApplication.shared.setActivationPolicy(.regular)
                     NSApplication.shared.activate()

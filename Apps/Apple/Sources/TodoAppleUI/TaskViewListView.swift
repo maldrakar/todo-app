@@ -4,14 +4,19 @@ import TaskViewListFeature
 import TodoCore
 
 /// The list of views, drawn as the module assembled it, every gesture sent as the one action its control is
-/// named for (spec section 2), except a deselect, which no action takes (`selection`). It knows nothing about
-/// renaming beyond what a row says: a row with a `draft` draws a field, and every other row its title.
+/// named for (spec section 2). A deselect is no gesture here: the highlight cannot be removed (`selection`). It
+/// knows nothing about renaming beyond what a row says: a row with a `draft` draws a field, and every other row
+/// its title.
 struct TaskViewListView: View {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
 
     /// Whether the list has the keyboard, which only the view can know (spec section 2).
     @FocusState private var isListFocused: Bool
+
+    /// How many times the List has emptied its own highlight. Nothing uses the number: `selection` reads the
+    /// property while `body` runs, so that a change runs `body` again.
+    @State private var emptiedHighlights = 0
 
     init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) {
         self.model = model
@@ -55,12 +60,18 @@ struct TaskViewListView: View {
     }
 
     /// The highlight, read from the model and moved only by an action, the shape a text field's binding has
-    /// (spec section 4). A nil written back is not sent, because no action takes it. In the app, a Cmd-click on
-    /// the highlighted row drops the List's own highlight while the model and the pane keep the view, so the
-    /// screen and the model disagree until the next model change (2026-10-12).
+    /// (spec section 4).
+    ///
+    /// The highlight cannot be removed, which the owner chose on 2026-10-12. A Cmd-click on the highlighted row
+    /// makes the List drop its own highlight and write nil, while the model and the pane keep the view. The nil
+    /// is not sent, since no action takes it, and the model does not change, so nothing the module does would
+    /// draw the List again. The view does it: the count moves, `body` runs again, and the List is handed
+    /// `model.selection` once more. On 2026-10-12, with the highlight emptied through the accessibility API,
+    /// the row was highlighted again within half a second; without the count it stayed empty.
     private var selection: Binding<ViewID?> {
-        Binding(get: { model.selection }, set: { id in
-            if let id { send(.rowSelected(id)) }
+        _ = emptiedHighlights
+        return Binding(get: { model.selection }, set: { id in
+            if let id { send(.rowSelected(id)) } else { emptiedHighlights += 1 }
         })
     }
 }
