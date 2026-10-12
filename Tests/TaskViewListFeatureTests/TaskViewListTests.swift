@@ -247,8 +247,8 @@ import SQLiteKit
     // What a gesture means is the module's to know: a view sends what the person did to a text field and
     // has no way of telling whether one is open, so a keystroke with no rename behind it is nothing at all
     // — and not a rename of whichever row happens to be highlighted. Nothing at all includes the sentence:
-    // the field that just closed behind the refusal sends its cancellation here, and a sentence cleared by
-    // it would go between the person being told and reading it.
+    // a field's echo of its text and its lost focus can arrive after the field closed, and a sentence
+    // cleared by them would go between the person being told and reading it.
     #expect(list.send(.action(.titleFieldChanged("Anything at all"))) == nil)
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
     #expect(list.send(.action(.titleFieldLostFocus)) == nil)
@@ -258,10 +258,10 @@ import SQLiteKit
     #expect(try store.journal(after: 0).count == written)
 }
 
-/// A text field reports the text it already holds when it opens, after every keystroke, and after Return and a
-/// lost focus (the app's event log, 2026-10-12). The report after a refused Return is the one that costs
-/// something: taken for a keystroke, it would clear the sentence the refusal had just set, before anybody read
-/// it.
+/// On 2026-10-12, by hand, a `TextField` wrote the text it holds back through its binding twice for every
+/// keystroke, and again after Return and after a lost focus. The report after a refused Return is the one that
+/// costs something: taken for a keystroke, it would clear the sentence the refusal had just set, before anybody
+/// read it.
 @Test func aFieldReportingTheTextItHoldsLeavesTheSentence() throws {
     let store = try makeStore()
     let list = try TaskViewList(store: store)
@@ -346,6 +346,29 @@ import SQLiteKit
     #expect(list.model.rows.first?.draft == "  ", "the field stays open on the text, as it does for Return")
     #expect(list.model.rows.first?.title == "Inbox")
     #expect(try store.journal(after: 0).count == written)
+}
+
+/// A click on another row while the field holds an empty name loses the field's focus first, and the refusal
+/// sets the sentence; the click's own `.rowSelected` follows. The highlight moves, the field stays open and
+/// empty where it was, and the sentence is still what explains it.
+@Test func choosingARowWhileAFieldIsOpenLeavesTheSentence() throws {
+    let list = try TaskViewList(store: try makeStore())
+    #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
+    #expect(list.send(.action(.titleFieldChanged(""))) == nil)
+    #expect(list.send(.action(.titleFieldLostFocus)) == nil)
+    let sentence = try #require(list.model.problem, "the refusal is the setup; without it this proves nothing")
+    #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == .selected(BuiltInTaskViews.today))
+    #expect(list.model.problem == sentence)
+    #expect(list.model.selection == BuiltInTaskViews.today)
+    #expect(list.model.rows.map(\.draft) == ["", nil, nil, nil, nil])
+    // The same state reached in the other order, the highlight moved before the refusal, compares the model
+    // whole: nothing else moved.
+    let reference = try TaskViewList(store: try makeStore())
+    _ = reference.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
+    _ = reference.send(.action(.rowSelected(BuiltInTaskViews.today)))
+    _ = reference.send(.action(.titleFieldChanged("")))
+    _ = reference.send(.action(.titleFieldLostFocus))
+    #expect(list.model == reference.model)
 }
 
 @Test func choosingRenameOnASecondRowMovesTheFieldAndDropsTheFirstDraft() throws {
