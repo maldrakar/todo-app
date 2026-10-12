@@ -138,7 +138,13 @@ public final class TaskViewList: FeatureModule {
             // module's to know, and a view sending a keystroke cannot tell whether a rename exists. Ignored
             // to the letter, the sentence included — a field closing behind a refusal sends its cancellation
             // here, and clearing the sentence on it would take away what explains the closing.
-            guard let rename = state.rename else { return nil }
+            //
+            // A text that is already the draft is ignored the same way, sentence included, because it is no
+            // keystroke: a text field reports the text it holds again when it opens, after every keystroke,
+            // and after Return and a lost focus (the app's event log, 2026-10-12). Taken for typing, the
+            // report after a refused Return would clear the sentence the refusal had just set, and "A title
+            // cannot be empty." would never stay on screen.
+            guard let rename = state.rename, text != rename.draft else { return nil }
             state.rename = State.Rename(id: rename.id, draft: text)
             state.problem = nil
             return nil

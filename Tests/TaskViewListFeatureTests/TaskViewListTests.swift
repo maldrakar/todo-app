@@ -100,9 +100,9 @@ import SQLiteKit
     #expect(selected.isEmpty)
 }
 
-/// One highlight, read two ways: `selection` is what a list bound to it reads, and `isSelected` what a client
-/// drawing row by row reads. Two readings that disagreed would put two highlights on screen, or one on a row
-/// that is not there.
+/// One highlight, read two ways: `selection` is what a list bound to one value reads, and `isSelected` what a
+/// client drawing row by row reads. Two readings that disagreed would have two clients highlight different
+/// rows, or bind a list to a row it does not draw.
 @Test func selectionNamesTheSelectedRow() throws {
     let store = try makeStore()
     let list = try TaskViewList(store: store)
@@ -256,6 +256,26 @@ import SQLiteKit
     #expect(list.model.problem == sentence, "the sentence outlives the gestures that were ignored")
     #expect(list.model == before)
     #expect(try store.journal(after: 0).count == written)
+}
+
+/// A text field reports the text it already holds when it opens, after every keystroke, and after Return and a
+/// lost focus (the app's event log, 2026-10-12). The report after a refused Return is the one that costs
+/// something: taken for a keystroke, it would clear the sentence the refusal had just set, before anybody read
+/// it.
+@Test func aFieldReportingTheTextItHoldsLeavesTheSentence() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store)
+    #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
+    #expect(list.send(.action(.titleFieldChanged(""))) == nil)
+    #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    let refused = list.model
+    #expect(refused.problem == "A title cannot be empty.", "the refusal is the setup; without it this proves nothing")
+    #expect(list.send(.action(.titleFieldChanged(""))) == nil)
+    #expect(list.model == refused, "the sentence and the open field are where the refusal left them")
+    // A keystroke is the person answering the sentence, and it still takes the sentence away.
+    #expect(list.send(.action(.titleFieldChanged("I"))) == nil)
+    #expect(list.model.problem == nil)
+    #expect(list.model.rows.first?.draft == "I")
 }
 
 @Test func problemSurvivesAChangedEvent() throws {
