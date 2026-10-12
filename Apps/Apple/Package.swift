@@ -17,8 +17,12 @@ let package = Package(
             .product(name: "AppFeature", package: "todo-core"),
             .product(name: "DeviceFile", package: "todo-core"),
             .product(name: "FeatureModule", package: "todo-core"),
+            .product(name: "TaskViewListFeature", package: "todo-core"),
             .product(name: "TodoCore", package: "todo-core"),
         ]),
+        // The `@main` and nothing else: the app is the library, which the Xcode app target that arrives when the
+        // store needs a bundle imports the way this does (ADR-0008).
+        .executableTarget(name: "todo-mac", dependencies: ["TodoAppleUI"]),
         .testTarget(name: "TodoAppleUITests", dependencies: [
             "TodoAppleUI",
             .product(name: "AppFeature", package: "todo-core"),

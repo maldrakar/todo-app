@@ -20,7 +20,7 @@ import Observation
 /// drop every request without a word. The `Output == Never` clause makes the compiler refuse it. In the app
 /// the module is the root.
 @MainActor @Observable
-public final class ModuleHost<M: FeatureModule> where M.Output == Never {
+final class ModuleHost<M: FeatureModule> where M.Output == Never {
     /// The module's model as it stood when the last event returned.
     ///
     /// Assigned after every event, many of which leave it equal: a module assembles its model again on every
@@ -29,7 +29,7 @@ public final class ModuleHost<M: FeatureModule> where M.Output == Never {
     /// assigned an equal one (expanded and run under Swift 6.3.3 and Xcode's 6.2.4 on 2026-10-08). The
     /// comparison is in the setter and not in the macro's `_modify`, which notifies every time, so the model
     /// is assigned whole and never changed in place.
-    public private(set) var model: M.Model
+    private(set) var model: M.Model
 
     private let module: M
 
@@ -44,13 +44,13 @@ public final class ModuleHost<M: FeatureModule> where M.Output == Never {
     /// store is held by the module the host holds, so a strong one would close a cycle through the store:
     /// releasing the host would release nothing, and its database would stay open for the life of the
     /// process, beside whatever store is opened over the same file next (`Store`, ADR-0005).
-    public init(_ module: M, world: (@escaping @MainActor (M.Event) -> Void) -> Void) {
+    init(_ module: M, world: (@escaping @MainActor (M.Event) -> Void) -> Void) {
         self.module = module
         self.model = module.model
         world { [weak self] event in self?.deliver(event) }
     }
 
-    public func send(_ action: M.Event.UserAction) {
+    func send(_ action: M.Event.UserAction) {
         deliver(.action(action))
     }
 
