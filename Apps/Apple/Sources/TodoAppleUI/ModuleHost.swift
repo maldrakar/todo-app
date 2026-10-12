@@ -14,8 +14,12 @@ import Observation
 /// `.changed`. Whatever arrives while an event is in flight waits, and is sent after that event returns, so a
 /// module never sees its own write in the middle of its own update. Everything runs on the main actor, so
 /// the queue is an array and needs no lock.
+///
+/// A host has no parent to hand an output to, so a host over a module that asks something of its parent would
+/// drop every request without a word. The `Output == Never` clause makes the compiler refuse it. In the app
+/// the module is the root.
 @MainActor @Observable
-public final class ModuleHost<M: FeatureModule> {
+public final class ModuleHost<M: FeatureModule> where M.Output == Never {
     /// The module's model as it stood when the last event returned.
     ///
     /// Assigned after every event, many of which leave it equal: a module assembles its model again on every
@@ -53,8 +57,8 @@ public final class ModuleHost<M: FeatureModule> {
         pending.append(event)
         guard pending.count == 1 else { return }
         while let next = pending.first {
-            // The answer is a parent's, and a host has no parent to hand it to: in the app it holds the root,
-            // whose `Output` is `Never`.
+            // Always nil: the type admits only a module with nothing to ask of a parent, so there is no answer
+            // to hand on.
             _ = module.send(next)
             model = module.model
             pending.removeFirst()
