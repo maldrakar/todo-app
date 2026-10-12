@@ -33,6 +33,15 @@ public final class TaskViewList: FeatureModule {
 
         public let rows: [Row]
 
+        /// The id of the highlighted row, and nil when no row is highlighted: what a list that keeps its
+        /// selection as one value is bound to, as the Mac's `List(selection:)` is, so that the binding reads a
+        /// field the way a text field's reads `draft`, instead of searching the rows for one (spec section 4).
+        ///
+        /// It is the highlight `Row.isSelected` carries, held a second way because it is read a second way: a
+        /// list bound to one value reads this, and a client that draws row by row reads the row. Both come
+        /// off the same drawn rows when the model is assembled, so they name the same row or none.
+        public let selection: ViewID?
+
         /// What went wrong, as the finished sentence the view shows until the next event, and nil when
         /// there is nothing to say: `send` cannot throw, so a failure inside it has nowhere else to go,
         /// and a view that had to spell one would be a view holding logic (spec section 2).
@@ -364,17 +373,18 @@ public final class TaskViewList: FeatureModule {
         var problem: String?
 
         /// The model a view draws: the rows with this person's session projected onto them — the highlight
-        /// on the row they chose, the draft on the row they are renaming — and the sentence, if any.
+        /// on the row they chose, the draft on the row they are renaming — the highlighted row's id, and the
+        /// sentence, if any.
         var model: Model {
-            Model(
-                rows: rows.map {
-                    Model.Row(
-                        id: $0.id, title: $0.title, depth: $0.depth,
-                        isSelected: $0.id == selection, draft: rename?.text(on: $0.id)
-                    )
-                },
-                problem: problem
-            )
+            let drawn = rows.map {
+                Model.Row(
+                    id: $0.id, title: $0.title, depth: $0.depth,
+                    isSelected: $0.id == selection, draft: rename?.text(on: $0.id)
+                )
+            }
+            // Read off the drawn rows and not copied from `selection`: `.rowSelected` keeps an id without asking
+            // the rows, and an id no row carries highlights nothing, so the model names no row for it either.
+            return Model(rows: drawn, selection: drawn.first(where: \.isSelected)?.id, problem: problem)
         }
 
         /// One row of the list as a read of the store produced it, before anything about this person's
@@ -415,3 +425,5 @@ public final class TaskViewList: FeatureModule {
         }
     }
 }
+
+extension TaskViewList.Model.Row: Identifiable {}

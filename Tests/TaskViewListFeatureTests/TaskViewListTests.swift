@@ -100,6 +100,28 @@ import SQLiteKit
     #expect(selected.isEmpty)
 }
 
+/// One highlight, read two ways: `selection` is what a list bound to it reads, and `isSelected` what a client
+/// drawing row by row reads. Two readings that disagreed would put two highlights on screen, or one on a row
+/// that is not there.
+@Test func selectionNamesTheSelectedRow() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store)
+    #expect(list.model.selection == BuiltInTaskViews.inbox)
+    #expect(list.model.rows.filter(\.isSelected).map(\.id) == [BuiltInTaskViews.inbox])
+    #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == .selected(BuiltInTaskViews.today))
+    #expect(list.model.selection == BuiltInTaskViews.today)
+    #expect(list.model.rows.filter(\.isSelected).map(\.id) == [BuiltInTaskViews.today])
+    let deleted = try changeSet(of: store) { try store.delete(view: BuiltInTaskViews.today) }
+    #expect(list.send(.changed(deleted)) == nil)
+    #expect(list.model.selection == nil, "the highlight went with its row")
+    #expect(list.model.rows.filter(\.isSelected).isEmpty)
+    // `.rowSelected` keeps whatever id it is given without asking the rows, so an id that names no row is a
+    // highlight the list holds and draws nowhere: neither reading names it.
+    _ = list.send(.action(.rowSelected(ViewID())))
+    #expect(list.model.selection == nil, "an id no row carries is no row to bind to")
+    #expect(list.model.rows.filter(\.isSelected).isEmpty)
+}
+
 /// A chain thousands of links deep arrives from sync as easily as a shallow one, and a stack — 64 KiB of it
 /// on wasm32 — is not what should decide whether the list draws (`docs/style.md`, "No recursion over
 /// data-shaped depth"). The chain is journaled straight into the store, because a thousand calls to
