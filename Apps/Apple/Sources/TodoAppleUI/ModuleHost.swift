@@ -2,8 +2,9 @@
 import FeatureModule
 import Observation
 
-/// The one object in the app that a view observes: it holds the root module and publishes its model (spec
-/// section 5).
+/// The one object in the app that SwiftUI observes: it holds the root module and publishes its model (spec
+/// section 5). The root view holds it, and every other view gets from the view above it the part of the model
+/// it draws and a closure over its own actions (spec section 3), so no other view names the host.
 ///
 /// It has two entrances and hands each to one caller. `send(_:)` is a view's, and with `model` it is all a
 /// view gets: a closure over `UserAction` cannot spell an event of the world. The world's entrance takes every
