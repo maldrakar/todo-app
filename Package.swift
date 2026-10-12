@@ -5,7 +5,13 @@ let package = Package(
     name: "todo-core",
     platforms: [.macOS(.v14), .iOS(.v17), .watchOS(.v10)],
     products: [
+        // A library for each target `Apps/Apple` imports and for no other: another package reaches a target
+        // only through a product, and a target in none stays this package's own.
         .library(name: "TodoCore", targets: ["TodoCore"]),
+        .library(name: "DeviceFile", targets: ["DeviceFile"]),
+        .library(name: "FeatureModule", targets: ["FeatureModule"]),
+        .library(name: "TaskViewListFeature", targets: ["TaskViewListFeature"]),
+        .library(name: "AppFeature", targets: ["AppFeature"]),
         .executable(name: "todo", targets: ["todo"]),
         .executable(name: "wasm-size-probe", targets: ["WasmSizeProbe"]),
     ],
@@ -28,7 +34,10 @@ let package = Package(
         ),
         .target(name: "SQLiteKit", dependencies: ["CSQLite"]),
         .target(name: "TodoCore", dependencies: ["SQLiteKit"]),
-        .target(name: "TodoCLI", dependencies: ["TodoCore"]),
+        .target(name: "TodoCLI", dependencies: ["TodoCore", "DeviceFile"]),
+        // Where an identity is kept beside its database, in a target of its own because two consumers keep
+        // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
+        .target(name: "DeviceFile"),
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core and the contract, never on
@@ -45,6 +54,7 @@ let package = Package(
         .testTarget(name: "SQLiteKitTests", dependencies: ["SQLiteKit"]),
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
+        .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
         .testTarget(name: "TaskViewListFeatureTests", dependencies: ["TaskViewListFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(name: "AppFeatureTests", dependencies: ["AppFeature", "TaskViewListFeature", "TodoCore", "TestSupport"]),
     ],

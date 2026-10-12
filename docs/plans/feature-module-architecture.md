@@ -40,7 +40,7 @@ from.
 
 | File | Task | Holds |
 | ---- | ---- | ----- |
-| `Package.swift` | 1, 3 | targets `FeatureModule`, `TaskViewListFeature`, `AppFeature`, `TestSupport`, the feature test targets; `WasmSizeProbe` depends on `AppFeature` |
+| `Package.swift` | 1, 3, 4 | targets `FeatureModule`, `TaskViewListFeature`, `AppFeature`, `TestSupport`, the feature test targets; `WasmSizeProbe` depends on `AppFeature`; `DeviceFile` and `DeviceFileTests`, and a library product for each target `Apps/Apple` imports (4) |
 | `Sources/FeatureModule/FeatureModule.swift` | 1 | `FeatureEvent`, `FeatureModule` |
 | `Sources/Features/TaskViewList/TaskViewList.swift` | 1, 2, 3, 5 | `TaskViewList` with `Model`, `Row`, `UserAction`, `Event`, `Output`, `send`; `Event.created`, which the root sends once after creating the list (3, #70) |
 | `Sources/Features/App/AppModule.swift` | 3 | `AppModule` with `Model`, `Detail`, `UserAction`, `Event`, `send` |
@@ -51,6 +51,7 @@ from.
 | `Tests/AppFeatureTests/AppModuleTests.swift` | 3 | the root's tests |
 | `Sources/DeviceFile/DeviceFile.swift` | 4 | the identity file beside a database, shared by the demo and the app |
 | `Sources/TodoCLI/CLI.swift` | 4 | calls `DeviceFile` instead of its own copy |
+| `Tests/DeviceFileTests/DeviceFileTests.swift` | 4 | the identity file's round trip, a file written by hand, and no file |
 | `Apps/Apple/Package.swift` | 4, 5 | `TodoAppleUI`, `TodoAppleUITests`, `todo-mac` |
 | `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift` | 4 | `ModuleHost` |
 | `Apps/Apple/Sources/TodoAppleUI/TodoApp.swift` | 4, 5 | `TodoApp.launch`, `TodoApp.host` |

@@ -1,4 +1,5 @@
 // Sources/TodoCLI/CLI.swift
+import DeviceFile
 import TodoCore
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -44,10 +45,6 @@ public enum CLI {
     /// The database a run opens when nothing names one: in the working directory, because a demo that writes
     /// into a home directory is a demo that is hard to throw away.
     private static let defaultDatabase = "todo.sqlite"
-
-    /// Where the demo keeps the identity it writes under: beside the database and not in it, since a database
-    /// carries its identity to every machine it is copied to and a copy is another device (ADR-0005).
-    private static let deviceSuffix = ".device"
 
     /// The database that keeps nothing between runs. It has no file to put a device file next to.
     private static let inMemoryDatabase = ":memory:"
@@ -119,24 +116,18 @@ public enum CLI {
     static func device(for database: String, _ environment: [String: String]) -> (id: String, kept: Bool) {
         if let given = set(environment["TODO_DEVICE"]) { return (given, true) }
         if database == inMemoryDatabase { return (Store.newDeviceID(), true) }
-        let kept = try? String(contentsOfFile: database + deviceSuffix, encoding: .utf8)
-        if let line = kept?.split(whereSeparator: \.isNewline).first { return (String(line), true) }
+        if let kept = DeviceFile.read(beside: database) { return (kept, true) }
         return (Store.newDeviceID(), false)
     }
 
     /// Writes the minted identity beside the database. A failure stops the run: a demo that cannot keep the
     /// id is a demo that is a new device on every command, and silence about that is the shape of #51.
     ///
-    /// The write is not the atomic one, which `FoundationEssentials` on WASI answers with "the requested
-    /// operation is not supported" — measured, and the whole wasm32 suite passes without it. The demo is
-    /// built and tested on both targets, and a torn write of these 36 bytes costs no data: what it leaves is
-    /// a prefix, the next run reads that prefix back as the id and goes on under it, and a prefix of a UUID
-    /// names no other device. What this run wrote is still pushed, because `own_devices` holds the id it
-    /// wrote under whatever the file beside the database ends up saying.
+    /// The message names the database and not the file, whose name is `DeviceFile`'s to make; the error it
+    /// wraps carries the file's path.
     static func keep(_ device: String, for database: String) throws {
-        let path = database + deviceSuffix
-        do { try device.write(toFile: path, atomically: false, encoding: .utf8) }
-        catch { throw CLIError("cannot keep the device id in \(path): \(error)") }
+        do { try DeviceFile.keep(device, beside: database) }
+        catch { throw CLIError("cannot keep the device id beside \(database): \(error)") }
     }
 
     /// A variable a shell exported without a value names neither a database nor a day, and refusing every
