@@ -1,8 +1,8 @@
 // Apps/Apple/Sources/TodoAppleUI/AppScene.swift
 import SwiftUI
 
-// macOS only, because `Window` is. What iOS and watchOS put on screen as their scene is decided when the Xcode
-// project brings them (ADR-0008); until then the library compiles for both without one.
+// Behind `#if os(macOS)` because iOS and watchOS have no `Window`. What they put on screen as their scene is decided
+// when the Xcode project brings them (ADR-0008); until then the library compiles for both without one.
 #if os(macOS)
 /// The app's scene, and the one thing this library exports: the executable's `@main` is its only caller from
 /// outside (ADR-0008).

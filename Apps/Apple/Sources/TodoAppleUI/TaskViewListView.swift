@@ -91,7 +91,7 @@ private struct TitleField: View {
             .focused($isFocused)
             .onSubmit { send(.titleFieldSubmitted) }
             #if os(macOS)
-            // Esc. The modifier is macOS's alone; what cancels a rename on iOS and watchOS is decided when they arrive.
+            // Esc. iOS and watchOS lack the modifier; what cancels a rename there is decided when they arrive.
             .onExitCommand { send(.titleFieldCancelled) }
             #endif
             // A field opens for a person to type in, whether the menu or the toolbar opened it.
