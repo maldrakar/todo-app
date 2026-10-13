@@ -90,7 +90,10 @@ private struct TitleField: View {
         TextField("Title", text: Binding(get: { draft }, set: { send(.titleFieldChanged($0)) }))
             .focused($isFocused)
             .onSubmit { send(.titleFieldSubmitted) }
+            #if os(macOS)
+            // Esc. The modifier is macOS's alone; what cancels a rename on iOS and watchOS is decided when they arrive.
             .onExitCommand { send(.titleFieldCancelled) }
+            #endif
             // A field opens for a person to type in, whether the menu or the toolbar opened it.
             .onAppear { isFocused = true }
             .onChange(of: isFocused) { _, focused in
