@@ -75,7 +75,8 @@ swiftly finds the root's `.swift-version` from there, so it builds with the same
 ```sh
 cd Apps/Apple
 swift run todo-mac
-TODO_DB=/tmp/second.sqlite swift run todo-mac   # in a second terminal: another database, another device
+# in a second terminal, also in Apps/Apple: another database, another device
+TODO_DB=/tmp/second.sqlite swift run todo-mac
 ```
 
 It opens one window: the list of views in a sidebar, and beside it the title of the view chosen there. Rename,
@@ -88,9 +89,9 @@ it is exported empty. Without `TODO_DB` the app opens `~/Library/Application Sup
 first launch creates the directory and the database; the directory is named for the app because the app has no
 bundle whose identifier could name it. Without `TODO_DEVICE` the device is the one kept in `<database>.device`
 beside the database, the same file the demo keeps, and a launch that finds none there mints one and keeps it. So
-two copies of the app on one machine, each over a database of its own as above, are two devices, and
-`TODO_DEVICE` names the device outright, as it does for the demo. A launch that fails, over a path that cannot be
-opened for one, stops the process with "The app could not launch:" and the reason.
+two copies of the app on one machine, each over a database of its own as above, are two devices. A launch that
+fails, for example over a path that cannot be opened, stops the process with "The app could not launch:" and the
+reason.
 
 ## Continuous integration
 
@@ -116,6 +117,6 @@ between them. The ceiling that means something arrives with the web client, meas
 
 A second job, on a macOS runner, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and
 watchOS SDKs, and builds and tests `Apps/Apple` with the pinned toolchain. It then builds the root package and
-`Apps/Apple` with Xcode's toolchain too, because that is the one Apple accepts store builds from, until the Xcode
-project brings the two to one (ADR-0008). It runs on `main` and on demand, never on a pull request, because macOS
-minutes cost tenfold on a private repository.
+`Apps/Apple` with Xcode's toolchain too, the one Apple accepts store builds from, and keeps doing so until the
+Xcode project brings the two to one (ADR-0008). It runs on `main` and on demand, never on a pull request, because
+macOS minutes cost tenfold on a private repository.

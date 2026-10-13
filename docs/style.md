@@ -79,7 +79,8 @@ value a peer wrote is as arbitrary as one a person typed.
   model, and every string about the data arrives finished from its
   module. Its own labels, a button's title or an empty pane's
   placeholder, are its vocabulary, localised by the platform. It keeps
-  only what is its own: focus, scroll, hover. (ADR-0006, spec section 2)
+  only what only it can know, such as focus, scroll, hover, the window
+  size or a drag in progress. (ADR-0006, spec section 2)
 
 ## In a review thread
 
