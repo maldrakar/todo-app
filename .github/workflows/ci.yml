@@ -68,7 +68,7 @@ jobs:
 
   apple:
     # macOS minutes cost tenfold, so this job runs on main and on demand, not on every pull request.
-    name: Compile for the iOS and watchOS SDKs
+    name: iOS and watchOS, the app and Xcode's toolchain
     if: github.event_name != 'pull_request'
     runs-on: macos-26
     steps:
@@ -109,3 +109,26 @@ jobs:
       - name: Compile the Apple UI library for watchOS
         working-directory: Apps/Apple
         run: swift build --target TodoAppleUI --triple arm64_32-apple-watchos10.0 --sdk "$(xcrun --sdk watchos --show-sdk-path)"
+
+      - name: Build the Apple package
+        working-directory: Apps/Apple
+        run: swift build
+
+      - name: Test the Apple package
+        working-directory: Apps/Apple
+        run: swift test
+
+      # Apple accepts store builds from Xcode's toolchain, so the code keeps building with it, outside the pinned
+      # toolchain's `.build`, until the Xcode project brings the pinned version and Xcode's to one (ADR-0008).
+      - name: Build the root package with Xcode's toolchain
+        run: |
+          set -eu
+          /usr/bin/swift --version
+          /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-root"
+
+      - name: Build the Apple package with Xcode's toolchain
+        working-directory: Apps/Apple
+        run: |
+          set -eu
+          /usr/bin/swift --version
+          /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-apple"
