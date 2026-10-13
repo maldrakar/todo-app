@@ -12,7 +12,9 @@ Milestones `M0 Process` and `M1 Core architecture` are complete, the second rele
 stores tasks, tags and views, resolves the tree their parent links describe, filters, sorts and groups them
 into pages, searches titles and notes, and exchanges a journal with another copy of itself; it builds and
 passes its suite on the host and on wasm32, and `todo` drives all of it from a command line.
-`M2 Feature-module architecture` is next.
+`M2 Feature-module architecture`, not yet released, has built the module contract in the shared core, the list
+of views and the root module over it, which pass their suites on the host and on wasm32 as the core does, and
+the macOS app in `Apps/Apple` that hosts them.
 
 ## Documents
 
@@ -64,6 +66,32 @@ to, and the journal needs two copies of one database to be two devices, or they 
 edits. So copy `demo.sqlite` on its own and the copy becomes a device of its own; copy the pair and both
 machines claim one identity. `TODO_DEVICE` names it instead, which is how one machine plays two.
 
+## Running the app
+
+`todo-mac` is the macOS app and the runnable part of `M2`. It lives in `Apps/Apple`, a package of its own beside
+the root one, because the root package is built on Linux and for wasm32, where there is no SwiftUI (ADR-0007);
+swiftly finds the root's `.swift-version` from there, so it builds with the same pinned toolchain.
+
+```sh
+cd Apps/Apple
+swift run todo-mac
+TODO_DB=/tmp/second.sqlite swift run todo-mac   # in a second terminal: another database, another device
+```
+
+It opens one window: the list of views in a sidebar, and beside it the title of the view chosen there. Rename,
+in a row's context menu, opens a field on the row: Return or a click away keeps the new title, a blank one is
+refused with a sentence under the list, and Esc keeps the old title. New Folder, on the toolbar, adds a folder at
+the end of the top level, chosen and with its field open.
+
+`TODO_DB` is the database's whole path and `TODO_DEVICE` the device it is written under, each read as unset when
+it is exported empty. Without `TODO_DB` the app opens `~/Library/Application Support/todo/todo.sqlite`, and the
+first launch creates the directory and the database; the directory is named for the app because the app has no
+bundle whose identifier could name it. Without `TODO_DEVICE` the device is the one kept in `<database>.device`
+beside the database, the same file the demo keeps, and a launch that finds none there mints one and keeps it. So
+two copies of the app on one machine, each over a database of its own as above, are two devices, and
+`TODO_DEVICE` names the device outright, as it does for the demo. A launch that fails, over a path that cannot be
+opened for one, stops the process with "The app could not launch:" and the reason.
+
 ## Continuous integration
 
 Every pull request runs one Linux job: build, the suite on the host, the same suite on wasm32 under WasmKit,
@@ -86,6 +114,8 @@ slack for the code the core would add. That code, with the JSON coding it pulls 
 SQLite and FoundationEssentials are inside the floor on both sides of the comparison rather than the difference
 between them. The ceiling that means something arrives with the web client, measured on its bundle.
 
-A second job compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and watchOS SDKs on a macOS
-runner. It runs on `main` and on demand, never on a pull request, because macOS minutes cost tenfold on a private
-repository.
+A second job, on a macOS runner, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and
+watchOS SDKs, and builds and tests `Apps/Apple` with the pinned toolchain. It then builds the root package and
+`Apps/Apple` with Xcode's toolchain too, because that is the one Apple accepts store builds from, until the Xcode
+project brings the two to one (ADR-0008). It runs on `main` and on demand, never on a pull request, because macOS
+minutes cost tenfold on a private repository.

@@ -72,6 +72,15 @@ value a peer wrote is as arbitrary as one a person typed.
   arrives from sync as easily as a shallow one, and the wasm32 stack is
   64 KiB. Walks over the data are iterative. (PR #38, #40)
 
+## Views
+
+- **A view holds no condition over a domain value and formats
+  nothing.** Every `if` in it is over a `Bool` or an optional of the
+  model, and every string about the data arrives finished from its
+  module. Its own labels, a button's title or an empty pane's
+  placeholder, are its vocabulary, localised by the platform. It keeps
+  only what is its own: focus, scroll, hover. (ADR-0006, spec section 2)
+
 ## In a review thread
 
 - A language question is settled by a compiler probe pasted into the

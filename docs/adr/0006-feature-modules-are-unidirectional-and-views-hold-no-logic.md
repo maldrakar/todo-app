@@ -1,6 +1,6 @@
 # ADR-0006: Structure every feature as a module with unidirectional data flow, and give views no logic
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-20
 - Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, #67, #78, ADR-0001, ADR-0004
 - Amended: 2026-10-03, after the owner's review of #78 (see the end)

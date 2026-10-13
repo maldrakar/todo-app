@@ -1,6 +1,6 @@
 # ADR-0008: Build the Apple app as a two-line `@main` over a library with SwiftPM alone, until the store needs an Xcode project
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-20
 - Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, #81, ADR-0001, ADR-0007
 - Amended: 2026-10-13, after the owner's review of #81 (see the end)
