@@ -86,5 +86,6 @@ slack for the code the core would add. That code, with the JSON coding it pulls 
 SQLite and FoundationEssentials are inside the floor on both sides of the comparison rather than the difference
 between them. The ceiling that means something arrives with the web client, measured on its bundle.
 
-A second job compiles `TodoCore` against the iOS and watchOS SDKs on a macOS runner. It runs on `main` and on
-demand, never on a pull request, because macOS minutes cost tenfold on a private repository.
+A second job compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and watchOS SDKs on a macOS
+runner. It runs on `main` and on demand, never on a pull request, because macOS minutes cost tenfold on a private
+repository.

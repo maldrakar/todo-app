@@ -3,7 +3,7 @@ import Foundation
 import AppFeature
 import DeviceFile
 import TaskViewListFeature
-import TodoAppleUI
+@testable import TodoAppleUI
 import TodoCore
 
 /// Which identity the store wrote under is out of reach through the host, which keeps the store to itself, so

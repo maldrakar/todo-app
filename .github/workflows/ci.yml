@@ -99,3 +99,13 @@ jobs:
 
       - name: Compile the core for watchOS
         run: swift build --target TodoCore --triple arm64_32-apple-watchos10.0 --sdk "$(xcrun --sdk watchos --show-sdk-path)"
+
+      # The library every Apple app target will import, kept compiling for the platforms that have no app yet
+      # (ADR-0008).
+      - name: Compile the Apple UI library for iOS
+        working-directory: Apps/Apple
+        run: swift build --target TodoAppleUI --triple arm64-apple-ios17.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)"
+
+      - name: Compile the Apple UI library for watchOS
+        working-directory: Apps/Apple
+        run: swift build --target TodoAppleUI --triple arm64_32-apple-watchos10.0 --sdk "$(xcrun --sdk watchos --show-sdk-path)"

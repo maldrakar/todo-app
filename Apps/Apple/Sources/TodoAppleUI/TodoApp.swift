@@ -7,7 +7,22 @@ import TodoCore
 /// The composition root: the store, the root module and the host, put together once per launch (spec
 /// section 5).
 @MainActor
-public enum TodoApp {
+enum TodoApp {
+    /// The host of this process, put together the first time anything reads it. A `static let` is initialised
+    /// once, on first use, where a `@State` in the scene would not be: its initial value is evaluated on every
+    /// creation of its struct, and each evaluation would open another store over the same file (spec, "Risks";
+    /// ADR-0005).
+    ///
+    /// A launch that throws ends the process with the error it threw; the recovery flow is M3's (spec section
+    /// 5).
+    static let host: ModuleHost<AppModule> = {
+        do {
+            return try launch(environment: ProcessInfo.processInfo.environment)
+        } catch {
+            fatalError("The app could not launch: \(error)")
+        }
+    }()
+
     /// The store at its path, the root module, the host, and the store's onChange wired to the host.
     ///
     /// `TODO_DB` is the database's whole path and `TODO_DEVICE` the identity it is written under, each unset
@@ -17,7 +32,7 @@ public enum TodoApp {
     ///
     /// It throws whatever the store or the file system throws, and its caller acts on the throw: in M2 a
     /// launch that failed is fatal and says why (spec section 5).
-    public static func launch(environment: [String: String]) throws -> ModuleHost<AppModule> {
+    static func launch(environment: [String: String]) throws -> ModuleHost<AppModule> {
         let database = try set(environment["TODO_DB"]) ?? defaultDatabase()
         let held = set(environment["TODO_DEVICE"]) ?? DeviceFile.read(beside: database)
         let device = held ?? Store.newDeviceID()

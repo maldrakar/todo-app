@@ -1,7 +1,7 @@
 import Testing
 import Observation
 import FeatureModule
-import TodoAppleUI
+@testable import TodoAppleUI
 
 @Test @MainActor func sendLiftsAnActionIntoAnEventAndCopiesTheModel() {
     let recorder = Recorder()

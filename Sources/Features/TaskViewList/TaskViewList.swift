@@ -33,6 +33,15 @@ public final class TaskViewList: FeatureModule {
 
         public let rows: [Row]
 
+        /// The id of the highlighted row, and nil when no row is highlighted: what a list that keeps its
+        /// selection as one value is bound to, as the Mac's `List(selection:)` is, so that the binding reads a
+        /// field the way a text field's reads `draft`, instead of searching the rows for one (spec section 4).
+        ///
+        /// It is the highlight `Row.isSelected` carries, held a second way because it is read a second way: a
+        /// list bound to one value reads this, and a client that draws row by row reads the row. Both come
+        /// off the same drawn rows when the model is assembled, so they name the same row or none.
+        public let selection: ViewID?
+
         /// What went wrong, as the finished sentence the view shows until the next event, and nil when
         /// there is nothing to say: `send` cannot throw, so a failure inside it has nowhere else to go,
         /// and a view that had to spell one would be a view holding logic (spec section 2).
@@ -104,15 +113,21 @@ public final class TaskViewList: FeatureModule {
         case .action(.rowSelected(let id)):
             // Answered every time, the same id twice included: choosing the row that is already chosen is
             // still a choice, and what the root does with it — open the view, close a column behind it — is
-            // the root's. The sentence goes with the event that produced it (spec, "The sidebar in M2"),
-            // which is the rule every action the module acts on follows.
+            // the root's.
+            //
+            // The sentence goes with the event that produced it (spec, "The sidebar in M2"), except while a
+            // field is open: then the sentence on screen is what explains the field, and this gesture leaves
+            // the field where it is. A click on another row while the field holds an empty name loses the
+            // field's focus first, so the refusal that sets the sentence arrives before this; cleared here, it
+            // would leave an empty field with the caret in it and nothing saying why. The owner chose this in
+            // chat on 2026-10-12.
             //
             // An open field stays open where it is. Losing focus is an action of its own, and the view is
             // what knows whether the field lost it: a module that read a selection change as a focus change
             // would settle or drop a person's half-typed name on a gesture they need not have made. The
             // owner settled this in chat on 2026-09-22, and `.titleFieldLostFocus` is the other half of it.
             state.selection = id
-            state.problem = nil
+            if state.rename == nil { state.problem = nil }
             return .selected(id)
         case .action(.renameMenuItemChosen(let id)):
             // The title comes off the row and not out of a read: the row is what the person chose the menu
@@ -127,9 +142,16 @@ public final class TaskViewList: FeatureModule {
         case .action(.titleFieldChanged(let text)):
             // The four field actions are ignored when no field is open: what a gesture means is the
             // module's to know, and a view sending a keystroke cannot tell whether a rename exists. Ignored
-            // to the letter, the sentence included — a field closing behind a refusal sends its cancellation
-            // here, and clearing the sentence on it would take away what explains the closing.
-            guard let rename = state.rename else { return nil }
+            // to the letter, the sentence included: a field's echo of its text and its lost focus can arrive
+            // after the module has closed the field, and a sentence cleared by them would go before the person
+            // had read it.
+            //
+            // A text that is already the draft is ignored the same way, sentence included, because it is no
+            // keystroke: on 2026-10-12, by hand, a `TextField` wrote the text it holds back through its binding
+            // twice for every keystroke, and again after Return and after a lost focus. Taken for typing, the
+            // report after a refused Return would clear the sentence the refusal had just set, and "A title
+            // cannot be empty." would never stay on screen.
+            guard let rename = state.rename, text != rename.draft else { return nil }
             state.rename = State.Rename(id: rename.id, draft: text)
             state.problem = nil
             return nil
@@ -364,17 +386,18 @@ public final class TaskViewList: FeatureModule {
         var problem: String?
 
         /// The model a view draws: the rows with this person's session projected onto them — the highlight
-        /// on the row they chose, the draft on the row they are renaming — and the sentence, if any.
+        /// on the row they chose, the draft on the row they are renaming — the highlighted row's id, and the
+        /// sentence, if any.
         var model: Model {
-            Model(
-                rows: rows.map {
-                    Model.Row(
-                        id: $0.id, title: $0.title, depth: $0.depth,
-                        isSelected: $0.id == selection, draft: rename?.text(on: $0.id)
-                    )
-                },
-                problem: problem
-            )
+            let drawn = rows.map {
+                Model.Row(
+                    id: $0.id, title: $0.title, depth: $0.depth,
+                    isSelected: $0.id == selection, draft: rename?.text(on: $0.id)
+                )
+            }
+            // Read off the drawn rows and not copied from `selection`: `.rowSelected` keeps an id without asking
+            // the rows, and an id no row carries highlights nothing, so the model names no row for it either.
+            return Model(rows: drawn, selection: drawn.first(where: \.isSelected)?.id, problem: problem)
         }
 
         /// One row of the list as a read of the store produced it, before anything about this person's
@@ -415,3 +438,5 @@ public final class TaskViewList: FeatureModule {
         }
     }
 }
+
+extension TaskViewList.Model.Row: Identifiable {}

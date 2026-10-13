@@ -53,14 +53,14 @@ from.
 | `Sources/TodoCLI/CLI.swift` | 4 | calls `DeviceFile` instead of its own copy |
 | `Tests/DeviceFileTests/DeviceFileTests.swift` | 4 | the identity file's round trip, a file written by hand, and no file |
 | `Apps/Apple/Package.swift` | 4, 5 | `TodoAppleUI`, `TodoAppleUITests`, `todo-mac` |
-| `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift` | 4 | `ModuleHost` |
+| `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift` | 4, 5 | `ModuleHost`; internal from Task 5, whose views are its only callers |
 | `Apps/Apple/Sources/TodoAppleUI/TodoApp.swift` | 4, 5 | `TodoApp.launch`, `TodoApp.host` |
 | `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift` | 5 | `TaskViewListView` |
 | `Apps/Apple/Sources/TodoAppleUI/RootView.swift` | 5 | `RootView` |
 | `Apps/Apple/Sources/TodoAppleUI/AppScene.swift` | 5 | `AppScene` |
-| `Apps/Apple/Sources/todo-mac/TodoMac.swift` | 5 | `@main` |
-| `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `TodoAppTests.swift` | 4 | the host's queue and the launch |
-| `.github/workflows/ci.yml` | 6 | the macOS job builds and tests `Apps/Apple`, and builds with Xcode's toolchain |
+| `Apps/Apple/Sources/todo-mac/TodoMac.swift` | 5 | `@main`, and the activation an executable without a bundle needs (ADR-0008, amended in #81) |
+| `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`, `TodoAppTests.swift` | 4, 5 | the host's queue and the launch, through `@testable import` from Task 5 |
+| `.github/workflows/ci.yml` | 5, 6 | the macOS job compiles `TodoAppleUI` for iOS and watchOS (5), builds and tests `Apps/Apple`, and builds with Xcode's toolchain (6) |
 | `README.md`, `docs/style.md`, `CHANGELOG.md` | 6 | how to run the app; the view rule; the epic's summary |
 
 ## Tasks
@@ -365,7 +365,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 **Rules.**
 
-- The macOS job keeps running on `main` and on demand only (`docs/process.md`, section 10). It adds, after the SDK compile checks: `swift build` and `swift test` in `Apps/Apple`, and `/usr/bin/swift build` in the repository root and in `Apps/Apple`, each into its own scratch path so that the two toolchains never share a `.build`. The added minutes are reported in the PR against the 200 a month.
+- The macOS job keeps running on `main` and on demand only (`docs/process.md`, section 10). It adds, after the SDK compile checks, which since #81 compile `TodoAppleUI` for iOS and watchOS as well as the core: `swift build` and `swift test` in `Apps/Apple`, and `/usr/bin/swift build` in the repository root and in `Apps/Apple`, each into its own scratch path so that the two toolchains never share a `.build`. The added minutes are reported in the PR against the 200 a month.
 - The Linux job is not touched: the root package's new targets are already in its build, its host run and its WasmKit run.
 - `docs/style.md` gains one entry under a new "Views" heading that states the view rule and points at ADR-0006; the owner edits the file directly, so the entry is proposed in the PR and the wording is theirs.
 - The three ADRs move from Proposed to Accepted, since the PR that proposed them has merged by then.
@@ -375,7 +375,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 **Verified facts and traps.**
 
-- The macOS job takes about 1.7 minutes today and `macos-26` runners carry Xcode 26; a build of the Apple package with SwiftUI is expected to add a few minutes, to be read off the first run.
+- The macOS job took 1 min 10 s on `main` on 2026-10-12, and 2 min 23 s on demand on 2026-10-13 with the two `TodoAppleUI` steps #81 added, about 33 s each (run 38456594848); `macos-26` runners carry Xcode 26; a build of the Apple package with SwiftUI is expected to add a few minutes, to be read off the first run.
 - Trap: `actions/checkout@v4` and `actions/cache@v4` warn about Node 20; not this task's to fix, and not to be silenced by an upgrade without reading the changelog.
 
 ## Self-review against the spec
