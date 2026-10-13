@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, ADR-0001, ADR-0007
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, #81, ADR-0001, ADR-0007
 - Amended: 2026-10-13, after the owner's review of #81 (see the end)
 
 ## Context
@@ -25,6 +25,6 @@ Constrained: nothing in `TodoAppleUI` may depend on being inside a bundle until 
 
 ## Amendment, 2026-10-13
 
-Made in the owner's review of #81, where the executable first ran. The decision above gave the executable two lines and everything else to `TodoAppleUI`. Running it showed that an executable without a bundle starts as a background application and stays behind the terminal that launched it. It has to make itself a regular application and activate itself once its launch has finished, which takes an application delegate. That code answers how `todo-mac` is packaged, not what the app does: an app target with a bundle needs none of it. So it lives in the executable, and the library that the iOS and watchOS app targets will import carries none of it. The rule that follows: `TodoAppleUI` holds nothing that only one target's packaging needs, and the executable holds its `@main` and what its missing bundle costs, and nothing else.
+Made in the owner's review of #81, where the executable first ran. The decision above gave the executable two lines and everything else to `TodoAppleUI`. Running it showed that an executable without a bundle starts as a background application and stays behind the terminal that launched it. It has to make itself a regular application and activate itself once its launch has finished, which the executable does from an application delegate. That code answers how `todo-mac` is packaged, not what the app does: an app target with a bundle needs none of it. So it lives in the executable, and the library that the iOS and watchOS app targets will import carries none of it. The rule that follows: `TodoAppleUI` holds nothing that only one target's packaging needs, and the executable holds its `@main` and what its missing bundle costs, and nothing else.
 
-What SwiftUI offers on macOS alone stays in the library behind `#if os(macOS)`: today the `Window` scene and Esc on a text field. What iOS and watchOS show in their place is decided when the Xcode project brings them. `Apps/Apple/Package.swift` declares iOS 17 and watchOS 10 beside macOS 14, and the macOS job compiles `TodoAppleUI` for both, so the library still builds for them when that project arrives.
+What SwiftUI offers on macOS but not on iOS or watchOS stays in the library behind `#if os(macOS)`: today the `Window` scene and Esc on a text field. What iOS and watchOS show in their place is decided when the Xcode project brings them. `Apps/Apple/Package.swift` declares iOS 17 and watchOS 10 beside macOS 14, and the macOS job compiles `TodoAppleUI` for both, so the library still builds for them when that project arrives.

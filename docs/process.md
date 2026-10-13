@@ -326,8 +326,9 @@ test suite on the host, the same suite on wasm32 under WasmKit, and a
 release wasm build checked against the size budget in
 `scripts/wasm-size.sh`, which is one script so that the run in CI and
 the run on a laptop are the same command. The macOS job compiles the
-core against the iOS and watchOS SDKs; it runs on `main` and on demand
-and never on a pull request.
+core, and the Apple UI library from `Apps/Apple`, against the iOS and
+watchOS SDKs; it runs on `main` and on demand and never on a pull
+request.
 
 Constraint: a private repository on the free plan has 2000 Actions
 minutes per month, and macOS runners consume them at a 10x multiplier,

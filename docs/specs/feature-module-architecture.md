@@ -1,6 +1,6 @@
 # Spec: Feature-module architecture
 
-- Status: Approved 2026-09-20 (revision 6); revision 7 of 2026-09-21 carries the names settled in the plan review on #66 and changes no decision; revision 8 of 2026-10-03 brings section 3, the sidebar's World row and the rejected alternative of a parent reading the child's model in line with the amendment of ADR-0006 made in #78: a parent never reads a child's model to learn a choice, and a child's first choice is its answer to `.created`
+- Status: Approved 2026-09-20 (revision 6); revision 7 of 2026-09-21 carries the names settled in the plan review on #66 and changes no decision; revision 8 of 2026-10-03 brings section 3, the sidebar's World row and the rejected alternative of a parent reading the child's model in line with the amendment of ADR-0006 made in #78: a parent never reads a child's model to learn a choice, and a child's first choice is its answer to `.created`; revision 9 of 2026-10-13 brings section 5's composition root and section 6's package table in line with the amendment of ADR-0008 made in #81: the executable carries the activation its missing bundle needs, and `TodoAppleUI` nothing that only one target's packaging needs
 - Owner review: https://claude.ai/artifact/CnGxEhqK4jDubEmcxgTZJF
 - Issue: #63
 
@@ -131,7 +131,7 @@ The host is the only object in the app that a view observes. There is one per ap
 
 **One event at a time.** The chain "send to the root, send to the sidebar, write to the store, `onChange`, deliver `.changed` to the root" enters the root a second time while the first call has not returned. The host therefore takes one event at a time: whatever is handed to it through either entrance while one is in flight is queued and sent after the current one returns. Everything runs on one thread, so this is a flag and an array, not a lock. Without the rule a module sees its own write in the middle of its own update; with it, the same probe shows the change set of a write delivered after the `send` that caused it.
 
-**The composition root.** The executable is a `@main` of two lines that opens the scene from the library. The library does the rest, once per launch: the database path in Application Support, the device identity in a file beside the database as the demo does (ADR-0005; the Keychain is a later decision), `Store.open` with `Store.systemNow`, the root module, the host, and `store.onChange` wired to the host's `deliver(.changed)`. The environment variables the demo reads, `TODO_DB` and `TODO_DEVICE`, are read here too, which is how one machine runs two copies of the app as two devices. A database that fails to open is fatal in M2 and says why; a recovery flow is a product decision for M3.
+**The composition root.** The executable is a `@main` that opens the scene from the library, and carries what its missing bundle costs, the activation at launch, and nothing else (ADR-0008, amended in #81). The library does the rest, once per launch: the database path in Application Support, the device identity in a file beside the database as the demo does (ADR-0005; the Keychain is a later decision), `Store.open` with `Store.systemNow`, the root module, the host, and `store.onChange` wired to the host's `deliver(.changed)`. The environment variables the demo reads, `TODO_DB` and `TODO_DEVICE`, are read here too, which is how one machine runs two copies of the app as two devices. A database that fails to open is fatal in M2 and says why; a recovery flow is a product decision for M3.
 
 **The thread.** Everything is on the main actor: the store is opened there, the modules live there, `onChange` fires synchronously inside the write, and the write happens inside a `send` that a view triggered. Modules and the store stay plain classes with no actor annotation, or they stop building the same way for wasm; the host confines them. If a query ever blocks the UI, the remedy is a separate actor that owns the store and the modules while the host receives models across the boundary, which is why `Model` and `Event` are `Sendable` from the start.
 
@@ -151,7 +151,7 @@ Everything that runs everywhere stays in the root package; everything that runs 
 | root | `AppFeature` (`Sources/Features/App`) | the root module, depends on the children | everywhere |
 | root | one test target per feature | swift-testing, run on the host and on wasm32 | everywhere |
 | `Apps/Apple` | `TodoAppleUI` | SwiftUI views, the host, the composition root, the scene | Apple |
-| `Apps/Apple` | `todo-mac` | `@main`, two lines | macOS |
+| `Apps/Apple` | `todo-mac` | `@main`, and the activation its missing bundle needs | macOS |
 
 **One target per feature.** Then `internal` means "inside this feature", a feature cannot reach into a neighbour's internals, and the dependency graph is written in the manifest where a review reads it: children depend on neither each other nor the root. The cost is two targets per feature in the manifest.
 
