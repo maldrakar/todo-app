@@ -375,7 +375,7 @@ extension TodoApp { public static let host: ModuleHost<AppModule> }   // launche
 
 **Verified facts and traps.**
 
-- The macOS job takes about 1.7 minutes today and `macos-26` runners carry Xcode 26; a build of the Apple package with SwiftUI is expected to add a few minutes, to be read off the first run.
+- The macOS job took 1 min 10 s on `main` on 2026-10-12, and 2 min 23 s on demand on 2026-10-13 with the two `TodoAppleUI` steps #81 added, about 33 s each (run 38456594848); `macos-26` runners carry Xcode 26; a build of the Apple package with SwiftUI is expected to add a few minutes, to be read off the first run.
 - Trap: `actions/checkout@v4` and `actions/cache@v4` warn about Node 20; not this task's to fix, and not to be silenced by an upgrade without reading the changelog.
 
 ## Self-review against the spec
