@@ -58,7 +58,7 @@ jobs:
       - name: Test on the host
         run: swift test
 
-      # The command `README.md` and the feature-module plan give, so the documented run and this one cannot drift.
+      # The command `README.md` gives, with the SDK named once in `WASM_SDK` above.
       # The flag skips nothing here; on macOS it keeps a run with `--filter` away from Xcode's XCTest helper (#76).
       - name: Test on wasm32 under WasmKit
         run: swift test --swift-sdk "$WASM_SDK" --disable-xctest
@@ -80,6 +80,23 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
+
+      # First, because every step below uses this Xcode and a preview image can repoint it to a build with another
+      # Swift: such a change fails here, by name, before the toolchain install and the compile checks are paid for.
+      - name: Xcode's toolchain is the pinned version
+        run: |
+          set -eu
+          PIN=$(cat .swift-version)
+          VERSION=$(/usr/bin/swift --version)
+          echo "$VERSION"
+          case "$VERSION" in
+            *"swiftlang-$PIN."*)
+              ;;
+            *)
+              echo "Xcode's toolchain is not Swift $PIN, which .swift-version pins: its version above has no swiftlang-$PIN."
+              exit 1
+              ;;
+          esac
 
       - name: Cache the toolchain
         uses: actions/cache@v4
@@ -125,24 +142,9 @@ jobs:
         working-directory: Apps/Apple
         run: swift test
 
-      # From Xcode 27 on the pinned toolchain and Xcode's are one version (ADR-0008), and the check and the two
-      # builds below, outside the pinned toolchain's `.build`, are what shows it. They stay because Apple accepts
-      # store builds from Xcode's toolchain, and because a preview image can change its Xcode under the job.
-      - name: Xcode's toolchain is the pinned version
-        run: |
-          set -eu
-          PIN=$(cat .swift-version)
-          VERSION=$(/usr/bin/swift --version)
-          echo "$VERSION"
-          case "$VERSION" in
-            *"swiftlang-$PIN."*)
-              ;;
-            *)
-              echo "Xcode's toolchain is not Swift $PIN, which .swift-version pins: its version above has no swiftlang-$PIN."
-              exit 1
-              ;;
-          esac
-
+      # Apple accepts store builds from Xcode's toolchain, so both packages keep building with it, outside the
+      # pinned toolchain's `.build`; with the first step, these builds are what shows that from Xcode 27 on the
+      # pinned toolchain and Xcode's are one version (ADR-0008).
       - name: Build the root package with Xcode's toolchain
         run: /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-root"
 

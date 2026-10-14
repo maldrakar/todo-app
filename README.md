@@ -118,9 +118,10 @@ SQLite and FoundationEssentials are inside the floor on both sides of the compar
 between them. The ceiling that means something arrives with the web client, measured on its bundle.
 
 A second job, on GitHub's `xcode-27` macOS runner and with Xcode 27.1, the Xcode the app is built with, for
-every step, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and watchOS SDKs, and
-builds and tests `Apps/Apple` with the pinned toolchain. It then checks that Xcode's own toolchain is the
-version `.swift-version` pins and builds the root package and `Apps/Apple` with it too, because Apple accepts
-store builds from that toolchain: from Xcode 27 on the two are one version (ADR-0008), the check and these
-builds are what shows it, and the image is a preview whose Xcode can change under the job. It runs on `main` and
-on demand, never on a pull request, because macOS minutes cost tenfold on a private repository.
+every step, first checks that Xcode's own toolchain is the version `.swift-version` pins, since the image is a
+preview whose Xcode can change under the job. It then compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`,
+against the iOS and watchOS SDKs, builds and tests `Apps/Apple` with the pinned toolchain, and builds the root
+package and `Apps/Apple` with Xcode's toolchain too. Those last two builds stay because Apple accepts store
+builds from Xcode's toolchain, and because they are what shows that, from Xcode 27 on, the pinned toolchain and
+Xcode's are one version (ADR-0008). It runs on `main` and on demand, never on a pull request, because macOS
+minutes cost tenfold on a private repository.

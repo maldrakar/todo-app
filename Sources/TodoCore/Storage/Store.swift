@@ -80,14 +80,11 @@ public final class Store {
     /// JS host standing in for one answers the realtime clock out of the browser's own — `Date.now()`, in
     /// `@bjorn3/browser_wasi_shim`, which JavaScriptKit and carton build on — so a web entry point passes
     /// this like any other platform does, and an entry point that wires that one import to a stub instead
-    /// is how the reading goes wrong there. FoundationEssentials reports nothing about such a host, because
-    /// it is told a time and repeats it, so what this answers is only ever as true as the host's import. The
-    /// test runner on wasm32 is such a host and tells the truth: WasmKit 0.3.1, in the 6.4 toolchains,
-    /// answers the clock from the calendar, where the 0.1.6 in 6.3.3 answered it from the machine's last
-    /// boot, days rather than decades after the epoch (#53), and a test in `StoreOpenTests` asserts a real
-    /// wall-clock value on every target. A device that stamped its edits from a clock that far behind would
-    /// lose every last-write-wins comparison in silence, which is why the fact is written here and not only
-    /// in a test.
+    /// is how the reading goes wrong there, since FoundationEssentials repeats whatever time the host's import
+    /// tells it. The test runner on wasm32 answers from the calendar as well, and a test in `StoreOpenTests`
+    /// holds the reading past 2025-09-10 on every target. A device that stamped its edits from a clock
+    /// decades behind the calendar would lose every last-write-wins comparison in silence, which is why the
+    /// fact is written here and not only in a test.
     public static func systemNow() -> Int64 { millis(since: Date().timeIntervalSince1970) }
 
     /// Seconds since the epoch as whole milliseconds. Separate from the clock it reads so that the
