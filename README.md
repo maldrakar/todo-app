@@ -26,7 +26,7 @@ that hosts them. `M3 Navigation` is next, and product functionality follows as `
 
 ## Building
 
-The core is a SwiftPM package built with the swift.org toolchain pinned in `.swift-version` and installed through [swiftly](https://www.swift.org/install/); Xcode only supplies the Apple SDKs. Installing the pin needs swiftly 1.1.4 or later, because from 6.4 on swift.org names a release with its `.0`, and an older swiftly looks for `swift-6.4-RELEASE` and gets a 404.
+The core is a SwiftPM package built with the swift.org toolchain pinned in `.swift-version` and installed through [swiftly](https://www.swift.org/install/); Xcode 27.1 supplies the Apple SDKs, and its own toolchain is the same Swift 6.4.0. Installing the pin needs swiftly 1.1.4 or later, because from 6.4 on swift.org names a release with its `.0`, and an older swiftly looks for `swift-6.4-RELEASE` and gets a 404.
 
 ```sh
 swiftly install                      # reads .swift-version
@@ -117,10 +117,10 @@ slack for the code the core would add. That code, with the JSON coding it pulls 
 SQLite and FoundationEssentials are inside the floor on both sides of the comparison rather than the difference
 between them. The ceiling that means something arrives with the web client, measured on its bundle.
 
-A second job, on GitHub's `xcode-27` macOS runner, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`,
-against the iOS and watchOS SDKs, and builds and tests `Apps/Apple` with the pinned toolchain. It then builds the
-root package and `Apps/Apple` with the toolchain of Xcode 27.1 too, the Xcode the app is built with and the one
-Apple accepts store builds from, and each of those builds fails first unless that toolchain is the version
-`.swift-version` pins: from Xcode 27 on the two are one version (ADR-0008), these builds are what shows it, and
-the image is a preview whose Xcode can change under the job. It runs on `main` and on demand, never on a pull
-request, because macOS minutes cost tenfold on a private repository.
+A second job, on GitHub's `xcode-27` macOS runner and with Xcode 27.1, the Xcode the app is built with, for
+every step, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and watchOS SDKs, and
+builds and tests `Apps/Apple` with the pinned toolchain. It then checks that Xcode's own toolchain is the
+version `.swift-version` pins and builds the root package and `Apps/Apple` with it too, because Apple accepts
+store builds from that toolchain: from Xcode 27 on the two are one version (ADR-0008), the check and these
+builds are what shows it, and the image is a preview whose Xcode can change under the job. It runs on `main` and
+on demand, never on a pull request, because macOS minutes cost tenfold on a private repository.

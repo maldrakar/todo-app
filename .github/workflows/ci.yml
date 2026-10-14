@@ -74,6 +74,10 @@ jobs:
     name: iOS and watchOS, the app and Xcode's toolchain
     if: github.event_name != 'pull_request'
     runs-on: xcode-27
+    # One Xcode for every step, the one the app is built with: its SDKs for the compile checks and its toolchain
+    # for the builds at the end.
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
 
@@ -121,26 +125,27 @@ jobs:
         working-directory: Apps/Apple
         run: swift test
 
-      # The pinned toolchain and Xcode's are one version from Xcode 27 on (ADR-0008), and these two steps are what
-      # shows it: each builds with Xcode's own toolchain, outside the pinned toolchain's `.build`, and fails first
-      # unless that toolchain is the version `.swift-version` pins. They stay because Apple accepts store builds
-      # from Xcode's toolchain, and because a preview image can change its Xcode under the job. Both take
-      # Xcode 27.1, the one the app is built with.
-      - name: Build the root package with Xcode's toolchain
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+      # From Xcode 27 on the pinned toolchain and Xcode's are one version (ADR-0008), and the check and the two
+      # builds below, outside the pinned toolchain's `.build`, are what shows it. They stay because Apple accepts
+      # store builds from Xcode's toolchain, and because a preview image can change its Xcode under the job.
+      - name: Xcode's toolchain is the pinned version
         run: |
           set -eu
-          PIN=$(cat .swift-version); VERSION=$(/usr/bin/swift --version); echo "$VERSION"
-          case "$VERSION" in *"swiftlang-$PIN."*) ;; *) echo "Xcode's toolchain is not Swift $PIN, which .swift-version pins: its version above has no swiftlang-$PIN."; exit 1 ;; esac
-          /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-root"
+          PIN=$(cat .swift-version)
+          VERSION=$(/usr/bin/swift --version)
+          echo "$VERSION"
+          case "$VERSION" in
+            *"swiftlang-$PIN."*)
+              ;;
+            *)
+              echo "Xcode's toolchain is not Swift $PIN, which .swift-version pins: its version above has no swiftlang-$PIN."
+              exit 1
+              ;;
+          esac
+
+      - name: Build the root package with Xcode's toolchain
+        run: /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-root"
 
       - name: Build the Apple package with Xcode's toolchain
         working-directory: Apps/Apple
-        env:
-          DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
-        run: |
-          set -eu
-          PIN=$(cat ../../.swift-version); VERSION=$(/usr/bin/swift --version); echo "$VERSION"
-          case "$VERSION" in *"swiftlang-$PIN."*) ;; *) echo "Xcode's toolchain is not Swift $PIN, which .swift-version pins: its version above has no swiftlang-$PIN."; exit 1 ;; esac
-          /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-apple"
+        run: /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-apple"
