@@ -39,7 +39,7 @@ scripts/wasm-size.sh                 # release wasm build, measured against the 
 
 The WebAssembly SDK is installed once with `swift sdk install <url> --checksum <sha256>`; the URL and checksum are in `.github/workflows/ci.yml`.
 
-`--disable-xctest` skips nothing, since every test here is swift-testing. It keeps the wasm32 run working on macOS when `--filter` is added: to filter, SwiftPM there lists the XCTest cases through Xcode's `swiftpm-xctest-helper`, which cannot load a bundle built for wasm32 (#76).
+`--disable-xctest` skips nothing, since every test here is swift-testing. It keeps the wasm32 run working on macOS when `--filter` is added: without it, a filtered run there calls Xcode's `swiftpm-xctest-helper` on the test bundle, which cannot load one built for wasm32 (#76).
 
 ## Trying the core
 

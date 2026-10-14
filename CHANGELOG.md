@@ -23,7 +23,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Fixed
 
-- The wasm32 test command runs on a macOS host with `--filter` too. To filter, SwiftPM on macOS lists the XCTest cases through Xcode's `swiftpm-xctest-helper`, which cannot load a bundle built for wasm32, so a filtered run stopped before its first test; `--disable-xctest` skips XCTest, which no test here uses, and the whole run passes the same 229 tests (#76). `README.md`, the global constraints of `docs/plans/feature-module-architecture.md` and the Linux CI job now give the same command, so the run a person or an implementing agent is handed and the run CI checks cannot drift.
+- The wasm32 test command runs on a macOS host with `--filter` too. A filtered run on macOS calls Xcode's `swiftpm-xctest-helper` on the test bundle, which cannot load one built for wasm32, so it stopped before its first test; `--disable-xctest` skips XCTest, which no test here uses, and the whole run passes the same 229 tests (#76). `README.md`, the global constraints of `docs/plans/feature-module-architecture.md` and the Linux CI job now give the same command, so the run a person or an implementing agent is handed and the run CI checks cannot drift.
 
 ## [0.1.0] - 2026-09-20
 
