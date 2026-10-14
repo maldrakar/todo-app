@@ -1,6 +1,6 @@
 # ADR-0005: Take the device identity from the platform at every open
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-20
 - Related: #51, `docs/specs/core-storage-and-search.md`, ADR-0003 (amends where the device id comes from)
 

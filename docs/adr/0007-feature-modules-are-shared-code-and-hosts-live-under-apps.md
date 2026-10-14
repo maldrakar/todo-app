@@ -1,6 +1,6 @@
 # ADR-0007: Keep feature modules in the root package as shared code, and every platform host in a package under `Apps/`
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-20
 - Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, ADR-0001, ADR-0006
 
