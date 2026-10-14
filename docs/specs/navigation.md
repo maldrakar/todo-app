@@ -1,6 +1,6 @@
 # Spec: Navigation
 
-- Status: Draft, revision 4 of 2026-10-14
+- Status: Approved 2026-10-14 (revision 4)
 - Owner review: https://claude.ai/artifact/Y9Wdu9U1ZtC65xZb9LcLEv
 - Issue: #67
 
