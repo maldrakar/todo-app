@@ -1,6 +1,6 @@
 # Spec: Navigation
 
-- Status: Draft, revision 2 of 2026-10-14
+- Status: Draft, revision 3 of 2026-10-14
 - Owner review: https://claude.ai/artifact/Y9Wdu9U1ZtC65xZb9LcLEv
 - Issue: #67
 
@@ -124,6 +124,8 @@ The window, when it appears, creates its host from its value, and after every ev
 **Quick entry** is the root's child on every platform and is drawn as a sheet on every Apple platform. Its swipe down, Esc or Cancel button arrive as the root's action `.quickEntryDismissed`, and the root applies its route without it; when quick entry has created its task it asks to be closed through its output, and the root drops it, which is the modal's own half of the way back. The floating panel Things has on the Mac is not this epic's: it needs a global shortcut and a bundle, and it would make the module's home depend on the platform, with a parent in the root on iPhone and no parent on the Mac, which is exactly what the issue forbids. If it is wanted later, it is a window of its own over a `ModuleHost<QuickEntry>` in a task of its own, and the host already allows it, being generic over the module.
 
 ### 6. One tree of views on every Apple platform
+
+**The containers are the epic's choice; the rule they obey is the product's.** `NavigationSplitView` and `NavigationStack` are what this epic draws on macOS, iPhone and iPad today. Modules, routes and the text form know nothing of them: no SwiftUI container appears in the decisions listed for ADRs at the end, which name the seat, the route and the host alone. A later tree of views, a container of the product's own, three columns the way Notes has them, whatever M4 and the milestones after it want, replaces this one inside the Apple package with no change to the core and no new ADR. The one thing any tree must keep is the rule below: every binding is read from the model and set only by sending an action.
 
 The root view keeps its `NavigationSplitView` (the two- or three-column container that collapses into one stack on iPhone). The detail column holds a `NavigationStack` (the push-and-pop container) whose root is the list of the chosen view's tasks, and the task screen pushes in it. On iPhone SwiftUI collapses the split view into one stack, sidebar, list, task; on iPad and on the Mac the columns stay and the task pushes inside the column. Quick entry is a `.sheet` over all of it. No `#if` is left for the shape of the interface, and `NavigationSplitView` is available on watchOS 9 and later, so the same tree compiles for the watch too (read in the SDK's interface on 2026-10-14; what the watch draws is its own, section 8).
 
