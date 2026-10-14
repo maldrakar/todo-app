@@ -21,6 +21,10 @@ All notable changes to this project are documented in this file. The format foll
 - ADR-0006 gains an amendment from the owner's review of #78, and the spec follows it: a parent never reads a child's model to learn a choice, and a child's first choice is its answer to `.created`.
 - ADR-0008 gains an amendment from the owner's review of #81: the executable carries what its missing bundle costs, the activation, and `TodoAppleUI` carries nothing that only one target's packaging needs, keeps the SwiftUI that iOS and watchOS lack behind `#if os(macOS)` and is compiled for both on the macOS job; the spec follows it.
 
+### Fixed
+
+- The wasm32 test command runs on a macOS host with `--filter` too. A filtered run on macOS calls Xcode's `swiftpm-xctest-helper` on the test bundle, which cannot load one built for wasm32, so it stopped before its first test; `--disable-xctest` skips XCTest, which no test here uses, and the whole run passes the same 229 tests (#76). `README.md`, the global constraints of `docs/plans/feature-module-architecture.md` and the Linux CI job now give the same command, so the run a person or an implementing agent is handed and the run CI checks cannot drift.
+
 ## [0.1.0] - 2026-09-20
 
 ### Added

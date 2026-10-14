@@ -32,12 +32,14 @@ The core is a SwiftPM package built with the swift.org toolchain pinned in `.swi
 swiftly install                      # reads .swift-version
 swift build
 swift test                           # host
-swift test --swift-sdk swift-6.3.3-RELEASE_wasm   # the same suite on wasm32 under WasmKit
+swift test --swift-sdk swift-6.3.3-RELEASE_wasm --disable-xctest   # the same suite on wasm32 under WasmKit
 swift run todo --help                # command-line demo
 scripts/wasm-size.sh                 # release wasm build, measured against the size budget
 ```
 
 The WebAssembly SDK is installed once with `swift sdk install <url> --checksum <sha256>`; the URL and checksum are in `.github/workflows/ci.yml`.
+
+`--disable-xctest` skips nothing, since every test here is swift-testing. It keeps the wasm32 run working on macOS when `--filter` is added: without it, a filtered run there calls Xcode's `swiftpm-xctest-helper` on the test bundle, which cannot load one built for wasm32 (#76).
 
 ## Trying the core
 

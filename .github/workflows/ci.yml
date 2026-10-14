@@ -57,8 +57,10 @@ jobs:
       - name: Test on the host
         run: swift test
 
+      # The command `README.md` and the feature-module plan give, so the documented run and this one cannot drift.
+      # The flag skips nothing here; on macOS it keeps a run with `--filter` away from Xcode's XCTest helper (#76).
       - name: Test on wasm32 under WasmKit
-        run: swift test --swift-sdk swift-6.3.3-RELEASE_wasm
+        run: swift test --swift-sdk swift-6.3.3-RELEASE_wasm --disable-xctest
 
       - name: Run the size probe on the host
         run: swift run wasm-size-probe
