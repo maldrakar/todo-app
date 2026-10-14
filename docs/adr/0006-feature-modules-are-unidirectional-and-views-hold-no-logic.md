@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, #67, #78, ADR-0001, ADR-0004
-- Amended: 2026-10-03, after the owner's review of #78 (see the end)
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), #63, #67, #78, ADR-0001, ADR-0004, ADR-0009
+- Amended: 2026-10-03, after the owner's review of #78, and 2026-10-14, after the approval of the navigation spec (see the end)
 
 ## Context
 
@@ -29,3 +29,11 @@ Made in the owner's review of #78, where one module first composed another. Two 
 
 1. **A parent never reads a child's model to learn a choice.** A `Model` is what the child's view draws, and nothing else. A parent carries a child's model into its own whole, for the view, and decides nothing in it. What the child chose, or asks its parent for, reaches the parent only as `Output`. The route this rules out was tried in #78: a `selection` field on the list's model, which the root read at launch. The owner turned it down because the model is the view's, and the list already reports what was chosen as its output `.selected`.
 2. **A child's first choice is its answer to `.created`.** A module publishes nothing and answers only the events it is given, so a choice nobody made, such as the view a list starts on, needs an event to answer. The parent sends `.created` to each child it creates, once, right after creating it and before anything else, and the child answers with its starting choice, or with nothing when it has none to report. The parent handles that answer on the same line every later answer takes, so the first choice and a click reach it the same way, and it names no choice of its own. `.created` is an event of the world, beside `.changed`, and no view can send it. It is named for what happened to the module (owner's naming in #78): its parent created it, which is not yet the same as putting it on screen. Whether more events of this kind follow is not decided here.
+
+## Amendment, 2026-10-14
+
+Made with the approval of the navigation spec, `docs/specs/navigation.md`, which settles the mechanics the decision above deferred to #67; ADR-0009 records them. Two sentences of the decision change, a rule the decision implied is written down, and the rest holds.
+
+1. **The opener creates a screen's module and drops it; the root is the opener of the first screens.** The decision said the root creates every screen's module with the store and drops it when the screen closes. Now every screen is a child of the screen that opened it, held in a seat, and the root holds the first screens and nothing below them. "The way back from the platform is an action of the root" holds: a pop or a dismissal arrives at the root and travels down to the owner of the screen by the path every action of a child takes.
+2. **`.route(Route)` is an event of the world, beside `.changed` and `.created`.** A route arrives at a live module through the one door, `send`, and no view sends it: a view's closure spells user actions only. A module that receives it looks at the tail alone, because the seat replaces a module whose head differs. `.created` keeps its meaning from the amendment above: a child created from a route answers with the choice the route carries, and a child created from no route answers with its own first choice.
+3. **A screen whose subject is gone asks to be closed.** The root no longer reads the store on `.changed` to learn that its pane's view was deleted. The module in the seat knows: it answers `.changed` with an output that says its subject is gone, and the parent drops it. The M2 rule that a pane on a view that is gone is a pane on nothing holds; only who knows it moves.
