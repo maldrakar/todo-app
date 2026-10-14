@@ -104,7 +104,8 @@ tag (section 9). The initial set follows the brief:
 | `M0 Process` | This document, repository bootstrap, backlog setup |
 | `M1 Core architecture` | Storage, search, sync model, Swift toolchain for all targets |
 | `M2 Feature-module architecture` | How a feature module is structured, wired and tested |
-| `M3+` | Product functionality, planned after M2 |
+| `M3 Navigation` | The navigation epic (#67): routes, windows, links, restoration and the first iPhone build, brought forward on 2026-10-14 so that product screens are built on settled mechanics |
+| `M4+` | Product functionality, planned after M3 |
 
 ## 5. Sizes of work
 

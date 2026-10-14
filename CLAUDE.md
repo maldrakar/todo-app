@@ -23,7 +23,7 @@ Everything in the repository and on GitHub is in English. Conversation with the 
 
 ## Backlog
 
-- GitHub Issues. Milestones are increments: `M0 Process`, `M1 Core architecture`, `M2 Feature-module architecture`, `M3 Product functionality`.
+- GitHub Issues. Milestones are increments: `M0 Process`, `M1 Core architecture`, `M2 Feature-module architecture`, `M3 Navigation`, `M4 Product functionality`.
 - Issue body has four sections: Context, Goal, Acceptance criteria, Out of scope. Priority inside a milestone is the order of issues, not a label.
 - Labels: type `feature` `bug` `arch` `infra` `docs` `spike` `epic`; area `core` `ui-apple` `ui-web`.
 - Epic: an issue labeled `epic` that links the spec and plan. Children are attached as sub-issues through `gh api graphql`; a task list in the epic body is the fallback.
