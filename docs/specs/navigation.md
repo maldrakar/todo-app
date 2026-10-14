@@ -1,6 +1,6 @@
 # Spec: Navigation
 
-- Status: Draft, revision 1 of 2026-10-14
+- Status: Draft, revision 2 of 2026-10-14
 - Owner review: https://claude.ai/artifact/Y9Wdu9U1ZtC65xZb9LcLEv
 - Issue: #67
 
@@ -53,7 +53,7 @@ The costs of this shape are real, and the sections that follow pay each of them.
 
 ### 2. A route is the address of a screen, and a tree of them is the address of a window
 
-Every module that can be opened has a `Route`, a plain value with a head and a tail. The head is what makes this screen this screen: the id of a task, the id of a view, or nothing for a screen of which there is one, such as quick entry. The tail is the routes of what is open inside it. The route of the root is the route of the window: the view the sidebar is on, the list in the pane, the task open in it, and whether quick entry is up.
+Every module that can be opened has a `Route`, a plain value with a head and a tail. The head is what makes this screen this screen: the id of a task, the id of a view, or nothing for a screen of which there is one, such as quick entry. The tail is the rest: the routes of what is open inside it and, where a module defines one, the argument it opens with. The route of the root is the route of the window: the view the sidebar is on, the list in the pane, the task open in it, and whether quick entry is up.
 
 A route is not a model. A `Model` is what a view draws, and a parent carries a child's model into its own and decides nothing in it, which is the amendment of ADR-0006 and holds unchanged. A route is the parent's and the host's: it is what a parent reads from a child to serialise the window, and what it hands a child to open it. The two are separate surfaces so that neither has to serve the other's reader.
 
@@ -71,6 +71,8 @@ The chain of main screens is the path and a modal is a query item, because a mod
 One codec, three uses: a link from outside the app, the state a window is restored from after a relaunch, and the URL in the browser's address bar. Each is a route written down, and section 7 and section 8 say where each is read.
 
 **What a route does not carry.** Session state: a draft in a field, a quick entry half typed, the scroll position, the sentence a person was last told. A route is what the next launch opens again, not a record of gestures. A link to a task that no longer exists opens the view it names and a sentence in the list, not a task screen; an id that is gone is data from outside too.
+
+**An argument to open with is not session state.** A route may say what a screen opens with: a quick entry that opens with a given text, a list that opens scrolled to one task. Such an argument sits in the tail, never in the head, because a quick entry opened with one text and a quick entry opened with another are the same screen. It is read once, in `init(store:route:)`, and becomes the first value in the model; what the person types after that is session state, which `var route` does not collect, so three keystrokes later the route of the window is `?quick-entry` again, without the text. Were it otherwise, every keystroke would change the address of the window, on the web the address bar, and a relaunch would restore a half-typed draft, which the rule above refuses. One consequence follows from section 3: a screen whose head is empty, such as quick entry, is kept alive when a route with an argument arrives while it is up, so the argument reaches the live module as `.route` with the tail, and whether it fills an empty field or is ignored over a draft is the module's own rule, written in its contract and not in the parent. Focus is rendering: the view moves focus to the field whose value is new, through SwiftUI's focus state, and neither the route nor the model names a focused field. No screen in this epic takes such an argument; quick entry's query item is a bare flag, and a text form for an argument is settled when the first screen needs one.
 
 ### 3. One entrance for navigation: apply a route
 
