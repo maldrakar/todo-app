@@ -2,7 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), #63, ADR-0001, ADR-0006
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), #63, #67, ADR-0001, ADR-0006, ADR-0009
+- Amended: 2026-10-14, after the approval of the navigation spec (see the end)
 
 ## Context
 
@@ -21,3 +22,7 @@ Easier: `internal` means "inside this feature"; the Linux job and the WasmKit ru
 Harder: two targets per feature in the manifest; `swift test` in `Apps/Apple` builds the root package's targets a second time into its own `.build`; the size ceiling moves whenever a module joins the probe.
 
 Constrained: no UI import in the root package, ever; no feature target reaches another feature's internals; a platform package never holds logic that a module could hold. Reversing this decision is a move of files and manifest entries, cheap at any time.
+
+## Amendment, 2026-10-14
+
+Made with the approval of the navigation spec, `docs/specs/navigation.md`, section 4, which ADR-0009 records. The decision above gave the `FeatureModule` target the module protocols and nothing else. The shared form of a parent now lives beside them: the protocol of an addressed module and the generic seat a parent holds each child in, which create a child from a route with the store and so need `Store` and `StoreError`. The target therefore depends on `TodoCore`, which every feature depends on already, and holds what every parent needs and nothing of any one feature. The rest of the decision holds: one target per feature, children that depend neither on each other nor on the root, and the hosts under `Apps/`.
