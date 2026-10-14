@@ -1,6 +1,6 @@
 # Plan: Navigation
 
-- Status: Draft
+- Status: Approved 2026-10-14
 - Spec: `docs/specs/navigation.md`, approved 2026-10-14
 - Epic: #67
 
@@ -89,16 +89,16 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | | The toolchain moves to Swift 6.4 and Xcode 27 | `infra` | |
-| 2 | | The shared form of a parent, and the sidebar becomes addressed | `feature`, `core` | 1 |
-| 3 | | The task screen and the task list | `feature`, `core` | 2 |
-| 4 | | Quick entry | `feature`, `core` | 2 |
-| 5 | | The root: seats, the window's route and its text form | `feature`, `core` | 3, 4 |
-| 6 | | A host per window, and the composition root fans out | `feature`, `ui-apple` | 5 |
-| 7 | | The views and the stack | `feature`, `ui-apple` | 6 |
-| 8 | | Windows, links and restoration | `feature`, `ui-apple` | 7 |
-| 9 | | The Xcode shell and the first iPhone build | `feature`, `ui-apple` | 8 |
-| 10 | | CI for the iPhone build, and the documentation that closes the epic | `infra`, `ui-apple` | 9 |
+| 1 | #88 | The toolchain moves to Swift 6.4 and Xcode 27 | `infra` | |
+| 2 | #89 | The shared form of a parent, and the sidebar becomes addressed | `feature`, `core` | 1 |
+| 3 | #90 | The task screen and the task list | `feature`, `core` | 2 |
+| 4 | #91 | Quick entry | `feature`, `core` | 2 |
+| 5 | #92 | The root: seats, the window's route and its text form | `feature`, `core` | 3, 4 |
+| 6 | #93 | A host per window, and the composition root fans out | `feature`, `ui-apple` | 5 |
+| 7 | #94 | The views and the stack | `feature`, `ui-apple` | 6 |
+| 8 | #95 | Windows, links and restoration | `feature`, `ui-apple` | 7 |
+| 9 | #96 | The Xcode shell and the first iPhone build | `feature`, `ui-apple` | 8 |
+| 10 | #97 | CI for the iPhone build, and the documentation that closes the epic | `infra`, `ui-apple` | 9 |
 
 The owner reviews this table and the interface of every task below.
 
