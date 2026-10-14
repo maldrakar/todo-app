@@ -26,13 +26,13 @@ that hosts them. `M3 Navigation` is next, and product functionality follows as `
 
 ## Building
 
-The core is a SwiftPM package built with the swift.org toolchain pinned in `.swift-version` and installed through [swiftly](https://www.swift.org/install/); Xcode only supplies the Apple SDKs.
+The core is a SwiftPM package built with the swift.org toolchain pinned in `.swift-version` and installed through [swiftly](https://www.swift.org/install/); Xcode only supplies the Apple SDKs. Installing the pin needs swiftly 1.1.4 or later, because from 6.4 on swift.org names a release with its `.0`, and an older swiftly looks for `swift-6.4-RELEASE` and gets a 404.
 
 ```sh
 swiftly install                      # reads .swift-version
 swift build
 swift test                           # host
-swift test --swift-sdk swift-6.3.3-RELEASE_wasm --disable-xctest   # the same suite on wasm32 under WasmKit
+swift test --swift-sdk swift-6.4.0-RELEASE_wasm --disable-xctest   # the same suite on wasm32 under WasmKit
 swift run todo --help                # command-line demo
 scripts/wasm-size.sh                 # release wasm build, measured against the size budget
 ```
@@ -108,7 +108,7 @@ view, rename it, make a folder — and beside it calls the public API of `TodoCo
 store, read a page, search, exchange a journal, take a snapshot — because the linker keeps what a client calls,
 and a number measured on calls that were dead-stripped is a number for a binary nobody ships.
 
-The budget is 6.5625 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
+The budget is 6.25 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
 CI runs and the command to run locally. It is the root module and the core as they stand with four percent to
 spare, rounded up to a whole 64 KiB: a guard against growing sideways, not a target to shrink towards. The
 4.5 MiB the spec first named was never measured — it is the floor measured in the toolchain spike, 3,743,306
@@ -117,8 +117,10 @@ slack for the code the core would add. That code, with the JSON coding it pulls 
 SQLite and FoundationEssentials are inside the floor on both sides of the comparison rather than the difference
 between them. The ceiling that means something arrives with the web client, measured on its bundle.
 
-A second job, on a macOS runner, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and
-watchOS SDKs, and builds and tests `Apps/Apple` with the pinned toolchain. It then builds the root package and
-`Apps/Apple` with the toolchain of Xcode 26.3 too, the Xcode the app is built with and the one Apple accepts
-store builds from, and keeps doing so until the Xcode project brings the two to one (ADR-0008). It runs on
-`main` and on demand, never on a pull request, because macOS minutes cost tenfold on a private repository.
+A second job, on GitHub's `xcode-27` macOS runner, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`,
+against the iOS and watchOS SDKs, and builds and tests `Apps/Apple` with the pinned toolchain. It then builds the
+root package and `Apps/Apple` with the toolchain of Xcode 27.1 too, the Xcode the app is built with and the one
+Apple accepts store builds from, and each of those builds fails first unless that toolchain is the version
+`.swift-version` pins: from Xcode 27 on the two are one version (ADR-0008), these builds are what shows it, and
+the image is a preview whose Xcode can change under the job. It runs on `main` and on demand, never on a pull
+request, because macOS minutes cost tenfold on a private repository.
