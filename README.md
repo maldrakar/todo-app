@@ -8,13 +8,13 @@ A reminders app in the spirit of Things 3, with one shared core and native UI pe
 
 ## Status
 
-Milestones `M0 Process` and `M1 Core architecture` are complete, the second released as `v0.1.0`. The core
-stores tasks, tags and views, resolves the tree their parent links describe, filters, sorts and groups them
-into pages, searches titles and notes, and exchanges a journal with another copy of itself; it builds and
-passes its suite on the host and on wasm32, and `todo` drives all of it from a command line.
-`M2 Feature-module architecture`, not yet released, has built the module contract in the shared core, the list
-of views and the root module over it, which pass their suites on the host and on wasm32 as the core does, and
-the macOS app in `Apps/Apple` that hosts them.
+Milestones `M0 Process`, `M1 Core architecture` and `M2 Feature-module architecture` are complete, the last two
+released as `v0.1.0` and `v0.2.0`. The core stores tasks, tags and views, resolves the tree their parent links
+describe, filters, sorts and groups them into pages, searches titles and notes, and exchanges a journal with
+another copy of itself; it builds and passes its suite on the host and on wasm32, and `todo` drives all of it
+from a command line. M2 built the module contract in the shared core, the list of views and the root module
+over it, which pass their suites on the host and on wasm32 as the core does, and the macOS app in `Apps/Apple`
+that hosts them. `M3 Product functionality` is next.
 
 ## Documents
 
