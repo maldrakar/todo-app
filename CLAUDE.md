@@ -74,4 +74,4 @@ All issues closed, CI green, `CHANGELOG.md` moves Unreleased into `[0.N.0]`, tag
 ## Toolchain notes
 
 - Toolchain: Swift 6.3.3 from swift.org, pinned in `.swift-version` and installed through swiftly; Xcode 26.3 supplies only the Apple SDKs. The core is full Swift restricted to the standard library and FoundationEssentials (ADR-0001), built and tested with SwiftPM alone, and compiles for iOS, macOS, iPadOS, watchOS and WASM through the Swift SDK of the same version.
-- CI: the Linux job (build, tests, wasm32 tests, wasm size budget in `scripts/wasm-size.sh`) runs on every PR; the macOS job (iOS and watchOS SDK compile checks) runs only on `main` and on demand, because macOS minutes cost tenfold.
+- CI: the Linux job (build, tests, wasm32 tests, wasm size budget in `scripts/wasm-size.sh`) runs on every PR; the macOS job (iOS and watchOS SDK compile checks, the Apple package's build and tests, and a build with Xcode's toolchain) runs only on `main` and on demand, because macOS minutes cost tenfold.
