@@ -14,7 +14,7 @@ describe, filters, sorts and groups them into pages, searches titles and notes, 
 another copy of itself; it builds and passes its suite on the host and on wasm32, and `todo` drives all of it
 from a command line. M2 built the module contract in the shared core, the list of views and the root module
 over it, which pass their suites on the host and on wasm32 as the core does, and the macOS app in `Apps/Apple`
-that hosts them. `M3 Product functionality` is next.
+that hosts them. `M3 Navigation` is next, and product functionality follows as `M4`.
 
 ## Documents
 
