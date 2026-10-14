@@ -117,6 +117,6 @@ between them. The ceiling that means something arrives with the web client, meas
 
 A second job, on a macOS runner, compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`, against the iOS and
 watchOS SDKs, and builds and tests `Apps/Apple` with the pinned toolchain. It then builds the root package and
-`Apps/Apple` with Xcode's toolchain too, the one Apple accepts store builds from, and keeps doing so until the
-Xcode project brings the two to one (ADR-0008). It runs on `main` and on demand, never on a pull request, because
-macOS minutes cost tenfold on a private repository.
+`Apps/Apple` with the toolchain of Xcode 26.3 too, the Xcode the app is built with and the one Apple accepts store
+builds from, and keeps doing so until the Xcode project brings the two to one (ADR-0008). It runs on `main` and on
+demand, never on a pull request, because macOS minutes cost tenfold on a private repository.

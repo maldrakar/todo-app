@@ -120,7 +120,10 @@ jobs:
 
       # Apple accepts store builds from Xcode's toolchain, so the code keeps building with it, outside the pinned
       # toolchain's `.build`, until the Xcode project brings the pinned version and Xcode's to one (ADR-0008).
+      # Both take Xcode 26.3, the one the app is built with, since the image's default Xcode ships the pinned version.
       - name: Build the root package with Xcode's toolchain
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
         run: |
           set -eu
           /usr/bin/swift --version
@@ -128,6 +131,8 @@ jobs:
 
       - name: Build the Apple package with Xcode's toolchain
         working-directory: Apps/Apple
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
         run: |
           set -eu
           /usr/bin/swift --version
