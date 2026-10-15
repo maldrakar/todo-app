@@ -107,9 +107,9 @@ public final class TaskViewList: Addressed {
         /// and as an answer it reaches the parent by the road every later choice takes, through `Output`.
         case created
 
-        /// A route applied to the live list, by a link, by a relaunch or by the root reconciling its window:
-        /// an event of the world, like `.changed`, that no view can send (ADR-0006, amendment of 2026-10-14).
-        /// The head of a list never differs, so it is the tail alone that the list reads.
+        /// A route applied to the live list, by a link or by the root reconciling its window: an event of the
+        /// world, like `.changed`, that no view can send (ADR-0006, amendment of 2026-10-14). The head of a
+        /// list never differs, so it is the tail alone that the list reads.
         case route(Route)
     }
 
@@ -238,13 +238,14 @@ public final class TaskViewList: Addressed {
             return .selected(selection)
         case .route(let route):
             // The route's choice and not a person's, and its parent already knows it, so it is answered with
-            // nothing: answered, it would have the root open again the pane the route itself opened (spec
-            // section 4). It moves the highlight onto a row the list holds, and a view it holds no row for, a
-            // link to one that is gone, moves nothing. It moves the highlight and only that: a route carries
-            // no session state and keeps what did not change (spec sections 2 and 3), so a field a person has
-            // open and the sentence on screen stay, as they do on a `.changed`, the other event of the world
-            // that answers no gesture made in this list. A route that names no view leaves the highlight
-            // alone, because the default window chooses the Inbox itself, at creation and never again.
+            // nothing: answered, it would have the root open again the pane it opens itself when it applies the
+            // route (spec section 3, the third flow; `docs/plans/navigation.md`, Task 2). It moves the
+            // highlight onto a row the list holds, and a view it holds no row for, a link to one that is gone,
+            // moves nothing. It moves the highlight and only that: a route carries no session state and keeps
+            // what did not change (spec sections 2 and 3), so a field a person has open and the sentence on
+            // screen stay, as they do on a `.changed`, the other event of the world that answers no gesture
+            // made in this list. A route that names no view leaves the highlight alone, because the default
+            // window chooses the Inbox itself, at creation and never again.
             if let id = route.selection, state.rows.contains(where: { $0.id == id }) { state.selection = id }
             return nil
         case .changed(let changes):
@@ -402,9 +403,10 @@ public final class TaskViewList: Addressed {
             return nil
         }
         // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
-        // of its own accord, after a write of its own, goes onto a row the list holds, and the read that
-        // just ran is the only thing that can say whether it holds one. It does not cover `.rowSelected`,
-        // which stores the id a view names without asking the rows (left as it shipped, see #77).
+        // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` and
+        // on `.route` without one. Here the read that just ran is the only thing that can say whether the
+        // list holds the row. It does not cover `.rowSelected`, which stores the id a view names without
+        // asking the rows (left as it shipped, see #77).
         //
         // A peer can have deleted the folder between the write and this read, and a highlight on a row
         // that came back deleted is a highlight on nothing.

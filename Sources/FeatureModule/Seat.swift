@@ -30,7 +30,7 @@ public struct Seat<Child: Addressed> {
     /// Applies a route to the seat, which is how a parent opens, moves and closes the child: a tap, a link, a
     /// relaunch and the way back each arrive here as a route (spec section 3).
     ///
-    /// It reconciles by head and never rebuilds. No route drops the child. A route with the head of the child
+    /// It reconciles by head and never rebuilds. A nil route drops the child. A route with the head of the child
     /// in the seat keeps it, with whatever session state it holds, and hands it `.route`, since the head of a
     /// live module never changes and such a module looks at the tail alone. Any other route, or a route into
     /// an empty seat, makes a new child, tells it it was created and returns its answer, its first choice.
@@ -52,7 +52,9 @@ public struct Seat<Child: Addressed> {
     /// Hands an event the parent spells to the child, `seat.send(.changed(changes))` or an action its view
     /// sent, and returns the child's answer. The seat knows nothing of the events it carries, so an event of
     /// the world a child learns to take needs nothing here; an empty seat has nobody to hand it to and
-    /// answers nothing.
+    /// answers nothing. A route goes through `apply` instead, the one road that compares heads: a `.route`
+    /// sent through here would skip the reconciliation and could hand a live module a new head, which spec
+    /// section 3 rules out: the head of a live module never changes.
     public func send(_ event: Child.Event) -> Child.Output? {
         child?.send(event)
     }

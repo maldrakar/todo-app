@@ -4,10 +4,10 @@ import TodoCore
 /// The address of a screen: a plain value with a head and a tail (spec section 2).
 ///
 /// The head is what makes this screen this screen, the id of a task or a view, or `NoHead` for a screen of
-/// which there is one. The tail is the rest, the routes of what is open inside it, and a conforming type
-/// declares it as fields of its own. Only the head is required, because the head is the one thing a parent
-/// reads without knowing which child it holds: its seat compares heads to decide whether a route keeps the
-/// child or replaces it (spec section 3).
+/// which there is one. The tail is the rest: what is chosen or open inside it, and the argument it opens with
+/// where it defines one; a conforming type declares it as fields of its own. Only the head is required,
+/// because the head is the one thing a parent reads without knowing which child it holds: its seat compares
+/// heads to decide whether a route keeps the child or replaces it (spec section 3).
 ///
 /// A route is not a model. A `Model` is what a view draws; a route is what a parent reads from a child to
 /// write the window down and what it hands a child to open it, and the two are separate so that neither has
@@ -46,6 +46,6 @@ public protocol Addressed: FeatureModule where Event: RoutedEvent {
 /// The head of a screen of which there is one, such as the sidebar of a window: every value is the same
 /// value, so a seat holding such a screen keeps it on every route it is handed rather than making it again,
 /// and what the route says reaches the live module as its tail (spec section 2).
-public struct NoHead: Hashable, Sendable {
+public struct NoHead: Equatable, Sendable {
     public init() {}
 }
