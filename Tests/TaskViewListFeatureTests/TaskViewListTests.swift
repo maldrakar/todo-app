@@ -431,6 +431,42 @@ import SQLiteKit
     #expect(list.model.rows.filter(\.isSelected).isEmpty)
 }
 
+/// A starting choice with no row is not kept for a row that may arrive later, whichever its source: the route's
+/// selection, as with a link to a view that has not synced to this device yet, or the Inbox the list falls back
+/// on. Kept, it would light up when a peer's change brought the row in, and the parent, told nothing in answer
+/// to `.created`, would hold a pane on another view or none beside it. The rows come in from a peer's journal,
+/// which is how a view with an id chosen elsewhere reaches this store.
+@Test func aStartingSelectionWithNoRowStaysUnhighlightedWhenTheRowArrives() throws {
+    let peer = Store.newDeviceID()
+    let later = HLC(millis: 1_800_000_000_000, counter: 0)
+    func written(_ id: ViewID, _ fields: [(String, Value)]) -> [JournalOperation] {
+        fields.map { JournalOperation(entity: .view, entityID: id.rawValue, field: $0.0, value: $0.1, clock: later, device: peer) }
+    }
+
+    let store = try makeStore()
+    let linked = ViewID()
+    let list = try TaskViewList(store: store, route: .init(selection: linked))
+    #expect(list.send(.created) == nil, "no row, no choice to report; this is the setup")
+    let synced = try changeSet(of: store) {
+        _ = try store.apply(written(linked, [
+            ("title", .text("Work")), ("parent", .null), ("rank", .text(Rank.initial)), ("deleted", Value(false)),
+        ]))
+    }
+    #expect(list.send(.changed(synced)) == nil)
+    #expect(list.model.rows.map(\.id).contains(linked), "the view arrived; without it this proves nothing")
+    #expect(list.model.selection == nil, "a highlight the root was never told of")
+    #expect(list.model.rows.filter(\.isSelected).isEmpty)
+
+    let bare = try makeStore()
+    try bare.delete(view: BuiltInTaskViews.inbox)
+    let fallback = try TaskViewList(store: bare, route: .init(selection: nil))
+    #expect(fallback.send(.created) == nil, "the Inbox is gone before launch; this is the setup")
+    let restored = try changeSet(of: bare) { _ = try bare.apply(written(BuiltInTaskViews.inbox, [("deleted", Value(false))])) }
+    #expect(fallback.send(.changed(restored)) == nil)
+    #expect(fallback.model.rows.map(\.id).contains(BuiltInTaskViews.inbox), "the Inbox is back; without it this proves nothing")
+    #expect(fallback.model.selection == nil, "a highlight the root was never told of")
+}
+
 /// A route is its parent's choice and not a person's, and the parent already knows it, so the list moves its
 /// highlight and answers nothing: an answer would have the root open again the pane the route opened.
 @Test func aRouteMovesTheHighlightAndAnswersNothing() throws {

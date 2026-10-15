@@ -134,14 +134,19 @@ public final class TaskViewList: Addressed {
 
     /// Made from its route, the one way a list is made (spec section 3): it starts on the view the route
     /// names, or on the Inbox when the route leaves the choice to it, and says which in answer to `.created`.
-    /// A view the route names that has no row is kept the way `.rowSelected` keeps one and highlights nothing.
+    ///
+    /// That choice is kept only when a row holds it, whichever its source, because a choice with no row is one
+    /// the parent is never told of: `.created` answers nothing for it, and a choice kept anyway would light up
+    /// the moment a peer's change brought the row in — a link to a view not yet synced here — beside a pane
+    /// the root never opened on it. It is the invariant `createFolder` holds for the same reason: what this
+    /// module puts on a row of its own accord goes onto a row the list holds.
     ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
     /// came up empty would look like a database with nothing in it (spec section 5).
     public init(store: Store, route: Route) throws(StoreError) {
-        let state = State(
-            rows: try TaskViewList.rows(of: store), selection: route.selection ?? BuiltInTaskViews.inbox
-        )
+        let rows = try TaskViewList.rows(of: store)
+        let start = route.selection ?? BuiltInTaskViews.inbox
+        let state = State(rows: rows, selection: rows.contains(where: { $0.id == start }) ? start : nil)
         self.store = store
         self.state = state
         self.model = state.model
