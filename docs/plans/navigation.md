@@ -25,16 +25,16 @@ The rules every task obeys, each with the spec section or ADR it comes
 from.
 
 - Toolchain: until Task 1 merges, Swift 6.3.3 as `.swift-version` pins it; from Task 1 on, the Swift 6.4 the owner's installed Xcode 27 prints, pinned there, with the wasm SDK of the same version, and Xcode's toolchain is that version too, so one toolchain builds everything (spec section 9, ADR-0008 amendment of 2026-10-14). Always the swiftly-managed `swift`; every command assumes `export PATH="$HOME/.swiftly/bin:$PATH"`. A `.build` made by the other version is deleted before building.
-- A feature target imports `TodoCore`, `FeatureModule`, the standard library and FoundationEssentials under `#if canImport(FoundationEssentials)`, and nothing else; no SwiftUI, no Observation, no Foundation proper in the root package. The wasm32 build in CI is the enforcement (ADR-0001, ADR-0007). From Task 2 the `FeatureModule` target imports `TodoCore` (ADR-0007 amendment of 2026-10-14).
-- A module is a `final class` conforming to `FeatureModule`: `Model`, `UserAction`, `Event` and `Output` nested, all `Equatable & Sendable`, no `Codable`; `send` is synchronous and never throws, and what the store refuses becomes part of the model (ADR-0006). A module that can be opened conforms to `Addressed` as well: a `Route` with a head and a tail, `init(store:route:)` throwing `StoreError`, `var route`, and `.route(_:)` and `.created` in its `Event` (spec section 4, ADR-0009).
-- A parent holds each child in a `Seat`, which creates the child from a route, sends it `.created` and hands the answer back, and reconciles by head on `.route`. What a parent writes per child is its `Model` field, its `UserAction` case, one line forwarding the child's actions, one forwarding `.changed`, and its reaction to the child's `Output` in a `switch` with no `default` (spec section 4). A parent learns a child's choice only through its output (ADR-0006 amendment of 2026-10-03). A request a parent cannot serve it re-emits under its own name (spec section 4).
-- Inside a module navigation has one entrance, apply a route: a tap, a link, a relaunch and the way back are each a route applied, and applying reconciles by head; the head of a live module never changes, and a module that receives `.route` looks at the tail alone (spec section 3). A route carries no session state; an argument a screen opens with sits in the tail, read once in `init(store:route:)` and never written back (spec section 2). No screen in this epic takes one.
+- A feature target imports `TodoCore`, `FeatureModule`, the standard library and FoundationEssentials under `#if canImport(FoundationEssentials)`, and nothing else; no SwiftUI, no Observation, no Foundation proper in the root package. The wasm32 build in CI is the enforcement (ADR-0001, ADR-0007). The `FeatureModule` target imports nothing: a seat is handed the way to make its child by its parent, so the contract names no dependency (ADR-0007 amendment of 2026-10-15, which withdraws the dependency on `TodoCore` the amendment of 2026-10-14 gave it, in the owner's review of #100).
+- A module is a `final class` conforming to `FeatureModule`: `Model`, `UserAction`, `Event` and `Output` nested, all `Equatable & Sendable`, no `Codable`; `send` is synchronous and never throws, and what the store refuses becomes part of the model (ADR-0006). A module that can be opened conforms to `Routable` as well: a `Route` with a head and a tail, `var route`, and `.route(_:)` and `.created` in its `Event` (spec section 4, ADR-0009). It is made by an `init` of its own from its route and the dependencies it needs, `init(store:route:)` for a screen that reads the store, which throws `StoreError` where the screen can refuse to be made; the protocol requires no `init` (owner's review of #100).
+- A parent holds each child in a `Seat<Child, Failure>`, which it builds once, where it creates the seat, with the way to make the child: a closure over the child's own `init` that captures the child's dependencies and never the parent, and names its thrown type, `{ route throws(StoreError) in try TaskList(store: store, route: route) }`, or throws nothing, so that `Failure` is `Never` and `apply` takes no `try`. The seat creates the child from a route with it, sends it `.created` and hands the answer back, and reconciles by head on `.route`. What a parent writes per child is its `Model` field, its `UserAction` case, one line forwarding the child's actions, one forwarding `.changed`, and its reaction to the child's `Output` in a `switch` with no `default` (spec section 4). A parent learns a child's choice only through its output (ADR-0006 amendment of 2026-10-03). A request a parent cannot serve it re-emits under its own name (spec section 4).
+- Inside a module navigation has one entrance, apply a route: a tap, a link, a relaunch and the way back are each a route applied, and applying reconciles by head; the head of a live module never changes, and a module that receives `.route` looks at the tail alone (spec section 3). A route carries no session state; an argument a screen opens with sits in the tail, read once in the screen's `init` and never written back (spec section 2). No screen in this epic takes one.
 - A module never writes to the store in answer to `.changed` (spec section 5, ADR-0009); a module publishes nothing and subscribes to nothing; the fan-out of a `ChangeSet` is the composition root's.
 - A screen whose subject is gone asks to be closed through its output, and its parent drops it (spec section 3). A screen that cannot be made leaves the one that was open, and the parent says so with a sentence in its own model (spec section 3).
 - A view holds no condition over a domain value and formats nothing: every `if` in a view is over a `Bool` or an optional of the model (`docs/style.md`, "Views"). Every binding keeps the shape `TextField` has: read from the model, set only by sending an action; the item of `navigationDestination(item:)` is the child's head, never its model (spec section 6). No SwiftUI container reaches the core, and the containers are the epic's choice (spec section 6).
 - A user action is named for the control and the gesture, never for the operation it triggers (ADR-0006, settled in the review of #66). What the platform reports, a pushed screen dismissed or a sheet dismissed, is named for what the platform did: `taskScreenDismissed`, `quickEntryDismissed`.
 - The host takes one event at a time; the world's entrance is the composition root's and never a view's; a view gets `model`, `route` and `send(UserAction)`, and the window's view installs the handler for the root's output (spec section 5).
-- Every exported name was probed unqualified in a file importing SwiftUI and Foundation on 2026-10-14 with Xcode 26.3's compiler: `Route`, `Seat`, `Addressed`, `Routed`, `RouteValue`, `RoutedEvent`, `RouteCodec`, `RouteError`, `NoHead`, `TaskList`, `TaskListFeature`, `TaskScreen`, `QuickEntry`, `TaskListView`, `TaskScreenView`, `QuickEntryView`, `TodoIOS`, `Head`, `Tail`, `Segment` are all free, and the control names `List`, `Task`, `URL`, `App`, `State` are taken, which is the probe working. A name a task adds beyond these gets the same probe before it is fixed (`docs/style.md`).
+- Every exported name was probed unqualified in a file importing SwiftUI and Foundation on 2026-10-14 with Xcode 26.3's compiler: `Route`, `Seat`, `Addressed`, `Routed`, `RouteValue`, `RoutedEvent`, `RouteCodec`, `RouteError`, `NoHead`, `TaskList`, `TaskListFeature`, `TaskScreen`, `QuickEntry`, `TaskListView`, `TaskScreenView`, `QuickEntryView`, `TodoIOS`, `Head`, `Tail`, `Segment` are all free, and the control names `List`, `Task`, `URL`, `App`, `State` are taken, which is the probe working. `Routable` was probed on 2026-10-15 with Xcode 27.1 (swiftlang-6.4.0.34.1), in a file importing SwiftUI, Foundation and Observation typechecked for macOS 14, iOS 17 and watchOS 10, and is free on all three, against a control file in which `URL`, `State<Int>`, `Text` and `Identifiable` resolve. A name a task adds beyond these gets the same probe before it is fixed (`docs/style.md`).
 - Tests are swift-testing. A module test opens `Store.openInMemory(device:now:)` through `makeStore` with a deterministic clock, sends events and compares the model whole; the root package's suite runs on the host with `swift test` and on wasm32 with `swift test --swift-sdk swift-<pin>-RELEASE_wasm --disable-xctest`, both green before a PR. From Task 1 on, the wall clock on wasm32 under the test runner is the real one, and the sentinel that said otherwise is flipped there.
 - `Apps/Apple` is a package of its own, built and tested from its directory with the pinned toolchain; the macOS job builds and tests it on `main` and on demand, and from Task 10 builds the iOS app for the simulator too.
 - Branch per task `<type>/<issue>-<slug>`, PR title in Conventional Commits with scope `core`, `apple`, `ci`, `infra` or `docs`, body per template, `Closes #<sub-issue>`; squash merge; one line under `[Unreleased]` in `CHANGELOG.md` per task; commits end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`. Everything in English. No `TODO` without a linked issue.
@@ -49,8 +49,8 @@ from.
 | `Sources/TodoCore/Storage/Store.swift` | 1 | the note on `Store.systemNow` without the test runner's lie |
 | `Sources/TodoCore/Model/Day.swift` | 3 | `Day.init(millisSinceEpoch:)`, the UTC day of a clock reading |
 | `Tests/TodoCoreTests/StoreOpenTests.swift` | 1 | the wall-clock test, one assertion on every target |
-| `Package.swift` | 2, 3, 4, 5 | `FeatureModule` depends on `TodoCore` and gains `FeatureModuleTests` (2); targets `TaskScreenFeature`, `TaskListFeature` (3), `QuickEntryFeature` (4) with their tests and products; `AppFeature` depends on all three (5) |
-| `Sources/FeatureModule/Addressed.swift` | 2 | `RouteValue`, `RoutedEvent`, `Addressed`, `NoHead` |
+| `Package.swift` | 2, 3, 4, 5 | `FeatureModule` gains `FeatureModuleTests` and depends on nothing (2); targets `TaskScreenFeature`, `TaskListFeature` (3), `QuickEntryFeature` (4) with their tests and products; `AppFeature` depends on all three (5) |
+| `Sources/FeatureModule/Routable.swift` | 2 | `RouteValue`, `RoutedEvent`, `Routable`, `NoHead` |
 | `Sources/FeatureModule/Seat.swift` | 2 | `Seat` |
 | `Tests/FeatureModuleTests/SeatTests.swift` | 2 | the seat over a stub child |
 | `Sources/Features/TaskViewList/TaskViewList.swift` | 2 | `TaskViewList.Route`, `init(store:route:)`, `route`, `.route`, `openInNewWindowMenuItemChosen` and `.openInWindow` |
@@ -234,7 +234,7 @@ public final class TaskViewList: Addressed {
 
 ### Task 3: The task screen and the task list
 
-**Goal.** Two addressed modules exist as skeletal screens: the task screen, whose head is a task id and which shows the task's title and nothing editable, and the task list, whose head is a view id, which lists the view's tasks by title, opens the task screen in its seat on a tap, closes it on the way back, and asks to be closed when its view is gone.
+**Goal.** Two routable modules exist as skeletal screens: the task screen, whose head is a task id and which shows the task's title and nothing editable, and the task list, whose head is a view id, which lists the view's tasks by title, opens the task screen in its seat on a tap, closes it on the way back, and asks to be closed when its view is gone.
 
 **Files.** `Package.swift`, targets `TaskScreenFeature` at `Sources/Features/TaskScreen` and `TaskListFeature` at `Sources/Features/TaskList`, their test targets, and library products for both; `Sources/Features/TaskScreen/TaskScreen.swift`; `Sources/Features/TaskList/TaskList.swift`; `Sources/TodoCore/Model/Day.swift`; `Tests/TaskScreenFeatureTests/TaskScreenTests.swift`; `Tests/TaskListFeatureTests/TaskListTests.swift`.
 
@@ -248,7 +248,7 @@ extension Day {
 }
 
 // TaskScreenFeature
-public final class TaskScreen: Addressed {
+public final class TaskScreen: Routable {
     public struct Route: RouteValue {
         public let head: TaskID
         public init(head: TaskID)
@@ -273,7 +273,7 @@ public final class TaskScreen: Addressed {
 }
 
 // TaskListFeature
-public final class TaskList: Addressed {
+public final class TaskList: Routable {
     public struct Route: RouteValue {
         public let head: ViewID
         public let task: TaskScreen.Route?
@@ -311,7 +311,7 @@ public final class TaskList: Addressed {
 **Rules.**
 
 - `TaskScreen.init` reads `store.task(route.head)` and throws `StoreError.notFound(route.head)` when it answers nil: a screen on a task that is gone is not made (spec section 3). `.changed` naming its task rereads it; a reread that finds no task answers `.closeRequested`; a reread that fails keeps the title. `.created`, `.route` and `.action` answer nothing, since the screen has no tail and no actions.
-- `TaskList.init` reads `store.tasks(in: route.head, today:)` for the rows and applies `route.task` to its seat; the seat's `.created` answer is dropped, since the task screen answers nothing. A `route.task` the store cannot make, a task that is gone, leaves no child and a sentence in `problem`, "The task is gone", and the list is still made: the link opened what still exists (spec section 3, fourth flow).
+- `TaskList.init` reads `store.tasks(in: route.head, today:)` for the rows, builds its seat, a `Seat<TaskScreen, StoreError>` made with `{ route throws(StoreError) in try TaskScreen(store: store, route: route) }`, which captures the store and never the list, and applies `route.task` to it; the seat's `.created` answer is dropped, since the task screen answers nothing. A `route.task` the store cannot make, a task that is gone, leaves no child and a sentence in `problem`, "The task is gone", and the list is still made: the link opened what still exists (spec section 3, fourth flow).
 - `.rowTapped(id)` applies `Route(head: head, task: TaskScreen.Route(head: id))`; `.taskScreenDismissed` applies `Route(head: head)`; `.route` applies the tail, which is `task`, to the seat: one entrance, four occasions (spec section 3). A tap on a row that is not in the rows applies nothing.
 - `.changed` naming the list's view reads `store.view(head)` and answers `.closeRequested` when the view is gone; naming any task, it rereads the rows, since which tasks a view holds is the query's to say; in either case it is forwarded to the seat, and `.closeRequested` from the task screen drops it. A reread that fails keeps the rows and writes "The list could not be read" into `problem`; the next action clears the sentence, as the sidebar's rule has it.
 - `today` is the UTC day of `Store.systemNow()` through `Day(millisSinceEpoch:)`, read once in `init` and again on every reread, until M4's change of the day arrives as an event of the world with the platform's day; the deviation is stated in the self-review. `Day` keeps its civil conversion in one place: the new `init` divides by the milliseconds of a day and clamps a reading before the epoch to day zero, and nothing traps (`docs/style.md`).
@@ -345,7 +345,7 @@ public final class TaskList: Addressed {
 **Interface.**
 
 ```swift
-public final class QuickEntry: Addressed {
+public final class QuickEntry: Routable {
     public struct Route: RouteValue {
         public var head: NoHead { get }
         public init()
@@ -370,7 +370,7 @@ public final class QuickEntry: Addressed {
     }
     public private(set) var model: Model { get }
     public var route: Route { get }
-    public init(store: Store, route: Route) throws(StoreError)
+    public init(store: Store, route: Route)
     public func send(_ event: Event) -> Output?
 }
 ```
@@ -380,7 +380,7 @@ public final class QuickEntry: Addressed {
 - The draft lives in the model and every keystroke is a round trip, as the sidebar's rename is (ADR-0006); `.titleFieldChanged` with the draft's own text moves nothing, the echo rule of #81.
 - `.titleFieldSubmitted` and `.addButtonTapped` settle into one line: the draft trimmed at both ends goes to `store.createTask(NewTask(title:))`, which lands in the Inbox by the Inbox's own filter; an empty trim is refused with "A title cannot be empty" and the field keeps the raw text; a store that refuses the write becomes "The task could not be saved"; a write that succeeds answers `.closeRequested`, the modal's own half of the way back (spec section 5).
 - `.changed` does nothing: quick entry reads nothing from the store, and a change elsewhere is no answer to what a person is typing. `.route` does nothing, since the tail is empty and no argument exists in this epic (spec section 2); `.created` answers nothing.
-- `init` throws nothing in practice, since it reads nothing, but it keeps the contract's signature; `route` is `Route()`.
+- `init` does not throw, since it reads nothing: the plan kept it throwing only for the protocol, which requires no `init` since the owner's review of #100. Its parent's seat is a `Seat<QuickEntry, Never>`, applied without `try`. `route` is `Route()`.
 - No sentence survives the next action the module acts on, as the sidebar's rule has it.
 
 **Tests.**
@@ -400,14 +400,14 @@ public final class QuickEntry: Addressed {
 
 ### Task 5: The root: seats, the window's route and its text form
 
-**Goal.** `AppModule` is addressed: it holds the sidebar, the task list and quick entry in seats, its route is the window's route, that route has the one text form with the codec in the core, the four flows of the spec run end to end through one entrance, "open in new window" climbs to the root's first output, and the size probe drives all of it.
+**Goal.** `AppModule` is routable: it holds the sidebar, the task list and quick entry in seats, its route is the window's route, that route has the one text form with the codec in the core, the four flows of the spec run end to end through one entrance, "open in new window" climbs to the root's first output, and the size probe drives all of it.
 
 **Files.** `Package.swift`, `AppFeature` depending on the three new features; `Sources/Features/App/AppModule.swift`; `Sources/Features/App/Route.swift`; `Tests/AppFeatureTests/AppModuleTests.swift`; `Tests/AppFeatureTests/RouteTests.swift`; `Sources/WasmSizeProbe/main.swift`; `scripts/wasm-size.sh`.
 
 **Interface.**
 
 ```swift
-public final class AppModule: Addressed {
+public final class AppModule: Routable {
     public struct Route: RouteValue {
         public var head: NoHead { get }
         public let sidebar: TaskViewList.Route
@@ -459,7 +459,7 @@ public enum RouteError: Error, Equatable, Sendable {
 
 **Rules.**
 
-- `init(store:route:)` applies the route to the three seats in order, sidebar, pane, quick entry, and reacts to each answer on the one line a click's answer takes: a sidebar created from no selection answers `.selected(inbox)`, the root applies `TaskList.Route(head: inbox)` to the pane and finds, when the route carried the same pane, that the head is already there (spec section 4). A sidebar the store cannot read throws, as today: the launch is the composition root's to refuse. A pane or a quick entry that cannot be made leaves its seat as it was and writes a sentence into `problem`, "The list could not be opened" (spec section 3).
+- `init(store:route:)` builds the three seats with their factories, each capturing the store and never the root: `Seat<TaskViewList, StoreError>` over `TaskViewList(store:route:)`, `Seat<TaskList, StoreError>` over `TaskList(store:route:)` and `Seat<QuickEntry, Never>` over `QuickEntry(store:route:)`. It applies the route to them in order, sidebar, pane, quick entry, and reacts to each answer on the one line a click's answer takes: a sidebar created from no selection answers `.selected(inbox)`, the root applies `TaskList.Route(head: inbox)` to the pane and finds, when the route carried the same pane, that the head is already there (spec section 4). A sidebar the store cannot read throws, as today: the launch is the composition root's to refuse. A pane that cannot be made leaves its seat as it was and writes a sentence into `problem`, "The list could not be opened" (spec section 3); quick entry cannot fail to be made.
 - `react(to:)` exists per child, each a `switch` with no `default`: the sidebar's `.selected(id)` applies the pane to `id`, its `.openInWindow(id)` answers `.openWindow(Route(sidebar: .init(selection: id), detail: .init(head: id), quickEntry: nil))`; the list's `.closeRequested` drops the pane; quick entry's `.closeRequested` drops it. `send` returns the one output `react` collected, which is the bubbling rule in code (spec section 4).
 - `.quickEntryButtonTapped` applies `QuickEntry.Route()` to its seat; `.quickEntryDismissed` applies nil. `.taskList(.taskScreenDismissed)` is forwarded like every list action. `.route(route)` applies each part to its seat, which is what a link does and what restoration does.
 - `.changed` goes to each seat in one line each, and a `.closeRequested` from any of them drops that child; the root reads the store for nothing of its own any more (spec section 3, ADR-0006 amendment of 2026-10-14). The next action clears `problem`.
@@ -491,9 +491,15 @@ public enum RouteError: Error, Equatable, Sendable {
 - Trap: the sidebar's `.selected` answers twice on a route that carries both a selection and a pane, once from `.created` and once from `.route` if the latter moved the highlight; the sidebar answers nothing to `.route` (Task 2), which is what keeps the pane from being applied twice.
 - Trap: a `Seat` holds a class and `AppModule.State` is a struct; `react` mutating two seats in one event is two mutations of `state`, assembled once into `model` afterwards, the shape #77 settled.
 
+**Open before the task starts.** Three questions the final review of #100 found in this section, for the owner to settle before the task is dispatched; nothing here decides them.
+
+- A seat cannot hold a child that is always there as this section types it: `Seat.route` and `Seat.model` are optional, while `Route.sidebar` and `Model.taskViewList` are not, and `TaskViewList.Model` has no public initializer to fall back on. The candidates: the sidebar held outside a seat, those two fields optional, or a holder for a child that is always there, added in this task by the rule of no API without a caller.
+- What a nil `detail` means at creation. In the order the rules give, sidebar then pane, the default route's sidebar answers `.selected(inbox)`, the root opens the pane on Inbox, and applying `detail: nil` then drops it, so the default window starts with no pane. The reverse order closes a task a link opened: `.selected(v)` applies `TaskList.Route(head: v)` with no task to the same head. One candidate rule: at creation, a nil `detail` means the pane follows the sidebar's choice.
+- `/` applied to a live window: the sidebar keeps its highlight on a nil selection (Task 2), and `detail: nil` drops the pane, which leaves a highlighted view beside an empty pane.
+
 ### Task 6: A host per window, and the composition root fans out
 
-**Goal.** The host serves an addressed module whose output goes somewhere: it publishes `route` beside `model`, takes the root's output to a handler the window's view installs, and keeps its queue; the composition root holds one store per process, makes a host per window from a route text, and hands every change set to every live host.
+**Goal.** The host serves a routable module whose output goes somewhere: it publishes `route` beside `model`, takes the root's output to a handler the window's view installs, and keeps its queue; the composition root holds one store per process, makes a host per window from a route text, and hands every change set to every live host.
 
 **Files.** `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift`; `Apps/Apple/Sources/TodoAppleUI/TodoApp.swift`; `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `Apps/Apple/Sources/TodoAppleUI/RootView.swift` and `AppScene.swift` only as far as they must compile against the new host until Task 7.
 
@@ -501,7 +507,7 @@ public enum RouteError: Error, Equatable, Sendable {
 
 ```swift
 @MainActor @Observable
-final class ModuleHost<M: Addressed> {
+final class ModuleHost<M: Routable> {
     private(set) var model: M.Model
     private(set) var route: M.Event.Route
     /// Installed by the window's view; an output with no handler is dropped and said so in a test.
@@ -524,7 +530,7 @@ final class TodoApp {
 **Rules.**
 
 - The host stays the one `@Observable` object a view observes and keeps one event at a time; after every event it publishes `model` and `route`, and hands the output, if any, to `onOutput` after the model is published, so a handler that opens a window sees the state the output came from (spec section 5).
-- `ModuleHost` loses `where M.Output == Never` and gains `M: Addressed`, which the root and a future `ModuleHost<QuickEntry>` satisfy; `route` is `module.route` read after each event.
+- `ModuleHost` loses `where M.Output == Never` and gains `M: Routable`, which the root and a future `ModuleHost<QuickEntry>` satisfy; `route` is `module.route` read after each event.
 - The composition root becomes an instance made once per launch, holding the store; `makeHost` creates the root with `AppModule(store:route:)`, registers the host's world entrance for fan-out, and returns it. A text that does not read is the default route, silently (spec section 7); a root the store cannot make throws, as `launch` does today.
 - Fan-out: `store.onChange` iterates the live hosts and delivers `.changed`; a host whose event is in flight queues it; an idle host processes it inside the other window's event, which the rule that no module writes in answer to `.changed` makes sound (spec section 5). The task's probe: the test `anIdleHostTakesAChangeInsideAnotherHostsEvent` passes as written; if it cannot, the composition root hands the change set to every other host on the next turn of the main actor and the test says so, which is the spec's named alternative.
 - Dead hosts are pruned on each fan-out; the host is created once per window and held by the window's view, in the form Task 7 settles, never in the initial value of a `@State`.
@@ -701,7 +707,7 @@ extension TodoApp {
 | 1. Every screen is a child of the screen that opened it | 2 (the seat), 3 (the list holds the task screen), 5 (the root holds three) |
 | 2. A route is the address of a screen | 2 (`RouteValue`, the sidebar's route), 3 and 4 (the screens' routes), 5 (the window's route and the text form); the argument in the tail is a rule and no screen takes one |
 | 3. One entrance: apply a route; the four flows; a screen whose subject is gone | 2 (`Seat.apply`), 3 (the list's tap, pop and `.route`), 5 (the four flows end to end), 3 and 5 (`closeRequested`) |
-| 4. The shared form of a parent | 2 (`Addressed`, `Seat`, the sidebar), 5 (what the root still writes per child, bubbling); names probed before any task |
+| 4. The shared form of a parent | 2 (`Routable`, `Seat`, the sidebar), 5 (what the root still writes per child, bubbling); names probed before any task |
 | 5. A window is a tree of modules; a process is one store; quick entry | 6 (host per window, fan-out, the output handler), 4 (quick entry), 7 and 8 (the sheet, Cmd-N, "open in new window") |
 | 6. One tree of views on every Apple platform | 7 |
 | 7. Deep links and restoration | 5 (the codec), 8 (a link into the running app, restoration, `TODO_ROUTE`), 9 (the scheme in the plist) |
