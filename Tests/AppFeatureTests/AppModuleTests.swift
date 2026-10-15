@@ -52,7 +52,7 @@ import TodoCore
 @Test func theRootModelIsRebuiltAfterEveryEvent() throws {
     let store = try makeStore()
     let app = try AppModule(store: store)
-    let twin = try TaskViewList(store: store)
+    let twin = try TaskViewList(store: store, route: .init(selection: nil))
     #expect(app.model.taskViewList == twin.model, "at launch")
     let reads: [TaskViewList.UserAction] = [
         .rowSelected(BuiltInTaskViews.today), .renameMenuItemChosen(BuiltInTaskViews.today),

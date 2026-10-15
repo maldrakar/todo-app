@@ -38,7 +38,10 @@ let package = Package(
         // Where an identity is kept beside its database, in a target of its own because two consumers keep
         // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
         .target(name: "DeviceFile"),
-        .target(name: "FeatureModule"),
+        // The contract, and beside it the shared form of a parent, the addressed module and its seat, which
+        // make a child from a route with the store and so need `Store` and `StoreError` (ADR-0007, amendment
+        // of 2026-10-14).
+        .target(name: "FeatureModule", dependencies: ["TodoCore"]),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core and the contract, never on
         // another feature and never on the root module (ADR-0007).
@@ -55,6 +58,7 @@ let package = Package(
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
+        .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule", "TodoCore", "TestSupport"]),
         .testTarget(name: "TaskViewListFeatureTests", dependencies: ["TaskViewListFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(name: "AppFeatureTests", dependencies: ["AppFeature", "TaskViewListFeature", "TodoCore", "TestSupport"]),
     ],
