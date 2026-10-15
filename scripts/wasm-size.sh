@@ -6,19 +6,22 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.5625 MiB. The probe measures 6,595,141 bytes as this is written, so the budget is that with four percent
-# to spare, rounded up to a whole 64 KiB. It is not the 4.5 MiB the spec first named, and that figure was
-# never measured: it was the floor measured in #3 — 3,743,306 bytes of standard library, FoundationEssentials
-# and SQLite with no core code reachable — plus half a megabyte of slack for the code the core would add. That
-# code, with the JSON coding it pulls in, costs 2.8 MB instead. SQLite and FoundationEssentials sit inside the
-# floor, on both sides of the comparison, so they are not what the difference is made of. Moving this number
-# is a decision, so it lives here in one place and nowhere else.
-BUDGET_BYTES=6881280
-SDK=swift-6.3.3-RELEASE_wasm
+# 6.25 MiB. The probe measures 6,275,518 bytes with Swift 6.4.0 as this is written, so the budget is that with
+# four percent to spare, rounded up to a whole 64 KiB. It was 6.5625 MiB over the 6,595,141 bytes the same
+# probe measured with Swift 6.3.3, and what moved it is the toolchain, not the code: the pin went to the 6.4
+# that Xcode 27 ships (#88), whose release build of the same sources is smaller. It is not the 4.5 MiB the spec
+# first named either, and that figure was never measured: it was the floor measured in #3 — 3,743,306 bytes of
+# standard library, FoundationEssentials and SQLite with no core code reachable — plus half a megabyte of slack
+# for the code the core would add. That code, with the JSON coding it pulls in, costs 2.8 MB instead. SQLite
+# and FoundationEssentials sit inside the floor, on both sides of the comparison, so they are not what the
+# difference is made of. Moving this number is a decision, so it lives here in one place and nowhere else.
+BUDGET_BYTES=6553600
+SDK=swift-6.4.0-RELEASE_wasm
 PRODUCT=wasm-size-probe
 
 swift build -c release --swift-sdk "$SDK" --product "$PRODUCT"
-WASM=".build/wasm32-unknown-wasip1/release/$PRODUCT.wasm"
+# Where SwiftPM 6.4 puts the product; 6.3 put it in `wasm32-unknown-wasip1/release/`, which 6.4 no longer makes.
+WASM=".build/out/Products/Release-webassembly-wasm32/$PRODUCT.wasm"
 [ -f "$WASM" ] || { echo "nothing to measure: no $WASM"; exit 1; }
 
 RAW=$(wc -c < "$WASM" | tr -d ' ')
