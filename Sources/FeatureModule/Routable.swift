@@ -1,5 +1,4 @@
-// Sources/FeatureModule/Addressed.swift
-import TodoCore
+// Sources/FeatureModule/Routable.swift
 
 /// The address of a screen: a plain value with a head and a tail (spec section 2).
 ///
@@ -30,16 +29,20 @@ public protocol RoutedEvent: FeatureEvent {
     static var created: Self { get }
 }
 
-/// A module that can be opened: it is made from its route with the store, and says at any moment which
-/// route it is on, so that a parent can make it, keep it and write it down without knowing what it is (spec
-/// section 4, ADR-0009).
+/// A module that can be opened: it says at any moment which route it is on, and takes `.route` and
+/// `.created` from its parent, so that a parent can keep it, reconcile it and write it down without knowing
+/// what it is (spec section 4, ADR-0009).
 ///
-/// `init` throws, because a screen that cannot read what it shows is not made: its parent keeps whatever
-/// was open and says so in its own model (spec section 3). `route` is assembled from the module's state,
-/// its own head and its children's routes, and holds no session state: it is what the next launch opens
-/// again, not a record of gestures (spec section 2).
-public protocol Addressed: FeatureModule where Event: RoutedEvent {
-    init(store: Store, route: Event.Route) throws(StoreError)
+/// It is made by an `init` of its own, from its route and whatever else it needs to be made, and the
+/// protocol requires none: what a screen needs is that screen's, the store for one and nothing for another,
+/// and a contract that named it would hand every screen a dependency some have no use for (owner's review of
+/// #100). That `init` is where a screen that cannot read what it shows refuses to be made, which is why it
+/// may throw: its parent keeps whatever was open and says so in its own model (spec section 3). The parent
+/// hands the way to make the child to the seat that holds it (`Seat`).
+///
+/// `route` is assembled from the module's state, its own head and its children's routes, and holds no
+/// session state: it is what the next launch opens again, not a record of gestures (spec section 2).
+public protocol Routable: FeatureModule where Event: RoutedEvent {
     var route: Event.Route { get }
 }
 

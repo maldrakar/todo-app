@@ -11,10 +11,10 @@ import TodoCore
 /// number and decides nothing, and the walk that builds them never recurses over a chain that arrived from
 /// sync (`docs/style.md`).
 ///
-/// It is an addressed module, one that can be opened (spec section 4): its route has no head, because a
-/// window has one list of views, and its tail is the selection, so that a link to a view highlights it here
-/// and the route a window writes down names the view its list is on.
-public final class TaskViewList: Addressed {
+/// It is a routable module, one that can be opened (spec section 4): its route has no head, because a window
+/// has one list of views, and its tail is the selection, so that a link to a view highlights it here and the
+/// route a window writes down names the view its list is on.
+public final class TaskViewList: Routable {
     public struct Model: Equatable, Sendable {
         public struct Row: Equatable, Sendable {
             public let id: ViewID
