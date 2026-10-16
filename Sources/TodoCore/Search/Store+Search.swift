@@ -50,7 +50,7 @@ extension Store {
     /// of one kind asks for more room rather than for a different shape. A limit of zero or less asks for no
     /// room and gets nothing, here and in `searchNotes`.
     public func quickFind(_ query: String, limit: Int = 20) throws(StoreError) -> [QuickFindHit] {
-        let needle = Store.normalized(query)
+        let needle = query.trimmed()
         guard limit > 0, !needle.isEmpty else { return [] }
         var hits: [QuickFindHit] = []
         if let match = Store.trigramQuery(needle) {
@@ -154,11 +154,11 @@ extension Store {
     }
 
     /// The whole query as one trigram phrase, or nil when it is too short for the index to answer: FTS5
-    /// indexes three characters at a time, so two of them match nothing rather than everything. It normalizes
-    /// what it is given, because it is also the door the tests knock on, and normalizing twice changes
-    /// nothing. Internal rather than private for those tests, and for nobody else.
+    /// indexes three characters at a time, so two of them match nothing rather than everything. It trims what
+    /// it is given, because it is also the door the tests knock on, and trimming twice changes nothing.
+    /// Internal rather than private for those tests, and for nobody else.
     static func trigramQuery(_ text: String) -> String? {
-        let needle = normalized(text)
+        let needle = text.trimmed()
         guard needle.count >= 3 else { return nil }
         return quoted(folded(needle))
     }
@@ -174,16 +174,6 @@ extension Store {
         var parts = words.map { quoted(String($0)) }
         if last.isLetter || last.isNumber { parts[parts.count - 1] += "*" }
         return parts.joined(separator: " ")
-    }
-
-    /// The ends trimmed, so that the space a keyboard adds after a word does not change the answer. What is
-    /// between the words is left alone: the trigram index holds a title byte for byte, so collapsing a run of
-    /// spaces here would make a title that holds one unreachable by the text a person reads on the screen.
-    private static func normalized(_ text: String) -> String {
-        var trimmed = Substring(text)
-        while let first = trimmed.first, first.isWhitespace { trimmed.removeFirst() }
-        while let last = trimmed.last, last.isWhitespace { trimmed.removeLast() }
-        return String(trimmed)
     }
 
     /// Characters no note is expected to hold, so that what fts5 added to the window can be told apart from

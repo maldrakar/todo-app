@@ -314,7 +314,7 @@ public final class TaskViewList: Routable {
         // but whitespace trims to nothing, which is what empty means here, and no second rule has to agree
         // with this one. Nothing else in the state moves, which is what leaves the field open on the raw
         // text a person is still looking at.
-        let title = TaskViewList.trimmed(rename.draft)
+        let title = rename.draft.trimmed()
         guard !title.isEmpty else {
             state.problem = Problem.emptyTitle.sentence
             return
@@ -347,18 +347,6 @@ public final class TaskViewList: Routable {
             // which is the smaller of the two facts and must not take the place of the larger.
             if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
         }
-    }
-
-    /// The draft as the store keeps it: the same text with the whitespace at either end gone, and the
-    /// whitespace between words untouched, because that is part of the name.
-    ///
-    /// The standard library trims a prefix and has no suffix to match it — probed, not remembered
-    /// (`docs/style.md`) — so the tail is trimmed as the prefix of the reverse. Both passes are `while`
-    /// loops over the characters and neither recurses: a run of spaces in a title that arrived from sync is
-    /// as data-shaped as a chain of parents.
-    private static func trimmed(_ draft: String) -> String {
-        let head = draft.trimmingPrefix(while: \.isWhitespace)
-        return String(head.reversed().trimmingPrefix(while: \.isWhitespace).reversed())
     }
 
     /// The sentence a refused write reads as.
