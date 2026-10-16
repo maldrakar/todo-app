@@ -151,11 +151,11 @@ private enum WasmSizeProbe {
         perform(.route(try AppModule.Route(text: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
         perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
         perform(.action(.quickEntry(.addButtonTapped)))
-        let filed = app.model.taskList?.rows.first
-        if let filed { perform(.action(.taskList(.rowTapped(filed.id)))) }
+        let filed = app.model.taskViewList.taskList?.rows.first
+        if let filed { perform(.action(.taskViewList(.taskList(.rowTapped(filed.id))))) }
         let taskRoute = app.route.text
-        let opened = app.model.taskList?.task?.title ?? "none"
-        perform(.action(.taskList(.backButtonTapped)))
+        let opened = app.model.taskViewList.taskList?.task?.title ?? "none"
+        perform(.action(.taskViewList(.taskList(.backButtonTapped))))
         perform(.action(.quickEntryButtonTapped))
         let drafted = app.model.quickEntry?.draft ?? "none"
         perform(.action(.quickEntry(.cancelButtonTapped)))
@@ -181,8 +181,8 @@ private enum WasmSizeProbe {
         print("journal \(exported.count) operations, first \(exported.first.map { "\($0.entity.rawValue).\($0.field) at \($0.clock.raw)" } ?? "none"), pair \(JournalOperation.pairID(view, review))")
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
-        print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil) \(root.problem != nil)")
-        print("route \(app.route.text), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), list \(root.taskList?.rows.count ?? 0) rows with \(root.taskList?.task == nil ? "nothing" : "a task") open, quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
+        print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
+        print("route \(app.route.text), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), list \(root.taskViewList.taskList?.rows.count ?? 0) rows with \(root.taskViewList.taskList?.task == nil ? "nothing" : "a task") open, quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
     }

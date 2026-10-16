@@ -12,47 +12,36 @@ import Foundation
 #endif
 
 extension AppModule {
-    /// The route of the root, which is the route of the window: the view the sidebar is on, the list in the pane,
-    /// the task open in it, and whether quick entry is up (spec section 2). It is what a link carries, what a
+    /// The route of the root, which is the route of the window: the sidebar's, with the list open in it and the
+    /// task open in that, and whether quick entry is up (spec section 2). It is what a link carries, what a
     /// window is restored from and what the web's address bar shows, each through its one text form, `text`.
     public struct Route: RouteValue {
         /// The same for every window, which has one root: the root is made from a route once and every later
         /// route reaches it as `.route`, of which it reads the tail.
         public var head: NoHead { NoHead() }
 
-        /// The sidebar's route: the view it highlights, or none, which leaves the choice to the sidebar.
+        /// The sidebar's route, which carries the list open in it, and none, which leaves the list to follow the
+        /// sidebar's choice.
         public let sidebar: TaskViewList.Route
-
-        /// The pane, and nil when the route says nothing of it: the pane then follows the sidebar's choice.
-        public let detail: TaskList.Route?
 
         /// Quick entry when it is up, and nil when it is not, which closes a live one, its draft with it: a draft
         /// is session state, which no route carries (spec section 2).
         public let quickEntry: QuickEntry.Route?
 
-        /// A route as its parts say. The text form makes only routes whose sidebar is on the pane's view, or on none
-        /// with no pane. One built here may put the two on different views, or the sidebar on a view with no pane,
-        /// and is not refused: applied to a live window, its sidebar moves the highlight and its pane goes to its own
-        /// view, or stays where it is when the route names none, so the highlight and the pane disagree until the
-        /// next click; a window made from it opens the pane on the sidebar's choice and then moves it to the route's
-        /// pane, when it names one. Its `text` writes the pane alone, so it reads back with the sidebar on the pane's
-        /// view, or on none.
-        public init(sidebar: TaskViewList.Route, detail: TaskList.Route?, quickEntry: QuickEntry.Route?) {
+        public init(sidebar: TaskViewList.Route, quickEntry: QuickEntry.Route?) {
             self.sidebar = sidebar
-            self.detail = detail
             self.quickEntry = quickEntry
         }
 
-        /// The default window: it names no view and no pane, so the sidebar chooses Inbox itself and the pane
-        /// follows; no quick entry.
-        public static let `default` = Route(sidebar: .init(selection: nil), detail: nil, quickEntry: nil)
+        /// The default window: it names no list, so the sidebar chooses Inbox itself and opens its list; no quick
+        /// entry.
+        public static let `default` = Route(sidebar: .init(list: nil), quickEntry: nil)
 
         /// The text form: `/`, `/view/<id>`, `/view/<id>/task/<id>`, with `?quick-entry` when it is up.
         ///
-        /// It undoes `text`: `/view/<id>` puts the sidebar on the view and the pane on it, `/task/<id>` after it
-        /// opens the task in that pane, and `?quick-entry` adds quick entry. So a text that reads writes back as
-        /// itself but for the case of its ids, and a route the text form can carry reads back from its `text` as
-        /// itself (the memberwise `init` says which routes it cannot carry). A route is data from outside, so
+        /// It undoes `text`: `/view/<id>` opens the sidebar's list on the view, `/task/<id>` after it opens the task
+        /// in that list, and `?quick-entry` adds quick entry. So a text that reads writes back as itself but for the
+        /// case of its ids, and a route reads back from its `text` as itself. A route is data from outside, so
         /// anything else refuses the whole route with the segment named, read from the left so that the first
         /// offence is the one named, the path before the query, and nothing traps (spec section 2,
         /// `docs/style.md`). An id is a segment `UUID(uuidString:)` reads whole, in either case, and is kept lowercase,
@@ -61,33 +50,31 @@ extension AppModule {
         /// rather than unwrapped.
         public init(text: String) throws(RouteError) {
             let query = text.firstIndex(of: "?")
-            let detail = try Route.detail(reading: text[..<(query ?? text.endIndex)])
+            let list = try Route.list(reading: text[..<(query ?? text.endIndex)])
             let quickEntry = try Route.quickEntry(reading: query.map { text[text.index(after: $0)...] })
-            self.init(sidebar: .init(selection: detail?.head), detail: detail, quickEntry: quickEntry)
+            self.init(sidebar: .init(list: list), quickEntry: quickEntry)
         }
 
-        /// The text form of the route: the pane's view and the task open in it as the path, and quick entry as
-        /// a query item, the chain of screens being the path and a modal being beside it (spec section 2).
-        ///
-        /// It writes the pane and not the sidebar: whenever a pane is open the sidebar's selection is its view,
-        /// so a selection with no pane is written as nothing, and `/` leaves the choice to the sidebar. Ids are
+        /// The text form of the route: the view of the sidebar's list and the task open in it as the path, and
+        /// quick entry as a query item, the chain of screens being the path and a modal being beside it (spec
+        /// section 2). A sidebar with no list is written as `/`, which leaves the choice to the sidebar. Ids are
         /// written as `EntityID.description` prints them.
         public var text: String {
             var segments: [String] = []
-            if let detail {
-                segments += [Segment.view.rawValue, detail.head.description]
-                if let task = detail.task { segments += [Segment.task.rawValue, task.head.description] }
+            if let list = sidebar.list {
+                segments += [Segment.view.rawValue, list.head.description]
+                if let task = list.task { segments += [Segment.task.rawValue, task.head.description] }
             }
             let query = quickEntry == nil ? "" : "?" + Route.quickEntryItem
             return "/" + segments.joined(separator: "/") + query
         }
 
-        /// The pane a path names, and nil for `/`, which names none.
+        /// The list a path names, and nil for `/`, which names none.
         ///
         /// Each word has one place: `view` first, and `task` after the view's id, each followed by its id. A
         /// word the path knows anywhere else, a second `view` or `task` included, is out of place, and any
         /// other segment, the empty one between two slashes or after a trailing one included, is unknown.
-        private static func detail(reading path: Substring) throws(RouteError) -> TaskList.Route? {
+        private static func list(reading path: Substring) throws(RouteError) -> TaskList.Route? {
             guard path.first == "/" else { throw .unknownSegment(String(path.prefix { $0 != "/" })) }
             guard path != "/" else { return nil }
             var segments = path.dropFirst().split(separator: "/", omittingEmptySubsequences: false).map(String.init)[...]

@@ -13,12 +13,11 @@ private typealias Route = AppModule.Route
 private let view = ViewID("6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f")
 private let task = TaskID("0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a")
 
-/// A view in the pane, the sidebar on it, and the task open in it when there is one, which is the shape every
-/// row of the text form's table reads as.
+/// The sidebar's list on a view, the task open in it when there is one, and quick entry when it is up, which is
+/// the shape every row of the text form's table reads as.
 private func pane(_ view: ViewID, task: TaskID? = nil, quickEntry: Bool = false) -> Route {
     Route(
-        sidebar: .init(selection: view),
-        detail: .init(head: view, task: task.map { TaskScreen.Route(head: $0) }),
+        sidebar: .init(list: .init(head: view, task: task.map { TaskScreen.Route(head: $0) })),
         quickEntry: quickEntry ? QuickEntry.Route() : nil
     )
 }
@@ -31,7 +30,7 @@ private let table: [(route: Route, text: String)] = [
     (pane(view, task: task), "/view/\(view)/task/\(task)"),
     (pane(view, task: task, quickEntry: true), "/view/\(view)/task/\(task)?quick-entry"),
     (pane(view, quickEntry: true), "/view/\(view)?quick-entry"),
-    (Route(sidebar: .init(selection: nil), detail: nil, quickEntry: QuickEntry.Route()), "/?quick-entry"),
+    (Route(sidebar: .init(list: nil), quickEntry: QuickEntry.Route()), "/?quick-entry"),
 ]
 
 /// Each row written and read: the text a route writes is the row's, and the row's text reads as the route.
@@ -48,15 +47,6 @@ private let table: [(route: Route, text: String)] = [
     for row in table {
         #expect(try Route(text: row.route.text) == row.route, "after writing \(row.text)")
     }
-}
-
-/// The text form writes the pane and not the sidebar: whenever a pane is open the sidebar's selection is its
-/// view, so a selection with no pane is written as nothing and reads back as the default window, which leaves
-/// the choice to the sidebar.
-@Test func aSelectionWithNoPaneIsWrittenAsNothing() throws {
-    let selected = Route(sidebar: .init(selection: view), detail: nil, quickEntry: nil)
-    #expect(selected.text == "/")
-    #expect(try Route(text: selected.text) == .default)
 }
 
 /// A task is opened inside a view's list, so it has no place before one (spec section 2).

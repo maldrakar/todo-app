@@ -49,8 +49,9 @@ let package = Package(
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
         // features it opens, which are its children, held in seats of its own (ADR-0009), and never on a
-        // sibling or on the root module (ADR-0007). The task list opens the task screen.
-        .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskViewList"),
+        // sibling or on the root module (ADR-0007). The sidebar opens the task list, and the task list opens
+        // the task screen.
+        .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskListFeature"], path: "Sources/Features/TaskViewList"),
         .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
         .target(name: "QuickEntryFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/QuickEntry"),
@@ -77,7 +78,10 @@ let package = Package(
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
-        .testTarget(name: "TaskViewListFeatureTests", dependencies: ["TaskViewListFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
+        .testTarget(
+            name: "TaskViewListFeatureTests",
+            dependencies: ["TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "TodoCore", "SQLiteKit", "TestSupport"]
+        ),
         .testTarget(name: "TaskListFeatureTests", dependencies: ["TaskListFeature", "TaskScreenFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(name: "TaskScreenFeatureTests", dependencies: ["TaskScreenFeature", "TodoCore", "TestSupport"]),
         .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
