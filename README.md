@@ -81,7 +81,7 @@ swift run todo-mac
 TODO_DB=/tmp/second.sqlite swift run todo-mac
 ```
 
-It opens one window: the list of views in a sidebar, and beside it the title of the view chosen there. Rename,
+It opens one window: the list of views in a sidebar, and beside it the tasks of the view chosen there. Rename,
 in a row's context menu, opens a field on the row: Return or a click away keeps the new title, a blank one is
 refused with a sentence under the list, and Esc keeps the old title. New Folder, on the toolbar, adds a folder at
 the end of the top level, chosen and with its field open.
