@@ -23,6 +23,17 @@ import SQLiteKit
     #expect(list.route == .init(head: BuiltInTaskViews.inbox))
 }
 
+/// A list on a view that is gone is not made, and its `init` says which view it looked for: the query refuses a
+/// view it does not hold, and the parent keeps what was open and says so (spec section 3).
+@Test func aListOnAGoneViewIsNotMade() throws {
+    let store = try makeStore()
+    let gone = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
+    try store.delete(view: gone)
+    #expect(throws: StoreError.notFound(gone)) { try TaskList(store: store, route: .init(head: gone)) }
+    let unknown = ViewID()
+    #expect(throws: StoreError.notFound(unknown)) { try TaskList(store: store, route: .init(head: unknown)) }
+}
+
 /// A link to a task, or a window restored onto one, makes the list with the task screen open in it, and the
 /// route says so; being created afterwards moves nothing, since the screen was made in `init`.
 @Test func aListCreatedWithATaskOpensIt() throws {
@@ -96,6 +107,38 @@ import SQLiteKit
     #expect(list.route == .init(head: BuiltInTaskViews.inbox))
 }
 
+/// The way back is a gesture on the screen that covered the list, so it leaves the list's sentence: one written
+/// while the screen was up, here by a link to a task that is gone, is first seen when the list is uncovered.
+@Test func dismissingTheTaskScreenLeavesTheSentenceWrittenUnderIt() throws {
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "Buy milk"))
+    let gone = try store.createTask(NewTask(title: "Call the bank"))
+    try store.delete(task: gone)
+    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: open)))
+    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))) == nil)
+    #expect(list.model.task?.title == "Buy milk", "the screen that was open stays; this is the setup")
+    #expect(list.model.problem == "The task is gone.")
+    #expect(list.send(.action(.taskScreenDismissed)) == nil)
+    #expect(list.model.task == nil)
+    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
+    #expect(list.model.problem == "The task is gone.")
+}
+
+/// With no screen open the way back has nothing to close, as with the nil the platform writes after a pop the
+/// model drove, and it moves nothing at all, the sentence included: the sidebar ignores a field action with no
+/// field open for the same reason (#81).
+@Test func dismissingWithNoTaskScreenOpenMovesNothing() throws {
+    let store = try makeStore()
+    let gone = try store.createTask(NewTask(title: "Buy milk"))
+    try store.delete(task: gone)
+    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
+    let told = list.model
+    #expect(told.problem != nil, "the sentence is the setup; without it this proves nothing about it")
+    #expect(list.send(.action(.taskScreenDismissed)) == nil)
+    #expect(list.model == told)
+    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
+}
+
 /// A link to another task while one is open: the seat sees another head and replaces the screen (spec
 /// section 3, the third flow).
 @Test func aRouteWithAnotherTaskReplacesTheOpenOne() throws {
@@ -139,8 +182,8 @@ import SQLiteKit
 }
 
 /// A sentence answers what a person did, so the events of the world leave it, a route that opens a task and a
-/// change that rereads the rows among them, and the next gesture the list acts on takes it away.
-@Test func theSentenceOutlivesEventsOfTheWorldAndGoesWithTheNextGesture() throws {
+/// change that rereads the rows among them, and the next tap on a row the list holds takes it away.
+@Test func theSentenceOutlivesEventsOfTheWorldAndGoesWithTheNextTap() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
@@ -227,26 +270,48 @@ import SQLiteKit
     #expect(list.route == .init(head: BuiltInTaskViews.inbox))
 }
 
-/// A newer app on a peer gave the view a filter this one cannot read: the view is still there, and its tasks can
-/// no longer be listed. The list keeps what it shows and says it may be out of date, until the next gesture.
+/// The view is still there and its tasks can no longer be listed. The list keeps the rows and the open task, says
+/// the tasks could not be read and the list may be out of date, and the next tap on a row it holds takes the
+/// sentence away.
 @Test func aRereadThatFailsKeepsTheRowsAndSaysSo() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let list = try TaskList(store: store, route: .init(head: work, task: .init(head: id)))
     let before = list.model
-    let unreadable = try changeSet(of: store) {
+    #expect(list.send(.changed(try unreadableFilter(on: work, in: store))) == nil, "the view is there, so the list stays")
+    #expect(list.model.rows == before.rows)
+    #expect(list.model.task == before.task)
+    #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.")
+    #expect(list.send(.action(.rowTapped(id))) == nil)
+    #expect(list.model == before)
+}
+
+/// A change answers for nobody, so a reread that fails says nothing over a sentence already on screen, here the
+/// one a link to a task that is gone left: that sentence answered something, and "may be out of date" would take
+/// its place, as the sidebar has it.
+@Test func aRereadThatFailsLeavesTheSentenceOnScreen() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
+    let gone = try store.createTask(NewTask(title: "Buy milk"))
+    try store.delete(task: gone)
+    let list = try TaskList(store: store, route: .init(head: work))
+    #expect(list.send(.route(.init(head: work, task: .init(head: gone)))) == nil)
+    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    let told = list.model
+    #expect(list.send(.changed(try unreadableFilter(on: work, in: store))) == nil)
+    #expect(list.model == told)
+}
+
+/// A newer app on a peer gives the view a filter this one cannot read, and the change of that write comes back:
+/// the view is still there, so the list stays, and `tasks(in:today:)` refuses it with `.viewNeedsNewerApp`.
+private func unreadableFilter(on view: ViewID, in store: Store) throws -> ChangeSet {
+    try changeSet(of: store) {
         _ = try store.apply([
             JournalOperation(
-                entity: .view, entityID: work.rawValue, field: "filter", value: .text("{\"kind\":\"reminder_soon\"}"),
+                entity: .view, entityID: view.rawValue, field: "filter", value: .text("{\"kind\":\"reminder_soon\"}"),
                 clock: HLC(millis: 1_800_000_000_000, counter: 0), device: Store.newDeviceID()
             ),
         ])
     }
-    #expect(list.send(.changed(unreadable)) == nil, "the view is there, so the list stays")
-    #expect(list.model.rows == before.rows)
-    #expect(list.model.task == before.task)
-    #expect(list.model.problem == "The list could not be read.")
-    #expect(list.send(.action(.taskScreenDismissed)) == nil)
-    #expect(list.model.problem == nil)
 }

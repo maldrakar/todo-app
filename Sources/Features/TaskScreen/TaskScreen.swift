@@ -5,9 +5,9 @@ import TodoCore
 /// One task on a screen of its own: its title, read from the store, and nothing a person can edit yet.
 ///
 /// It is the first screen opened from below the root, the child of the list of a view's tasks, and the first
-/// that needs a stack, which is why the epic builds one (spec section 10). What it holds is exactly
-/// what makes the navigation to it real: a head, the id of its task, and a title to show that it arrived. The
-/// editor is M4's.
+/// that needs a stack, which is why the epic builds one (spec section 10). What it holds is exactly what makes
+/// the navigation to it real: a head, the id of its task, and a title to show that it arrived. The editor is
+/// M4's.
 ///
 /// It is a routable module (spec section 4): its route is the task's id and has no tail, because nothing
 /// opens inside it yet.
@@ -49,8 +49,9 @@ public final class TaskScreen: Routable {
     }
 
     public enum Output: Equatable, Sendable {
-        /// The task is gone, so the screen asks its parent to drop it (spec section 3): on an iPhone that is a
-        /// pop, on a Mac an empty column, and the mechanism is the way back's with the store as the occasion.
+        /// The task is gone, so the screen asks its parent to drop it (spec section 3): the stack it was pushed
+        /// onto pops on every platform (spec section 6), and the mechanism is the way back's with the store as
+        /// the occasion.
         case closeRequested
     }
 
@@ -79,9 +80,9 @@ public final class TaskScreen: Routable {
     public func send(_ event: Event) -> Output? {
         switch event {
         case .changed(let changes):
-            // A commit that touched another task touched nothing on this screen, and the guard is what keeps
-            // a person typing in the list behind it out of the tasks table. A commit naming this task can have
-            // changed its title or deleted it, and the read tells the two apart.
+            // A commit that touched another task touched nothing on this screen, and the guard is what keeps a
+            // write to another task, from quick entry or from a peer, from costing this screen a read. A commit
+            // naming this task can have changed its title or deleted it, and the read tells the two apart.
             guard changes.tasks.contains(route.head) else { return nil }
             do {
                 guard let task = try store.task(route.head) else { return .closeRequested }

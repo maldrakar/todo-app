@@ -8,8 +8,8 @@ import TodoCore
 /// It takes the pane beside the sidebar, where the root's placeholder stands until #92, and it is the first
 /// parent below the root: the task screen opened from a row is its child, held in a seat of its own, so the
 /// root never learns that a list opens a task and does not grow when the task screen learns to open something
-/// (spec section 1). What it holds is what makes the navigation
-/// real and nothing more; sections, grouping, ordering and completion are M4's (spec section 10).
+/// (spec section 1). What it holds is what makes the navigation real and nothing more; sections, grouping,
+/// ordering and completion are M4's (spec section 10).
 ///
 /// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the
 /// task open in it, so that a link to a task opens the list with the task screen in it, and the route a window
@@ -54,8 +54,9 @@ public final class TaskList: Routable {
     public enum UserAction: Equatable, Sendable {
         /// A row of the list, tapped or clicked.
         case rowTapped(TaskID)
-        /// The task screen went away by the platform's own gesture, a swipe back or the back button, which is
-        /// named for what the platform did (spec section 6).
+        /// The task screen went away by the platform's own gesture, a swipe back or the back button. It is
+        /// named for what the platform did, by the naming rule settled in the review of #66 (ADR-0006), where
+        /// the spec has `taskClosed` (`docs/plans/navigation.md`, Deviations).
         case taskScreenDismissed
     }
 
@@ -104,8 +105,9 @@ public final class TaskList: Routable {
     public init(store: Store, route: Route) throws(StoreError) {
         let rows = try TaskList.rows(of: store, in: route.head)
         // The seat is built once, here, with the way to make the screen: a closure over the screen's own
-        // `init` that captures the store and never this list, which holds the seat in its state, so that
-        // neither keeps the other alive (`Seat.init`). Its error is named, so that the seat's type below is
+        // `init` that captures the store and never this list. The list holds the seat in its state, so a
+        // closure holding the list would close a cycle, list to state to seat to closure to list, and none of
+        // them would ever be released (`Seat.init`). Its error is named, so that the seat's type below is
         // checked against it rather than widened to `any Error`.
         let task = Seat<TaskScreen, StoreError> { route throws(StoreError) in
             try TaskScreen(store: store, route: route)
@@ -132,15 +134,20 @@ public final class TaskList: Routable {
             // sidebar's menu items do nothing on a row it does not hold: the tap is on something no longer on
             // screen, and what it would open is a task this view does not show.
             guard state.rows.contains(where: { $0.id == id }) else { return nil }
-            // The sentence goes before the route is applied, so that a task that cannot be made writes a fresh
-            // one: it answers this tap, and the one it replaces answered an earlier gesture.
+            // The sentence goes with a tap on a row, the one gesture made on the list itself, and it goes before
+            // the route is applied, so that a task that cannot be made writes a fresh one: it answers this tap,
+            // and the one it replaces answered something earlier.
             state.problem = nil
             apply(Route(head: head, task: TaskScreen.Route(head: id)))
             return nil
         case .action(.taskScreenDismissed):
-            // The way back is the route without the task, applied (spec section 3, the second flow), and a
-            // gesture like a tap, so the sentence goes with it.
-            state.problem = nil
+            // The way back is the route without the task, applied (spec section 3, the second flow). It is a
+            // gesture on the screen that covered the list, so it leaves the list's sentence: one written while
+            // the screen was up, by a link to a task that is gone or a reread that failed, is one the person
+            // first sees now that the list is uncovered. With no screen open it moves nothing at all, since an
+            // empty seat has nothing to drop: the platform can write nil through its binding after a pop the
+            // model drove, as after `.closeRequested`, and that nil is nobody's gesture, which is why the
+            // sidebar ignores a field action with no field open (#81).
             apply(Route(head: head))
             return nil
         case .created:
@@ -166,9 +173,11 @@ public final class TaskList: Routable {
                 if TaskList.rereads(on: changes, of: head) { state.rows = try TaskList.rows(of: store, in: head) }
             } catch {
                 // The rows on screen are kept, since they are assigned only after a read that succeeded, and a
-                // list emptied by a failed read would take with it the only thing left to act on; the next
-                // gesture the list acts on takes the sentence away, as in the sidebar.
-                state.problem = Problem.couldNotReadList.sentence
+                // list emptied by a failed read would take with it the only thing left to act on. The sentence
+                // is written only when none is on screen, as in the sidebar: a change answers for nobody, so it
+                // neither clears a sentence nor replaces one, and "may be out of date" would take the place of
+                // what the person was told about something they did or a link asked for.
+                if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
             // The open screen gets the change whatever the rows did, since what it shows is its own task's and
             // only it reads that.
@@ -200,8 +209,8 @@ public final class TaskList: Routable {
     private func react(to output: TaskScreen.Output?) {
         switch output {
         case .closeRequested?:
-            // The task is gone, and so is the screen on it (spec section 3): on an iPhone a pop, on a Mac an
-            // empty column, and in the route no task.
+            // The task is gone, and so is the screen on it (spec section 3): the stack it was pushed onto pops
+            // back to the list on every platform (spec section 6), and the route names no task.
             state.task.drop()
         case nil:
             break
@@ -214,7 +223,8 @@ public final class TaskList: Routable {
     /// because of it: a task trashed moves its children out of a view and names itself alone, and a tag
     /// deleted empties a view filtered by it and names only the tag (`ChangeSet`). A view holds tens of tasks
     /// in this epic, and the query is the one place that knows which. A change naming only other views is no
-    /// change to this one's tasks and costs not even a read, which is every edit made in the sidebar.
+    /// change to this one's tasks and costs not even a read, which is every edit made in the sidebar to a view
+    /// other than this one.
     private static func rereads(on changes: ChangeSet, of view: ViewID) -> Bool {
         !changes.tasks.isEmpty || !changes.tags.isEmpty || changes.views.contains(view)
     }
@@ -267,13 +277,13 @@ public final class TaskList: Routable {
     private enum Problem {
         case taskIsGone
         case couldNotReadTask
-        case couldNotReadList
+        case couldNotReadTasks
 
         var sentence: String {
             switch self {
             case .taskIsGone: "The task is gone."
             case .couldNotReadTask: "The task could not be read."
-            case .couldNotReadList: "The list could not be read."
+            case .couldNotReadTasks: "The tasks could not be read, so this list may be out of date."
             }
         }
     }

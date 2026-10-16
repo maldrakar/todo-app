@@ -24,14 +24,21 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
     ///
     /// A day of the epoch's count is 86,400,000 milliseconds, so the reading divided by that is the day count
     /// itself, and the civil conversion stays where it is, in `civil` and `init(year:month:day:)`. The reading
-    /// is data from outside, a machine's clock, and nothing here traps on it (`docs/style.md`): one before the
-    /// epoch is day zero, since `Store.systemNow()` reads such a clock as zero too, and one past the last day
-    /// the `Int32` count holds is that last day, which an `Int64` of milliseconds passes about fifty times over.
+    /// is data from outside, a machine's clock, so it is clamped rather than trusted (`docs/style.md`): one
+    /// before the epoch is day zero, since `Store.systemNow()` reads such a clock as zero too, and one past
+    /// `lastCivilDay` is that day. So this never traps, and the day it gives has a year, a month and a day on
+    /// every target; what a caller does with it afterwards, `advanced(by:)` among it, is the caller's.
     public init(millisSinceEpoch: Int64) {
-        self.init(daysSinceEpoch: Int32(clamping: max(0, millisSinceEpoch) / Day.millisPerDay))
+        let days = Int32(clamping: max(0, millisSinceEpoch) / Day.millisPerDay)
+        self.init(daysSinceEpoch: min(days, Day.lastCivilDay))
     }
 
     private static let millisPerDay: Int64 = 86_400_000
+
+    /// The last day whose year, month and day `civil` can work out on every target, 5879610-09-09. `civil` adds
+    /// 719,468, the days from 0000-03-01 to the epoch, to the count in an `Int`, which is 32 bits on wasm32 and
+    /// on watchOS's arm64_32, and for a later day that sum leaves the `Int` and traps.
+    private static let lastCivilDay: Int32 = .max - 719_468
 
     public init(year: Int, month: Int, day: Int) {
         let y = month <= 2 ? year - 1 : year

@@ -51,6 +51,11 @@ import Testing
     #expect(Day(millisSinceEpoch: 0) == Day(year: 1970, month: 1, day: 1))
     #expect(Day(millisSinceEpoch: -1) == Day(year: 1970, month: 1, day: 1), "a reading before the epoch is day zero")
     #expect(Day(millisSinceEpoch: .min) == Day(year: 1970, month: 1, day: 1))
-    // `Int64.max` milliseconds is about 1.07e11 days, past what the `Int32` day count holds.
-    #expect(Day(millisSinceEpoch: .max).daysSinceEpoch == .max, "a reading past the last day is the last day")
+    // `Int64.max` milliseconds is about 1.07e11 days, past what the `Int32` day count holds, and the day it
+    // reads as has to print: `civil` adds 719,468 days to the count in an `Int`, which is 32 bits on wasm32 and
+    // on watchOS's arm64_32, so the last day is the last one that sum holds there. The date was computed
+    // outside `Day`, from Python's ordinal calendar and whole 400-year cycles of 146,097 days.
+    let last = Day(millisSinceEpoch: .max)
+    #expect(last.daysSinceEpoch == Int32.max - 719_468, "a reading past the last day is the last day")
+    #expect(last.description == "5879610-09-09")
 }

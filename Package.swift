@@ -47,10 +47,8 @@ let package = Package(
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
-        // features it opens, never on a sibling and never on its parent, the root module included (ADR-0007).
-        // A feature it opens is its child, held in a seat of its own, which is the edge the root has to the
-        // features it holds (ADR-0009): the task list holds the task screen, and the screen knows nothing of
-        // the list.
+        // features it opens, which are its children, held in seats of its own (ADR-0009), and never on a
+        // sibling or on the root module (ADR-0007). The task list opens the task screen.
         .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskViewList"),
         .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
