@@ -12,7 +12,7 @@ import TodoCore
 /// row's, so that the module replacing it is created in the same place from the same two things (spec
 /// section 4).
 public final class AppModule: FeatureModule {
-    /// What the root view draws: the list's model as the list assembled it, and the pane beside it.
+    /// What the root view draws: the list's model as the list computes it, and the pane beside it.
     public struct Model: Equatable, Sendable {
         /// The pane beside the list: the chosen view's title, until M3's list module takes its place.
         public struct Detail: Equatable, Sendable {
@@ -149,7 +149,7 @@ public final class AppModule: FeatureModule {
         let taskViewList: TaskViewList
         var detail: Detail?
 
-        /// The model the root view draws: the list's, as the list assembled it, and the pane.
+        /// The model the root view draws: the list's, as the list computes it, and the pane.
         var model: Model {
             Model(taskViewList: taskViewList.model, detail: detail.map { Model.Detail(title: $0.title) })
         }
