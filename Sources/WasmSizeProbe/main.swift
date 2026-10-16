@@ -130,34 +130,35 @@ private enum WasmSizeProbe {
         var pending: [ChangeSet] = []
         appStore.onChange = { pending.append($0) }
         let app = try AppModule(store: appStore, route: try AppModule.Route(text: "/"))
+        @discardableResult
         func perform(_ event: AppModule.Event) -> AppModule.Output? {
             let output = app.send(event)
             while !pending.isEmpty { _ = app.send(.changed(pending.removeFirst())) }
             return output
         }
-        _ = perform(.action(.taskViewList(.rowSelected(BuiltInTaskViews.today))))
-        _ = perform(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today))))
-        _ = perform(.action(.taskViewList(.titleFieldChanged("Today, open"))))
-        _ = perform(.action(.taskViewList(.titleFieldSubmitted)))
+        perform(.action(.taskViewList(.rowSelected(BuiltInTaskViews.today))))
+        perform(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today))))
+        perform(.action(.taskViewList(.titleFieldChanged("Today, open"))))
+        perform(.action(.taskViewList(.titleFieldSubmitted)))
         // Read between the two writes: after the folder the highlight is on the folder, and the title the rename
         // put on the row would not reach a `print` at all.
         let renamed = app.model.taskViewList.rows.first(where: \.isSelected)?.title ?? "none"
-        _ = perform(.action(.taskViewList(.createFolderButtonTapped)))
+        perform(.action(.taskViewList(.createFolderButtonTapped)))
         let newFolder = app.model.taskViewList.rows.first(where: \.isSelected)
         // A link, read from its text and applied, with quick entry up over the Inbox; quick entry files a task,
         // whose change reaches the list; a tap pushes the task, and the way back pops it; quick entry opened
         // again is cancelled; and a view asks for a window of its own, whose route is written down.
-        _ = perform(.route(try AppModule.Route(text: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
-        _ = perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
-        _ = perform(.action(.quickEntry(.addButtonTapped)))
+        perform(.route(try AppModule.Route(text: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
+        perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
+        perform(.action(.quickEntry(.addButtonTapped)))
         let filed = app.model.taskList?.rows.first
-        if let filed { _ = perform(.action(.taskList(.rowTapped(filed.id)))) }
+        if let filed { perform(.action(.taskList(.rowTapped(filed.id)))) }
         let taskRoute = app.route.text
         let opened = app.model.taskList?.task?.title ?? "none"
-        _ = perform(.action(.taskList(.backButtonTapped)))
-        _ = perform(.action(.quickEntryButtonTapped))
+        perform(.action(.taskList(.backButtonTapped)))
+        perform(.action(.quickEntryButtonTapped))
         let drafted = app.model.quickEntry?.draft ?? "none"
-        _ = perform(.action(.quickEntry(.cancelButtonTapped)))
+        perform(.action(.quickEntry(.cancelButtonTapped)))
         let window: String
         switch perform(.action(.taskViewList(.openInNewWindowMenuItemChosen(BuiltInTaskViews.today)))) {
         case .openWindow(let route)?: window = route.text

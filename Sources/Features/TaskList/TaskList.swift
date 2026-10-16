@@ -5,11 +5,12 @@ import TodoCore
 
 /// The tasks of one view, by title, and the task opened from among them.
 ///
-/// It takes the pane beside the sidebar, where the root's placeholder stands until #92, and it is the first
-/// parent below the root: the task screen opened from a row is its child, held in a seat of its own, so the
-/// root never learns that a list opens a task and does not grow when the task screen learns to open something
-/// (spec section 1). What it holds is what makes the navigation real and nothing more; sections, grouping,
-/// ordering and completion are M4's (spec section 10).
+/// It takes the pane beside the sidebar, in a seat of the root's, and it is the first parent below the root: the
+/// task screen opened from a row is its child, held in a seat of its own, so the root's module never learns that a
+/// list opens a task and its code does not grow when the task screen learns to open something (spec section 1);
+/// the window's text form, which spells the whole window, gains a segment then (`AppModule.Route`). What it holds
+/// is what makes the navigation real and nothing more; sections, grouping, ordering and completion are M4's
+/// (spec section 10).
 ///
 /// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the
 /// task open in it, so that a link to a task opens the list with the task screen in it, and the route a window

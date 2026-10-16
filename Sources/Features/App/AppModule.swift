@@ -8,11 +8,12 @@ import TodoCore
 /// The root of the tree of modules, and the one module a host holds: the sidebar, the list of the chosen view's
 /// tasks in the pane beside it, and quick entry when it is up (spec section 1).
 ///
-/// It knows its three children and what each asks for: the task open in the list is the list's child, so the root
-/// never learns that a list opens a task and does not grow when the task screen learns to open something (spec
-/// section 1). Only the window's text form, which spells the whole window, names the task (`Route`). The sidebar
-/// is a field of the root's state and the other two sit in seats (spec section 4; `State` says why the sidebar
-/// is not in one).
+/// It knows its three children and what each asks for: the task open in the list is the list's child, so this
+/// module never learns that a list opens a task, and its code does not grow when the task screen learns to open
+/// something (spec section 1). The window's text form does grow: it spells the whole window, so it names the task,
+/// and a screen opened inside the task screen would be a segment of it too (`Route`). The task list and quick entry
+/// sit in seats (spec section 4), and the sidebar is a field of the root's state outside one (owner's decision of
+/// 2026-10-16; `State` says why).
 ///
 /// It is a routable module (spec section 4), and its route is the route of the window: what a link carries, what
 /// a window is restored from and what the web's address bar shows, each through the route's one text form (spec
@@ -32,8 +33,9 @@ public final class AppModule: Routable {
         /// platform (spec section 5).
         public let quickEntry: QuickEntry.Model?
 
-        /// What went wrong, as the finished sentence the view shows until the next action, and nil when there is
-        /// nothing to say: a pane that could not be opened, where the one that was open stays (spec section 3).
+        /// What went wrong, as the finished sentence the view shows until the next action that has something to
+        /// act on it, and nil when there is nothing to say: a pane that could not be opened, where the one that was
+        /// open stays (spec section 3).
         public let problem: String?
     }
 
@@ -44,9 +46,11 @@ public final class AppModule: Routable {
     public enum UserAction: Equatable, Sendable {
         /// An action of the sidebar, handed to it as it came.
         case taskViewList(TaskViewList.UserAction)
-        /// An action of the pane's list, handed to it as it came; nothing, with no pane open.
+        /// An action of the pane's list, handed to it as it came; with no pane open it moves nothing, the root's
+        /// sentence included.
         case taskList(TaskList.UserAction)
-        /// An action of quick entry, handed to it as it came; nothing, with no quick entry up.
+        /// An action of quick entry, handed to it as it came; with no quick entry up it moves nothing, the root's
+        /// sentence included.
         case quickEntry(QuickEntry.UserAction)
         /// The toolbar's quick entry button.
         case quickEntryButtonTapped
@@ -59,8 +63,9 @@ public final class AppModule: Routable {
         case action(UserAction)
         /// What a commit touched, delivered by the host and never in the middle of another event (spec section 5).
         case changed(ChangeSet)
-        /// The root has just been made, which every routable module is told (`RoutedEvent`). `init` has told every
-        /// child already, so the root has nothing left to say and nothing to move.
+        /// The module has just been made: the event `RoutedEvent` asks every routable module to spell, which a
+        /// parent sends the child it made. The root has no parent and nothing sends it this today; `init` has told
+        /// every child already, so it answers nothing and moves nothing.
         case created
         /// A route applied to the live window, a link into it or the browser's back and forward buttons (spec
         /// sections 7 and 8), and never by a view, whose closure spells user actions alone.
@@ -118,24 +123,34 @@ public final class AppModule: Routable {
     }
 
     public func send(_ event: Event) -> Output? {
-        // Only an action takes the sentence away, since the person has done something since reading it: a route, a
-        // change and being created are nobody's doing, so a sentence cleared by them would go before the person had
-        // read it. It goes before the action is handed on, so that a pane the action cannot open writes a fresh one.
-        if case .action = event { state.problem = nil }
+        // An action takes the sentence away, since the person has done something since reading it, and it goes
+        // before the action is handed on, so that a pane the action cannot open writes a fresh one. A route, a
+        // change and being created are nobody's doing and leave it, since a sentence cleared by them would go before
+        // the person had read it. So does an action for a pane or a quick entry that is not there, which moves
+        // nothing at all: a view sends one when the platform writes back through a binding after a close the model
+        // drove, as the sheet does after a route closed quick entry, and nobody did anything.
         switch event {
         case .action(.taskViewList(let action)):
+            state.problem = nil
             return react(to: state.taskViewList.send(.action(action)))
         case .action(.taskList(let action)):
+            // The back button the platform sends after a pop the model drove reaches a list that is there, and takes
+            // the sentence too. That sentence was on screen before the pop: the event that popped wrote none, since
+            // a pop and a pane that could not be opened never come from one event.
+            guard state.taskList.route != nil else { return nil }
+            state.problem = nil
             react(to: state.taskList.send(.action(action)))
             return nil
         case .action(.quickEntry(let action)):
-            // Cancel included, which closes quick entry by its own answer. With no quick entry up the empty seat
-            // answers nothing, which is where the sheet's binding lands when it writes false after a close the
-            // model drove.
+            // Cancel included, which closes quick entry by its own answer; with no quick entry up, it is where the
+            // sheet's binding lands when it writes false after a close the model drove.
+            guard state.quickEntry.route != nil else { return nil }
+            state.problem = nil
             react(to: state.quickEntry.send(.action(action)))
             return nil
         case .action(.quickEntryButtonTapped):
             // A quick entry already up has the head of every quick entry, so its seat keeps it, draft and all.
+            state.problem = nil
             react(to: state.quickEntry.apply(QuickEntry.Route()))
             return nil
         case .changed(let changes):
@@ -208,8 +223,10 @@ public final class AppModule: Routable {
         }
     }
 
-    /// What quick entry asked for: to be closed, with its task created or with none, and the root drops it, which
-    /// is the modal's own half of the way back (spec section 5).
+    /// What quick entry asked for: to be closed, and the root drops it. With its task created, that is the modal's
+    /// own half of the way back (spec section 5); after its Cancel, which the swipe down and Esc send too, it is
+    /// quick entry's own answer to its own action, since closing is what quick entry decides the gesture means
+    /// (the owner's ruling on #101).
     private func react(to output: QuickEntry.Output?) {
         switch output {
         case .closeRequested?: state.quickEntry.drop()

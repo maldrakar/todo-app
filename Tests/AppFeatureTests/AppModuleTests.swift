@@ -279,13 +279,19 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
 }
 
 /// After a close the model drove, the sheet's binding writes false and the view sends Cancel to a quick entry
-/// that is already gone: the empty seat answers nothing, and nothing moves.
+/// that is already gone: the empty seat answers nothing, and nothing moves, the sentence included. Here a link to
+/// a view that is gone closed quick entry and wrote the sentence in one event, and the Cancel that follows it is
+/// no answer to the sentence, which would otherwise go before anyone read it.
 @Test func aCancelWithNoQuickEntryOpenMovesNothing() throws {
     let store = try makeStore()
+    let gone = try taggedView("Errands", in: store)
+    try store.delete(view: gone.view)
     let app = try AppModule(store: store, route: .default)
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
-    #expect(app.send(.action(.quickEntry(.addButtonTapped))) == nil)
+    #expect(app.send(.route(try Route(text: "/view/\(gone.view)"))) == nil)
+    #expect(app.model.quickEntry == nil, "the link closed quick entry; this is the setup")
+    #expect(app.model.problem == "The list could not be opened.", "the sentence is the setup; without it this proves nothing")
     let model = app.model
     let route = app.route
     let written = try store.journal(after: 0).count
@@ -293,6 +299,42 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
     #expect(app.model == model)
     #expect(app.route == route)
     #expect(try store.journal(after: 0).count == written)
+}
+
+/// An action of the list with no pane open, a row or a back button that is no longer on screen, has nobody to act
+/// on it and moves nothing, the sentence included.
+@Test func aListActionWithNoPaneOpenMovesNothing() throws {
+    let store = try makeStore()
+    let gone = try taggedView("Errands", in: store)
+    try store.delete(view: gone.view)
+    let task = try store.createTask(NewTask(title: "Buy milk"))
+    let app = try AppModule(store: store, route: try Route(text: "/view/\(gone.view)"))
+    #expect(app.model.taskList == nil, "no pane is open; this is the setup")
+    let model = app.model
+    #expect(model.problem == "The list could not be opened.", "the sentence is the setup; without it this proves nothing")
+    #expect(app.send(.action(.taskList(.backButtonTapped))) == nil)
+    #expect(app.send(.action(.taskList(.rowTapped(task)))) == nil)
+    #expect(app.model == model)
+    #expect(app.route == .default)
+}
+
+/// An action for a child that is there is the person's next gesture and takes the sentence away, whatever the
+/// child does with it: a keystroke in quick entry, and the back button of a list with no task open.
+@Test func anActionForAChildThatIsThereTakesTheSentenceAway() throws {
+    let store = try makeStore()
+    let work = try taggedView("Work", in: store)
+    let gone = try taggedView("Errands", in: store)
+    try store.delete(view: gone.view)
+    let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)?quick-entry"))
+    let link = try Route(text: "/view/\(gone.view)?quick-entry")
+    #expect(app.send(.route(link)) == nil)
+    #expect(app.model.problem != nil, "the sentence is the setup; without it this proves nothing")
+    #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
+    #expect(app.model.problem == nil)
+    #expect(app.send(.route(link)) == nil)
+    #expect(app.model.problem != nil, "the sentence is the setup again")
+    #expect(app.send(.action(.taskList(.backButtonTapped))) == nil)
+    #expect(app.model.problem == nil)
 }
 
 /// A route with no quick entry closes the one that is up, a link from outside included, and its draft goes with
