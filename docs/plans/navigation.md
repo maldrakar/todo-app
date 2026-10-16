@@ -507,9 +507,17 @@ public enum RouteError: Error, Equatable, Sendable {
 - A click on the highlighted view returns to its list, closing the task open in it.
 - `Apps/Apple` changes as far as it must compile against the new root, so `main` stays green until Task 6.
 
+**Owner's review of #103.** The owner reviewed the pull request on 2026-10-16, in its threads and in chat, and changed what follows; the rules above stay as planned, and the pull request's body states each departure.
+
+- The task list is the sidebar's child, by ADR-0009's rule, since a choice in the sidebar opens it: `TaskViewList` holds it in a `Seat<TaskList, StoreError>` and opens it in its own `init`; its route is `Route(list: TaskList.Route?)` in place of `selection`, a nil list saying nothing of the list; a list that cannot be made is the sidebar's sentence, "The list could not be opened."; `.selected` goes, and `.openInWindow` carries the sidebar's own route.
+- The root holds the sidebar as a field and quick entry in a seat; its `Model` is `taskViewList` and `quickEntry`, its `UserAction` loses `.taskList`, which travels as `.taskViewList(.taskList(_))`, its `Route` is `sidebar` and `quickEntry`, and `problem` leaves it until Task 8 gives it a sentence of its own.
+- A route clears the sentence at its start, the sidebar's unless a rename is open and the task list's, and a child's gestures leave its parent's sentence.
+- Each route reads and writes its own part of the window's path, which is the text form's name, `AppModule.Route.init(path:)` and `var path`; `RouteError` moves to `FeatureModule`; an id is read whole once, by `EntityID(uuidString:)` in the core; `AppFeature` depends on the sidebar and quick entry alone.
+- `AppModule.init(store:route:)`'s route defaults to `.default`.
+
 ### Task 6: A host per window, and the composition root fans out
 
-**Goal.** The host serves a routable module whose output goes somewhere: it publishes `route` beside `model`, takes the root's output to a handler the window's view installs, and keeps its queue; the composition root holds one store per process, makes a host per window from a route text, and hands every change set to every live host.
+**Goal.** The host serves a routable module whose output goes somewhere: it publishes `route` beside `model`, takes the root's output to a handler the window's view installs, and keeps its queue; the composition root holds one store per process, makes a host per window from a path, the window route's text form, and hands every change set to every live host.
 
 **Files.** `Apps/Apple/Sources/TodoAppleUI/ModuleHost.swift`; `Apps/Apple/Sources/TodoAppleUI/TodoApp.swift`; `Apps/Apple/Tests/TodoAppleUITests/ModuleHostTests.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `Apps/Apple/Sources/TodoAppleUI/RootView.swift` and `AppScene.swift` only as far as they must compile against the new host until Task 7.
 
@@ -531,8 +539,8 @@ final class TodoApp {
     /// Once per process, from the environment: the store and the device identity, as today.
     static let shared: TodoApp
     static func launch(environment: [String: String]) throws -> TodoApp
-    /// A host for a window: the root made from the text, or from the default route when the text is nil or does not read.
-    func makeHost(route text: String?) throws -> ModuleHost<AppModule>
+    /// A host for a window: the root made from the path, or from the default route when the path is nil or does not read.
+    func makeHost(path: String?) throws -> ModuleHost<AppModule>
 }
 // Every host made here and still alive receives the change set a commit reports; how they are held is private.
 ```
@@ -541,7 +549,7 @@ final class TodoApp {
 
 - The host stays the one `@Observable` object a view observes and keeps one event at a time; after every event it publishes `model` and `route`, and hands the output, if any, to `onOutput` after the model is published, so a handler that opens a window sees the state the output came from (spec section 5).
 - `ModuleHost`, which lost `where M.Output == Never` in Task 5 and has dropped the root's output since, gains `M: Routable`, which the root and a future `ModuleHost<QuickEntry>` satisfy; `route` is `module.route` read after each event.
-- The composition root becomes an instance made once per launch, holding the store; `makeHost` creates the root with `AppModule(store:route:)`, registers the host's world entrance for fan-out, and returns it. A text that does not read is the default route, silently (spec section 7); a root the store cannot make throws, as `launch` does today.
+- The composition root becomes an instance made once per launch, holding the store; `makeHost` creates the root with `AppModule(store:route:)`, registers the host's world entrance for fan-out, and returns it. A path that does not read is the default route, silently, which is restoration's rule (spec section 7), where a link that does not read is Task 8's; a root the store cannot make throws, as `launch` does today.
 - Fan-out: `store.onChange` iterates the live hosts and delivers `.changed`; a host whose event is in flight queues it; an idle host processes it inside the other window's event, which the rule that no module writes in answer to `.changed` makes sound (spec section 5). The task's probe: the test `anIdleHostTakesAChangeInsideAnotherHostsEvent` passes as written; if it cannot, the composition root hands the change set to every other host on the next turn of the main actor and the test says so, which is the spec's named alternative.
 - Dead hosts are pruned on each fan-out; the host is created once per window and held by the window's view, in the form Task 7 settles, never in the initial value of a `@State`.
 - `TODO_DB` and `TODO_DEVICE` keep their meaning; the default database under Application Support is unchanged.
@@ -550,7 +558,7 @@ final class TodoApp {
 
 - `theHostPublishesTheRouteAfterEachEvent`; `anOutputReachesTheHandlerAfterTheModel`: the handler sees `host.route` already moved.
 - `anOutputWithNoHandlerIsDropped`.
-- `aHostMadeFromNoTextIsTheDefaultWindow`; `aHostMadeFromATextOpensIt`; `aHostMadeFromAnUnreadableTextIsTheDefaultWindow`.
+- `aHostMadeFromNoPathIsTheDefaultWindow`; `aHostMadeFromAPathOpensIt`; `aHostMadeFromAnUnreadablePathIsTheDefaultWindow`.
 - `twoHostsOverOneStoreBothReceiveAChange`: a write through the first window's action reaches the second host's model.
 - `anIdleHostTakesAChangeInsideAnotherHostsEvent`: proven by order, the second host's model moves before the first host's `send` returns, or the test states the deferred alternative.
 - `aHostInFlightQueuesTheChange`: the change set from its own write arrives after its `send` returned, as today.
@@ -592,12 +600,12 @@ public struct AppScene: Scene {
 
 **Rules.**
 
-- `RootView` draws `NavigationSplitView` with the sidebar and a `NavigationStack` in the detail column whose root is `TaskListView` when `model.taskList` is there and a placeholder otherwise; `navigationDestination(item:)` binds to the head of the open task, `host.route.detail?.task?.head`, and its destination draws `TaskScreenView` from `host.model.taskList?.task` with one `if let`; the binding's set to nil sends `.taskList(.backButtonTapped)` and a set to a value sends nothing, since only the module opens (spec section 6). With no screen open that action moves nothing in the list, so the nil SwiftUI writes after a pop the model drove changes nothing, and it leaves the list's sentence, so a sentence the list wrote while the screen covered it shows when the screen is popped (Task 3). `.sheet` binds to `model.quickEntry != nil`, and a set to false, the swipe down or Esc, sends `.quickEntry(.cancelButtonTapped)`, the action `QuickEntryView`'s Cancel button sends. The quick entry button sits on the toolbar and sends `.quickEntryButtonTapped`. `RootView` draws the root's sentence, `model.problem`, whenever it is not nil, in the detail column beside whatever pane is open, where neither a pushed screen nor the sheet covers it; its exact placement is this task's choice, a `safeAreaInset` at the bottom of the column the first candidate (Task 5).
-- The item is the head, a `TaskID`, which is `Hashable`; never the model (spec section 6). The head the view binds to is read from `host.route.detail?.task?.head`, which is why the host publishes the route.
+- `RootView` draws `NavigationSplitView` with the sidebar and a `NavigationStack` in the detail column whose root is `TaskListView` when `model.taskViewList.taskList` is there and a placeholder otherwise, the list being the sidebar's child (Task 5); `navigationDestination(item:)` binds to the head of the open task, `host.route.sidebar.list?.task?.head`, and its destination draws `TaskScreenView` from `host.model.taskViewList.taskList?.task` with one `if let`; the binding's set to nil sends `.taskViewList(.taskList(.backButtonTapped))` and a set to a value sends nothing, since only the module opens (spec section 6). With no screen open that action moves nothing in the list, so the nil SwiftUI writes after a pop the model drove changes nothing, and it leaves the list's sentence, so a sentence the list wrote while the screen covered it shows when the screen is popped (Task 3). `.sheet` binds to `model.quickEntry != nil`, and a set to false, the swipe down or Esc, sends `.quickEntry(.cancelButtonTapped)`, the action `QuickEntryView`'s Cancel button sends. The quick entry button sits on the toolbar and sends `.quickEntryButtonTapped`. A list that could not be opened is no longer the root's sentence but the sidebar's, `model.taskViewList.problem`, since the list is the sidebar's child (Task 5, the owner's review of #103), and the root has no sentence in this task; `TaskViewListView` already draws the sidebar's sentence under its rows, and that is where it is drawn. The rule stays that the sentence shows beside whatever pane is open, the pane that stayed when another could not be opened: on the Mac and the iPad the sidebar's column is beside the detail column, and where the sidebar is not on screen beside the pane, as in the collapsed stack on iPhone, this task finds where the sentence shows beside the pane, a `safeAreaInset` at the bottom of the pane's column the first candidate.
+- The item is the head, a `TaskID`, which is `Hashable`; never the model (spec section 6). The head the view binds to is read from `host.route.sidebar.list?.task?.head`, which is why the host publishes the route.
 - `TaskViewListView` gains a context menu item "Open in New Window" sending `.openInNewWindowMenuItemChosen(id)`, behind `#if !os(watchOS)`, which is the only platform condition in a view and is about a menu the watch does not have.
 - The sidebar's `.contextMenu(menuItems:)` is deprecated on watchOS, a warning in `TaskViewListView.swift` since #81; with "Open in New Window" added to that menu behind `#if !os(watchOS)`, this task puts the whole menu behind it or uses the form that is not deprecated, so that the warning goes.
-- `AppScene` is `WindowGroup(for: String.self)` on macOS and iOS, with the window's value the route text and a `RootView` over a host made once per window; on watchOS it is a plain `WindowGroup` over a host made from nil, because `WindowGroup(for:)`, `openWindow` and `handlesExternalEvents` are unavailable there (deviation, self-review). Where the host is held is this task's probe: a `@State` wrapper whose value is set in `.task` or `.onAppear` when nil, or an object created in the scene's content closure, whichever the probe shows creates one host per window and never two; the test is a counter in `TodoApp.makeHost` read after the window appeared and after it redrew.
-- The two-level push in one update is the task's second probe: a route text with a task set at window creation and a `.route` into a task of another view while a task is open must both show the list and the task screen pushed, in order, with no runtime warning; the fallback is a view that maps the route's chain into a `path` for `NavigationStack(path:)`, which is a map and not a decision (spec, Risks).
+- `AppScene` is `WindowGroup(for: String.self)` on macOS and iOS, with the window's value its path and a `RootView` over a host made once per window; on watchOS it is a plain `WindowGroup` over a host made from nil, because `WindowGroup(for:)`, `openWindow` and `handlesExternalEvents` are unavailable there (deviation, self-review). Where the host is held is this task's probe: a `@State` wrapper whose value is set in `.task` or `.onAppear` when nil, or an object created in the scene's content closure, whichever the probe shows creates one host per window and never two; the test is a counter in `TodoApp.makeHost` read after the window appeared and after it redrew.
+- The two-level push in one update is the task's second probe: a path with a task set at window creation and a `.route` into a task of another view while a task is open must both show the list and the task screen pushed, in order, with no runtime warning; the fallback is a view that maps the route's chain into a `path` for `NavigationStack(path:)`, which is a map and not a decision (spec, Risks).
 - Every `if` in a view is over a `Bool` or an optional of the model; the reviewing agent reads every view for the rule (`docs/style.md`, "Views").
 
 **Tests.**
@@ -618,13 +626,13 @@ public struct AppScene: Scene {
 
 **Goal.** A second window on the Mac and the iPad, "open in new window" from the sidebar, a link into the running app, restoration after a relaunch from the same string, and a route fed at launch to the Mac executable, all through the one entrance.
 
-**Files.** `Apps/Apple/Sources/TodoAppleUI/AppScene.swift`; `RootView.swift`; `TodoApp.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `README.md`, the running section.
+**Files.** `Apps/Apple/Sources/TodoAppleUI/AppScene.swift`; `RootView.swift`; `TodoApp.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `Sources/Features/App/AppModule.swift` and `Tests/AppFeatureTests/AppModuleTests.swift`, for the root's sentence; `README.md`, the running section.
 
 **Interface.**
 
 ```swift
 extension TodoApp {
-    /// The route a URL the system opened carries, with the scheme stripped, or nil when it does not read: ignored silently in this epic.
+    /// The route a URL the system opened carries, with the scheme stripped, or nil when it does not read, which the window answers with the root's sentence.
     func route(from url: URL) -> AppModule.Route?
     /// The route named at launch by `TODO_ROUTE`, for the executable without a bundle; nil when unset or unreadable.
     var launchRoute: AppModule.Route? { get }
@@ -633,9 +641,9 @@ extension TodoApp {
 
 **Rules.**
 
-- The window's value is the route text; the window creates its host from it and writes `host.route.text` back into the value after every event, which is what restoration reads at the next launch on macOS; on iPhone the same string lives in `@SceneStorage("route")` and is read at scene creation (spec section 7). The probe: if setting the group's value binding re-identifies the window or recreates its view, the write-back goes to `@SceneStorage` on every platform and the window's value stays what it was created with (spec, Risks).
-- Cmd-N opens a window with the default route; `.openWindow(route)` from the host reaches the handler the window's view installed, which calls `openWindow(value: route.text)` (spec section 5). On iPadOS this needs the Info.plist of Task 9; on the Mac executable it works as soon as the scene is a group.
-- A link: `onOpenURL` on the window's content hands the URL to `TodoApp.shared.route(from:)`, which strips the scheme and reads the path and query with the codec; a route is delivered to that window's host as `.route` through the world's entrance, and nil is ignored. On the Mac the key window takes the link when there is one and a new window opens only when none; `handlesExternalEvents(preferring:allowing:)` on the window's content is the lever, and which sets give "the key window if any, else a new one" is this task's probe, recorded in its PR.
+- The window's value is its path; the window creates its host from it and writes `host.route.path` back into the value after every event, which is what restoration reads at the next launch on macOS; on iPhone the same string lives in `@SceneStorage("route")` and is read at scene creation (spec section 7). The probe: if setting the group's value binding re-identifies the window or recreates its view, the write-back goes to `@SceneStorage` on every platform and the window's value stays what it was created with (spec, Risks).
+- Cmd-N opens a window with the default route; `.openWindow(route)` from the host reaches the handler the window's view installed, which calls `openWindow(value: route.path)` (spec section 5). On iPadOS this needs the Info.plist of Task 9; on the Mac executable it works as soon as the scene is a group.
+- A link: `onOpenURL` on the window's content hands the URL to `TodoApp.shared.route(from:)`, which strips the scheme and reads the path and query with the codec; a route is delivered to that window's host as `.route` through the world's entrance. A link that does not read leaves the window as it is, and the root says "The link could not be opened." in a `problem` the root gains in this task, through an event of its own whose shape, and the rule that clears the sentence, are this task's pre-read (owner, 2026-10-16, answering the spec's open question). Restoration from a saved path that does not read stays silent and gives the default window (spec section 7). On the Mac the key window takes the link when there is one and a new window opens only when none; `handlesExternalEvents(preferring:allowing:)` on the window's content is the lever, and which sets give "the key window if any, else a new one" is this task's probe, recorded in its PR.
 - The Mac executable has no URL scheme: `TODO_ROUTE` names the route at launch, read in `launch(environment:)` like `TODO_DB`, and the first window is created from it; a running `todo-mac` is not reachable by a link until Task 9's app exists (spec section 7).
 - Two windows on one route are allowed to coexist or to bring the first forward, whichever `WindowGroup(for:)` does; the task records which (spec, Open questions).
 
@@ -643,7 +651,8 @@ extension TodoApp {
 
 - `aURLWithTheSchemeReadsAsARoute`: `todo:///view/<id>/task/<id>` gives the route; `aURLWithTheQueryReadsAsARoute`: `todo:///view/<id>?quick-entry` opens quick entry.
 - `anUnreadableURLGivesNil`; `aLaunchRouteIsReadFromTheEnvironment`; `anEmptyLaunchRouteIsNil`.
-- By hand on the Mac with the accessibility driver: Cmd-N opens Inbox in a second window; "Open in New Window" on Today opens Today; a rename in one window appears in the other; closing one window leaves the other working; quit and relaunch restores both windows with their routes; `TODO_ROUTE=/view/<today>/task/<id> swift run todo-mac` opens the task; an unreadable `TODO_ROUTE` opens the default window; a `TODO_ROUTE` naming a view that is gone opens the window with no pane and the root's sentence in the detail column (Task 5). A running `todo-mac` takes no link, so a link to a view that is gone leaving the old pane is checked in Task 9.
+- The root's sentence, in `AppModuleTests`: a link that does not read leaves the model and the route as they were and says "The link could not be opened."; the tests of its clearing follow the shape the pre-read settles.
+- By hand on the Mac with the accessibility driver: Cmd-N opens Inbox in a second window; "Open in New Window" on Today opens Today; a rename in one window appears in the other; closing one window leaves the other working; quit and relaunch restores both windows with their routes; `TODO_ROUTE=/view/<today>/task/<id> swift run todo-mac` opens the task; an unreadable `TODO_ROUTE` opens the default window; a `TODO_ROUTE` naming a view that is gone opens the window with no list and the sidebar's sentence, "The list could not be opened." (Task 5). A running `todo-mac` takes no link, so a link to a view that is gone leaving the old pane is checked in Task 9.
 
 **Verified facts and traps.**
 
@@ -679,7 +688,7 @@ extension TodoApp {
 
 - `theProjectFileDecodes`; `theProjectHasOneApplicationTargetOverTheLibrary`; `theInfoPlistRegistersTheSchemeAndMultipleScenes`; `theProjectFileIsCanonical`.
 - `xcodebuild -project Apps/Apple/Todo.xcodeproj -target Todo -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build` on the owner's Mac, which Task 10 puts into CI.
-- By hand in the simulator and on a device: the collapsed stack, sidebar to list to task and back by swipe; quick entry as a sheet; `xcrun simctl openurl booted todo:///view/<id>/task/<id>` into the running app opens the task in the one window; a link to a view that is gone leaves the pane that was open and shows the root's sentence (Task 5); a relaunch restores the stack; on the iPad, "Open in New Window" opens a second scene.
+- By hand in the simulator and on a device: the collapsed stack, sidebar to list to task and back by swipe; quick entry as a sheet; `xcrun simctl openurl booted todo:///view/<id>/task/<id>` into the running app opens the task in the one window; a link to a view that is gone leaves the list that was open and shows the sidebar's sentence (Task 5); a relaunch restores the stack; on the iPad, "Open in New Window" opens a second scene.
 
 **Verified facts and traps.**
 
@@ -727,7 +736,7 @@ extension TodoApp {
 | 9. The Xcode shell and the first iPhone build; the toolchain | 1 (the toolchain first), 9 (the shell), 10 (CI) |
 | 10. The screens the epic builds | 3 (task list, task screen), 4 (quick entry) |
 | Testing, CI and the deliverable | tests per task; the size probe in 5; the hand checks in 7, 8 and 9; CI in 1 and 10; the deliverable is Task 9's app and the Mac of Task 8 |
-| Open questions | the fan-out form in 6, two windows on one route and `handlesExternalEvents` in 8, where the host is held and the two-level push in 7, which 6.4 in 1; the unreadable link stays ignored, as the spec's default |
+| Open questions | the fan-out form in 6, two windows on one route and `handlesExternalEvents` in 8, where the host is held and the two-level push in 7, which 6.4 in 1; the unreadable link is answered with the root's sentence in 8, the owner's answer of 2026-10-16 |
 | Decisions to record as ADRs | recorded in #86 before this plan; Task 10 accepts them |
 
 Deviations, each stated where it happens:
@@ -737,6 +746,7 @@ Deviations, each stated where it happens:
 - The way back from a pushed screen is `backButtonTapped` and not the spec's `taskClosed` (Tasks 3, 5, 7): the owner's review of #101 names the control and the gesture, and the swipe back sends the same action, since SwiftUI reports both alike. Task 3's section keeps `taskScreenDismissed`, the name it was written with.
 - Quick entry's sheet closes on quick entry's own `cancelButtonTapped`, answered with `.closeRequested`, and not on the spec's root action `.quickEntryDismissed` (Tasks 4, 5, 7): the owner's ruling on #101 names the control, the swipe down and Esc send the same action through the sheet's binding, and the module decides that it means closing.
 - The sidebar is a field of the root's state and not held in a seat (Task 5): spec sections 4 and 10, ADR-0009's Decision and ADR-0006's amendment of 2026-10-14 put every child in a seat, and a seat makes, keeps, replaces and drops its child, none of which a child that a window always has needs (owner, 2026-10-16).
+- The task list is the sidebar's child and not the root's (Task 5, the owner's review of #103): spec sections 4 and 10 and its components diagram put it in a seat of the root's, and a choice in the sidebar opens it, so ADR-0009's rule, every screen is a child of the screen that opened it, makes it the sidebar's; the spec carries an amendment line saying so in each of the three places.
 - The project file's canonical form is held by a test (Task 9) beside the formatter the spec names, so that a hand edit fails in `swift test` and not in review.
 - `Signing.xcconfig` keeps the owner's team out of the repository (Task 9); the spec says automatic signing and nothing about where the team is written.
 - The size budget moves twice, in Task 1 by the toolchain and in Task 5 by the root (spec, Risks); both readings go into `scripts/wasm-size.sh` by its own rule.

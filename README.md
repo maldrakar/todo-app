@@ -108,7 +108,7 @@ view, rename it, make a folder — and beside it calls the public API of `TodoCo
 store, read a page, search, exchange a journal, take a snapshot — because the linker keeps what a client calls,
 and a number measured on calls that were dead-stripped is a number for a binary nobody ships.
 
-The budget is 6.25 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
+The budget is 6.3125 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
 CI runs and the command to run locally. It is the root module and the core as they stand with four percent to
 spare, rounded up to a whole 64 KiB: a guard against growing sideways, not a target to shrink towards. The
 4.5 MiB the spec first named was never measured — it is the floor measured in the toolchain spike, 3,743,306
