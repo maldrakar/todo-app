@@ -28,7 +28,10 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
     /// before the epoch is day zero, since `Store.systemNow()` reads such a clock as zero too, and one past
     /// `lastCivilDay` is that day. So this never traps, and the day it gives has a year, a month and a day on
     /// every target; what a caller does with it afterwards, `advanced(by:)` among it, is the caller's.
-    public init(millisSinceEpoch: Int64) {
+    ///
+    /// `package`, as `String.trimmed()` is: every caller is in this package, and a member widens only as far
+    /// as a call site forces (`docs/style.md`, "Tightest visibility by default").
+    package init(millisSinceEpoch: Int64) {
         let days = Int32(clamping: max(0, millisSinceEpoch) / Day.millisPerDay)
         self.init(daysSinceEpoch: min(days, Day.lastCivilDay))
     }

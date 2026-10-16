@@ -14,7 +14,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// Quick entry opens on an empty field with nothing to say, on the one route it has, and answers being created
 /// with nothing: it reads nothing to show and has no choice to report.
 @Test func quickEntryStartsEmpty() throws {
-    let entry = QuickEntry(store: try makeStore(), route: .init())
+    let entry = QuickEntry(store: try makeStore())
     #expect(entry.model.draft == "")
     #expect(entry.model.problem == nil)
     #expect(entry.route == .init())
@@ -27,7 +27,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// what the person typed, down to the spaces at its ends. A keystroke is the next thing the person did, so a
 /// sentence a refusal left goes with it.
 @Test func typingMovesTheDraft() throws {
-    let entry = QuickEntry(store: try makeStore(), route: .init())
+    let entry = QuickEntry(store: try makeStore())
     #expect(entry.send(.action(.titleFieldChanged("B"))) == nil)
     #expect(entry.model.draft == "B")
     #expect(entry.send(.action(.titleFieldChanged(" Buy milk "))) == nil)
@@ -45,7 +45,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// that is no keystroke: taken for one, the echo after a refused Return would clear the sentence the refusal
 /// had just set, and the person would never read it.
 @Test func anEchoOfTheDraftMovesNothing() throws {
-    let entry = QuickEntry(store: try makeStore(), route: .init())
+    let entry = QuickEntry(store: try makeStore())
     _ = entry.send(.action(.titleFieldChanged("   ")))
     _ = entry.send(.action(.titleFieldSubmitted))
     let refused = entry.model
@@ -59,7 +59,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// on it, in the same event, before any view draws again.
 @Test func submittingCreatesTheTaskInTheInboxAndAsksToClose() throws {
     let store = try makeStore()
-    let entry = QuickEntry(store: store, route: .init())
+    let entry = QuickEntry(store: store)
     _ = entry.send(.action(.titleFieldChanged("Buy milk")))
     #expect(entry.send(.action(.titleFieldSubmitted)) == .closeRequested)
     #expect(try inbox(of: store) == ["Buy milk"])
@@ -72,8 +72,8 @@ private func inbox(of store: Store) throws -> [String] {
 @Test func theAddButtonTakesTheSameRoadAsReturn() throws {
     let returnStore = try makeStore()
     let buttonStore = try makeStore()
-    let returned = QuickEntry(store: returnStore, route: .init())
-    let tapped = QuickEntry(store: buttonStore, route: .init())
+    let returned = QuickEntry(store: returnStore)
+    let tapped = QuickEntry(store: buttonStore)
     _ = returned.send(.action(.titleFieldChanged("Buy milk")))
     _ = tapped.send(.action(.titleFieldChanged("Buy milk")))
     #expect(returned.send(.action(.titleFieldSubmitted)) == .closeRequested)
@@ -86,7 +86,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// the module says why and stays open, and the field keeps the text the person is looking at.
 @Test func aBlankTitleIsRefusedWithASentenceAndKeepsTheText() throws {
     let store = try makeStore()
-    let entry = QuickEntry(store: store, route: .init())
+    let entry = QuickEntry(store: store)
     _ = entry.send(.action(.titleFieldChanged("   ")))
     #expect(entry.send(.action(.titleFieldSubmitted)) == nil)
     #expect(try inbox(of: store) == [])
@@ -99,7 +99,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// is part of the name and goes in as typed.
 @Test func theTitleIsTrimmedOnTheWayToTheStore() throws {
     let store = try makeStore()
-    let entry = QuickEntry(store: store, route: .init())
+    let entry = QuickEntry(store: store)
     _ = entry.send(.action(.titleFieldChanged("  Buy  milk \n")))
     #expect(entry.send(.action(.titleFieldSubmitted)) == .closeRequested)
     #expect(try inbox(of: store) == ["Buy  milk"])
@@ -115,7 +115,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// the way `StoreOpenTests` reaches it, so that the core grows no API for a test.
 @Test func aRefusedWriteBecomesASentence() throws {
     let store = try makeStore()
-    let entry = QuickEntry(store: store, route: .init())
+    let entry = QuickEntry(store: store)
     _ = entry.send(.action(.titleFieldChanged("Buy milk")))
     try store.db.execute("PRAGMA query_only = ON")
     #expect(entry.send(.action(.titleFieldSubmitted)) == nil)
@@ -132,7 +132,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// the module, which the parent drops. Nothing in the model moves, since nothing it would clear is seen again.
 @Test func theCancelButtonAsksToCloseAndWritesNothing() throws {
     let store = try makeStore()
-    let entry = QuickEntry(store: store, route: .init())
+    let entry = QuickEntry(store: store)
     _ = entry.send(.action(.titleFieldChanged("Buy milk")))
     let typed = entry.model
     #expect(entry.send(.action(.cancelButtonTapped)) == .closeRequested)
@@ -144,7 +144,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// store, and what another write did is no answer to what a person is typing.
 @Test func aChangeMovesNothing() throws {
     let store = try makeStore()
-    let entry = QuickEntry(store: store, route: .init())
+    let entry = QuickEntry(store: store)
     _ = entry.send(.action(.titleFieldChanged("   ")))
     _ = entry.send(.action(.titleFieldSubmitted))
     let before = entry.model
@@ -156,7 +156,7 @@ private func inbox(of store: Store) throws -> [String] {
 /// The route has neither a head nor a tail, so a route applied to a live quick entry has nothing to say to it,
 /// and the draft and the sentence a person is looking at stay (spec section 2).
 @Test func aRouteMovesNothing() throws {
-    let entry = QuickEntry(store: try makeStore(), route: .init())
+    let entry = QuickEntry(store: try makeStore())
     _ = entry.send(.action(.titleFieldChanged("   ")))
     _ = entry.send(.action(.titleFieldSubmitted))
     let before = entry.model

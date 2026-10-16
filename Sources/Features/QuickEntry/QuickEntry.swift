@@ -90,7 +90,11 @@ public final class QuickEntry: Routable {
     /// nothing to show, so there is nothing to refuse, and its parent holds it in a `Seat<QuickEntry, Never>`,
     /// applied without `try`. It opens on an empty field with nothing to say, and the route has nothing in it
     /// to read: no tail, and no argument opens quick entry in this epic (spec section 2).
-    public init(store: Store, route: Route) {
+    ///
+    /// The route defaults to `Route()` because that is the one route there is, with no head and no tail, so a
+    /// caller that has none to hand on spells nothing (owner's review of #102). A seat still passes the route it
+    /// applies.
+    public init(store: Store, route: Route = Route()) {
         self.store = store
         self.state = State(draft: "", problem: nil)
     }
