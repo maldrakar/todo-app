@@ -109,6 +109,8 @@ The duties `AppModule` carries for its one child in M2 are every parent's now. W
 
 **What this changes in the code that exists.** The sidebar becomes addressed with an empty head and the selection as its tail, and `.route` moves its highlight, which is how a link to a view highlights it in the list. `AppModule.State.detail` becomes a seat holding the task list where the placeholder stood; the module M3 was to put there arrives now. `.created` keeps its meaning from the amendment of ADR-0006: a child created from a route answers with the choice the route carries, the root reconciles the pane to it and finds it already there, and a child created from no route answers with its own first choice, Inbox for the sidebar. Launch, a click and a link all take that one path.
 
+> **Amended 2026-10-16, in the owner's review of #103.** The task list is the sidebar's child, since a choice in the sidebar opens it: ADR-0009's rule, every screen is a child of the screen that opened it, applied. The sidebar is a field of the root's state and not a seat, and the root holds quick entry in a seat.
+
 `.changed` goes on being handed to each child in one line of each parent. The world has two events today and a third, the change of the day, is M4's; the moment a third one has to be forwarded by every parent is the moment to fold the world's events into one case of `Event`, and not before (open questions).
 
 ### 5. A window is a tree of modules; a process is one store
@@ -173,6 +175,8 @@ Each is built with exactly what makes the navigation between them real and nothi
 - **The sidebar** gains its route, with the selection as the tail and `.route` moving the highlight, and one output, `.openInWindow(id)`, from a context menu item the Mac and the iPad draw and the iPhone does not.
 - **The root** holds three seats and learns three things: `.quickEntryButtonTapped` from its toolbar, `.quickEntryDismissed` from the sheet, and the output `.openWindow(Route)`, which is the sidebar's request re-emitted with the route the root builds for it.
 
+> **Amended 2026-10-16, in the owner's review of #103.** The task list is the sidebar's child, since a choice in the sidebar opens it: ADR-0009's rule, every screen is a child of the screen that opened it, applied. The sidebar is a field of the root's state and not a seat, and the root holds quick entry in a seat.
+
 ### Testing, CI and the deliverable
 
 In the core, run on the host and on wasm32 as every core test is: the route codec, every row of the table in section 2 written and read back, and every refusal with the segment it names; the seat, with a stub child, keeping on the same head, replacing on a different one and dropping on none, and `.created` answered through it; the root, a tap that opens, a pop that closes, a `.route` that moves the sidebar and replaces the pane, a link to a deleted task that leaves the list and a sentence, a deleted view that closes the pane through the child's output, quick entry that asks to close, and "open in new window" climbing from the sidebar to `.openWindow`; and the three screens' own reads, rereads and sentences. In the Apple package: the host handing an output to its handler, two hosts over one store both receiving a `ChangeSet` with the idle one processing it at once, and the route written back after an event. By hand on the Mac with the accessibility driver: a push and a pop in the column, a second window, the sheet, a relaunch that restores, and a route fed at launch. In the simulator and on a device: the collapsed stack, a `todo://` link into the running app, a relaunch.
@@ -199,6 +203,8 @@ The epic is a milestone of its own, `M3 Navigation`, and product functionality m
 | Replacing the module tree on every `.route` | A link into an open task would recreate the list and lose the session state of everything on the way. Reconciling by head keeps what did not change. |
 
 ## Components and data flow
+
+> **Amended 2026-10-16, in the owner's review of #103.** The task list is the sidebar's child, since a choice in the sidebar opens it: ADR-0009's rule, every screen is a child of the screen that opened it, applied. The sidebar is a field of the root's state and not a seat, and the root holds quick entry in a seat.
 
 The tree of modules in one window, each module with its route, and the view tree that draws it:
 
