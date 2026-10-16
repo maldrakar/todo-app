@@ -23,15 +23,17 @@ private func taggedView(_ title: String, in store: Store) throws -> (view: ViewI
     return (try store.createView(NewTaskView(title: title, filter: .hasTag(tag))), tag)
 }
 
-/// A store with one task in the Inbox and one deleted from it, the two a link can name there: the list's own
-/// sentence after a link to the deleted one is what a test tells one list instance from another by, since a
-/// list opened afresh on the open one starts without it.
-private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: TaskID) {
-    let store = try makeStore()
-    let open = try store.createTask(NewTask(title: "Buy milk"))
-    let gone = try store.createTask(NewTask(title: "Call the bank"))
-    try store.delete(task: gone)
-    return (store, open, gone)
+/// The rows of the list open in the window, read before a task is written into its view without its change being
+/// delivered. The live list keeps the rows it last read, while a list made afresh reads the new task, so a list
+/// whose rows still equal these after an event is the same instance: the mark a test tells one list from another
+/// by, which only that instance holds and which adds nothing to the module's surface.
+private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Set<TagID> = []) throws -> [TaskList.Model.Row] {
+    let head = try #require(app.route.detail?.head, "a list is open; this is the setup")
+    let rows = try #require(app.model.taskList?.rows)
+    try store.createTask(NewTask(title: "Unread", tags: tags))
+    let afresh = try TaskList(store: store, route: .init(head: head)).model.rows
+    #expect(afresh.count == rows.count + 1, "a list made now reads the task; without that this proves nothing")
+    return rows
 }
 
 /// The default window names no view, so the sidebar chooses the Inbox itself, says so in answer to `.created`,
@@ -62,7 +64,8 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
 
 /// `init` has told the children already, so `.created`, sent to the root once it is made, has nothing left to say.
 @Test func theRootsOwnCreatedAnswersNothingAndMovesNothing() throws {
-    let (store, open, _) = try storeWithAGoneTask()
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "Buy milk"))
     let app = try AppModule(store: store, route: try Route(text: "/view/\(inbox)/task/\(open)?quick-entry"))
     let model = app.model
     let route = app.route
@@ -165,16 +168,17 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
 /// Applying a route reconciles and never rebuilds (spec section 3): a link into a task of the view that is open
 /// keeps the sidebar with the name half typed in it, and keeps the list, which opens the task.
 @Test func aLinkIntoTheOpenListKeepsItsSessionState() throws {
-    let (store, open, gone) = try storeWithAGoneTask()
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(inbox)/task/\(gone)"))
-    let sentence = try #require(app.model.taskList?.problem, "the list's own sentence tells the instance; without it this proves nothing")
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "Buy milk"))
+    let app = try AppModule(store: store, route: .default)
+    let rows = try rowsBeforeAnUnreadTask(in: app, of: store)
     #expect(app.send(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today)))) == nil)
     #expect(app.send(.action(.taskViewList(.titleFieldChanged("Soon")))) == nil)
     #expect(app.send(.route(try Route(text: "/view/\(inbox)/task/\(open)"))) == nil)
     #expect(app.model.taskViewList.rows.first { $0.id == BuiltInTaskViews.today }?.draft == "Soon")
     #expect(app.model.taskViewList.selection == inbox)
     #expect(app.model.taskList?.task?.title == "Buy milk")
-    #expect(app.model.taskList?.problem == sentence, "the same list, since a list opened afresh says nothing")
+    #expect(app.model.taskList?.rows == rows, "the same list, since a list made afresh reads the task written since")
     #expect(app.route.text == "/view/\(inbox)/task/\(open)")
 }
 
@@ -376,16 +380,12 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
     let report = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
-    let gone = try store.createTask(NewTask(title: "File the expenses", tags: [work.tag]))
-    try store.delete(task: gone)
     let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)/task/\(report)?quick-entry"))
-    #expect(app.send(.route(try Route(text: "/view/\(work.view)/task/\(gone)?quick-entry"))) == nil)
-    #expect(app.model.taskList?.task?.title == "Write the report", "the task that was open stays; this is the setup")
-    let sentence = try #require(app.model.taskList?.problem, "the list's own sentence tells the instance; without it this proves nothing")
+    let rows = try rowsBeforeAnUnreadTask(in: app, of: store, tags: [work.tag])
     #expect(app.send(.route(.default)) == nil)
     #expect(app.model.taskViewList.selection == work.view)
     #expect(app.model.taskList?.task?.title == "Write the report")
-    #expect(app.model.taskList?.problem == sentence, "the same list, since a list opened afresh says nothing")
+    #expect(app.model.taskList?.rows == rows, "the same list, since a list made afresh reads the task written since")
     #expect(app.model.quickEntry == nil)
     #expect(app.route.text == "/view/\(work.view)/task/\(report)")
 }
@@ -394,14 +394,13 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
 /// task open in it closes and the list stays, as System Settings does on the Mac and a second tap on a tab does
 /// on iOS (owner's decision of 2026-10-16).
 @Test func aClickOnTheHighlightedViewReturnsToItsList() throws {
-    let (store, open, gone) = try storeWithAGoneTask()
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "Buy milk"))
     let app = try AppModule(store: store, route: try Route(text: "/view/\(inbox)/task/\(open)"))
-    #expect(app.send(.route(try Route(text: "/view/\(inbox)/task/\(gone)"))) == nil)
-    #expect(app.model.taskList?.task?.title == "Buy milk", "the task that was open stays; this is the setup")
-    let sentence = try #require(app.model.taskList?.problem, "the list's own sentence tells the instance; without it this proves nothing")
+    let rows = try rowsBeforeAnUnreadTask(in: app, of: store)
     #expect(app.send(.action(.taskViewList(.rowSelected(inbox)))) == nil)
     #expect(app.model.taskList?.task == nil)
-    #expect(app.model.taskList?.problem == sentence, "the same list, since a list opened afresh says nothing")
+    #expect(app.model.taskList?.rows == rows, "the same list, since a list made afresh reads the task written since")
     #expect(app.route.text == "/view/\(inbox)")
 }
 

@@ -152,9 +152,11 @@ public final class TaskList: Routable {
             return nil
         case .route(let route):
             // The route's own head is not read: a seat hands a live list only a route with its head, and the
-            // head of a live module never changes (spec section 3). A route that opens its task leaves the
-            // sentence, since a route answers no gesture made in this list, and neither does `.changed`; a route
-            // whose task cannot be made writes one, inside `apply`.
+            // head of a live module never changes (spec section 3). The sentence goes at the start, as it does
+            // for a tap: a route is what a link or a click in the sidebar asks of this list, and the sentence on
+            // screen answered something earlier (owner, 2026-10-16). A route whose task cannot be made writes a
+            // fresh one, inside `apply`.
+            state.problem = nil
             apply(route)
             return nil
         case .changed(let changes):

@@ -181,23 +181,41 @@ import SQLiteKit
     #expect(linked.route == tapped.route)
 }
 
-/// A sentence answers what a person did, so the events of the world leave it, a route that opens a task and a
-/// change that rereads the rows among them, and the next tap on a row the list holds takes it away.
-@Test func theSentenceOutlivesEventsOfTheWorldAndGoesWithTheNextTap() throws {
+/// A change answers for nobody, so it leaves the sentence, and the next tap on a row the list holds takes it away.
+@Test func theSentenceOutlivesAChangeAndGoesWithTheNextTap() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
     let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
-    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: id)))) == nil)
-    #expect(list.model.task?.title == "Buy milk", "the route opened the task")
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Write it down")) }
     #expect(list.send(.changed(created)) == nil)
     #expect(list.model.rows.map(\.title) == ["Buy milk", "Write it down"], "the change was read")
-    #expect(list.model.problem == "The task is gone.", "and neither event took the sentence away")
+    #expect(list.model.problem == "The task is gone.", "and it left the sentence")
     #expect(list.send(.action(.rowTapped(id))) == nil)
     #expect(list.model.problem == nil)
     #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))).model)
+}
+
+/// A route clears the sentence at its start, as a tap does: it is what a link or a click in the sidebar asks of
+/// the list, and the sentence on screen answered something earlier (owner, 2026-10-16). A route whose task cannot
+/// be made writes a fresh one.
+@Test func aRouteTakesTheSentenceAwayAndATaskItCannotOpenWritesAFreshOne() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let gone = try store.createTask(NewTask(title: "Call the bank"))
+    try store.delete(task: gone)
+    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
+    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: id)))) == nil)
+    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))).model)
+    #expect(list.model.problem == nil)
+    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox))) == nil)
+    #expect(list.send(.changed(try unreadableFilter(on: BuiltInTaskViews.inbox, in: store))) == nil)
+    #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.", "a second sentence, for the next route to replace")
+    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))) == nil)
+    #expect(list.model.problem == "The task is gone.")
+    #expect(list.model.task == nil)
 }
 
 @Test func aChangeNamingATaskRereadsTheRows() throws {
