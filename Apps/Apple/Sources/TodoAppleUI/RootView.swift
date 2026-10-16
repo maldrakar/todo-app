@@ -16,7 +16,7 @@ struct RootView: View {
         NavigationSplitView {
             TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
         } detail: {
-            if let list = host.model.taskList {
+            if let list = host.model.taskViewList.taskList {
                 List(list.rows) { Text($0.title) }
             } else {
                 Text("Nothing to show")
