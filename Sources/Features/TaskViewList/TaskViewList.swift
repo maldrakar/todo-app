@@ -216,7 +216,10 @@ public final class TaskViewList: Routable {
             // owner settled this in chat on 2026-09-22, and `.titleFieldLostFocus` is the other half of it.
             //
             // The sentence goes before the list is applied, so that a list the click cannot open writes a fresh
-            // one: it answers this click, and the one it replaces answered something earlier.
+            // one: it answers this click, and the one it replaces answered something earlier. It does so with a
+            // field open too, over the field's own sentence, which the rule above keeps from being cleared and not
+            // from being answered: the new sentence answers the gesture just made, the field stays open on its
+            // draft, and Return brings the field's refusal back.
             state.selection = id
             if state.rename == nil { state.problem = nil }
             apply(list: TaskList.Route(head: id))
@@ -285,15 +288,15 @@ public final class TaskViewList: Routable {
             // and nothing is answered: `init` opened the list already.
             return nil
         case .route(let route):
-            // The route's choice and not a person's, and its parent already knows it, so it is answered with
-            // nothing (spec section 3, the third flow). The sentence goes at its start, so that a list the route
-            // cannot open writes a fresh one, except while a field is open, whose sentence explains it and which
-            // the route leaves where it is, as a click does (owner, 2026-10-16). A route carries no session state
-            // and keeps what did not change (spec sections 2 and 3): it moves the highlight onto its list's view
-            // when a row holds it, a link to a view that is gone leaving the highlight where it is, and applies
-            // its list to the seat, which keeps the list on the same view and replaces it on another. A route that
-            // names no list leaves the highlight and the list alone, because the default window chooses the Inbox
-            // itself, at creation and never again (owner, 2026-10-16).
+            // The route's choice and not a person's, and its parent already knows it, so it is answered with nothing
+            // (spec section 3, the third flow). The sentence goes at its start, a route that names no list included,
+            // except while a field is open, whose sentence explains it and which the route leaves where it is, as a
+            // click does (owner, 2026-10-16). A list the route cannot open writes a fresh sentence, over an open
+            // field's too, as a click's does. A route carries no session state and keeps what did not change (spec
+            // sections 2 and 3): it moves the highlight onto its list's view when a row holds it, a link to a view that
+            // is gone leaving the highlight where it is, and applies its list to the seat, which keeps the list on the
+            // same view and replaces it on another. A route that names no list leaves the highlight and the list alone,
+            // because the default window chooses the Inbox itself, at creation and never again (owner, 2026-10-16).
             if state.rename == nil { state.problem = nil }
             guard let list = route.list else { return nil }
             if state.rows.contains(where: { $0.id == list.head }) { state.selection = list.head }
@@ -517,7 +520,7 @@ public final class TaskViewList: Routable {
     /// array inside it is copy-on-write, so a class buys nothing here and would put a second reference type
     /// into a module that is already one. The seat is a struct holding a class, so a call that changes what it
     /// holds is a mutation of this state, and it is a field of the state because the tree of live modules is
-    /// the navigation state (spec section 4).
+    /// the navigation state (`docs/specs/feature-module-architecture.md`, section 4).
     private struct State {
         var rows: [ReadRow]
         var selection: ViewID?

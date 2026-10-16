@@ -572,6 +572,14 @@ private func rowsBeforeAnUnreadTask(in list: TaskViewList, of store: Store) thro
     let list = try TaskViewList(store: store, route: .init(list: nil))
     #expect(list.send(.route(on(gone))) == nil)
     #expect(list.model.problem == "The list could not be opened.", "the sentence is the setup; without it this proves nothing")
+    // A route that names no list takes the sentence too, and leaves the list where it is.
+    let open = list.model.taskList
+    #expect(list.send(.route(.init(list: nil))) == nil)
+    #expect(list.model.problem == nil)
+    #expect(list.model.taskList == open)
+    #expect(list.route == on(BuiltInTaskViews.inbox))
+    #expect(list.send(.route(on(gone))) == nil)
+    #expect(list.model.problem == "The list could not be opened.", "the sentence is the setup again")
     #expect(list.send(.route(on(BuiltInTaskViews.today))) == nil)
     #expect(list.model.problem == nil)
     // With a field open on a refused name, the sentence explains the field, and a route leaves both.
@@ -587,6 +595,28 @@ private func rowsBeforeAnUnreadTask(in list: TaskViewList, of store: Store) thro
     _ = reference.send(.action(.titleFieldChanged(" ")))
     _ = reference.send(.action(.titleFieldSubmitted))
     #expect(list.model == reference.model)
+}
+
+/// With a field open on a refused name, a click or a route that cannot open a list writes its own sentence over the
+/// field's: it answers the gesture just made, and the field stays open on the draft, so Return brings the field's
+/// own refusal back.
+@Test func aListThatCannotBeOpenedSpeaksOverAnOpenFieldsSentence() throws {
+    let store = try makeStore()
+    let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
+    let list = try TaskViewList(store: store, route: .init(list: nil))
+    _ = list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
+    _ = list.send(.action(.titleFieldChanged(" ")))
+    _ = list.send(.action(.titleFieldSubmitted))
+    #expect(list.model.problem == "A title cannot be empty.", "the field's refusal is the setup; without it this proves nothing")
+    try store.delete(view: gone)
+    #expect(list.send(.action(.rowSelected(gone))) == nil)
+    #expect(list.model.problem == "The list could not be opened.")
+    #expect(list.model.rows.first?.draft == " ", "the field stays open on the draft")
+    #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    #expect(list.model.problem == "A title cannot be empty.", "Return brings the field's refusal back")
+    #expect(list.send(.route(on(gone))) == nil)
+    #expect(list.model.problem == "The list could not be opened.")
+    #expect(list.model.rows.first?.draft == " ")
 }
 
 /// A route to a view the module holds no row for, a link to one that is gone, leaves the highlight, since a

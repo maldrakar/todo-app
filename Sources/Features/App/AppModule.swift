@@ -7,12 +7,13 @@ import TodoCore
 /// The root of the tree of modules, and the one module a host holds (spec section 1): the sidebar, with the list of
 /// the chosen view's tasks it opened, and quick entry when it is up.
 ///
-/// It knows its two children and what each asks for, and nothing below them. The list is the sidebar's child,
-/// since a choice in the sidebar opens it, and the task open in the list is the list's, each by the rule that
-/// every screen is a child of the screen that opened it (ADR-0009), so this module never learns that a choice
-/// opens a list or that a list opens a task, and its code does not grow when either learns to open something
-/// (spec section 1). Quick entry sits in a seat (spec section 4), and the sidebar is a field of the root's state
-/// outside one (owner's decision of 2026-10-16; `State` says why).
+/// It knows its two children and what each asks for, and nothing below them. The task open in the list is the
+/// list's, so this module never learns that a list opens a task, and its code does not grow when the task screen
+/// learns to open something (spec section 1). The list is the sidebar's, since a choice in the sidebar opens it,
+/// by the rule that every screen is a child of the screen that opened it, applied in the owner's review of #103
+/// (ADR-0009), so this module never learns that a choice opens a list either. Quick entry sits in a seat (spec
+/// section 4), and the sidebar is a field of the root's state outside one (owner's decision of 2026-10-16; `State`
+/// says why).
 ///
 /// It is a routable module (spec section 4), and its route is the route of the window: what a link carries, what
 /// a window is restored from and what the web's address bar shows, each through the route's one text form, `path`

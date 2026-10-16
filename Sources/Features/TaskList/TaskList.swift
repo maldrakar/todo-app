@@ -295,7 +295,8 @@ public final class TaskList: Routable {
     /// #101).
     ///
     /// The seat is a field of the state and not a property beside it, because the tree of live modules is the
-    /// navigation state (spec section 4): the screen open in the list is part of what the list holds.
+    /// navigation state (`docs/specs/feature-module-architecture.md`, section 4): the screen open in the list is
+    /// part of what the list holds.
     private struct State {
         var rows: [Model.Row]
         var task: Seat<TaskScreen, StoreError>
