@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "TaskViewListFeature", targets: ["TaskViewListFeature"]),
         .library(name: "TaskListFeature", targets: ["TaskListFeature"]),
         .library(name: "TaskScreenFeature", targets: ["TaskScreenFeature"]),
+        .library(name: "QuickEntryFeature", targets: ["QuickEntryFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
         .executable(name: "todo", targets: ["todo"]),
         .executable(name: "wasm-size-probe", targets: ["WasmSizeProbe"]),
@@ -52,6 +53,7 @@ let package = Package(
         .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskViewList"),
         .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
+        .target(name: "QuickEntryFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/QuickEntry"),
         // The root module, which is the features' parent and not one of them: it depends on them, since
         // composing them is what it is for, and none of them depends on it (ADR-0007).
         .target(name: "AppFeature", dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature"], path: "Sources/Features/App"),
@@ -68,6 +70,7 @@ let package = Package(
         .testTarget(name: "TaskViewListFeatureTests", dependencies: ["TaskViewListFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(name: "TaskListFeatureTests", dependencies: ["TaskListFeature", "TaskScreenFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(name: "TaskScreenFeatureTests", dependencies: ["TaskScreenFeature", "TodoCore", "TestSupport"]),
+        .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(name: "AppFeatureTests", dependencies: ["AppFeature", "TaskViewListFeature", "TodoCore", "TestSupport"]),
     ],
     swiftLanguageModes: [.v6]
