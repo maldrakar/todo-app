@@ -33,9 +33,10 @@ public final class AppModule: Routable {
         /// platform (spec section 5).
         public let quickEntry: QuickEntry.Model?
 
-        /// What went wrong, as the finished sentence the view shows until the next action that has something to
-        /// act on it, and nil when there is nothing to say: a pane that could not be opened, where the one that was
-        /// open stays (spec section 3).
+        /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say: a pane
+        /// that could not be opened, where the one that was open stays (spec section 3). It stays until a gesture
+        /// on the window takes it away: an action of the sidebar, of the list in the pane, or the quick entry
+        /// button (`send`).
         public let problem: String?
     }
 
@@ -49,8 +50,8 @@ public final class AppModule: Routable {
         /// An action of the pane's list, handed to it as it came; with no pane open it moves nothing, the root's
         /// sentence included.
         case taskList(TaskList.UserAction)
-        /// An action of quick entry, handed to it as it came; with no quick entry up it moves nothing, the root's
-        /// sentence included.
+        /// An action of quick entry, handed to it as it came. It leaves the root's sentence, which is beneath the
+        /// sheet, and with no quick entry up it moves nothing.
         case quickEntry(QuickEntry.UserAction)
         /// The toolbar's quick entry button.
         case quickEntryButtonTapped
@@ -123,12 +124,14 @@ public final class AppModule: Routable {
     }
 
     public func send(_ event: Event) -> Output? {
-        // An action takes the sentence away, since the person has done something since reading it, and it goes
-        // before the action is handed on, so that a pane the action cannot open writes a fresh one. A route, a
-        // change and being created are nobody's doing and leave it, since a sentence cleared by them would go before
-        // the person had read it. So does an action for a pane or a quick entry that is not there, which moves
+        // The sentence is about the pane, and a gesture on the window takes it away, since the person has done
+        // something since reading it: an action of the sidebar, the quick entry button, and an action of the list in
+        // the pane. It goes before the action is handed on, so that a pane the action cannot open writes a fresh
+        // one. A route, a change and being created are nobody's doing and leave it, since a sentence cleared by them
+        // would go before the person had read it. So does an action for a list that is not there, which moves
         // nothing at all: a view sends one when the platform writes back through a binding after a close the model
-        // drove, as the sheet does after a route closed quick entry, and nobody did anything.
+        // drove, and nobody did anything. And so does every action of quick entry, a sheet over the window: a
+        // gesture in it leaves the sentence beneath, as a gesture on the task screen leaves the list's own.
         switch event {
         case .action(.taskViewList(let action)):
             state.problem = nil
@@ -142,10 +145,9 @@ public final class AppModule: Routable {
             react(to: state.taskList.send(.action(action)))
             return nil
         case .action(.quickEntry(let action)):
-            // Cancel included, which closes quick entry by its own answer; with no quick entry up, it is where the
-            // sheet's binding lands when it writes false after a close the model drove.
-            guard state.quickEntry.route != nil else { return nil }
-            state.problem = nil
+            // Cancel included, which closes quick entry by its own answer. With no quick entry up the empty seat
+            // answers nothing, which is where the sheet's binding lands when it writes false after a close the model
+            // drove, and nothing moves.
             react(to: state.quickEntry.send(.action(action)))
             return nil
         case .action(.quickEntryButtonTapped):

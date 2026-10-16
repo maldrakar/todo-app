@@ -280,8 +280,8 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
 
 /// After a close the model drove, the sheet's binding writes false and the view sends Cancel to a quick entry
 /// that is already gone: the empty seat answers nothing, and nothing moves, the sentence included. Here a link to
-/// a view that is gone closed quick entry and wrote the sentence in one event, and the Cancel that follows it is
-/// no answer to the sentence, which would otherwise go before anyone read it.
+/// a view that is gone closed quick entry and wrote the sentence in one event, and the Cancel that follows it
+/// leaves the sentence for the person to read.
 @Test func aCancelWithNoQuickEntryOpenMovesNothing() throws {
     let store = try makeStore()
     let gone = try taggedView("Errands", in: store)
@@ -318,21 +318,20 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
     #expect(app.route == .default)
 }
 
-/// An action for a child that is there is the person's next gesture and takes the sentence away, whatever the
-/// child does with it: a keystroke in quick entry, and the back button of a list with no task open.
-@Test func anActionForAChildThatIsThereTakesTheSentenceAway() throws {
+/// The sentence is about the pane, so a gesture on the list that is open takes it away, a back button with no task
+/// open included. Quick entry is a sheet over the window, and a gesture in it leaves the sentence beneath, as a
+/// gesture on the task screen covering a list leaves the list's own sentence.
+@Test func aListActionTakesTheSentenceAwayAndAQuickEntryActionLeavesIt() throws {
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
     let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)?quick-entry"))
-    let link = try Route(text: "/view/\(gone.view)?quick-entry")
-    #expect(app.send(.route(link)) == nil)
-    #expect(app.model.problem != nil, "the sentence is the setup; without it this proves nothing")
+    #expect(app.send(.route(try Route(text: "/view/\(gone.view)?quick-entry"))) == nil)
+    let sentence = try #require(app.model.problem, "the sentence is the setup; without it this proves nothing")
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
-    #expect(app.model.problem == nil)
-    #expect(app.send(.route(link)) == nil)
-    #expect(app.model.problem != nil, "the sentence is the setup again")
+    #expect(app.model.quickEntry?.draft == "Buy milk", "quick entry took the keystroke")
+    #expect(app.model.problem == sentence)
     #expect(app.send(.action(.taskList(.backButtonTapped))) == nil)
     #expect(app.model.problem == nil)
 }
@@ -352,8 +351,9 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
 }
 
 /// A new window is the platform's to open, so the sidebar's request climbs and leaves the root under the root's
-/// own name, with the route of a window on the view (spec section 4, the rule of bubbling). The window that
-/// asked moves nothing.
+/// own name, with the route of a window on the view (spec section 4, the rule of bubbling). Nothing else moves in
+/// the window that asked; no sentence stands here, and one would go, since the menu item is an action of the
+/// sidebar.
 @Test func openInNewWindowClimbsToTheRoot() throws {
     let app = try AppModule(store: try makeStore(), route: .default)
     let model = app.model
@@ -437,9 +437,10 @@ private func storeWithAGoneTask() throws -> (store: Store, open: TaskID, gone: T
     #expect(app.route.detail == .init(head: work.view))
 }
 
-/// The sentence answers what the last action or route asked for, and only the next action takes it away: a
-/// route, a change and being created answer no gesture, so a sentence would go before the person read it.
-@Test func theNextActionTakesTheSentenceAway() throws {
+/// The sentence answers what the last action or route asked for, and only a gesture on the window takes it away,
+/// here the quick entry button: a route, a change and being created answer no gesture, so a sentence would go
+/// before the person read it.
+@Test func onlyAGestureOnTheWindowTakesTheSentenceAway() throws {
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
     let gone = try taggedView("Errands", in: store)

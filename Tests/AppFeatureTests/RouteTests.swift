@@ -73,7 +73,7 @@ private let table: [(route: Route, text: String)] = [
     #expect(throws: RouteError.unknownSegment("View")) { try Route(text: "/View/\(view)") }
 }
 
-/// An id is whatever `UUID(uuidString:)` reads, in either case, and it is kept as the command line prints it,
+/// An id is a segment `UUID(uuidString:)` reads whole, in either case, and it is kept as the command line prints it,
 /// lowercase, so that a link typed by hand opens the same view as the one the app wrote.
 @Test func anUppercaseIDIsReadLowercased() throws {
     let shouted = "/view/\(view.rawValue.uppercased())/task/\(task.rawValue.uppercased())"
@@ -90,6 +90,15 @@ private let table: [(route: Route, text: String)] = [
     #expect(throws: RouteError.notAnID("\(view)x")) { try Route(text: "/view/\(view)x") }
     #expect(throws: RouteError.notAnID("")) { try Route(text: "/view") }
     #expect(throws: RouteError.notAnID("")) { try Route(text: "/view/\(view)/task") }
+}
+
+/// `UUID(uuidString:)` stops reading at a NUL, so an id with a NUL and anything after it would read as the id before
+/// it. The whole segment has to be the id, or it is refused as written.
+@Test func anIDWithAnythingAfterANULIsRefused() {
+    let view = "\(view)\u{0}junk"
+    #expect(throws: RouteError.notAnID(view)) { try Route(text: "/view/\(view)") }
+    let task = "\(task)\u{0}"
+    #expect(throws: RouteError.notAnID(task)) { try Route(text: "/view/\(BuiltInTaskViews.inbox)/task/\(task)") }
 }
 
 /// `quick-entry` is the one query item the window knows.

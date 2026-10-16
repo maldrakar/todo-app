@@ -55,7 +55,7 @@ extension AppModule {
         /// itself (the memberwise `init` says which routes it cannot carry). A route is data from outside, so
         /// anything else refuses the whole route with the segment named, read from the left so that the first
         /// offence is the one named, the path before the query, and nothing traps (spec section 2,
-        /// `docs/style.md`). An id is whatever `UUID(uuidString:)` reads, in either case, and is kept lowercase,
+        /// `docs/style.md`). An id is a segment `UUID(uuidString:)` reads whole, in either case, and is kept lowercase,
         /// the form the command line prints. The string is the path and the query alone: a scheme or a site is the
         /// platform's wrapping, which its caller strips, so a string that does not begin with `/` is refused
         /// rather than unwrapped.
@@ -107,13 +107,18 @@ extension AppModule {
         }
 
         /// The id after `view` or `task`: none at all is an empty id, an empty segment is the empty segment a
-        /// doubled or trailing slash leaves, and anything `UUID(uuidString:)` does not read is refused as
+        /// doubled or trailing slash leaves, and anything `UUID(uuidString:)` does not read whole is refused as
         /// written.
+        ///
+        /// Whole, because `UUID(uuidString:)` stops reading at a NUL and answers for what came before it, so the id
+        /// it read is held against the segment, both lowercase, since it reads either case.
         private static func id(_ segment: String?) throws(RouteError) -> EntityID {
             guard let segment else { throw .notAnID("") }
             guard !segment.isEmpty else { throw .unknownSegment("") }
-            guard let uuid = UUID(uuidString: segment) else { throw .notAnID(segment) }
-            return EntityID(uuid.uuidString.lowercased())
+            guard let read = UUID(uuidString: segment)?.uuidString.lowercased(), read == segment.lowercased() else {
+                throw .notAnID(segment)
+            }
+            return EntityID(read)
         }
 
         /// Quick entry, when the query says it is up. The one item is a bare flag, with no value, since no
@@ -150,8 +155,8 @@ public enum RouteError: Error, Equatable, Sendable {
     /// A word the route knows where it cannot stand: `task` before `view`, either of them a second time, and
     /// `quick-entry` a second time in the query.
     case segmentOutOfPlace(String)
-    /// What stands where an id must, as written, which `UUID(uuidString:)` does not read, and the empty string
-    /// when nothing stands there.
+    /// What stands where an id must, as written, which `UUID(uuidString:)` does not read whole, and the empty
+    /// string when nothing stands there.
     case notAnID(String)
     /// A query item that is not `quick-entry`, as written: one with a value, and the empty one, included.
     case unknownQuery(String)
