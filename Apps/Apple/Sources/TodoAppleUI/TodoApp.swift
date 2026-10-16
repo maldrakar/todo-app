@@ -42,7 +42,7 @@ enum TodoApp {
         // that is not there. The open has already recorded the new id in `own_devices`, so a launch that then
         // cannot keep it leaves that row behind and the next launch mints another.
         if held == nil { try DeviceFile.keep(device, beside: database) }
-        let root = try AppModule(store: store)
+        let root = try AppModule(store: store, route: .default)
         return ModuleHost(root) { deliver in store.onChange = { deliver(.changed($0)) } }
     }
 

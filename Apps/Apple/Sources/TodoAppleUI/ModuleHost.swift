@@ -16,11 +16,11 @@ import Observation
 /// module never sees its own write in the middle of its own update. Everything runs on the main actor, so
 /// the queue is an array and needs no lock.
 ///
-/// A host has no parent to hand an output to, so a host over a module that asks something of its parent would
-/// drop every request without a word. The `Output == Never` clause makes the compiler refuse it. In the app
-/// the module is the root.
+/// What the module answers is dropped until #93 hands it to the handler the window's view installs (spec section
+/// 5). Nothing is lost meanwhile: the root's one answer, a window to open, comes from a menu item that no view
+/// draws before #94. In the app the module is the root.
 @MainActor @Observable
-final class ModuleHost<M: FeatureModule> where M.Output == Never {
+final class ModuleHost<M: FeatureModule> {
     /// The module's model as it stood when the last event returned.
     ///
     /// Assigned after every event, many of which leave it equal: a module computes its model from its state
@@ -60,8 +60,7 @@ final class ModuleHost<M: FeatureModule> where M.Output == Never {
         pending.append(event)
         guard pending.count == 1 else { return }
         while let next = pending.first {
-            // Always nil: the type admits only a module with nothing to ask of a parent, so there is no answer
-            // to hand on.
+            // Dropped, for the reason on the type: nothing hands it on before #93.
             _ = module.send(next)
             model = module.model
             pending.removeFirst()
