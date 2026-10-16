@@ -5,9 +5,10 @@ import QuickEntryFeature
 import SQLiteKit
 
 /// The titles of the Inbox, where quick entry files what it creates: a task with no day and no parent is the
-/// Inbox's by the Inbox's own filter, and the day a dateless task is read on changes nothing.
+/// Inbox's by the Inbox's own filter, which reads no day, so the day asked about is a fixed one and not the
+/// wall clock, which a module test never reads.
 private func inbox(of store: Store) throws -> [String] {
-    try store.tasks(in: BuiltInTaskViews.inbox, today: Day(millisSinceEpoch: Store.systemNow())).map(\.title)
+    try store.tasks(in: BuiltInTaskViews.inbox, today: Day(year: 2026, month: 10, day: 16)).map(\.title)
 }
 
 /// Quick entry opens on an empty field with nothing to say, on the one route it has, and answers being created
@@ -34,6 +35,7 @@ private func inbox(of store: Store) throws -> [String] {
     #expect(entry.model.problem == nil)
     _ = entry.send(.action(.titleFieldChanged(" ")))
     _ = entry.send(.action(.titleFieldSubmitted))
+    #expect(entry.model.problem == "A title cannot be empty.", "the sentence is the setup")
     #expect(entry.send(.action(.titleFieldChanged(" B"))) == nil)
     #expect(entry.model.draft == " B")
     #expect(entry.model.problem == nil, "the keystroke after the refusal takes its sentence away")
@@ -53,8 +55,8 @@ private func inbox(of store: Store) throws -> [String] {
 }
 
 /// Return creates the task and asks to be closed, which is the modal's own half of the way back (spec section
-/// 5). The draft stays as typed: the parent drops the module on this answer, and a field emptied first would
-/// empty under the person's eyes while the sheet slides away.
+/// 5). The draft stays as typed, because nothing cleared after this answer is seen: the parent drops the module
+/// on it, in the same event, before any view draws again.
 @Test func submittingCreatesTheTaskInTheInboxAndAsksToClose() throws {
     let store = try makeStore()
     let entry = QuickEntry(store: store, route: .init())

@@ -16,9 +16,9 @@ public final class QuickEntry: Routable {
     /// The address of quick entry, the same for every one: it says that quick entry is up and nothing else,
     /// since what a person has typed is session state and no route carries it (spec section 2).
     public struct Route: RouteValue {
-        /// The same for every quick entry, which is what keeps the one that is up alive on every route it is
-        /// handed: a link that arrives while a person is typing leaves the draft where it is (spec sections 2
-        /// and 3).
+        /// The same for every quick entry, so a route that keeps quick entry up, `?quick-entry` in the
+        /// window's text form, keeps the live one alive, and its draft with it, rather than making it again
+        /// (spec sections 2 and 3).
         public var head: NoHead { NoHead() }
 
         public init() {}
@@ -31,7 +31,7 @@ public final class QuickEntry: Routable {
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a refusal inside it has nowhere else to go, and a view that had to spell one
-        /// would be a view holding logic (spec section 2).
+        /// would be a view holding logic (`docs/specs/feature-module-architecture.md`, section 2).
         public let problem: String?
     }
 
@@ -74,9 +74,11 @@ public final class QuickEntry: Routable {
     /// model is (owner's review of #101).
     public var model: Model { state.model }
 
-    /// A constant, because this route has neither a head nor a tail: nothing that happens to quick entry can
-    /// change its address (spec section 2).
-    public let route: Route
+    /// Assembled on every read, as every module's route is, and always the same, because this route has
+    /// neither a head nor a tail: nothing that happens to quick entry can change its address. Nothing is kept
+    /// from the route `init` was given, since what opens a screen is read once and never written back, and a
+    /// copy kept here would carry it into the window's route (spec section 2).
+    public var route: Route { Route() }
 
     /// The one write the module makes goes here. Nothing is read from it: quick entry shows only what the
     /// person typed.
@@ -86,10 +88,10 @@ public final class QuickEntry: Routable {
 
     /// Made from its route, the one way a screen is made (spec section 3), and it cannot fail: quick entry reads
     /// nothing to show, so there is nothing to refuse, and its parent holds it in a `Seat<QuickEntry, Never>`,
-    /// applied without `try`. It opens on an empty field with nothing to say.
+    /// applied without `try`. It opens on an empty field with nothing to say, and the route has nothing in it
+    /// to read: no tail, and no argument opens quick entry in this epic (spec section 2).
     public init(store: Store, route: Route) {
         self.store = store
-        self.route = route
         self.state = State(draft: "", problem: nil)
     }
 
@@ -149,8 +151,8 @@ public final class QuickEntry: Routable {
             state.problem = Problem.couldNotSave.sentence
             return nil
         }
-        // The draft stays as typed: the parent drops the module on this answer, and a field emptied first
-        // would empty under the person's eyes while the sheet slides away.
+        // The draft stays as typed, because nothing cleared after this answer is seen: the parent drops the
+        // module on it, in the same event, before any view draws again.
         state.problem = nil
         return .closeRequested
     }
