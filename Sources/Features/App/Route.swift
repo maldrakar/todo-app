@@ -47,14 +47,20 @@ extension AppModule {
             let query = path.firstIndex(of: "?")
             let text = path[..<(query ?? path.endIndex)]
             guard text.first == "/" else { throw .unknownSegment(String(text.prefix { $0 != "/" })) }
-            var segments = text == "/" ? [] : text.dropFirst().split(separator: "/", omittingEmptySubsequences: false).map(String.init)[...]
+            var segments = text == "/" ? [] : Route.split(text.dropFirst(), at: "/")
             let sidebar = try TaskViewList.Route(reading: &segments)
-            var items = query.map { path[path.index(after: $0)...].split(separator: "&", omittingEmptySubsequences: false).map(String.init)[...] } ?? []
-            let quickEntry: QuickEntry.Route? = if items.first == QuickEntry.Route.item { try QuickEntry.Route(reading: &items) } else { nil }
+            var items = query.map { Route.split(path[path.index(after: $0)...], at: "&") } ?? []
+            let quickEntry: QuickEntry.Route? = if items.first == QuickEntry.Route.item {
+                try QuickEntry.Route(reading: &items)
+            } else {
+                nil
+            }
             // What no route read: quick entry's item again is out of place, since a window has one quick entry,
             // and any other item is unknown, the empty one a `?` or an `&` with nothing after it leaves included,
             // which the writer never writes.
-            if let item = items.first { throw item == QuickEntry.Route.item ? .segmentOutOfPlace(item) : .unknownQuery(item) }
+            if let item = items.first {
+                throw item == QuickEntry.Route.item ? .segmentOutOfPlace(item) : .unknownQuery(item)
+            }
             self.init(sidebar: sidebar, quickEntry: quickEntry)
         }
 
@@ -63,7 +69,14 @@ extension AppModule {
         /// `/`, which leaves the choice to the sidebar.
         public var path: String {
             let items = quickEntry?.items ?? []
-            return "/" + sidebar.segments.joined(separator: "/") + (items.isEmpty ? "" : "?" + items.joined(separator: "&"))
+            let query = items.isEmpty ? "" : "?" + items.joined(separator: "&")
+            return "/" + sidebar.segments.joined(separator: "/") + query
+        }
+
+        /// The parts of the path or of the query between their separators, the empty ones kept, so that a doubled,
+        /// leading or trailing separator leaves an empty part for a route to refuse.
+        private static func split(_ text: Substring, at separator: Character) -> ArraySlice<String> {
+            text.split(separator: separator, omittingEmptySubsequences: false).map(String.init)[...]
         }
     }
 }

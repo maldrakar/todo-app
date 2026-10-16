@@ -28,7 +28,9 @@ extension ArraySlice where Element == String {
     /// is an empty id; the empty segment a doubled or trailing slash leaves is that segment, unknown; and what
     /// `read`, the route's reader of its id, refuses is refused as written. Generic over the reader, because this
     /// target depends on nothing (ADR-0007, amendment of 2026-10-15) and an id is the core's.
-    package mutating func popID<ID, Failure: Error>(readBy read: (String) throws(Failure) -> ID) throws(RouteError) -> ID {
+    package mutating func popID<ID, Failure: Error>(
+        readBy read: (String) throws(Failure) -> ID
+    ) throws(RouteError) -> ID {
         guard let segment = popFirst() else { throw .notAnID("") }
         guard !segment.isEmpty else { throw .unknownSegment("") }
         do {

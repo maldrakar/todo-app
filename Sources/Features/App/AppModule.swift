@@ -4,8 +4,8 @@ import QuickEntryFeature
 import TaskViewListFeature
 import TodoCore
 
-/// The root of the tree of modules, and the one module a host holds: the sidebar, with the list of the chosen
-/// view's tasks it opened, and quick entry when it is up (spec section 1).
+/// The root of the tree of modules, and the one module a host holds (spec section 1): the sidebar, with the list of
+/// the chosen view's tasks it opened, and quick entry when it is up.
 ///
 /// It knows its two children and what each asks for, and nothing below them. The list is the sidebar's child,
 /// since a choice in the sidebar opens it, and the task open in the list is the list's, each by the rule that

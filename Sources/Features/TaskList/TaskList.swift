@@ -67,7 +67,11 @@ public final class TaskList: Routable {
             let word = path.popFirst() ?? ""
             guard word == Route.word else { throw Route.refusal(of: word) }
             let head = try path.popID(readBy: ViewID.init(uuidString:))
-            let task: TaskScreen.Route? = if path.first == TaskScreen.Route.word { try TaskScreen.Route(reading: &path) } else { nil }
+            let task: TaskScreen.Route? = if path.first == TaskScreen.Route.word {
+                try TaskScreen.Route(reading: &path)
+            } else {
+                nil
+            }
             if let rest = path.first { throw Route.refusal(of: rest) }
             self.init(head: head, task: task)
         }

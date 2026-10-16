@@ -362,7 +362,8 @@ private func read(_ segments: [String]) throws(RouteError) -> TaskList.Route {
 
 /// What stands where the view's id must and does not read whole as one is refused as written, and `view` with
 /// nothing after it has an empty one; `UUID(uuidString:)` stops reading at a NUL, so an id with one is refused
-/// too. The task's id is the task screen's route to read (`TaskScreenTests`).
+/// too. The task's id is read by the task screen's route (`TaskScreenTests`), and its refusal reaches this route's
+/// reader as thrown.
 @Test func theRouteRefusesWhatIsNotAnID() {
     #expect(throws: RouteError.notAnID("inbox")) { try read(["view", "inbox"]) }
     #expect(throws: RouteError.notAnID("\(view)x")) { try read(["view", "\(view)x"]) }

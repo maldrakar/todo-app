@@ -15,8 +15,8 @@ import TodoCore
 ///
 /// It is the task list's parent. A choice here opens the list of that view's tasks, so the list is this module's
 /// child, held in a seat of its own, by the rule that every screen is a child of the screen that opened it
-/// (ADR-0009): on a phone it is the screen pushed after this one, and on the Mac the pane beside it. The root never
-/// learns that a choice opens a list.
+/// (ADR-0009), drawn on a phone as the screen pushed after this one and on the Mac as the pane beside it. The root
+/// never learns that a choice opens a list.
 ///
 /// It is a routable module, one that can be opened (spec section 4): its route has no head, because a window
 /// has one list of views, and its tail is the route of the list open in it, so that a link to a view opens its
@@ -163,11 +163,13 @@ public final class TaskViewList: Routable {
     /// list opens its task screen in its own `init`: on the route's list when the route names one, with the task
     /// in it, and otherwise on the view it starts on.
     ///
-    /// That start is highlighted only when a row holds it, whichever its source, and the list opens on it only
-    /// then, because a highlight kept anyway would light up the moment a peer's change brought the row in — a
-    /// link to a view not yet synced here — beside a list that was never opened on it. It is the invariant
-    /// `createFolder` holds for the same reason: what this module puts on a row of its own accord goes onto a
-    /// row the list holds.
+    /// That start is highlighted only when a row holds it, whichever its source, because a highlight kept anyway
+    /// would light up the moment a peer's change brought the row in — a link to a view not yet synced here —
+    /// beside a list that was never opened on it. It is the invariant `createFolder` holds for the same reason:
+    /// what this module puts on a row of its own accord goes onto a row the list holds. A list the route names is
+    /// opened whether or not a row holds its view, and one that cannot be made, its view gone or not yet synced,
+    /// is said in `problem`; the Inbox this module falls back on is opened only when a row holds it, so a person
+    /// who deleted it is told nothing, having asked for nothing.
     ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
     /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own read
@@ -184,7 +186,8 @@ public final class TaskViewList: Routable {
             try TaskList(store: store, route: route)
         }
         self.store = store
-        self.state = State(rows: rows, selection: rows.contains(where: { $0.id == start }) ? start : nil, taskList: taskList)
+        let selection = rows.contains(where: { $0.id == start }) ? start : nil
+        self.state = State(rows: rows, selection: selection, taskList: taskList)
         if let list = route.list ?? state.selection.map({ TaskList.Route(head: $0) }) { apply(list: list) }
     }
 
@@ -287,10 +290,10 @@ public final class TaskViewList: Routable {
             // cannot open writes a fresh one, except while a field is open, whose sentence explains it and which
             // the route leaves where it is, as a click does (owner, 2026-10-16). A route carries no session state
             // and keeps what did not change (spec sections 2 and 3): it moves the highlight onto its list's view
-            // when a row holds it, a link to a view that is gone moving nothing, and applies its list to the
-            // seat, which keeps the list on the same view and replaces it on another. A route that names no list
-            // leaves the highlight and the list alone, because the default window chooses the Inbox itself, at
-            // creation and never again (owner, 2026-10-16).
+            // when a row holds it, a link to a view that is gone leaving the highlight where it is, and applies
+            // its list to the seat, which keeps the list on the same view and replaces it on another. A route that
+            // names no list leaves the highlight and the list alone, because the default window chooses the Inbox
+            // itself, at creation and never again (owner, 2026-10-16).
             if state.rename == nil { state.problem = nil }
             guard let list = route.list else { return nil }
             if state.rows.contains(where: { $0.id == list.head }) { state.selection = list.head }
@@ -534,7 +537,8 @@ public final class TaskViewList: Routable {
             }
             // Read off the drawn rows and not copied from `selection`: `.rowSelected` keeps an id without asking
             // the rows, and an id no row carries highlights nothing, so the model names no row for it either.
-            return Model(rows: drawn, selection: drawn.first(where: \.isSelected)?.id, taskList: taskList.model, problem: problem)
+            let selection = drawn.first(where: \.isSelected)?.id
+            return Model(rows: drawn, selection: selection, taskList: taskList.model, problem: problem)
         }
 
         /// One row of the list as a read of the store produced it, before anything about this person's
