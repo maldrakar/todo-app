@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), #63, #67, ADR-0001, ADR-0006, ADR-0009
-- Amended: 2026-10-14, after the approval of the navigation spec (see the end)
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), #63, #67, #100, ADR-0001, ADR-0006, ADR-0009
+- Amended: 2026-10-14, after the approval of the navigation spec, and 2026-10-15, after the owner's review of #100 (see the end)
 
 ## Context
 
@@ -26,3 +26,7 @@ Constrained: no UI import in the root package, ever; no feature target reaches a
 ## Amendment, 2026-10-14
 
 Made with the approval of the navigation spec, `docs/specs/navigation.md`, section 4, which ADR-0009 records. The decision above gave the `FeatureModule` target the module protocols and nothing else. The shared form of a parent now lives beside them: the protocol of an addressed module and the generic seat a parent holds each child in, which create a child from a route with the store and so need `Store` and `StoreError`. The target therefore depends on `TodoCore`, which every feature depends on already, and holds what every parent needs and nothing of any one feature. The rest of the decision holds: one target per feature, children that depend neither on each other nor on the root, and the hosts under `Apps/`.
+
+## Amendment, 2026-10-15
+
+Made in the owner's review of #100, the pull request that built the shared form of a parent. The dependency on `TodoCore` that the amendment of 2026-10-14 gave the `FeatureModule` target is withdrawn. A seat is created by its parent with the way to make its child, a closure over the child's own `init` that takes the route and whatever that child needs, so the contract names no dependency, and a screen that needs none, or needs others than the store, needs nothing from it. A module's `init` is no longer a requirement of the contract; it stays where a screen that cannot read what it shows refuses to be made, and the seat throws what that refusal throws. The target holds the module protocols and the seat, and depends on nothing. The amendment of 2026-10-14 stays as it was written, and the rest of the decision holds.

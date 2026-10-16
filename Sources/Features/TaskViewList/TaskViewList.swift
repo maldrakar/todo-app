@@ -10,7 +10,11 @@ import TodoCore
 /// The rows are flat and carry a depth instead of holding their children: a view drawing them indents by a
 /// number and decides nothing, and the walk that builds them never recurses over a chain that arrived from
 /// sync (`docs/style.md`).
-public final class TaskViewList: FeatureModule {
+///
+/// It is a routable module, one that can be opened (spec section 4): its route has no head, because a window
+/// has one list of views, and its tail is the selection, so that a link to a view highlights it here and the
+/// route a window writes down names the view its list is on.
+public final class TaskViewList: Routable {
     public struct Model: Equatable, Sendable {
         public struct Row: Equatable, Sendable {
             public let id: ViewID
@@ -48,6 +52,23 @@ public final class TaskViewList: FeatureModule {
         public let problem: String?
     }
 
+    /// The address of the list in its window: no head, and the view it is on as the tail (spec section 4).
+    ///
+    /// The selection is nil in the route of the default window, which leaves the choice to the list: it starts
+    /// on the Inbox, and says so in answer to `.created`, as it did before it had a route (spec section 2).
+    public struct Route: RouteValue {
+        /// The same for every list, which is what keeps the one a window holds alive on every route it is
+        /// handed: a list is never made again by a link, so a name half typed in it survives one.
+        public var head: NoHead { NoHead() }
+
+        /// The view the list is on, and nil when the route leaves the choice to the list.
+        public let selection: ViewID?
+
+        public init(selection: ViewID?) {
+            self.selection = selection
+        }
+    }
+
     /// What a view may send. Each case is named for the control and the gesture and never for the operation
     /// it triggers, so that what a gesture means is decided here: a second way to start a rename is another
     /// case beside these, not a view that works out what to ask for (ADR-0006).
@@ -66,9 +87,11 @@ public final class TaskViewList: FeatureModule {
         case titleFieldLostFocus
         /// The toolbar button.
         case createFolderButtonTapped
+        /// The row's Open in New Window menu item, on the Mac and the iPad.
+        case openInNewWindowMenuItemChosen(ViewID)
     }
 
-    public enum Event: FeatureEvent {
+    public enum Event: RoutedEvent {
         case action(UserAction)
         case changed(ChangeSet)
 
@@ -77,27 +100,53 @@ public final class TaskViewList: FeatureModule {
         /// module's own creation, and it writes nothing. It is an event of the world and not a `UserAction`,
         /// because nobody did anything and a view has no way to send it (spec section 2).
         ///
-        /// The list answers it with the view it starts on when that view has a row, and with nothing when
-        /// it has none, as with an Inbox a person deleted before launch. A module publishes nothing (spec
+        /// The list answers it with the view it starts on, the one its route named or the Inbox when the
+        /// route named none, when that view has a row, and with nothing when it has none, as with an Inbox a
+        /// person deleted before launch or a link to a view deleted since. A module publishes nothing (spec
         /// section 2) and speaks only in answer to an event, so the first choice needs an event to answer,
         /// and as an answer it reaches the parent by the road every later choice takes, through `Output`.
         case created
+
+        /// A route applied to the live list, by a link or by the root reconciling its window: an event of the
+        /// world, like `.changed`, that no view can send (ADR-0006, amendment of 2026-10-14). The head of a
+        /// list never differs, so it is the tail alone that the list reads.
+        case route(Route)
     }
 
     public enum Output: Equatable, Sendable {
         case selected(ViewID)
+        /// A view a person asked to see in a window of its own, which only the platform can open: the list
+        /// asks, and its parent passes the request on under its own name (spec section 4, the rule of
+        /// bubbling).
+        case openInWindow(ViewID)
     }
 
     public private(set) var model: Model
+
+    /// The route the list is on, assembled from its state and never kept beside it (spec section 4): the
+    /// highlight as the model draws it, so that a route names a view only when a row of the list shows it, and
+    /// an id `.rowSelected` kept that no row holds names no view, as the model names no row for it.
+    public var route: Route { Route(selection: model.selection) }
 
     private let store: Store
 
     private var state: State
 
+    /// Made from its route, the one way a list is made (spec section 3): it starts on the view the route
+    /// names, or on the Inbox when the route leaves the choice to it, and says which in answer to `.created`.
+    ///
+    /// That choice is kept only when a row holds it, whichever its source, because a choice with no row is one
+    /// the parent is never told of: `.created` answers nothing for it, and a choice kept anyway would light up
+    /// the moment a peer's change brought the row in — a link to a view not yet synced here — beside a pane
+    /// the root never opened on it. It is the invariant `createFolder` holds for the same reason: what this
+    /// module puts on a row of its own accord goes onto a row the list holds.
+    ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
     /// came up empty would look like a database with nothing in it (spec section 5).
-    public init(store: Store) throws(StoreError) {
-        let state = State(rows: try TaskViewList.rows(of: store), selection: BuiltInTaskViews.inbox)
+    public init(store: Store, route: Route) throws(StoreError) {
+        let rows = try TaskViewList.rows(of: store)
+        let start = route.selection ?? BuiltInTaskViews.inbox
+        let state = State(rows: rows, selection: rows.contains(where: { $0.id == start }) ? start : nil)
         self.store = store
         self.state = state
         self.model = state.model
@@ -171,6 +220,14 @@ public final class TaskViewList: FeatureModule {
             return nil
         case .action(.createFolderButtonTapped):
             return createFolder()
+        case .action(.openInNewWindowMenuItemChosen(let id)):
+            // Asked of the parent, because a window is the platform's to open and what it opens is the root's
+            // to decide (spec section 4, the rule of bubbling). Nothing here moves, the highlight, an open
+            // field and its sentence included: the person did nothing to this list, and the window that opens
+            // beside it answers nothing they were told. A row that is not there asks for nothing, the way the
+            // Rename menu item on one opens no field.
+            guard state.rows.contains(where: { $0.id == id }) else { return nil }
+            return .openInWindow(id)
         case .created:
             // Answered only for a row the list holds: the answer says which view is chosen, and a view with
             // no row is not on screen to be chosen, as with an Inbox a person deleted before launch. Nothing
@@ -179,6 +236,18 @@ public final class TaskViewList: FeatureModule {
                 return nil
             }
             return .selected(selection)
+        case .route(let route):
+            // The route's choice and not a person's, and its parent already knows it, so it is answered with
+            // nothing: answered, it would have the root open again the pane it opens itself when it applies the
+            // route (spec section 3, the third flow; `docs/plans/navigation.md`, Task 2). It moves the
+            // highlight onto a row the list holds, and a view it holds no row for, a link to one that is gone,
+            // moves nothing. It moves the highlight and only that: a route carries no session state and keeps
+            // what did not change (spec sections 2 and 3), so a field a person has open and the sentence on
+            // screen stay, as they do on a `.changed`, the other event of the world that answers no gesture
+            // made in this list. A route that names no view leaves the highlight alone, because the default
+            // window chooses the Inbox itself, at creation and never again.
+            if let id = route.selection, state.rows.contains(where: { $0.id == id }) { state.selection = id }
+            return nil
         case .changed(let changes):
             // Every edit to a task is a commit that touched no view, and this list is the same afterwards,
             // so the guard is what keeps a person typing in a list out of the views table. A commit that did
@@ -334,9 +403,10 @@ public final class TaskViewList: FeatureModule {
             return nil
         }
         // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
-        // of its own accord, after a write of its own, goes onto a row the list holds, and the read that
-        // just ran is the only thing that can say whether it holds one. It does not cover `.rowSelected`,
-        // which stores the id a view names without asking the rows (left as it shipped, see #77).
+        // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` and
+        // on `.route` without one. Here the read that just ran is the only thing that can say whether the
+        // list holds the row. It does not cover `.rowSelected`, which stores the id a view names without
+        // asking the rows (left as it shipped, see #77).
         //
         // A peer can have deleted the folder between the write and this read, and a highlight on a row
         // that came back deleted is a highlight on nothing.

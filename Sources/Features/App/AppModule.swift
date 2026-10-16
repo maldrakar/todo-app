@@ -63,7 +63,9 @@ public final class AppModule: FeatureModule {
     /// with no pane rather than refusing the launch: there is no open pane to keep, which is the rule a failed
     /// read follows after a click too (owner's review of #78).
     public init(store: Store) throws(StoreError) {
-        let taskViewList = try TaskViewList(store: store)
+        // The route of the default window, which names no view, so that the list starts on its own first choice,
+        // as it did before it had a route; the root is made from a route of its own in #92.
+        let taskViewList = try TaskViewList(store: store, route: .init(selection: nil))
         self.store = store
         self.state = State(taskViewList: taskViewList, detail: nil)
         // Assembled here to finish the stored properties, because `react` is a method and Swift refuses a
@@ -115,6 +117,11 @@ public final class AppModule: FeatureModule {
     private func react(to output: TaskViewList.Output?) {
         switch output {
         case .selected(let id)?: readDetail(of: id)
+        case .openInWindow?:
+            // Nothing yet. A new window is the platform's to open, so the root passes the request on under its
+            // own name (spec section 4), and it has no output to pass it through until #92 gives it
+            // `.openWindow`; no view sends the menu item before #94.
+            break
         case nil: break
         }
     }
