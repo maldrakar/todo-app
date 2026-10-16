@@ -20,6 +20,19 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
 
     init(daysSinceEpoch: Int32) { self.daysSinceEpoch = daysSinceEpoch }
 
+    /// The UTC day a clock reading falls on, for a client with no time zone of its own.
+    ///
+    /// A day of the epoch's count is 86,400,000 milliseconds, so the reading divided by that is the day count
+    /// itself, and the civil conversion stays where it is, in `civil` and `init(year:month:day:)`. The reading
+    /// is data from outside, a machine's clock, and nothing here traps on it (`docs/style.md`): one before the
+    /// epoch is day zero, since `Store.systemNow()` reads such a clock as zero too, and one past the last day
+    /// the `Int32` count holds is that last day, which an `Int64` of milliseconds passes about fifty times over.
+    public init(millisSinceEpoch: Int64) {
+        self.init(daysSinceEpoch: Int32(clamping: max(0, millisSinceEpoch) / Day.millisPerDay))
+    }
+
+    private static let millisPerDay: Int64 = 86_400_000
+
     public init(year: Int, month: Int, day: Int) {
         let y = month <= 2 ? year - 1 : year
         let era = (y >= 0 ? y : y - 399) / 400

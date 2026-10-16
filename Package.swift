@@ -11,6 +11,8 @@ let package = Package(
         .library(name: "DeviceFile", targets: ["DeviceFile"]),
         .library(name: "FeatureModule", targets: ["FeatureModule"]),
         .library(name: "TaskViewListFeature", targets: ["TaskViewListFeature"]),
+        .library(name: "TaskListFeature", targets: ["TaskListFeature"]),
+        .library(name: "TaskScreenFeature", targets: ["TaskScreenFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
         .executable(name: "todo", targets: ["todo"]),
         .executable(name: "wasm-size-probe", targets: ["WasmSizeProbe"]),
@@ -44,9 +46,14 @@ let package = Package(
         // amendment of 2026-10-15).
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
-        // is read here rather than taken on trust: a feature depends on the core and the contract, never on
-        // another feature and never on the root module (ADR-0007).
+        // is read here rather than taken on trust: a feature depends on the core, the contract and the
+        // features it opens, never on a sibling and never on its parent, the root module included (ADR-0007).
+        // A feature it opens is its child, held in a seat of its own, which is the edge the root has to the
+        // features it holds (ADR-0009): the task list holds the task screen, and the screen knows nothing of
+        // the list.
         .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskViewList"),
+        .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
+        .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
         // The root module, which is the features' parent and not one of them: it depends on them, since
         // composing them is what it is for, and none of them depends on it (ADR-0007).
         .target(name: "AppFeature", dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature"], path: "Sources/Features/App"),
@@ -61,6 +68,8 @@ let package = Package(
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(name: "TaskViewListFeatureTests", dependencies: ["TaskViewListFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
+        .testTarget(name: "TaskListFeatureTests", dependencies: ["TaskListFeature", "TaskScreenFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
+        .testTarget(name: "TaskScreenFeatureTests", dependencies: ["TaskScreenFeature", "TodoCore", "TestSupport"]),
         .testTarget(name: "AppFeatureTests", dependencies: ["AppFeature", "TaskViewListFeature", "TodoCore", "TestSupport"]),
     ],
     swiftLanguageModes: [.v6]

@@ -38,3 +38,19 @@ import Testing
     }
     #expect(DayParseError(input: "nope").description == "not a date: nope, expected YYYY-MM-DD")
 }
+
+/// A reading of the wall clock is data from outside: a clock set before 1970 or one that saturated at the top
+/// of its range is still a reading, and neither may trap (`docs/style.md`). The UTC day is what a client with
+/// no time zone of its own takes for today, so the boundary is midnight UTC and no other.
+@Test func theDayOfAReadingIsItsUTCDay() {
+    // 2026-10-14T23:59:59.999Z, the last millisecond of the day, and the first one of the next.
+    let lastOfTheDay: Int64 = 1_792_022_399_999
+    #expect(Day(millisSinceEpoch: lastOfTheDay) == Day(year: 2026, month: 10, day: 14))
+    #expect(Day(millisSinceEpoch: lastOfTheDay + 1) == Day(year: 2026, month: 10, day: 15))
+    #expect(Day(millisSinceEpoch: lastOfTheDay + 1) - Day(millisSinceEpoch: lastOfTheDay) == 1)
+    #expect(Day(millisSinceEpoch: 0) == Day(year: 1970, month: 1, day: 1))
+    #expect(Day(millisSinceEpoch: -1) == Day(year: 1970, month: 1, day: 1), "a reading before the epoch is day zero")
+    #expect(Day(millisSinceEpoch: .min) == Day(year: 1970, month: 1, day: 1))
+    // `Int64.max` milliseconds is about 1.07e11 days, past what the `Int32` day count holds.
+    #expect(Day(millisSinceEpoch: .max).daysSinceEpoch == .max, "a reading past the last day is the last day")
+}
