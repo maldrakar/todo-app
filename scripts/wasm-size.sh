@@ -6,7 +6,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.3125 MiB. The probe measures 6,362,397 bytes with Swift 6.4.0 as this is written, so the budget is that with
+# 6.3125 MiB. The probe measures 6,362,344 bytes with Swift 6.4.0 as this is written, so the budget is that with
 # four percent to spare, rounded up to a whole 64 KiB. It was 6.25 MiB over the 6,275,518 bytes the probe measured
 # when the pin moved to Swift 6.4.0, and what has moved the reading since is the code: 6,286,422 bytes once the
 # sidebar had its route (#89), and the rest once the window held the task list, opened by the sidebar, with the
