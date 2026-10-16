@@ -1,5 +1,6 @@
 // Sources/WasmSizeProbe/main.swift
 import AppFeature
+import FeatureModule
 import QuickEntryFeature
 import TaskListFeature
 import TaskScreenFeature

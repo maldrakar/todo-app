@@ -164,7 +164,7 @@ extension Store {
             let id = row[0].string ?? ""
             let definition = ViewDefinition(filter: row[4], sort: row[5], groupBy: row[6])
             return TaskView(
-                id: ViewID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(ViewID.init),
+                id: ViewID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(ViewID.init(_:)),
                 rank: row[3].string ?? Rank.initial, filter: definition.filter, sort: definition.sort,
                 groupBy: definition.groupBy, needsNewerApp: definition.needsNewerApp,
                 createdAt: row[7].int64 ?? 0, updatedAt: row[8].int64 ?? 0

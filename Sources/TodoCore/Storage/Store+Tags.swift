@@ -73,7 +73,7 @@ extension Store {
         let tags = rows.compactMap { row -> Tag? in
             guard !row[6].bool else { return nil }
             let id = row[0].string ?? ""
-            return Tag(id: TagID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(TagID.init), rank: row[3].string ?? Rank.initial, createdAt: row[4].int64 ?? 0, updatedAt: row[5].int64 ?? 0)
+            return Tag(id: TagID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(TagID.init(_:)), rank: row[3].string ?? Rank.initial, createdAt: row[4].int64 ?? 0, updatedAt: row[5].int64 ?? 0)
         }
         return TreeRules.inTreeOrder(tags)
     }

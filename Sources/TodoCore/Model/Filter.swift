@@ -229,7 +229,7 @@ extension Filter: Codable {
         // cannot read: without the check the second reads as the first and draws the whole root list.
         case "parent":
             guard c.contains(.task) else { throw FilterError.unsupported(kind: "parent") }
-            self = .parent(try c.decodeIfPresent(String.self, forKey: .task).map(TaskID.init))
+            self = .parent(try c.decodeIfPresent(String.self, forKey: .task).map(TaskID.init(_:)))
         case "listed_in": self = .listedIn(ViewID(try c.decode(String.self, forKey: .view)))
         case "trashed": self = .trashed(try c.decode(Bool.self, forKey: .value))
         case "and": self = .and(try c.decode([Filter].self, forKey: .filters))
