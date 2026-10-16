@@ -57,8 +57,8 @@ import FeatureModule
     #expect(host.model == Recorder.Model(count: 1))
 }
 
-/// A module assembles its model again on every event, the many it ignores included, so many events leave the
-/// model equal, and a view told of each of them would redraw for nothing.
+/// The host reads the module's model after every event, the many the module ignores included, so many events
+/// leave the model equal, and a view told of each of them would redraw for nothing.
 @Test @MainActor func anEventThatLeavesTheModelEqualNotifiesNoObserver() {
     let recorder = Recorder()
     let host = ModuleHost(recorder) { _ in }
@@ -85,7 +85,7 @@ private final class Recorder: FeatureModule {
     enum UserAction: Equatable, Sendable {
         /// Moves the model.
         case counted
-        /// Assembles an equal model, the way a module answers an event it ignores.
+        /// Moves nothing, the way a module answers an event it ignores.
         case ignored
         /// Calls the world's entrance from inside `send`, the way a write calls `Store.onChange`.
         case relayed
@@ -110,8 +110,10 @@ private final class Recorder: FeatureModule {
         case ended(Event)
     }
 
-    private(set) var model = Model(count: 0)
+    var model: Model { Model(count: count) }
     private(set) var steps: [Step] = []
+
+    private var count = 0
 
     /// What the host held as each event began, read through `hostModel` when a test sets it.
     private(set) var heldByTheHost: [Model] = []
@@ -125,15 +127,15 @@ private final class Recorder: FeatureModule {
         if let hostModel { heldByTheHost.append(hostModel()) }
         defer { steps.append(.ended(event)) }
         switch event {
-        case .action(.counted), .fromWorld: model = Model(count: model.count + 1)
-        case .action(.ignored): model = Model(count: model.count)
+        case .action(.counted), .fromWorld: count += 1
+        case .action(.ignored): break
         case .action(.relayed): world?(.fromWorld)
         case .action(.relayedTwice):
-            model = Model(count: model.count + 1)
+            count += 1
             world?(.fromWorldRelaying)
             world?(.fromWorld)
         case .fromWorldRelaying:
-            model = Model(count: model.count + 1)
+            count += 1
             world?(.fromWorld)
         }
         return nil

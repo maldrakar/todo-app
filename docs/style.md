@@ -72,6 +72,20 @@ value a peer wrote is as arbitrary as one a person typed.
   arrives from sync as easily as a shallow one, and the wasm32 stack is
   64 KiB. Walks over the data are iterative. (PR #38, #40)
 
+## Modules
+
+- **A module's model is computed from its state, never stored.**
+  What a module's events move is held in one private `State`, and
+  the model is read from it:
+  `public var model: Model { state.model }`. A model kept beside the
+  state is a second copy of the same values, and the two disagree
+  the moment one is moved without the other. (PR #77, #101)
+- **A user action names the control and the gesture, never what the
+  module does about it.** `rowTapped(id)` and `backButtonTapped`, not
+  `openTask(id)` or `taskScreenDismissed`: the view reports what the
+  person did, and what that means, opening a task or closing a
+  screen, is the module's to decide. (PR #66, #101)
+
 ## Views
 
 - **A view holds no condition over a domain value and formats

@@ -23,8 +23,10 @@ import Observation
 final class ModuleHost<M: FeatureModule> where M.Output == Never {
     /// The module's model as it stood when the last event returned.
     ///
-    /// Assigned after every event, many of which leave it equal: a module assembles its model again on every
-    /// event it gets, the ones it ignores included. The host does not compare the two itself, because the
+    /// Assigned after every event, many of which leave it equal: a module computes its model from its state
+    /// on every read, and the host reads it after every event the module gets, the ones it ignores included.
+    /// It is a copy, where a module keeps none of its own (`docs/style.md`), because SwiftUI observes what
+    /// this class stores and not what the module holds. The host does not compare the two itself, because the
     /// setter the `@Observable` macro writes already does: it skips notifying when an `Equatable` value is
     /// assigned an equal one (expanded and run under Swift 6.3.3 and Xcode's 6.2.4 on 2026-10-08). The
     /// comparison is in the setter and not in the macro's `_modify`, which notifies every time, so the model

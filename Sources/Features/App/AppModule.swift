@@ -12,7 +12,7 @@ import TodoCore
 /// row's, so that the module replacing it is created in the same place from the same two things (spec
 /// section 4).
 public final class AppModule: FeatureModule {
-    /// What the root view draws: the list's model as the list assembled it, and the pane beside it.
+    /// What the root view draws: the list's model as the list computes it, and the pane beside it.
     public struct Model: Equatable, Sendable {
         /// The pane beside the list: the chosen view's title, until M3's list module takes its place.
         public struct Detail: Equatable, Sendable {
@@ -50,8 +50,9 @@ public final class AppModule: FeatureModule {
     /// `Never`: there is no module above the root to ask anything of.
     public typealias Output = Never
 
-    /// What the root view draws, assembled again after every event.
-    public private(set) var model: Model
+    /// What the root view draws, computed from the state on every read and never kept beside it, so that what
+    /// the root holds is in one place and the model cannot disagree with it (owner's review of #101).
+    public var model: Model { state.model }
 
     private let store: Store
 
@@ -68,29 +69,20 @@ public final class AppModule: FeatureModule {
         let taskViewList = try TaskViewList(store: store, route: .init(selection: nil))
         self.store = store
         self.state = State(taskViewList: taskViewList, detail: nil)
-        // Assembled here to finish the stored properties, because `react` is a method and Swift refuses a
-        // method call on `self` before every stored property holds a value, and assembled again below, once
-        // the answer has opened the pane.
-        self.model = state.model
         // The list is told it has been created and answers with the view it starts on, which is the list's
         // to choose. The answer goes through `react(to:)`, the line a click's answer goes through, so the
         // first pane opens the way every later one does and this module names no view of its own. A list
         // that starts on no row, as it does when a person deleted the Inbox, answers nothing and opens no
         // pane.
         react(to: state.taskViewList.send(.created))
-        self.model = state.model
     }
 
-    /// Hands the event to the list, reacts to what the list answers, and assembles the model again.
+    /// Hands the event to the list and reacts to what the list answers.
     ///
     /// It answers nothing, since `Output` is `Never`, and it is `@discardableResult` because every caller
     /// drops an answer that is always nil (`docs/style.md`, "One shape everywhere it fits").
     @discardableResult
     public func send(_ event: Event) -> Never? {
-        // The list's shape, which the owner's review of #77 gave it: the cases below move the state and hand
-        // the event on, and the model is assembled once when they are done, from the state, the list's model
-        // as the list left it included, so that one place decides what the root draws.
-        defer { model = state.model }
         switch event {
         case .action(.taskViewList(let action)):
             react(to: state.taskViewList.send(.action(action)))
@@ -144,8 +136,8 @@ public final class AppModule: FeatureModule {
     }
 
     /// Everything the root holds between two events: the list's module, and the pane that is open. One
-    /// value, moved by the cases of `send` and assembled into the model afterwards, which is how the list
-    /// keeps its own.
+    /// value, moved by the cases of `send`, from which the model is computed on every read, as the list's is
+    /// (owner's reviews of #77 and #101).
     ///
     /// The list is a field of the state and not a property beside it, because the tree of live modules is
     /// the navigation state (spec section 4): a screen's module is part of what the root holds, and the
@@ -157,7 +149,7 @@ public final class AppModule: FeatureModule {
         let taskViewList: TaskViewList
         var detail: Detail?
 
-        /// The model the root view draws: the list's, as the list assembled it, and the pane.
+        /// The model the root view draws: the list's, as the list computes it, and the pane.
         var model: Model {
             Model(taskViewList: taskViewList.model, detail: detail.map { Model.Detail(title: $0.title) })
         }
