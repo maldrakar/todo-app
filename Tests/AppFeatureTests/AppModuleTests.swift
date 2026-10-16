@@ -43,12 +43,13 @@ import TodoCore
     #expect(app.model.taskViewList.rows.map(\.title) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash", "Docs"])
 }
 
-/// The root assembles its model out of the list's after every event, and the list inside it is private, so a
-/// twin list over the same store, sent the same events after launch, is what the root's copy is held against:
-/// the `.created` the root sends its list at launch moves no model, so the twin is not sent one. The twin can
-/// share only the events that write nothing: sent a Return of its own, it would write the name a second time.
-/// The writes are checked by what they leave in the root's model instead, which is what a path that assembled
-/// nothing would fail, since its model would still be the one from before it.
+/// The root's model is computed from its state, the list's model included, and the list inside it is
+/// private, so a twin list over the same store, sent the same events after launch, is what the root's model
+/// is held against: the `.created` the root sends its list at launch moves no model, so the twin is not sent
+/// one. The twin can share only the events that write nothing: sent a Return of its own, it would write the
+/// name a second time. The writes are checked by what they leave in the root's model instead, which is what
+/// a root that kept a copy of the list's model would fail, since the copy would still be the one from before
+/// them.
 @Test func theRootModelIsRebuiltAfterEveryEvent() throws {
     let store = try makeStore()
     let app = try AppModule(store: store)
@@ -87,7 +88,7 @@ import TodoCore
         app.send(.action(.taskViewList(.renameMenuItemChosen(docs))))
         app.send(.action(.taskViewList(.titleFieldChanged(title))))
         let renamed = try changeSet(of: store) { app.send(.action(.taskViewList(end))) }
-        // Left unassembled, the model would still hold the old title with the draft open over it.
+        // A copy kept from before the write would still hold the old title with the draft open over it.
         #expect(app.model.taskViewList.rows.map(\.title) == builtIn + [title], "after \(end)")
         #expect(app.model.taskViewList.rows.allSatisfy { $0.draft == nil }, "after \(end)")
         let written = app.model

@@ -55,15 +55,17 @@ public final class TaskScreen: Routable {
         case closeRequested
     }
 
-    /// The title as the last read answered. It is all the screen holds besides its route and the store, so it
-    /// is kept as the model itself, with no state beside it to assemble the model from.
-    public private(set) var model: Model
+    /// What a view draws, computed from the state on every read and never kept beside it, as every module's
+    /// model is (owner's review of #101).
+    public var model: Model { state.model }
 
     /// A constant, because the head of a live module never changes and this route has no tail (spec section
     /// 3, `docs/style.md`): nothing that happens to the screen can change its address.
     public let route: Route
 
     private let store: Store
+
+    private var state: State
 
     /// Made from its route, the one way a screen is made (spec section 3). A task the store does not hold, one
     /// deleted since a link was written or one a peer deleted under a tap, is refused with `.notFound` and the
@@ -74,7 +76,7 @@ public final class TaskScreen: Routable {
         guard let task = try store.task(route.head) else { throw .notFound(route.head) }
         self.store = store
         self.route = route
-        self.model = Model(title: task.title)
+        self.state = State(title: task.title)
     }
 
     public func send(_ event: Event) -> Output? {
@@ -86,7 +88,7 @@ public final class TaskScreen: Routable {
             guard changes.tasks.contains(route.head) else { return nil }
             do {
                 guard let task = try store.task(route.head) else { return .closeRequested }
-                model = Model(title: task.title)
+                state.title = task.title
             } catch {
                 // The title stays. A read that failed says nothing about the task, and a screen emptied by it
                 // would show nothing in place of what is still likely true; the screen has no sentence of its
@@ -96,5 +98,15 @@ public final class TaskScreen: Routable {
         case .created, .route:
             return nil
         }
+    }
+
+    /// Everything the screen holds between two events besides its route and the store: the title as the last
+    /// read answered. The model is computed from it, which is the shape every module has, one with a single
+    /// field included (owner's review of #101).
+    private struct State {
+        var title: String
+
+        /// The model a view draws: the title.
+        var model: Model { Model(title: title) }
     }
 }

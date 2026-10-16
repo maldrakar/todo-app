@@ -9,9 +9,9 @@
 /// parent's to decide, in a `switch` of its own (spec section 4).
 ///
 /// A struct holding a class: a parent keeps it in a `var` of its own state, and a call that changes what the
-/// seat holds is a mutation of that state, after which the parent assembles its model once, as it does after
-/// every event (owner's review of #77). The child itself never leaves the seat: a parent reads its route and
-/// its model, and learns its choices only from its answers (ADR-0006, amendment of 2026-10-03).
+/// seat holds is a mutation of that state, which the parent's model, computed from the state, shows at its
+/// next read (owner's reviews of #77 and #101). The child itself never leaves the seat: a parent reads its
+/// route and its model, and learns its choices only from its answers (ADR-0006, amendment of 2026-10-03).
 ///
 /// `Failure` is what making the child can throw: `StoreError` for a screen that reads the store to be made,
 /// and `Never` for one that cannot fail, whose seat is applied without `try`.

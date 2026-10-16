@@ -97,11 +97,11 @@ import SQLiteKit
 }
 
 /// The way back is the route without the task, applied: the list it leaves is the one with nothing open.
-@Test func dismissingTheTaskScreenClosesIt() throws {
+@Test func theBackButtonClosesTheTaskScreen() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))
-    #expect(list.send(.action(.taskScreenDismissed)) == nil)
+    #expect(list.send(.action(.backButtonTapped)) == nil)
     #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))).model)
     #expect(list.model.task == nil)
     #expect(list.route == .init(head: BuiltInTaskViews.inbox))
@@ -109,7 +109,7 @@ import SQLiteKit
 
 /// The way back is a gesture on the screen that covered the list, so it leaves the list's sentence: one written
 /// while the screen was up, here by a link to a task that is gone, is first seen when the list is uncovered.
-@Test func dismissingTheTaskScreenLeavesTheSentenceWrittenUnderIt() throws {
+@Test func theBackButtonLeavesTheSentenceWrittenUnderIt() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
@@ -118,7 +118,7 @@ import SQLiteKit
     #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))) == nil)
     #expect(list.model.task?.title == "Buy milk", "the screen that was open stays; this is the setup")
     #expect(list.model.problem == "The task is gone.")
-    #expect(list.send(.action(.taskScreenDismissed)) == nil)
+    #expect(list.send(.action(.backButtonTapped)) == nil)
     #expect(list.model.task == nil)
     #expect(list.route == .init(head: BuiltInTaskViews.inbox))
     #expect(list.model.problem == "The task is gone.")
@@ -127,14 +127,14 @@ import SQLiteKit
 /// With no screen open the way back has nothing to close, as with the nil the platform writes after a pop the
 /// model drove, and it moves nothing at all, the sentence included: the sidebar ignores a field action with no
 /// field open for the same reason (#81).
-@Test func dismissingWithNoTaskScreenOpenMovesNothing() throws {
+@Test func theBackButtonWithNoTaskScreenOpenMovesNothing() throws {
     let store = try makeStore()
     let gone = try store.createTask(NewTask(title: "Buy milk"))
     try store.delete(task: gone)
     let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
     let told = list.model
     #expect(told.problem != nil, "the sentence is the setup; without it this proves nothing about it")
-    #expect(list.send(.action(.taskScreenDismissed)) == nil)
+    #expect(list.send(.action(.backButtonTapped)) == nil)
     #expect(list.model == told)
     #expect(list.route == .init(head: BuiltInTaskViews.inbox))
 }

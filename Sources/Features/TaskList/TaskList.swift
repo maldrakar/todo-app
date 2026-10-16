@@ -54,10 +54,11 @@ public final class TaskList: Routable {
     public enum UserAction: Equatable, Sendable {
         /// A row of the list, tapped or clicked.
         case rowTapped(TaskID)
-        /// The task screen went away by the platform's own gesture, a swipe back or the back button. It is
-        /// named for what the platform did, by the naming rule settled in the review of #66 (ADR-0006), where
+        /// The back button of the task screen, tapped, or the swipe back that does the same: SwiftUI reports
+        /// both as one write of nil through the binding that pushed the screen. It names the control and the
+        /// gesture, and closing the screen is what the list decides it means (owner's review of #101), where
         /// the spec has `taskClosed` (`docs/plans/navigation.md`, Deviations).
-        case taskScreenDismissed
+        case backButtonTapped
     }
 
     public enum Event: RoutedEvent {
@@ -81,7 +82,9 @@ public final class TaskList: Routable {
         case closeRequested
     }
 
-    public private(set) var model: Model
+    /// What a view draws, computed from the state on every read and never kept beside it, so that what the
+    /// list holds is in one place and the model cannot disagree with it (owner's review of #101).
+    public var model: Model { state.model }
 
     /// The route the list is on, assembled and never kept beside its state (spec section 4): its own head, and
     /// as the tail the route of the task screen in its seat, which names a task only while a screen is open on
@@ -115,19 +118,10 @@ public final class TaskList: Routable {
         self.head = route.head
         self.store = store
         self.state = State(rows: rows, task: task, problem: nil)
-        // Assembled here to finish the stored properties, because `apply` is a method and Swift refuses a
-        // method call on `self` before every stored property holds a value, and assembled again below, once
-        // the tail is open (the root's `init` has the same two lines for the same reason).
-        self.model = state.model
         apply(route)
-        self.model = state.model
     }
 
     public func send(_ event: Event) -> Output? {
-        // Every path ends here. The cases below move the state and say nothing about what is on screen; the
-        // model is assembled from the state once, when they are done, the open screen's model as the screen
-        // left it included (owner's review of #77).
-        defer { model = state.model }
         switch event {
         case .action(.rowTapped(let id)):
             // A row the list does not hold opens nothing and moves nothing, the sentence included, the way the
@@ -140,14 +134,15 @@ public final class TaskList: Routable {
             state.problem = nil
             apply(Route(head: head, task: TaskScreen.Route(head: id)))
             return nil
-        case .action(.taskScreenDismissed):
+        case .action(.backButtonTapped):
             // The way back is the route without the task, applied (spec section 3, the second flow). It is a
             // gesture on the screen that covered the list, so it leaves the list's sentence: one written while
             // the screen was up, by a link to a task that is gone or a reread that failed, is one the person
             // first sees now that the list is uncovered. With no screen open it moves nothing at all, since an
-            // empty seat has nothing to drop: the platform can write nil through its binding after a pop the
-            // model drove, as after `.closeRequested`, and that nil is nobody's gesture, which is why the
-            // sidebar ignores a field action with no field open (#81).
+            // empty seat has nothing to drop: the view sends this action when the platform writes nil through
+            // its binding, and the platform writes one after a pop the model drove as well, as after
+            // `.closeRequested`, when nobody tapped anything, which is why the sidebar ignores a field action
+            // with no field open (#81).
             apply(Route(head: head))
             return nil
         case .created:
@@ -256,8 +251,9 @@ public final class TaskList: Routable {
     }
 
     /// Everything the list holds between two events: the rows as the last read produced them, the seat with the
-    /// task screen in it, and the sentence a person was last told. One value, moved field by field, with the
-    /// model assembled from it afterwards (owner's review of #77).
+    /// task screen in it, and the sentence a person was last told. One value, moved field by field, and the
+    /// one place any of it is kept: the model is computed from it on every read (owner's reviews of #77 and
+    /// #101).
     ///
     /// The seat is a field of the state and not a property beside it, because the tree of live modules is the
     /// navigation state (spec section 4): the screen open in the list is part of what the list holds.
@@ -266,7 +262,7 @@ public final class TaskList: Routable {
         var task: Seat<TaskScreen, StoreError>
         var problem: String?
 
-        /// The model a view draws: the rows, the open screen's model as the screen assembled it, and the
+        /// The model a view draws: the rows, the open screen's model as the screen computes it, and the
         /// sentence, if any.
         var model: Model { Model(rows: rows, task: task.model, problem: problem) }
     }

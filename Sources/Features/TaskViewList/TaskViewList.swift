@@ -121,7 +121,9 @@ public final class TaskViewList: Routable {
         case openInWindow(ViewID)
     }
 
-    public private(set) var model: Model
+    /// What a view draws, computed from the state on every read and never kept beside it, so that what the
+    /// list holds is in one place and the model cannot disagree with it (owner's review of #101).
+    public var model: Model { state.model }
 
     /// The route the list is on, assembled from its state and never kept beside it (spec section 4): the
     /// highlight as the model draws it, so that a route names a view only when a row of the list shows it, and
@@ -146,18 +148,14 @@ public final class TaskViewList: Routable {
     public init(store: Store, route: Route) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let start = route.selection ?? BuiltInTaskViews.inbox
-        let state = State(rows: rows, selection: rows.contains(where: { $0.id == start }) ? start : nil)
         self.store = store
-        self.state = state
-        self.model = state.model
+        self.state = State(rows: rows, selection: rows.contains(where: { $0.id == start }) ? start : nil)
     }
 
     public func send(_ event: Event) -> Output? {
-        // Every path ends here. The cases below move the state field by field and say nothing about what is
-        // on screen; the model is assembled from the state once, when they are done, so there is one place
-        // that decides what a row looks like (owner's review of #77). A path that moved nothing assembles
-        // the same model again, which is the same value.
-        defer { model = state.model }
+        // The cases below move the state field by field and say nothing about what is on screen: the model is
+        // computed from the state, so there is one place that decides what a row looks like (owner's reviews
+        // of #77 and #101).
         switch event {
         case .action(.rowSelected(let id)):
             // Answered every time, the same id twice included: choosing the row that is already chosen is
@@ -443,8 +441,8 @@ public final class TaskViewList: Routable {
 
     /// Everything this module holds between two events: the rows as the last read produced them, the row a
     /// person chose, the rename they have open, and the sentence they were last told. One entity, moved
-    /// field by field, with the model assembled from it afterwards, so that nothing on screen is state in
-    /// its own right and there is no second copy to keep in step (owner's review of #77).
+    /// field by field, from which the model is computed on every read, so that nothing on screen is state in
+    /// its own right and there is no second copy to keep in step (owner's reviews of #77 and #101).
     ///
     /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the
     /// array inside it is copy-on-write, so a class buys nothing here and would put a second reference type
