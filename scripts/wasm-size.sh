@@ -6,16 +6,19 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.25 MiB. The probe measures 6,275,518 bytes with Swift 6.4.0 as this is written, so the budget is that with
-# four percent to spare, rounded up to a whole 64 KiB. It was 6.5625 MiB over the 6,595,141 bytes the same
-# probe measured with Swift 6.3.3, and what moved it is the toolchain, not the code: the pin went to the 6.4
-# that Xcode 27 ships (#88), whose release build of the same sources is smaller. It is not the 4.5 MiB the spec
-# first named either, and that figure was never measured: it was the floor measured in #3 — 3,743,306 bytes of
+# 6.3125 MiB. The probe measures 6,356,681 bytes with Swift 6.4.0 as this is written, so the budget is that with
+# four percent to spare, rounded up to a whole 64 KiB. It was 6.25 MiB over the 6,275,518 bytes the probe
+# measured when the pin moved to Swift 6.4.0, and what moved it since is the code: the root opens the task list,
+# with the task screen inside it, and quick entry, and reads and writes the window's route in its text form, and
+# the probe drives all of it (#92). Before that it was 6.5625 MiB over the 6,595,141 bytes the probe measured
+# with Swift 6.3.3, and what moved that is the toolchain, not the code: the pin went to the 6.4 that Xcode 27
+# ships (#88), whose release build of the same sources is smaller. It is not the 4.5 MiB the spec first named
+# either, and that figure was never measured: it was the floor measured in #3 — 3,743,306 bytes of
 # standard library, FoundationEssentials and SQLite with no core code reachable — plus half a megabyte of slack
 # for the code the core would add. That code, with the JSON coding it pulls in, costs 2.8 MB instead. SQLite
 # and FoundationEssentials sit inside the floor, on both sides of the comparison, so they are not what the
 # difference is made of. Moving this number is a decision, so it lives here in one place and nowhere else.
-BUDGET_BYTES=6553600
+BUDGET_BYTES=6619136
 SDK=swift-6.4.0-RELEASE_wasm
 PRODUCT=wasm-size-probe
 
