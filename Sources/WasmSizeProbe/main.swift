@@ -1,10 +1,6 @@
 // Sources/WasmSizeProbe/main.swift
 import AppFeature
 import FeatureModule
-import QuickEntryFeature
-import TaskListFeature
-import TaskScreenFeature
-import TaskViewListFeature
 import TodoCore
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -25,10 +21,10 @@ import WASILibc
 /// client, and the `todo` demo is the wrong stand-in for one: the demo carries an argument parser, a
 /// formatter and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about
 /// the core. This executable does what a web entry point will: it builds the root module over a store in
-/// memory from the text of a window's route, which is the web's address bar, and drives the root and its three
-/// screens — a selection, a rename and a new folder in the sidebar, a link applied as `.route`, quick entry
-/// creating a task, a tap that pushes the task, the way back, Cancel, and Open in New Window, whose route it
-/// writes down — with the change each write produced, and a text the codec refuses. Beside
+/// memory from a window's path, which is the web's address bar, and drives every module of the window — a
+/// selection, a rename and a new folder in the sidebar, a link applied as `.route`, quick entry creating a
+/// task, a tap in the list that pushes the task, the way back, Cancel, and Open in New Window, whose path it
+/// writes down — with the change each write produced, and a path the routes refuse. Beside
 /// that it calls the core's public API directly, and each group of calls has a client that ships it. The
 /// writes, the reads, a page and search are what the modules M3 adds will call. The filter codec and the
 /// journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in them
@@ -130,7 +126,7 @@ private enum WasmSizeProbe {
         let appStore = try Store.openInMemory(device: Store.newDeviceID(), now: { fixedNow })
         var pending: [ChangeSet] = []
         appStore.onChange = { pending.append($0) }
-        let app = try AppModule(store: appStore, route: try AppModule.Route(text: "/"))
+        let app = try AppModule(store: appStore, route: try AppModule.Route(path: "/"))
         @discardableResult
         func perform(_ event: AppModule.Event) -> AppModule.Output? {
             let output = app.send(event)
@@ -146,15 +142,15 @@ private enum WasmSizeProbe {
         let renamed = app.model.taskViewList.rows.first(where: \.isSelected)?.title ?? "none"
         perform(.action(.taskViewList(.createFolderButtonTapped)))
         let newFolder = app.model.taskViewList.rows.first(where: \.isSelected)
-        // A link, read from its text and applied, with quick entry up over the Inbox; quick entry files a task,
+        // A link, read from its path and applied, with quick entry up over the Inbox; quick entry files a task,
         // whose change reaches the list; a tap pushes the task, and the way back pops it; quick entry opened
         // again is cancelled; and a view asks for a window of its own, whose route is written down.
-        perform(.route(try AppModule.Route(text: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
+        perform(.route(try AppModule.Route(path: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
         perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
         perform(.action(.quickEntry(.addButtonTapped)))
         let filed = app.model.taskViewList.taskList?.rows.first
         if let filed { perform(.action(.taskViewList(.taskList(.rowTapped(filed.id))))) }
-        let taskRoute = app.route.text
+        let taskRoute = app.route.path
         let opened = app.model.taskViewList.taskList?.task?.title ?? "none"
         perform(.action(.taskViewList(.taskList(.backButtonTapped))))
         perform(.action(.quickEntryButtonTapped))
@@ -162,13 +158,13 @@ private enum WasmSizeProbe {
         perform(.action(.quickEntry(.cancelButtonTapped)))
         let window: String
         switch perform(.action(.taskViewList(.openInNewWindowMenuItemChosen(BuiltInTaskViews.today)))) {
-        case .openWindow(let route)?: window = route.text
+        case .openWindow(let route)?: window = route.path
         case nil: window = "none"
         }
         let root = app.model
         let refusal: RouteError?
         do {
-            _ = try AppModule.Route(text: "/view/inbox")
+            _ = try AppModule.Route(path: "/view/inbox")
             refusal = nil
         } catch {
             refusal = error
@@ -183,7 +179,7 @@ private enum WasmSizeProbe {
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
         print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
-        print("route \(app.route.text), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), list \(root.taskViewList.taskList?.rows.count ?? 0) rows with \(root.taskViewList.taskList?.task == nil ? "nothing" : "a task") open, quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
+        print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), list \(root.taskViewList.taskList?.rows.count ?? 0) rows with \(root.taskViewList.taskList?.task == nil ? "nothing" : "a task") open, quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
     }

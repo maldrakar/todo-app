@@ -25,7 +25,7 @@ private func pane(_ view: ViewID, task: TaskID? = nil, quickEntry: Bool = false)
 
 /// The table of spec section 2, a row per line, with the two rows quick entry adds where the table has one: up
 /// over a view with nothing open in it, and up over the default window.
-private let table: [(route: Route, text: String)] = [
+private let table: [(route: Route, path: String)] = [
     (.default, "/"),
     (pane(view), "/view/\(view)"),
     (pane(view, task: task), "/view/\(view)/task/\(task)"),
@@ -34,133 +34,108 @@ private let table: [(route: Route, text: String)] = [
     (Route(sidebar: .init(list: nil), quickEntry: QuickEntry.Route()), "/?quick-entry"),
 ]
 
-/// Each row written and read: the text a route writes is the row's, and the row's text reads as the route.
+/// Each row written and read: the path a route writes is the row's, and the row's path reads as the route.
 @Test func everyRowOfTheTableWritesAndReadsBack() throws {
     for row in table {
-        #expect(row.route.text == row.text)
-        #expect(try Route(text: row.text) == row.route, "reading \(row.text)")
+        #expect(row.route.path == row.path)
+        #expect(try Route(path: row.path) == row.route, "reading \(row.path)")
     }
 }
 
 /// Starting from the value: a route written down and read again is the route, which is what restoring a window
-/// from the text it kept depends on (spec section 7).
+/// from the path it kept depends on (spec section 7).
 @Test func aRouteReadsBackToTheSameValue() throws {
     for row in table {
-        #expect(try Route(text: row.route.text) == row.route, "after writing \(row.text)")
+        #expect(try Route(path: row.route.path) == row.route, "after writing \(row.path)")
     }
 }
 
-/// A task is opened inside a view's list, so it has no place before one (spec section 2).
-@Test func taskWithoutViewIsOutOfPlace() {
-    #expect(throws: RouteError.segmentOutOfPlace("task")) { try Route(text: "/task/\(task)") }
-    #expect(throws: RouteError.segmentOutOfPlace("task")) { try Route(text: "/task/\(task)/view/\(view)") }
-}
-
-/// A segment the window's route has no place for refuses the whole route and is named, wherever it stands.
-@Test func anUnknownSegmentIsRefused() {
-    #expect(throws: RouteError.unknownSegment("list")) { try Route(text: "/list/\(view)") }
-    #expect(throws: RouteError.unknownSegment("tag")) { try Route(text: "/view/\(view)/tag/\(task)") }
-    #expect(throws: RouteError.unknownSegment("edit")) { try Route(text: "/view/\(view)/task/\(task)/edit") }
-    #expect(throws: RouteError.unknownSegment("View")) { try Route(text: "/View/\(view)") }
-}
-
-/// An id is a segment `UUID(uuidString:)` reads whole, in either case, and it is kept as the command line prints it,
-/// lowercase, so that a link typed by hand opens the same view as the one the app wrote.
+/// An id reads in either case and is written as the command line prints it, lowercase, so that a link typed by
+/// hand opens the same view as the one the app wrote, and writes back as the app writes it.
 @Test func anUppercaseIDIsReadLowercased() throws {
     let shouted = "/view/\(view.rawValue.uppercased())/task/\(task.rawValue.uppercased())"
-    let read = try Route(text: shouted)
+    let read = try Route(path: shouted)
     #expect(read == pane(view, task: task))
-    #expect(read.text == "/view/\(view)/task/\(task)")
+    #expect(read.path == "/view/\(view)/task/\(task)")
 }
 
-/// What stands where an id must and does not read as one is refused as written, and `view` or `task` with
-/// nothing after it has an empty one.
-@Test func aStringThatIsNotAnIDIsRefused() {
-    #expect(throws: RouteError.notAnID("inbox")) { try Route(text: "/view/inbox") }
-    #expect(throws: RouteError.notAnID("42")) { try Route(text: "/view/\(view)/task/42") }
-    #expect(throws: RouteError.notAnID("\(view)x")) { try Route(text: "/view/\(view)x") }
-    #expect(throws: RouteError.notAnID("")) { try Route(text: "/view") }
-    #expect(throws: RouteError.notAnID("")) { try Route(text: "/view/\(view)/task") }
-}
-
-/// `UUID(uuidString:)` stops reading at a NUL, so an id with a NUL and anything after it would read as the id before
-/// it. The whole segment has to be the id, or it is refused as written.
-@Test func anIDWithAnythingAfterANULIsRefused() {
-    let view = "\(view)\u{0}junk"
-    #expect(throws: RouteError.notAnID(view)) { try Route(text: "/view/\(view)") }
-    let task = "\(task)\u{0}"
-    #expect(throws: RouteError.notAnID(task)) { try Route(text: "/view/\(BuiltInTaskViews.inbox)/task/\(task)") }
+/// Each route reads its own part of the path and refuses what it cannot read, and the window refuses with what it
+/// threw: here the list's route, which finds `task` before a view, `view` after the task and a word it does not
+/// know, the task screen's route, which finds no id after `task`, and the core's reading of an id, which reads one
+/// only whole.
+@Test func whatARouteRefusesInThePathIsWhatTheWindowRefuses() {
+    #expect(throws: RouteError.segmentOutOfPlace("task")) { try Route(path: "/task/\(task)") }
+    #expect(throws: RouteError.segmentOutOfPlace("view")) { try Route(path: "/view/\(view)/task/\(task)/view/\(view)") }
+    #expect(throws: RouteError.unknownSegment("edit")) { try Route(path: "/view/\(view)/task/\(task)/edit") }
+    #expect(throws: RouteError.notAnID("42")) { try Route(path: "/view/\(view)/task/42") }
+    #expect(throws: RouteError.notAnID("inbox")) { try Route(path: "/view/inbox") }
+    #expect(throws: RouteError.notAnID("\(view)\u{0}junk")) { try Route(path: "/view/\(view)\u{0}junk") }
+    #expect(throws: RouteError.notAnID("\(task)\u{0}")) { try Route(path: "/view/\(BuiltInTaskViews.inbox)/task/\(task)\u{0}") }
 }
 
 /// `quick-entry` is the one query item the window knows.
 @Test func anUnknownQueryItemIsRefused() {
-    #expect(throws: RouteError.unknownQuery("search")) { try Route(text: "/?search") }
-    #expect(throws: RouteError.unknownQuery("sheet")) { try Route(text: "/view/\(view)?quick-entry&sheet") }
-    #expect(throws: RouteError.unknownQuery("Quick-Entry")) { try Route(text: "/?Quick-Entry") }
+    #expect(throws: RouteError.unknownQuery("search")) { try Route(path: "/?search") }
+    #expect(throws: RouteError.unknownQuery("sheet")) { try Route(path: "/view/\(view)?quick-entry&sheet") }
+    #expect(throws: RouteError.unknownQuery("Quick-Entry")) { try Route(path: "/?Quick-Entry") }
 }
 
 /// A trailing slash leaves an empty segment after it, which is no segment the route has a place for.
 @Test func aTrailingSlashIsRefused() {
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "/view/\(view)/") }
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "/view/\(view)/task/\(task)/") }
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "/view/") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "/view/\(view)/") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "/view/\(view)/task/\(task)/") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "/view/") }
 }
 
 /// The empty string is not `/`: a caller that stripped a link down to nothing has no route to hand on, and the
 /// codec does not guess the default window for it.
 @Test func anEmptyStringIsRefused() {
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "") }
 }
 
 /// `quick-entry` is a bare flag: no screen in this epic opens with an argument, and the text form for one is
 /// settled when the first screen needs one (spec section 2).
 @Test func aQuickEntryWithAValueIsRefused() {
-    #expect(throws: RouteError.unknownQuery("quick-entry=1")) { try Route(text: "/?quick-entry=1") }
-    #expect(throws: RouteError.unknownQuery("quick-entry=")) { try Route(text: "/view/\(view)?quick-entry=") }
+    #expect(throws: RouteError.unknownQuery("quick-entry=1")) { try Route(path: "/?quick-entry=1") }
+    #expect(throws: RouteError.unknownQuery("quick-entry=")) { try Route(path: "/view/\(view)?quick-entry=") }
 }
 
 /// A string that does not begin with `/` is refused with what stands before its first slash, which names the
 /// scheme a caller forgot to strip (spec section 2: the caller strips the scheme and the site).
 @Test func aStringThatDoesNotBeginWithASlashIsRefused() {
-    #expect(throws: RouteError.unknownSegment("view")) { try Route(text: "view/\(view)") }
-    #expect(throws: RouteError.unknownSegment("todo:")) { try Route(text: "todo:///view/\(view)") }
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "?quick-entry") }
+    #expect(throws: RouteError.unknownSegment("view")) { try Route(path: "view/\(view)") }
+    #expect(throws: RouteError.unknownSegment("todo:")) { try Route(path: "todo:///view/\(view)") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "?quick-entry") }
 }
 
-/// A doubled slash is an empty segment wherever it stands, the place of an id included.
+/// A doubled slash is an empty segment wherever it stands, the place of an id included: the window keeps the empty
+/// segments of its path for the routes to refuse.
 @Test func aDoubledSlashIsRefused() {
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "//") }
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "//view/\(view)") }
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "/view//\(view)") }
-    #expect(throws: RouteError.unknownSegment("")) { try Route(text: "/view/\(view)//task/\(task)") }
-}
-
-/// A window has one pane and the pane one task, so `view` and `task` each have one place, and a second one is
-/// out of it, as `view` is after `task`.
-@Test func aSegmentASecondTimeIsOutOfPlace() {
-    #expect(throws: RouteError.segmentOutOfPlace("view")) { try Route(text: "/view/\(view)/view/\(view)") }
-    #expect(throws: RouteError.segmentOutOfPlace("task")) { try Route(text: "/view/\(view)/task/\(task)/task/\(task)") }
-    #expect(throws: RouteError.segmentOutOfPlace("view")) { try Route(text: "/view/\(view)/task/\(task)/view/\(view)") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "//") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "//view/\(view)") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "/view//\(view)") }
+    #expect(throws: RouteError.unknownSegment("")) { try Route(path: "/view/\(view)//task/\(task)") }
 }
 
 /// A window has one quick entry, so its query item has one place too, and the same item again is out of it
 /// rather than unknown.
 @Test func quickEntryASecondTimeIsOutOfPlace() {
-    #expect(throws: RouteError.segmentOutOfPlace("quick-entry")) { try Route(text: "/?quick-entry&quick-entry") }
+    #expect(throws: RouteError.segmentOutOfPlace("quick-entry")) { try Route(path: "/?quick-entry&quick-entry") }
 }
 
 /// A `?` opens a query, and a query of nothing, or an item of nothing after an `&`, is an empty item, which is
 /// no item the window knows: the writer never puts a `?` without an item after it.
 @Test func anEmptyQueryItemIsRefused() {
-    #expect(throws: RouteError.unknownQuery("")) { try Route(text: "/?") }
-    #expect(throws: RouteError.unknownQuery("")) { try Route(text: "/view/\(view)?") }
-    #expect(throws: RouteError.unknownQuery("")) { try Route(text: "/?quick-entry&") }
-    #expect(throws: RouteError.unknownQuery("")) { try Route(text: "/?&quick-entry") }
+    #expect(throws: RouteError.unknownQuery("")) { try Route(path: "/?") }
+    #expect(throws: RouteError.unknownQuery("")) { try Route(path: "/view/\(view)?") }
+    #expect(throws: RouteError.unknownQuery("")) { try Route(path: "/?quick-entry&") }
+    #expect(throws: RouteError.unknownQuery("")) { try Route(path: "/?&quick-entry") }
 }
 
 /// Every offence is found reading from the left, so a path that is wrong in two places is refused for the
-/// first, and the query is read only after the path.
+/// first, and the query is read only after the path, its items from the left too.
 @Test func theFirstOffenceFromTheLeftIsTheOneNamed() {
-    #expect(throws: RouteError.notAnID("x")) { try Route(text: "/view/x/note") }
-    #expect(throws: RouteError.unknownSegment("note")) { try Route(text: "/note?search") }
+    #expect(throws: RouteError.notAnID("x")) { try Route(path: "/view/x/note") }
+    #expect(throws: RouteError.unknownSegment("note")) { try Route(path: "/note?search") }
+    #expect(throws: RouteError.unknownQuery("search")) { try Route(path: "/?search&quick-entry&quick-entry") }
 }

@@ -5,12 +5,12 @@ import TodoCore
 
 /// The tasks of one view, by title, and the task opened from among them.
 ///
-/// It takes the pane beside the sidebar, in a seat of the root's, and it is the first parent below the root: the
-/// task screen opened from a row is its child, held in a seat of its own, so the root's module never learns that a
-/// list opens a task and its code does not grow when the task screen learns to open something (spec section 1);
-/// the window's text form, which spells the whole window, gains a segment then (`AppModule.Route`). What it holds
-/// is what makes the navigation real and nothing more; sections, grouping, ordering and completion are M4's
-/// (spec section 10).
+/// It is the sidebar's child, opened by a choice there and held in a seat of the sidebar's (ADR-0009), and it is
+/// drawn in the pane beside the sidebar on the Mac. The task screen opened from a row is its child, held in a seat
+/// of its own, so neither the sidebar nor the root learns that a list opens a task, and their code does not grow
+/// when the task screen learns to open something (spec section 1); the task screen's route reads and writes its
+/// own part of the window's path then, as this list's route does. What it holds is what makes the navigation real
+/// and nothing more; sections, grouping, ordering and completion are M4's (spec section 10).
 ///
 /// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the
 /// task open in it, so that a link to a task opens the list with the task screen in it, and the route a window
@@ -37,6 +37,10 @@ public final class TaskList: Routable {
     }
 
     /// The address of the list: the view it lists, and the task open in it as the tail (spec section 2).
+    ///
+    /// In a window's path it is `view/<id>` followed by the task screen's part, and this route reads and writes
+    /// its own part and hands the rest to the task screen's route, knowing that route's word and nothing more of
+    /// its spelling.
     public struct Route: RouteValue {
         /// The view the list is on, which is what makes this list this one: a route to another view is
         /// another list, which the seat holding this one makes in its place (spec section 3).
@@ -48,6 +52,34 @@ public final class TaskList: Routable {
         public init(head: ViewID, task: TaskScreen.Route? = nil) {
             self.head = head
             self.task = task
+        }
+
+        /// The word before the view's id in a window's path.
+        private static let word = "view"
+
+        /// Reads the path it is handed whole: `view/<id>` from the front, the id whole and in either case through
+        /// the core (`EntityID(uuidString:)`), then the task screen's part when what follows begins with its word.
+        /// Whatever is left is refused, and so is a front that is not `view`: this route's word or the task
+        /// screen's is out of place there, since each has one place, and any other segment is unknown, the empty
+        /// one a doubled or trailing slash leaves included. Read from the left, so the first offence is the one
+        /// named.
+        package init(reading path: inout ArraySlice<String>) throws(RouteError) {
+            let word = path.popFirst() ?? ""
+            guard word == Route.word else { throw Route.refusal(of: word) }
+            let head = try path.popID(readBy: ViewID.init(uuidString:))
+            let task: TaskScreen.Route? = if path.first == TaskScreen.Route.word { try TaskScreen.Route(reading: &path) } else { nil }
+            if let rest = path.first { throw Route.refusal(of: rest) }
+            self.init(head: head, task: task)
+        }
+
+        /// This route's part of a window's path, its word and the view's id as `EntityID.description` prints it,
+        /// and the task screen's part after it when a task is open.
+        package var segments: [String] { [Route.word, head.description] + (task?.segments ?? []) }
+
+        /// A segment where this route cannot read it: a word this route or the task screen's knows is out of
+        /// place, and anything else is unknown.
+        private static func refusal(of segment: String) -> RouteError {
+            segment == word || segment == TaskScreen.Route.word ? .segmentOutOfPlace(segment) : .unknownSegment(segment)
         }
     }
 

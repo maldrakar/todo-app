@@ -46,13 +46,23 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func theDefaultWindowOpensTheListOnTheSidebarsChoice() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     #expect(app.model.taskViewList.selection == inbox)
     #expect(app.model.taskViewList.taskList == (try listOn(inbox, in: store)))
     #expect(app.model.taskViewList.taskList?.rows.map(\.title) == ["Buy milk"])
     #expect(app.model.taskViewList.problem == nil)
     #expect(app.model.quickEntry == nil)
-    #expect(app.route.text == "/view/\(inbox)")
+    #expect(app.route.path == "/view/\(inbox)")
+}
+
+/// A root made with no route is the default window's: a caller with no route to hand on spells none (owner's
+/// review of #103).
+@Test func aRootMadeWithNoRouteIsTheDefaultWindow() throws {
+    let store = try makeStore()
+    let app = try AppModule(store: store)
+    let named = try AppModule(store: store, route: .default)
+    #expect(app.model == named.model)
+    #expect(app.route == named.route)
 }
 
 /// A person who deleted the Inbox leaves the sidebar starting on no row: no list opens, nothing is said, and the
@@ -60,7 +70,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func theDefaultWindowWithNoInboxOpensNoList() throws {
     let store = try makeStore()
     try store.delete(view: inbox)
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     #expect(app.model.taskViewList.selection == nil)
     #expect(app.model.taskViewList.taskList == nil)
     #expect(app.model.taskViewList.problem == nil)
@@ -71,7 +81,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func theRootsOwnCreatedAnswersNothingAndMovesNothing() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(inbox)/task/\(open)?quick-entry"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(open)?quick-entry"))
     let model = app.model
     let route = app.route
     #expect(app.send(.created) == nil)
@@ -85,12 +95,12 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let store = try makeStore()
     let today = BuiltInTaskViews.today
     let id = try store.createTask(NewTask(title: "Call the bank", when: Day(millisSinceEpoch: Store.systemNow())))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(today)/task/\(id)"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(today)/task/\(id)"))
     #expect(app.model.taskViewList.selection == today)
     #expect(app.model.taskViewList.taskList == (try listOn(today, task: id, in: store)))
     #expect(app.model.taskViewList.taskList?.task?.title == "Call the bank")
     #expect(app.model.taskViewList.problem == nil)
-    #expect(app.route.text == "/view/\(today)/task/\(id)")
+    #expect(app.route.path == "/view/\(today)/task/\(id)")
 }
 
 /// A window made from a link to a view that is gone, or restored onto one: the list cannot be made, and the window
@@ -100,7 +110,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let store = try makeStore()
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(gone.view)"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(gone.view)"))
     #expect(app.send(.created) == nil)
     #expect(app.model.taskViewList.selection == nil)
     #expect(app.model.taskViewList.taskList == nil)
@@ -113,21 +123,21 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func aTapOnATaskOpensItAndTheRouteSaysSo() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     #expect(app.send(.action(.taskViewList(.taskList(.rowTapped(id))))) == nil)
     #expect(app.model.taskViewList.taskList?.task?.title == "Buy milk")
-    #expect(app.route.text == "/view/\(inbox)/task/\(id)")
+    #expect(app.route.path == "/view/\(inbox)/task/\(id)")
 }
 
 /// The way back is the route without the task, applied (spec section 3, the second flow).
 @Test func theBackButtonClosesTheTaskScreenAndTheRouteSaysSo() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(inbox)/task/\(id)"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"))
     #expect(app.send(.action(.taskViewList(.taskList(.backButtonTapped)))) == nil)
     #expect(app.model.taskViewList.taskList == (try listOn(inbox, in: store)))
     #expect(app.model.taskViewList.taskList?.task == nil)
-    #expect(app.route.text == "/view/\(inbox)")
+    #expect(app.route.path == "/view/\(inbox)")
 }
 
 /// A link to a task in another view, while a task of a third is open: the sidebar moves its highlight, and its
@@ -140,15 +150,15 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let home = try taggedView("Home", in: store)
     let report = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
     let milk = try store.createTask(NewTask(title: "Buy milk", tags: [home.tag]))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)/task/\(report)"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)/task/\(report)"))
     #expect(app.model.taskViewList.taskList?.task?.title == "Write the report", "the task of the third view is the setup")
-    #expect(app.send(.route(try Route(text: "/view/\(home.view)/task/\(milk)"))) == nil)
+    #expect(app.send(.route(try Route(path: "/view/\(home.view)/task/\(milk)"))) == nil)
     #expect(app.model.taskViewList.selection == home.view)
     #expect(app.model.taskViewList.taskList == (try listOn(home.view, task: milk, in: store)))
     #expect(app.model.taskViewList.taskList?.rows.map(\.title) == ["Buy milk"])
     #expect(app.model.taskViewList.taskList?.task?.title == "Buy milk")
     #expect(app.model.taskViewList.problem == nil)
-    #expect(app.route.text == "/view/\(home.view)/task/\(milk)")
+    #expect(app.route.path == "/view/\(home.view)/task/\(milk)")
 }
 
 /// A link to a task deleted since opens what still exists: the list is made, the task screen is not, and the
@@ -159,14 +169,14 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let kept = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
     let gone = try store.createTask(NewTask(title: "File the expenses", tags: [work.tag]))
     try store.delete(task: gone)
-    let app = try AppModule(store: store, route: .default)
-    #expect(app.send(.route(try Route(text: "/view/\(work.view)/task/\(gone)"))) == nil)
+    let app = try AppModule(store: store)
+    #expect(app.send(.route(try Route(path: "/view/\(work.view)/task/\(gone)"))) == nil)
     #expect(app.model.taskViewList.selection == work.view)
     #expect(app.model.taskViewList.taskList?.rows.map(\.id) == [kept])
     #expect(app.model.taskViewList.taskList?.task == nil)
     #expect(app.model.taskViewList.taskList?.problem == "The task is gone.")
     #expect(app.model.taskViewList.problem == nil)
-    #expect(app.route.text == "/view/\(work.view)")
+    #expect(app.route.path == "/view/\(work.view)")
 }
 
 /// Applying a route reconciles and never rebuilds (spec section 3): a link into a task of the view that is open
@@ -174,16 +184,16 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func aLinkIntoTheOpenListKeepsItsSessionState() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     let rows = try rowsBeforeAnUnreadTask(in: app, of: store)
     #expect(app.send(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today)))) == nil)
     #expect(app.send(.action(.taskViewList(.titleFieldChanged("Soon")))) == nil)
-    #expect(app.send(.route(try Route(text: "/view/\(inbox)/task/\(open)"))) == nil)
+    #expect(app.send(.route(try Route(path: "/view/\(inbox)/task/\(open)"))) == nil)
     #expect(app.model.taskViewList.rows.first { $0.id == BuiltInTaskViews.today }?.draft == "Soon")
     #expect(app.model.taskViewList.selection == inbox)
     #expect(app.model.taskViewList.taskList?.task?.title == "Buy milk")
     #expect(app.model.taskViewList.taskList?.rows == rows, "the same list, since a list made afresh reads the task written since")
-    #expect(app.route.text == "/view/\(inbox)/task/\(open)")
+    #expect(app.route.path == "/view/\(inbox)/task/\(open)")
 }
 
 /// The list whose view was deleted asks the sidebar to close it, and the sidebar drops it: neither the root nor the
@@ -192,7 +202,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func aViewDeletedUnderTheListClosesItThroughTheChild() throws {
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"))
     #expect(app.model.taskViewList.taskList != nil, "the list is open on the view before it goes")
     let deleted = try changeSet(of: store) { try store.delete(view: work.view) }
     #expect(app.send(.changed(deleted)) == nil)
@@ -208,7 +218,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func aChangeReachesEveryModuleInTheWindow() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(inbox)/task/\(id)?quick-entry"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)?quick-entry"))
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Call the")))) == nil)
     let changes = try [
         changeSet(of: store) { try store.createView(NewTaskView(title: "Docs")) },
@@ -229,7 +239,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
     let id = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)/task/\(id)?quick-entry"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)/task/\(id)?quick-entry"))
     let changes = try [
         changeSet(of: store) { try store.createTask(NewTask(title: "File the expenses", tags: [work.tag])) },
         changeSet(of: store) { try store.update(task: id, [.title("Write the summary")]) },
@@ -249,15 +259,15 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 /// after the `send` that wrote, as it learns of a peer's (spec section 5).
 @Test func quickEntryOpensDrawsAndClosesWhenItAsks() throws {
     let store = try makeStore()
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
     #expect(app.model.quickEntry?.draft == "")
-    #expect(app.route.text == "/view/\(inbox)?quick-entry")
+    #expect(app.route.path == "/view/\(inbox)?quick-entry")
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
     #expect(app.model.quickEntry?.draft == "Buy milk")
     let created = try changeSet(of: store) { #expect(app.send(.action(.quickEntry(.addButtonTapped))) == nil) }
     #expect(app.model.quickEntry == nil)
-    #expect(app.route.text == "/view/\(inbox)")
+    #expect(app.route.path == "/view/\(inbox)")
     #expect(try inboxTitles(of: store) == ["Buy milk"])
     #expect(app.send(.changed(created)) == nil)
     #expect(app.model.taskViewList.taskList?.rows.map(\.title) == ["Buy milk"])
@@ -266,7 +276,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 /// The button pressed a second time keeps the quick entry that is up, with its draft, since it has no head to
 /// differ by (spec section 3).
 @Test func theQuickEntryButtonKeepsTheOneThatIsUp() throws {
-    let app = try AppModule(store: try makeStore(), route: .default)
+    let app = try AppModule(store: try makeStore())
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
@@ -277,13 +287,13 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 /// the draft goes with it and nothing is written.
 @Test func quickEntrysCancelButtonClosesIt() throws {
     let store = try makeStore()
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
     let written = try store.journal(after: 0).count
     #expect(app.send(.action(.quickEntry(.cancelButtonTapped))) == nil)
     #expect(app.model.quickEntry == nil)
-    #expect(app.route.text == "/view/\(inbox)")
+    #expect(app.route.path == "/view/\(inbox)")
     #expect(try store.journal(after: 0).count == written)
 }
 
@@ -295,10 +305,10 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let store = try makeStore()
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
-    #expect(app.send(.route(try Route(text: "/view/\(gone.view)"))) == nil)
+    #expect(app.send(.route(try Route(path: "/view/\(gone.view)"))) == nil)
     #expect(app.model.quickEntry == nil, "the link closed quick entry; this is the setup")
     #expect(app.model.taskViewList.problem == "The list could not be opened.", "the sentence is the setup; without it this proves nothing")
     let model = app.model
@@ -319,8 +329,8 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let report = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)?quick-entry"))
-    #expect(app.send(.route(try Route(text: "/view/\(gone.view)?quick-entry"))) == nil)
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)?quick-entry"))
+    #expect(app.send(.route(try Route(path: "/view/\(gone.view)?quick-entry"))) == nil)
     let sentence = try #require(app.model.taskViewList.problem, "the sentence is the setup; without it this proves nothing")
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
     #expect(app.model.quickEntry?.draft == "Buy milk", "quick entry took the keystroke")
@@ -333,10 +343,10 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 /// it: a half-typed quick entry is session state, which no route carries (spec section 2).
 @Test func aLinkWithoutQuickEntryClosesTheOpenOne() throws {
     let store = try makeStore()
-    let app = try AppModule(store: store, route: .default)
+    let app = try AppModule(store: store)
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
-    #expect(app.send(.route(try Route(text: "/view/\(inbox)"))) == nil)
+    #expect(app.send(.route(try Route(path: "/view/\(inbox)"))) == nil)
     #expect(app.model.quickEntry == nil)
     #expect(try inboxTitles(of: store).isEmpty)
     #expect(app.send(.action(.quickEntryButtonTapped)) == nil)
@@ -347,7 +357,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 /// own name, with the sidebar's own route for the window (spec section 4, the rule of bubbling): the root never
 /// spells its grandchild's route. Nothing else moves in the window that asked.
 @Test func openInNewWindowClimbsToTheRoot() throws {
-    let app = try AppModule(store: try makeStore(), route: .default)
+    let app = try AppModule(store: try makeStore())
     let model = app.model
     let route = app.route
     let today = BuiltInTaskViews.today
@@ -356,7 +366,7 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
         Issue.record("the root answers with a window to open, and answered \(String(describing: output))")
         return
     }
-    #expect(window.text == "/view/\(today)")
+    #expect(window.path == "/view/\(today)")
     #expect(window == Route(sidebar: .init(list: .init(head: today)), quickEntry: nil))
     #expect(app.model == model)
     #expect(app.route == route)
@@ -368,14 +378,14 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
     let report = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)/task/\(report)?quick-entry"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)/task/\(report)?quick-entry"))
     let rows = try rowsBeforeAnUnreadTask(in: app, of: store, tags: [work.tag])
     #expect(app.send(.route(.default)) == nil)
     #expect(app.model.taskViewList.selection == work.view)
     #expect(app.model.taskViewList.taskList?.task?.title == "Write the report")
     #expect(app.model.taskViewList.taskList?.rows == rows, "the same list, since a list made afresh reads the task written since")
     #expect(app.model.quickEntry == nil)
-    #expect(app.route.text == "/view/\(work.view)/task/\(report)")
+    #expect(app.route.path == "/view/\(work.view)/task/\(report)")
 }
 
 /// A click on the highlighted view is the list's route with no task, applied to the list that is there, so the
@@ -384,12 +394,12 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
 @Test func aClickOnTheHighlightedViewReturnsToItsList() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(inbox)/task/\(open)"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(open)"))
     let rows = try rowsBeforeAnUnreadTask(in: app, of: store)
     #expect(app.send(.action(.taskViewList(.rowSelected(inbox)))) == nil)
     #expect(app.model.taskViewList.taskList?.task == nil)
     #expect(app.model.taskViewList.taskList?.rows == rows, "the same list, since a list made afresh reads the task written since")
-    #expect(app.route.text == "/view/\(inbox)")
+    #expect(app.route.path == "/view/\(inbox)")
 }
 
 /// A link to a view that is gone leaves the list that was open, and the sidebar says so in its own model (spec
@@ -399,11 +409,11 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     let work = try taggedView("Work", in: store)
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
-    let app = try AppModule(store: store, route: try Route(text: "/view/\(work.view)"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"))
     let before = app.model.taskViewList
-    #expect(app.send(.route(try Route(text: "/view/\(gone.view)"))) == nil)
+    #expect(app.send(.route(try Route(path: "/view/\(gone.view)"))) == nil)
     #expect(app.model.taskViewList.problem == "The list could not be opened.")
     #expect(app.model.taskViewList.taskList == before.taskList)
     #expect(app.model.taskViewList.selection == before.selection)
-    #expect(app.route.text == "/view/\(work.view)")
+    #expect(app.route.path == "/view/\(work.view)")
 }

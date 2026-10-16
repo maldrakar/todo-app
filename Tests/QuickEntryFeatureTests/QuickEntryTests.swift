@@ -1,5 +1,6 @@
 import Testing
 import TestSupport
+import FeatureModule
 import QuickEntryFeature
 @testable import TodoCore
 import SQLiteKit
@@ -162,4 +163,22 @@ private func inbox(of store: Store) throws -> [String] {
     let before = entry.model
     #expect(entry.send(.route(.init())) == nil)
     #expect(entry.model == before)
+}
+
+/// Quick entry's route owns the `quick-entry` item of a window's query, a bare flag: it reads it from the front of
+/// the items and leaves what follows for the window, and it writes it.
+@Test func theRouteReadsAndWritesItsQueryItem() throws {
+    var items: ArraySlice = ["quick-entry", "search"]
+    #expect(try QuickEntry.Route(reading: &items) == .init())
+    #expect(items == ["search"])
+    #expect(QuickEntry.Route().items == ["quick-entry"])
+}
+
+/// Any other item is not quick entry's, a value on its own included, since no screen in this epic opens with an
+/// argument (spec section 2).
+@Test func theRouteRefusesAnyOtherItem() {
+    for item in ["search", "quick-entry=1", "Quick-Entry", ""] {
+        var items: ArraySlice = [item]
+        #expect(throws: RouteError.unknownQuery(item)) { try QuickEntry.Route(reading: &items) }
+    }
 }

@@ -56,13 +56,12 @@ let package = Package(
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
         .target(name: "QuickEntryFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/QuickEntry"),
         // The root module, which is the features' parent and not one of them: it depends on them, since
-        // composing them is what it is for, and none of them depends on it (ADR-0007). It opens the sidebar,
-        // the task list and quick entry, and it names the task screen too, which the task list opens and not
-        // the root: the root writes and reads the whole window's route in its one text form, in which the task
-        // open in the list is a segment (spec section 2).
+        // composing them is what it is for, and none of them depends on it (ADR-0007). It opens the sidebar and
+        // quick entry, its children, and depends on those alone (ADR-0009): the task list is the sidebar's, and
+        // each route reads and writes its own part of the window's path, so the root names nothing below them.
         .target(
             name: "AppFeature",
-            dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature"],
+            dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature", "QuickEntryFeature"],
             path: "Sources/Features/App"
         ),
         // The test helpers as an ordinary target: a test target cannot be depended on, and every feature's
@@ -71,7 +70,7 @@ let package = Package(
         .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
         .executableTarget(
             name: "WasmSizeProbe",
-            dependencies: ["TodoCore", "FeatureModule", "AppFeature", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature"]
+            dependencies: ["TodoCore", "FeatureModule", "AppFeature"]
         ),
         .testTarget(name: "SQLiteKitTests", dependencies: ["SQLiteKit"]),
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
@@ -80,11 +79,14 @@ let package = Package(
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",
-            dependencies: ["TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "TodoCore", "SQLiteKit", "TestSupport"]
+            dependencies: ["TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]
         ),
-        .testTarget(name: "TaskListFeatureTests", dependencies: ["TaskListFeature", "TaskScreenFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
-        .testTarget(name: "TaskScreenFeatureTests", dependencies: ["TaskScreenFeature", "TodoCore", "TestSupport"]),
-        .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
+        .testTarget(
+            name: "TaskListFeatureTests",
+            dependencies: ["TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]
+        ),
+        .testTarget(name: "TaskScreenFeatureTests", dependencies: ["TaskScreenFeature", "FeatureModule", "TodoCore", "TestSupport"]),
+        .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(
             name: "AppFeatureTests",
             dependencies: ["AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature", "TodoCore", "TestSupport"]

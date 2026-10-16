@@ -80,6 +80,16 @@ public final class TaskViewList: Routable {
         public init(list: TaskList.Route?) {
             self.list = list
         }
+
+        /// Reads the list from a window's path, owning no segment of its own: it hands the path whole to the
+        /// list's route, which reads it to the end or refuses it, and an empty path names no list.
+        package init(reading path: inout ArraySlice<String>) throws(RouteError) {
+            let list: TaskList.Route? = if path.isEmpty { nil } else { try TaskList.Route(reading: &path) }
+            self.init(list: list)
+        }
+
+        /// This route's part of a window's path, which is its list's, and nothing when it names no list.
+        package var segments: [String] { list?.segments ?? [] }
     }
 
     /// What a view may send. Each case is named for the control and the gesture and never for the operation

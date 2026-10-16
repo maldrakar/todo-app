@@ -1,5 +1,6 @@
 import Testing
 import TestSupport
+import FeatureModule
 import TaskListFeature
 import TaskScreenFeature
 import TaskViewListFeature
@@ -719,4 +720,21 @@ private func rowsBeforeAnUnreadTask(in list: TaskViewList, of store: Store) thro
     let before = list.model
     #expect(list.send(.action(.openInNewWindowMenuItemChosen(ViewID()))) == nil)
     #expect(list.model == before)
+}
+
+/// The sidebar's route owns no segment of a window's path: it hands the path whole to its list's route, an empty
+/// path naming no list, and writes what its list writes, nothing for no list.
+@Test func theRouteHandsThePathToItsList() throws {
+    let view = BuiltInTaskViews.today.rawValue
+    var empty: ArraySlice<String> = []
+    let none = try TaskViewList.Route(reading: &empty)
+    #expect(none == .init(list: nil))
+    #expect(none.segments == [])
+    var path: ArraySlice = ["view", view]
+    let route = try TaskViewList.Route(reading: &path)
+    #expect(route == on(BuiltInTaskViews.today))
+    #expect(path.isEmpty)
+    #expect(route.segments == ["view", view])
+    var task: ArraySlice = ["task", view]
+    #expect(throws: RouteError.segmentOutOfPlace("task"), "what the list's route refuses") { try TaskViewList.Route(reading: &task) }
 }

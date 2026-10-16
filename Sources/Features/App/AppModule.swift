@@ -15,8 +15,8 @@ import TodoCore
 /// outside one (owner's decision of 2026-10-16; `State` says why).
 ///
 /// It is a routable module (spec section 4), and its route is the route of the window: what a link carries, what
-/// a window is restored from and what the web's address bar shows, each through the route's one text form (spec
-/// section 2).
+/// a window is restored from and what the web's address bar shows, each through the route's one text form, `path`
+/// (spec section 2).
 public final class AppModule: Routable {
     /// What the root view draws: each child's model as the child computes it, carried whole.
     public struct Model: Equatable, Sendable {
@@ -82,10 +82,13 @@ public final class AppModule: Routable {
     /// the root names no view of its own (ADR-0006, amendment of 2026-10-03). Then it is told it was created, as
     /// every child is, and quick entry comes last.
     ///
+    /// The route defaults to the default window, so that a caller with no route to hand on spells none (owner's
+    /// review of #103, as quick entry's `init` has it since #102).
+    ///
     /// Throws what the sidebar's `init` throws and nothing else, as M2's root did: a window is not made around a
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A list that cannot be
     /// made is the sidebar's to say, and quick entry cannot fail to be made.
-    public init(store: Store, route: Route) throws(StoreError) {
+    public init(store: Store, route: Route = .default) throws(StoreError) {
         let taskViewList = try TaskViewList(store: store, route: route.sidebar)
         // The seat is built once, here, with the way to make quick entry: a closure over its own `init` that
         // captures the store and never this root. The root holds the seat in its state, so a closure holding the
