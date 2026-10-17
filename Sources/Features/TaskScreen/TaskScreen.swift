@@ -44,8 +44,8 @@ public final class TaskScreen: Routable {
             self.init(head: try path.popID(readBy: TaskID.init(uuidString:)))
         }
 
-        /// This route's part of a window's path, its word and the task's id as `EntityID.description` prints it.
-        package var segments: [String] { [Route.word, head.description] }
+        /// This route's part of a window's path, its word and the task's id, its `rawValue`.
+        package var segments: [String] { [Route.word, head.rawValue] }
     }
 
     /// Nothing yet: the screen shows a title and offers nothing to do with it. The type is there because the

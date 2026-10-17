@@ -76,9 +76,9 @@ public final class TaskList: Routable {
             self.init(head: head, task: task)
         }
 
-        /// This route's part of a window's path, its word and the view's id as `EntityID.description` prints it,
-        /// and the task screen's part after it when a task is open.
-        package var segments: [String] { [Route.word, head.description] + (task?.segments ?? []) }
+        /// This route's part of a window's path, its word and the view's id, its `rawValue`, and the task screen's
+        /// part after it when a task is open.
+        package var segments: [String] { [Route.word, head.rawValue] + (task?.segments ?? []) }
 
         /// A segment where this route cannot read it: a word this route or the task screen's knows is out of
         /// place, and anything else is unknown.
