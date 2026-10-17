@@ -1,5 +1,6 @@
 import Testing
 import TestSupport
+import FeatureModule
 import TaskListFeature
 import TaskScreenFeature
 import TodoCore
@@ -181,23 +182,41 @@ import SQLiteKit
     #expect(linked.route == tapped.route)
 }
 
-/// A sentence answers what a person did, so the events of the world leave it, a route that opens a task and a
-/// change that rereads the rows among them, and the next tap on a row the list holds takes it away.
-@Test func theSentenceOutlivesEventsOfTheWorldAndGoesWithTheNextTap() throws {
+/// A change answers for nobody, so it leaves the sentence, and the next tap on a row the list holds takes it away.
+@Test func theSentenceOutlivesAChangeAndGoesWithTheNextTap() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
     let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
-    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: id)))) == nil)
-    #expect(list.model.task?.title == "Buy milk", "the route opened the task")
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Write it down")) }
     #expect(list.send(.changed(created)) == nil)
     #expect(list.model.rows.map(\.title) == ["Buy milk", "Write it down"], "the change was read")
-    #expect(list.model.problem == "The task is gone.", "and neither event took the sentence away")
+    #expect(list.model.problem == "The task is gone.", "and it left the sentence")
     #expect(list.send(.action(.rowTapped(id))) == nil)
     #expect(list.model.problem == nil)
     #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))).model)
+}
+
+/// A route clears the sentence at its start, as a tap does: it is what a link or a click in the sidebar asks of
+/// the list, and the sentence on screen answered something earlier (owner, 2026-10-16). A route whose task cannot
+/// be made writes a fresh one.
+@Test func aRouteTakesTheSentenceAwayAndATaskItCannotOpenWritesAFreshOne() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let gone = try store.createTask(NewTask(title: "Call the bank"))
+    try store.delete(task: gone)
+    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
+    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: id)))) == nil)
+    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))).model)
+    #expect(list.model.problem == nil)
+    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox))) == nil)
+    #expect(list.send(.changed(try unreadableFilter(on: BuiltInTaskViews.inbox, in: store))) == nil)
+    #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.", "a second sentence, for the next route to replace")
+    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))) == nil)
+    #expect(list.model.problem == "The task is gone.")
+    #expect(list.model.task == nil)
 }
 
 @Test func aChangeNamingATaskRereadsTheRows() throws {
@@ -301,6 +320,75 @@ import SQLiteKit
     let told = list.model
     #expect(list.send(.changed(try unreadableFilter(on: work, in: store))) == nil)
     #expect(list.model == told)
+}
+
+/// A view and a task as the command line prints their ids, the lowercase UUID string of `EntityID`. Fixed, so
+/// that a refusal can name them and a failure reads the same on every run.
+private let view = ViewID("6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f")
+private let task = TaskID("0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a")
+
+/// The list's route reads the path with the list's head at the front, so a path is these segments.
+private func read(_ segments: [String]) throws(RouteError) -> TaskList.Route {
+    var path = ArraySlice(segments)
+    return try TaskList.Route(reading: &path)
+}
+
+/// The list's route owns `view/<id>` in a window's path and hands what follows `task` to the task screen's route:
+/// it reads the path whole and writes its part and the screen's, ids as the command line prints them.
+@Test func theRouteReadsAndWritesViewAndItsIDAndHandsTheRestToTheTask() throws {
+    let list = try read(["view", view.rawValue])
+    #expect(list == .init(head: view))
+    #expect(list.segments == ["view", view.rawValue])
+    let open = try read(["view", view.rawValue, "task", task.rawValue])
+    #expect(open == .init(head: view, task: .init(head: task)))
+    #expect(open.segments == ["view", view.rawValue, "task", task.rawValue])
+    #expect(try read(["view", view.rawValue.uppercased(), "task", task.rawValue.uppercased()]) == open, "ids read in either case")
+}
+
+/// A task is opened inside a view's list, so it has no place before one (spec section 2).
+@Test func theRouteRefusesTaskBeforeView() {
+    #expect(throws: RouteError.segmentOutOfPlace("task")) { try read(["task", task.rawValue]) }
+    #expect(throws: RouteError.segmentOutOfPlace("task")) { try read(["task", task.rawValue, "view", view.rawValue]) }
+}
+
+/// A segment the list's route has no place for refuses the whole route and is named, wherever it stands, and a
+/// word is case-sensitive.
+@Test func theRouteRefusesASegmentItHasNoPlaceFor() {
+    #expect(throws: RouteError.unknownSegment("list")) { try read(["list", view.rawValue]) }
+    #expect(throws: RouteError.unknownSegment("tag")) { try read(["view", view.rawValue, "tag", task.rawValue]) }
+    #expect(throws: RouteError.unknownSegment("edit")) { try read(["view", view.rawValue, "task", task.rawValue, "edit"]) }
+    #expect(throws: RouteError.unknownSegment("View")) { try read(["View", view.rawValue]) }
+}
+
+/// What stands where the view's id must and does not read whole as one is refused as written, and `view` with
+/// nothing after it has an empty one; `UUID(uuidString:)` stops reading at a NUL, so an id with one is refused
+/// too. The task's id is read by the task screen's route (`TaskScreenTests`), and its refusal reaches this route's
+/// reader as thrown.
+@Test func theRouteRefusesWhatIsNotAnID() {
+    #expect(throws: RouteError.notAnID("inbox")) { try read(["view", "inbox"]) }
+    #expect(throws: RouteError.notAnID("\(view)x")) { try read(["view", "\(view)x"]) }
+    #expect(throws: RouteError.notAnID("")) { try read(["view"]) }
+    #expect(throws: RouteError.notAnID("\(view)\u{0}junk")) { try read(["view", "\(view)\u{0}junk"]) }
+    #expect(throws: RouteError.notAnID("42")) { try read(["view", view.rawValue, "task", "42"]) }
+}
+
+/// A list has one view and one task open in it, so `view` and `task` each have one place, and a second one is
+/// out of it, as `view` is after the task.
+@Test func theRouteRefusesAWordASecondTime() {
+    #expect(throws: RouteError.segmentOutOfPlace("view")) { try read(["view", view.rawValue, "view", view.rawValue]) }
+    #expect(throws: RouteError.segmentOutOfPlace("task")) { try read(["view", view.rawValue, "task", task.rawValue, "task", task.rawValue]) }
+    #expect(throws: RouteError.segmentOutOfPlace("view")) { try read(["view", view.rawValue, "task", task.rawValue, "view", view.rawValue]) }
+}
+
+/// The empty segment a doubled or trailing slash leaves is no segment the route has a place for, the place of an
+/// id included.
+@Test func theRouteRefusesAnEmptySegment() {
+    #expect(throws: RouteError.unknownSegment("")) { try read(["", "view", view.rawValue]) }
+    #expect(throws: RouteError.unknownSegment("")) { try read(["view", ""]) }
+    #expect(throws: RouteError.unknownSegment("")) { try read(["view", "", view.rawValue]) }
+    #expect(throws: RouteError.unknownSegment("")) { try read(["view", view.rawValue, ""]) }
+    #expect(throws: RouteError.unknownSegment("")) { try read(["view", view.rawValue, "", "task", task.rawValue]) }
+    #expect(throws: RouteError.unknownSegment("")) { try read(["view", view.rawValue, "task", task.rawValue, ""]) }
 }
 
 /// A newer app on a peer gives the view a filter this one cannot read, and the change of that write comes back:

@@ -41,37 +41,56 @@ let package = Package(
         // Where an identity is kept beside its database, in a target of its own because two consumers keep
         // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
         .target(name: "DeviceFile"),
-        // The contract, and beside it the shared form of a parent, the routable module and its seat. It depends
-        // on nothing: a seat is handed the way to make its child by the parent, so the contract names no
-        // dependency, and a screen that needs none, or others than the store, needs nothing from it (ADR-0007,
-        // amendment of 2026-10-15).
+        // The contract, and beside it the shared form of a parent, the routable module and its seat, and the
+        // error a route's text form is refused with. It depends on nothing: a seat is handed the way to make its
+        // child by the parent, so the contract names no dependency, and a screen that needs none, or others than
+        // the store, needs nothing from it (ADR-0007, amendment of 2026-10-15).
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
         // features it opens, which are its children, held in seats of its own (ADR-0009), and never on a
-        // sibling or on the root module (ADR-0007). The task list opens the task screen.
-        .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskViewList"),
+        // sibling or on the root module (ADR-0007). The sidebar opens the task list, and the task list opens
+        // the task screen.
+        .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskListFeature"], path: "Sources/Features/TaskViewList"),
         .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
         .target(name: "QuickEntryFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/QuickEntry"),
         // The root module, which is the features' parent and not one of them: it depends on them, since
-        // composing them is what it is for, and none of them depends on it (ADR-0007).
-        .target(name: "AppFeature", dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature"], path: "Sources/Features/App"),
+        // composing them is what it is for, and none of them depends on it (ADR-0007). It opens the sidebar and
+        // quick entry, its children, and depends on those alone (ADR-0009): the task list is the sidebar's, and
+        // each route reads and writes its own part of the window's path, so the root names nothing below them.
+        .target(
+            name: "AppFeature",
+            dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature", "QuickEntryFeature"],
+            path: "Sources/Features/App"
+        ),
         // The test helpers as an ordinary target: a test target cannot be depended on, and every feature's
         // tests open a store the same way. It is in no product, so nothing ships it.
         .target(name: "TestSupport", dependencies: ["TodoCore"], path: "Tests/Support"),
         .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
-        .executableTarget(name: "WasmSizeProbe", dependencies: ["TodoCore", "AppFeature", "TaskViewListFeature"]),
+        .executableTarget(
+            name: "WasmSizeProbe",
+            dependencies: ["TodoCore", "FeatureModule", "AppFeature"]
+        ),
         .testTarget(name: "SQLiteKitTests", dependencies: ["SQLiteKit"]),
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
-        .testTarget(name: "TaskViewListFeatureTests", dependencies: ["TaskViewListFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
-        .testTarget(name: "TaskListFeatureTests", dependencies: ["TaskListFeature", "TaskScreenFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
-        .testTarget(name: "TaskScreenFeatureTests", dependencies: ["TaskScreenFeature", "TodoCore", "TestSupport"]),
-        .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport"]),
-        .testTarget(name: "AppFeatureTests", dependencies: ["AppFeature", "TaskViewListFeature", "TodoCore", "TestSupport"]),
+        .testTarget(
+            name: "TaskViewListFeatureTests",
+            dependencies: ["TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]
+        ),
+        .testTarget(
+            name: "TaskListFeatureTests",
+            dependencies: ["TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]
+        ),
+        .testTarget(name: "TaskScreenFeatureTests", dependencies: ["TaskScreenFeature", "FeatureModule", "TodoCore", "TestSupport"]),
+        .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]),
+        .testTarget(
+            name: "AppFeatureTests",
+            dependencies: ["AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature", "TodoCore", "TestSupport"]
+        ),
     ],
     swiftLanguageModes: [.v6]
 )

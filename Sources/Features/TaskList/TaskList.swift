@@ -5,11 +5,12 @@ import TodoCore
 
 /// The tasks of one view, by title, and the task opened from among them.
 ///
-/// It takes the pane beside the sidebar, where the root's placeholder stands until #92, and it is the first
-/// parent below the root: the task screen opened from a row is its child, held in a seat of its own, so the
-/// root never learns that a list opens a task and does not grow when the task screen learns to open something
-/// (spec section 1). What it holds is what makes the navigation real and nothing more; sections, grouping,
-/// ordering and completion are M4's (spec section 10).
+/// It is the sidebar's child, opened by a choice there and held in a seat of the sidebar's (ADR-0009), and it is
+/// drawn in the pane beside the sidebar on the Mac. The task screen opened from a row is its child, held in a seat
+/// of its own, so neither the sidebar nor the root learns that a list opens a task, and their code does not grow
+/// when the task screen learns to open something (spec section 1); the task screen's route reads and writes its
+/// own part of the window's path then, as this list's route does. What it holds is what makes the navigation real
+/// and nothing more; sections, grouping, ordering and completion are M4's (spec section 10).
 ///
 /// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the
 /// task open in it, so that a link to a task opens the list with the task screen in it, and the route a window
@@ -36,6 +37,10 @@ public final class TaskList: Routable {
     }
 
     /// The address of the list: the view it lists, and the task open in it as the tail (spec section 2).
+    ///
+    /// In a window's path it is `view/<id>` followed by the task screen's part, and this route reads and writes
+    /// its own part and hands the rest to the task screen's route, knowing that route's word and nothing more of
+    /// its spelling.
     public struct Route: RouteValue {
         /// The view the list is on, which is what makes this list this one: a route to another view is
         /// another list, which the seat holding this one makes in its place (spec section 3).
@@ -47,6 +52,38 @@ public final class TaskList: Routable {
         public init(head: ViewID, task: TaskScreen.Route? = nil) {
             self.head = head
             self.task = task
+        }
+
+        /// The word before the view's id in a window's path.
+        private static let word = "view"
+
+        /// Reads the path it is handed whole: `view/<id>` from the front, the id whole and in either case through
+        /// the core (`EntityID(uuidString:)`), then the task screen's part when what follows begins with its word.
+        /// Whatever is left is refused, and so is a front that is not `view`: this route's word or the task
+        /// screen's is out of place there, since each has one place, and any other segment is unknown, the empty
+        /// one a doubled or trailing slash leaves included. Read from the left, so the first offence is the one
+        /// named.
+        package init(reading path: inout ArraySlice<String>) throws(RouteError) {
+            let word = path.popFirst() ?? ""
+            guard word == Route.word else { throw Route.refusal(of: word) }
+            let head = try path.popID(readBy: ViewID.init(uuidString:))
+            let task: TaskScreen.Route? = if path.first == TaskScreen.Route.word {
+                try TaskScreen.Route(reading: &path)
+            } else {
+                nil
+            }
+            if let rest = path.first { throw Route.refusal(of: rest) }
+            self.init(head: head, task: task)
+        }
+
+        /// This route's part of a window's path, its word and the view's id, its `rawValue`, and the task screen's
+        /// part after it when a task is open.
+        package var segments: [String] { [Route.word, head.rawValue] + (task?.segments ?? []) }
+
+        /// A segment where this route cannot read it: a word this route or the task screen's knows is out of
+        /// place, and anything else is unknown.
+        private static func refusal(of segment: String) -> RouteError {
+            segment == word || segment == TaskScreen.Route.word ? .segmentOutOfPlace(segment) : .unknownSegment(segment)
         }
     }
 
@@ -151,9 +188,11 @@ public final class TaskList: Routable {
             return nil
         case .route(let route):
             // The route's own head is not read: a seat hands a live list only a route with its head, and the
-            // head of a live module never changes (spec section 3). A route that opens its task leaves the
-            // sentence, since a route answers no gesture made in this list, and neither does `.changed`; a route
-            // whose task cannot be made writes one, inside `apply`.
+            // head of a live module never changes (spec section 3). The sentence goes at the start, as it does
+            // for a tap: a route is what a link or a click in the sidebar asks of this list, and the sentence on
+            // screen answered something earlier (owner, 2026-10-16). A route whose task cannot be made writes a
+            // fresh one, inside `apply`.
+            state.problem = nil
             apply(route)
             return nil
         case .changed(let changes):
@@ -256,7 +295,8 @@ public final class TaskList: Routable {
     /// #101).
     ///
     /// The seat is a field of the state and not a property beside it, because the tree of live modules is the
-    /// navigation state (spec section 4): the screen open in the list is part of what the list holds.
+    /// navigation state (`docs/specs/feature-module-architecture.md`, section 4): the screen open in the list is
+    /// part of what the list holds.
     private struct State {
         var rows: [Model.Row]
         var task: Seat<TaskScreen, StoreError>

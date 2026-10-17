@@ -18,6 +18,9 @@ public final class TaskScreen: Routable {
     }
 
     /// The address of the screen: the task it shows, and nothing after it (spec section 2).
+    ///
+    /// In a window's path it is `task/<id>`, which this route reads and writes itself, so that its parent knows
+    /// its word and nothing more of its spelling.
     public struct Route: RouteValue {
         /// The task the screen is on, which is what makes this screen this one: a route to another task is
         /// another screen, which the seat holding this one makes in its place (spec section 3).
@@ -26,6 +29,23 @@ public final class TaskScreen: Routable {
         public init(head: TaskID) {
             self.head = head
         }
+
+        /// The word before the task's id in a window's path, by which the list's route knows that what follows
+        /// its own part is this route's.
+        package static let word = "task"
+
+        /// Reads `task/<id>` from the front of a window's path, the id whole and in either case through the core
+        /// (`EntityID(uuidString:)`), and leaves what follows for its parent: a route with no child of its own
+        /// cannot tell its parent's word from one nobody knows, so the parent, which knows both its own word and
+        /// this one, refuses whatever is left. A path that does not begin with the word is not this route's.
+        package init(reading path: inout ArraySlice<String>) throws(RouteError) {
+            let word = path.popFirst() ?? ""
+            guard word == Route.word else { throw .unknownSegment(word) }
+            self.init(head: try path.popID(readBy: TaskID.init(uuidString:)))
+        }
+
+        /// This route's part of a window's path, its word and the task's id, its `rawValue`.
+        package var segments: [String] { [Route.word, head.rawValue] }
     }
 
     /// Nothing yet: the screen shows a title and offers nothing to do with it. The type is there because the

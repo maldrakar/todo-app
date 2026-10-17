@@ -19,3 +19,26 @@ public struct EntityID: Hashable, Comparable, Sendable, CustomStringConvertible 
 public typealias TaskID = EntityID
 public typealias TagID = EntityID
 public typealias ViewID = EntityID
+
+/// Why a string is not an id. It carries the string as written, because what reads an id from outside, a route
+/// among them, names it back to the person who wrote it.
+package struct EntityIDParseError: Error, Equatable, Sendable {
+    let input: String
+
+    init(input: String) { self.input = input }
+}
+
+extension EntityID {
+    /// An id read from a string from outside, a link or one typed by hand: what `UUID(uuidString:)` reads, in
+    /// either case, kept lowercase, the form `EntityID()` mints and the command line prints. Anything else is
+    /// refused with the string as written (`docs/style.md`, "A failure says what failed").
+    ///
+    /// Read whole: `UUID(uuidString:)` stops reading at a NUL and answers for what came before it, so the id it
+    /// read is held against the string, both lowercase, and a string with anything after the id is refused.
+    package init(uuidString text: String) throws(EntityIDParseError) {
+        guard let read = UUID(uuidString: text)?.uuidString.lowercased(), read == text.lowercased() else {
+            throw EntityIDParseError(input: text)
+        }
+        self.init(read)
+    }
+}

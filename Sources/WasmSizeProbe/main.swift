@@ -1,6 +1,6 @@
 // Sources/WasmSizeProbe/main.swift
 import AppFeature
-import TaskViewListFeature
+import FeatureModule
 import TodoCore
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -21,7 +21,10 @@ import WASILibc
 /// client, and the `todo` demo is the wrong stand-in for one: the demo carries an argument parser, a
 /// formatter and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about
 /// the core. This executable does what a web entry point will: it builds the root module over a store in
-/// memory and drives it — a selection, a rename, a new folder, and the change each write produced. Beside
+/// memory from a window's path, which is the web's address bar, and drives every module of the window — a
+/// selection, a rename and a new folder in the sidebar, a link applied as `.route`, quick entry creating a
+/// task, a tap in the list that pushes the task, the way back, Cancel, and Open in New Window, whose path it
+/// writes down — with the change each write produced, and a path the routes refuse. Beside
 /// that it calls the core's public API directly, and each group of calls has a client that ships it. The
 /// writes, the reads, a page and search are what the modules M3 adds will call. The filter codec and the
 /// journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in them
@@ -123,21 +126,49 @@ private enum WasmSizeProbe {
         let appStore = try Store.openInMemory(device: Store.newDeviceID(), now: { fixedNow })
         var pending: [ChangeSet] = []
         appStore.onChange = { pending.append($0) }
-        let app = try AppModule(store: appStore)
-        func perform(_ action: AppModule.UserAction) {
-            app.send(.action(action))
-            while !pending.isEmpty { app.send(.changed(pending.removeFirst())) }
+        let app = try AppModule(store: appStore, route: try AppModule.Route(path: "/"))
+        @discardableResult
+        func perform(_ event: AppModule.Event) -> AppModule.Output? {
+            let output = app.send(event)
+            while !pending.isEmpty { _ = app.send(.changed(pending.removeFirst())) }
+            return output
         }
-        perform(.taskViewList(.rowSelected(BuiltInTaskViews.today)))
-        perform(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today)))
-        perform(.taskViewList(.titleFieldChanged("Today, open")))
-        perform(.taskViewList(.titleFieldSubmitted))
-        // Read between the two writes: after the folder the pane shows the folder, and the title the rename
-        // put there would not reach a `print` at all.
-        let renamed = app.model.detail?.title ?? "none"
-        perform(.taskViewList(.createFolderButtonTapped))
+        perform(.action(.taskViewList(.rowSelected(BuiltInTaskViews.today))))
+        perform(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today))))
+        perform(.action(.taskViewList(.titleFieldChanged("Today, open"))))
+        perform(.action(.taskViewList(.titleFieldSubmitted)))
+        // Read between the two writes: after the folder the highlight is on the folder, and the title the rename
+        // put on the row would not reach a `print` at all.
+        let renamed = app.model.taskViewList.rows.first(where: \.isSelected)?.title ?? "none"
+        perform(.action(.taskViewList(.createFolderButtonTapped)))
+        let newFolder = app.model.taskViewList.rows.first(where: \.isSelected)
+        // A link, read from its path and applied, with quick entry up over the Inbox; quick entry files a task,
+        // whose change reaches the list; a tap pushes the task, and the way back pops it; quick entry opened
+        // again is cancelled; and a view asks for a window of its own, whose route is written down.
+        perform(.route(try AppModule.Route(path: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
+        perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
+        perform(.action(.quickEntry(.addButtonTapped)))
+        let filed = app.model.taskViewList.taskList?.rows.first
+        if let filed { perform(.action(.taskViewList(.taskList(.rowTapped(filed.id))))) }
+        let taskRoute = app.route.path
+        let opened = app.model.taskViewList.taskList?.task?.title ?? "none"
+        perform(.action(.taskViewList(.taskList(.backButtonTapped))))
+        perform(.action(.quickEntryButtonTapped))
+        let drafted = app.model.quickEntry?.draft ?? "none"
+        perform(.action(.quickEntry(.cancelButtonTapped)))
+        let window: String
+        switch perform(.action(.taskViewList(.openInNewWindowMenuItemChosen(BuiltInTaskViews.today)))) {
+        case .openWindow(let route)?: window = route.path
+        case nil: window = "none"
+        }
         let root = app.model
-        let newFolder = root.taskViewList.rows.first(where: \.isSelected)
+        let refusal: RouteError?
+        do {
+            _ = try AppModule.Route(path: "/view/inbox")
+            refusal = nil
+        } catch {
+            refusal = error
+        }
 
         print("tasks \(restoredTasks.count), tags \(try store.tags().count), views \(try store.views().count) of \(sidebar.count) at the root, roots \(roots.count)")
         print("page \(page.view.title): \(page.sections.count) sections, groups \(page.sections.flatMap(\.groups).map { label($0.key) }.joined(separator: "/")), listed \(listed.count), inbox \(inbox.sections.count)")
@@ -147,7 +178,9 @@ private enum WasmSizeProbe {
         print("journal \(exported.count) operations, first \(exported.first.map { "\($0.entity.rawValue).\($0.field) at \($0.clock.raw)" } ?? "none"), pair \(JournalOperation.pairID(view, review))")
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
-        print("root \(root.taskViewList.rows.count) views, detail \(renamed) then \(root.detail?.title ?? "none"), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
+        print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
+        print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), list \(root.taskViewList.taskList?.rows.count ?? 0) rows with \(root.taskViewList.taskList?.task == nil ? "nothing" : "a task") open, quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
+        print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
     }
 

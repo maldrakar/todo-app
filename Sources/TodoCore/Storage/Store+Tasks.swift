@@ -215,9 +215,9 @@ extension Store {
     func effectiveParent(of id: EntityID, in kind: EntityKind) throws(StoreError) -> EntityID? {
         if kind == .task {
             let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT parent FROM task_tree WHERE id = ?", [.text(id.rawValue)]) }
-            return rows.first?[0].string.map(EntityID.init)
+            return rows.first?[0].string.map(EntityID.init(_:))
         }
-        return (try effectiveParents(in: kind)[id.rawValue] ?? nil).map(EntityID.init)
+        return (try effectiveParents(in: kind)[id.rawValue] ?? nil).map(EntityID.init(_:))
     }
 
     /// Whether `id` sits under `ancestor` as a read sees the tree, which is what a move has to refuse.
@@ -296,7 +296,7 @@ extension Store {
             // type cannot hold reads as no day, the way an unusable parent link reads as no link.
             when: row[3].int64.flatMap { Int32(exactly: $0) }.map(Day.init(daysSinceEpoch:)),
             deadline: row[4].int64.flatMap { Int32(exactly: $0) }.map(Day.init(daysSinceEpoch:)),
-            parent: row[5].string.map(TaskID.init),
+            parent: row[5].string.map(TaskID.init(_:)),
             rank: row[6].string ?? Rank.initial,
             tags: tags,
             trashed: row[7].bool,

@@ -22,6 +22,19 @@ public final class QuickEntry: Routable {
         public var head: NoHead { NoHead() }
 
         public init() {}
+
+        /// The name of the query item that says quick entry is up in a window's text form, by which the window
+        /// knows that an item is this route's and hands it here alone (spec section 2).
+        package static let name = "quick-entry"
+
+        /// Reads its item, which is the bare name, since no screen in this epic opens with an argument (spec
+        /// section 2): anything else, the name with a value included, an empty one too, is refused as written.
+        package init(item: String) throws(RouteError) {
+            guard item == Route.name else { throw .unknownQuery(item) }
+        }
+
+        /// This route's item in a window's query.
+        package var item: String { Route.name }
     }
 
     public struct Model: Equatable, Sendable {

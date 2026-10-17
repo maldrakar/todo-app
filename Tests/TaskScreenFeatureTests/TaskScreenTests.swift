@@ -1,5 +1,6 @@
 import Testing
 import TestSupport
+import FeatureModule
 import TaskScreenFeature
 import TodoCore
 
@@ -61,4 +62,34 @@ import TodoCore
     let deleted = try changeSet(of: store) { try store.delete(task: id) }
     #expect(screen.send(.changed(deleted)) == .closeRequested)
     #expect(screen.model == before)
+}
+
+/// A task as the command line prints its id, fixed so that a refusal can name it.
+private let task = TaskID("0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a")
+
+/// The screen's route owns `task/<id>` in a window's path: it reads them from the front and leaves what follows
+/// for its parent, which knows the words around it, and it writes them as the command line prints the id.
+@Test func theRouteReadsAndWritesTaskAndItsID() throws {
+    var path: ArraySlice = ["task", task.rawValue, "edit"]
+    let route = try TaskScreen.Route(reading: &path)
+    #expect(route == .init(head: task))
+    #expect(path == ["edit"])
+    #expect(route.segments == ["task", task.rawValue])
+    var shouted: ArraySlice = ["task", task.rawValue.uppercased()]
+    #expect(try TaskScreen.Route(reading: &shouted) == route, "an id reads in either case and is kept lowercase")
+}
+
+/// What stands where the id must and does not read whole as one is refused as written, nothing at all is an empty
+/// id, and a path that does not begin with the screen's word is not the screen's.
+@Test func theRouteRefusesWhatIsNotItsWordAndAnID() {
+    for (segments, error) in [
+        (["task", "42"], RouteError.notAnID("42")),
+        (["task"], .notAnID("")),
+        (["task", ""], .unknownSegment("")),
+        (["task", "\(task)\u{0}"], .notAnID("\(task)\u{0}")),
+        (["note", task.rawValue], .unknownSegment("note")),
+    ] {
+        var path = ArraySlice(segments)
+        #expect(throws: error, "reading \(segments)") { try TaskScreen.Route(reading: &path) }
+    }
 }

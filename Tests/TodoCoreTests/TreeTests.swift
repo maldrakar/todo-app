@@ -176,7 +176,7 @@ private struct Node: TreeOrdered, Equatable {
 
     init(_ id: String, parent: String? = nil, rank: String = "i") {
         self.id = EntityID(id)
-        self.parent = parent.map(EntityID.init)
+        self.parent = parent.map(EntityID.init(_:))
         self.rank = rank
     }
 }
