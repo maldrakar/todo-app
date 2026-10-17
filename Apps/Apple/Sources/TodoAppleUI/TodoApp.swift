@@ -71,9 +71,10 @@ final class TodoApp {
     /// #95's. A route whose views or tasks are gone is read, and opens what still exists, as the root's own children
     /// say (`docs/specs/navigation.md`, section 3).
     ///
-    /// The host's world entrance is kept for the fan-out and the host itself is not: the window's view holds it, and
-    /// when the view lets go the host is released and the next fan-out passes it by. It throws what the root's
-    /// `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the throw.
+    /// The host's world entrance is kept for the fan-out and the host itself is not: its caller holds it for as long
+    /// as the window lives, and once the caller lets go the host is released and the next fan-out passes it by. It
+    /// throws what the root's `init` throws, the store's error when the sidebar cannot be read, and its caller acts on
+    /// the throw.
     func makeHost(path: String?) throws -> ModuleHost<AppModule> {
         let route = path.flatMap { try? AppModule.Route(path: $0) } ?? .default
         let root = try AppModule(store: store, route: route)
