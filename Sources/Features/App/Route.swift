@@ -33,9 +33,10 @@ extension AppModule {
         /// too: `/`, `/view/<id>`, `/view/<id>/task/<id>`, with `?quick-entry` when quick entry is up.
         ///
         /// Each route reads its own part, so this one reads only what is the window's: the leading `/`, the
-        /// path split from the query at the first `?`, the path handed to the sidebar's route and the query's
-        /// items to quick entry's. The path is split at every `/`, its empty segments kept for the routes to
-        /// refuse. A route is data from outside, so anything a route cannot read refuses the whole route with the
+        /// path split from the query at the first `?`, the path handed to the sidebar's route, and each item of
+        /// the query handed alone to the route its name names, so the order of the items means nothing. The path
+        /// is split at every `/`, its empty segments kept for the routes to refuse, and the query at every `&`.
+        /// A route is data from outside, so anything a route cannot read refuses the whole route with the
         /// segment named, read from the left so that the first offence is the one named, the path before the
         /// query, and nothing traps (spec section 2, `docs/style.md`). The string is the path and the query alone:
         /// a scheme or a site is the platform's wrapping, which its caller strips, so a string that does not begin
@@ -49,28 +50,25 @@ extension AppModule {
             guard text.first == "/" else { throw .unknownSegment(String(text.prefix { $0 != "/" })) }
             var segments = text == "/" ? [] : Route.split(text.dropFirst(), at: "/")
             let sidebar = try TaskViewList.Route(reading: &segments)
-            var items = query.map { Route.split(path[path.index(after: $0)...], at: "&") } ?? []
-            let quickEntry: QuickEntry.Route? = if items.first == QuickEntry.Route.item {
-                try QuickEntry.Route(reading: &items)
-            } else {
-                nil
-            }
-            // What no route read: quick entry's item again is out of place, since a window has one quick entry,
-            // and any other item is unknown, the empty one a `?` or an `&` with nothing after it leaves included,
-            // which the writer never writes.
-            if let item = items.first {
-                throw item == QuickEntry.Route.item ? .segmentOutOfPlace(item) : .unknownQuery(item)
+            let items = query.map { Route.split(path[path.index(after: $0)...], at: "&") } ?? []
+            var quickEntry: QuickEntry.Route?
+            for item in items {
+                // An item's name is what stands before its first `=`, and a name no route of the window owns is
+                // unknown, the empty item a `?` or an `&` with nothing after it leaves included, which the writer
+                // never writes. Quick entry's item a second time is out of place, since a window has one.
+                guard item.prefix(while: { $0 != "=" }) == QuickEntry.Route.name else { throw .unknownQuery(item) }
+                let read = try QuickEntry.Route(item: item)
+                guard quickEntry == nil else { throw .segmentOutOfPlace(item) }
+                quickEntry = read
             }
             self.init(sidebar: sidebar, quickEntry: quickEntry)
         }
 
         /// The text form of the route: the sidebar's part as the path, the chain of screens, and quick entry's
-        /// as the query, a modal being beside the chain (spec section 2). A sidebar with no list is written as
-        /// `/`, which leaves the choice to the sidebar.
+        /// item as the query, a modal being beside the chain (spec section 2). A sidebar with no list is written
+        /// as `/`, which leaves the choice to the sidebar.
         public var path: String {
-            let items = quickEntry?.items ?? []
-            let query = items.isEmpty ? "" : "?" + items.joined(separator: "&")
-            return "/" + sidebar.segments.joined(separator: "/") + query
+            "/" + sidebar.segments.joined(separator: "/") + (quickEntry.map { "?" + $0.item } ?? "")
         }
 
         /// The parts of the path or of the query between their separators, the empty ones kept, so that a doubled,

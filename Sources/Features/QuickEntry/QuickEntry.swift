@@ -23,21 +23,18 @@ public final class QuickEntry: Routable {
 
         public init() {}
 
-        /// The query item that says quick entry is up in a window's text form, a bare flag, since no screen in
-        /// this epic opens with an argument (spec section 2). The window reads it to know that the query is this
-        /// route's, and that a second one is out of place.
-        package static let item = "quick-entry"
+        /// The name of the query item that says quick entry is up in a window's text form, by which the window
+        /// knows that an item is this route's and hands it here alone (spec section 2).
+        package static let name = "quick-entry"
 
-        /// Reads its item from the front of a window's query items and leaves what follows for the window, which
-        /// refuses what no route reads. An item that is not this one, one with a value included, is not quick
-        /// entry's.
-        package init(reading items: inout ArraySlice<String>) throws(RouteError) {
-            let item = items.popFirst() ?? ""
-            guard item == Route.item else { throw .unknownQuery(item) }
+        /// Reads its item, which is the bare name, since no screen in this epic opens with an argument (spec
+        /// section 2): anything else, the name with a value included, an empty one too, is refused as written.
+        package init(item: String) throws(RouteError) {
+            guard item == Route.name else { throw .unknownQuery(item) }
         }
 
-        /// This route's part of a window's query.
-        package var items: [String] { [Route.item] }
+        /// This route's item in a window's query.
+        package var item: String { Route.name }
     }
 
     public struct Model: Equatable, Sendable {

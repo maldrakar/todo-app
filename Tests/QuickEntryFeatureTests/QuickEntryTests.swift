@@ -165,20 +165,17 @@ private func inbox(of store: Store) throws -> [String] {
     #expect(entry.model == before)
 }
 
-/// Quick entry's route owns the `quick-entry` item of a window's query, a bare flag: it reads it from the front of
-/// the items and leaves what follows for the window, and it writes it.
+/// Quick entry's route owns the `quick-entry` item of a window's query, a bare flag, which the window hands it alone,
+/// found by its name: it reads it and writes it.
 @Test func theRouteReadsAndWritesItsQueryItem() throws {
-    var items: ArraySlice = ["quick-entry", "search"]
-    #expect(try QuickEntry.Route(reading: &items) == .init())
-    #expect(items == ["search"])
-    #expect(QuickEntry.Route().items == ["quick-entry"])
+    #expect(try QuickEntry.Route(item: "quick-entry") == .init())
+    #expect(QuickEntry.Route().item == "quick-entry")
 }
 
-/// Any other item is not quick entry's, a value on its own included, since no screen in this epic opens with an
-/// argument (spec section 2).
+/// Anything but the bare name is refused as written, its name with a value included, an empty one too, since no
+/// screen in this epic opens with an argument (spec section 2).
 @Test func theRouteRefusesAnyOtherItem() {
-    for item in ["search", "quick-entry=1", "Quick-Entry", ""] {
-        var items: ArraySlice = [item]
-        #expect(throws: RouteError.unknownQuery(item)) { try QuickEntry.Route(reading: &items) }
+    for item in ["quick-entry=1", "quick-entry=", "search", "Quick-Entry", ""] {
+        #expect(throws: RouteError.unknownQuery(item)) { try QuickEntry.Route(item: item) }
     }
 }
