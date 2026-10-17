@@ -507,13 +507,14 @@ public enum RouteError: Error, Equatable, Sendable {
 - A click on the highlighted view returns to its list, closing the task open in it.
 - `Apps/Apple` changes as far as it must compile against the new root, so `main` stays green until Task 6.
 
-**Owner's review of #103.** The owner reviewed the pull request on 2026-10-16, in its threads and in chat, and changed what follows; the rules above stay as planned, and the pull request's body states each departure.
+**Owner's review of #103.** The owner reviewed the pull request on 2026-10-16 and 2026-10-17, in its threads and in chat, and changed what follows; the rules above stay as planned, and the pull request's body states each departure.
 
 - The task list is the sidebar's child, by ADR-0009's rule, since a choice in the sidebar opens it: `TaskViewList` holds it in a `Seat<TaskList, StoreError>` and opens it in its own `init`; its route is `Route(list: TaskList.Route?)` in place of `selection`, a nil list saying nothing of the list; a list that cannot be made is the sidebar's sentence, "The list could not be opened."; `.selected` goes, and `.openInWindow` carries the sidebar's own route.
 - The root holds the sidebar as a field and quick entry in a seat; its `Model` is `taskViewList` and `quickEntry`, its `UserAction` loses `.taskList`, which travels as `.taskViewList(.taskList(_))`, its `Route` is `sidebar` and `quickEntry`, and `problem` leaves it until Task 8 gives it a sentence of its own.
 - A route clears the sentence at its start, the sidebar's unless a rename is open and the task list's, and a child's gestures leave its parent's sentence.
 - Each route reads and writes its own part of the window's path, which is the text form's name, `AppModule.Route.init(path:)` and `var path`; `RouteError` moves to `FeatureModule`; an id is read whole once, by `EntityID(uuidString:)` in the core; `AppFeature` depends on the sidebar and quick entry alone.
 - `AppModule.init(store:route:)`'s route defaults to `.default`.
+- The query is a set of items and not a chain: the window hands each item alone, by its name, the text before its first `=`, to the route that owns that name, so the order of the items means nothing; `QuickEntry.Route` reads its item through `init(item:)` and writes it as `item`. An id is written as its `rawValue`, the value itself, not as `description`.
 
 ### Task 6: A host per window, and the composition root fans out
 
