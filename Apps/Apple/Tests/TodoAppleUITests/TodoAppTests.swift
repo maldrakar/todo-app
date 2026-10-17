@@ -89,18 +89,25 @@ import TodoCore
     }
 }
 
-/// One store per process and a host per window: a write through one window's action reaches the other window,
-/// which then draws what a window opened after the write draws.
-@Test @MainActor func twoHostsOverOneStoreBothReceiveAChange() throws {
+/// One store per process and a host per window: a write through one window's action reaches every window, the
+/// windows made before the writer and after it and the writer itself, and each then draws what a window opened
+/// after the write draws. The write is quick entry's, through the window made second, so that the writer's list
+/// too learns of the task from the change set alone, and a fan-out that reached the first host only, the last
+/// only, or skipped the writer would leave a window behind.
+@Test @MainActor func everyLiveHostOverOneStoreReceivesAChange() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
         let first = try app.makeHost(path: nil)
-        let second = try app.makeHost(path: nil)
-        let before = second.model
-        first.send(.taskViewList(.createFolderButtonTapped))
+        let writer = try app.makeHost(path: "/?quick-entry")
+        let third = try app.makeHost(path: nil)
+        let before = first.model
+        writer.send(.quickEntry(.titleFieldChanged("Milk")))
+        writer.send(.quickEntry(.addButtonTapped))
         let opened = try app.makeHost(path: nil)
-        #expect(second.model == opened.model)
-        #expect(second.model != before, "the write moved what a window draws")
+        #expect(opened.model != before, "the write moved what a window draws")
+        #expect(first.model == opened.model, "the window made before the writer")
+        #expect(writer.model == opened.model, "the writer, its quick entry closed")
+        #expect(third.model == opened.model, "the window made after the writer")
     }
 }
 
