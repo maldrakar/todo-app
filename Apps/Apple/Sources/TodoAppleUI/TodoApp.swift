@@ -6,17 +6,17 @@ import TodoCore
 
 /// The composition root: one store per process, opened at launch under the device's identity, and a host per window,
 /// each around a root of its own made from the window's path, with every change set the store reports handed to every
-/// host still alive (`docs/specs/navigation.md`, section 5). The feature-module spec's "one host and one root per
-/// process" is "one host per window, one store per process".
+/// host still alive (`docs/specs/navigation.md`, section 5), where the feature-module spec's "one host and one root
+/// per process" becomes "one host per window, one store per process".
 @MainActor
 final class TodoApp {
     /// The composition root of this process, put together the first time anything reads it. A `static let` is
     /// initialised once, on first use, where a `@State` in the scene would not be: its initial value is
     /// evaluated on every creation of its struct, and each evaluation would open another store over the same
-    /// file (spec, "Risks"; ADR-0005).
+    /// file (`docs/specs/feature-module-architecture.md`, "Risks"; ADR-0005).
     ///
     /// A launch that throws ends the process with the error it threw; a recovery flow is a product decision
-    /// (spec section 5).
+    /// (`docs/specs/feature-module-architecture.md`, section 5).
     static let shared: TodoApp = {
         do {
             return try launch(environment: ProcessInfo.processInfo.environment)
@@ -43,7 +43,7 @@ final class TodoApp {
     /// over a database mints one and keeps it there (ADR-0005).
     ///
     /// It throws whatever the store or the file system throws, and its caller acts on the throw: in the app a
-    /// launch that failed is fatal and says why (spec section 5).
+    /// launch that failed is fatal and says why (`docs/specs/feature-module-architecture.md`, section 5).
     static func launch(environment: [String: String]) throws -> TodoApp {
         let database = try set(environment["TODO_DB"]) ?? defaultDatabase()
         let held = set(environment["TODO_DEVICE"]) ?? DeviceFile.read(beside: database)
@@ -72,8 +72,8 @@ final class TodoApp {
     /// say (`docs/specs/navigation.md`, section 3).
     ///
     /// The host's world entrance is kept for the fan-out and the host itself is not: the window's view holds it, and
-    /// when the view lets go the host is released and the next fan-out passes it by. It throws what the root throws
-    /// when the store cannot read its sidebar, as a launch did when it made the one root.
+    /// when the view lets go the host is released and the next fan-out passes it by. It throws what the root's
+    /// `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the throw.
     func makeHost(path: String?) throws -> ModuleHost<AppModule> {
         let route = path.flatMap { try? AppModule.Route(path: $0) } ?? .default
         let root = try AppModule(store: store, route: route)

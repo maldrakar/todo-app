@@ -5,7 +5,8 @@ import Observation
 /// The one object in the app that SwiftUI observes: it holds a routable module and publishes its model and its route
 /// (`docs/specs/navigation.md`, section 5). In the app the module is the root of a window, and each window has a host
 /// of its own. The window's view holds it, and every other view gets from the view above it the part of the model it
-/// draws and a closure over its own actions (spec section 3), so no other view names the host.
+/// draws and a closure over its own actions (`docs/specs/feature-module-architecture.md`, section 3), so no other view
+/// names the host.
 ///
 /// It has two entrances and hands each to one caller. `send(_:)` is a view's, and with `model`, `route` and the handler
 /// the window's view puts in `onOutput` it is all a view gets: a closure over `UserAction` cannot spell an event of the
@@ -48,10 +49,16 @@ final class ModuleHost<M: Routable> {
     /// platform is within reach (`docs/specs/navigation.md`, section 5).
     ///
     /// It is handed each output after the host has published the model and the route the event left, so a
-    /// handler that opens a window opens it on the state the output came from. An output that arrives with no
-    /// handler is dropped, and not kept for one installed later, which would act on a gesture made before
-    /// anything could answer it. Left out of observation, because no view draws it, and an observer of it
-    /// would be told of every installation for nothing.
+    /// handler that opens a window opens it on the state the output came from, and while it runs the event is
+    /// still in flight, so an action it sends waits its turn. An output that arrives with no handler is
+    /// dropped, and not kept for one installed later, which would act on a gesture made before anything could
+    /// answer it. Left out of observation, because no view draws it, and an observer of it would be told of
+    /// every installation for nothing.
+    ///
+    /// The host holds the handler, so a handler holds the host weakly or unowned: one that captured it would
+    /// close a cycle, host to handler to host, and a closed window's host would never be released and would go
+    /// on taking every change set (probed 2026-10-17 under Swift 6.4.0: a strong capture kept the host after its
+    /// last holder let go, and a weak one did not).
     @ObservationIgnored var onOutput: ((M.Output) -> Void)?
 
     private let module: M

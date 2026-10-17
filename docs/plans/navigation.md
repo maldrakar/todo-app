@@ -660,6 +660,8 @@ extension TodoApp {
 - `WindowGroup(for:)` requires `D: Codable & Hashable`, which `String` is; `handlesExternalEvents(preferring:allowing:)` is unavailable only on watchOS and tvOS; `onOpenURL` and `SceneStorage` exist on every Apple platform (macOS 26.2 SDK interface, read 2026-10-14).
 - Trap: SwiftUI's default for a `WindowGroup` is a new window for every URL (spec section 7); a probe that forgets the modifier passes its own test on a fresh launch and fails on the second link.
 - Trap: `@SceneStorage` is per scene and survives a relaunch only when the system restores the scene; a test of restoration is by hand.
+- Trap: the host holds `onOutput` strongly, so a handler that captures the host, as a closure in `RootView` over its stored `host` does, closes host to handler to host, and a closed window's host is never released, its `Entrance.host` never goes nil and the window goes on taking every change set; the handler holds the host weakly or unowned (probed 2026-10-17 in the Apple package under Swift 6.4.0: a strong capture kept the host after its last holder let go, a weak one did not; `ModuleHost.onOutput`, Task 6).
+- A link's `.route` reaches one window's host through that host's world entrance, which `TodoApp` keeps private, each entrance beside its host held weakly in `entrances` (`TodoApp.swift`, Task 6, read 2026-10-17), so this task adds a way, private to the composition root, to reach the entrance of the window that took the link, and the window's view gets the route delivered and never the entrance.
 
 ### Task 9: The Xcode shell and the first iPhone build
 
