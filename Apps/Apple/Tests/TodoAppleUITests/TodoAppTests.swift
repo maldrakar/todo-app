@@ -43,9 +43,9 @@ import TodoCore
 }
 
 /// The store holds the composition root's fan-out as its `onChange`, the composition root holds the store, and
-/// a host holds the module that holds the store. A fan-out that held the composition root would close a cycle
-/// through the store that kept all of them alive once the last holder let go, and every launch would keep its
-/// database open for the life of the process.
+/// a host holds the module that holds the store. A fan-out that held the composition root would close a cycle,
+/// store to composition root to store, that kept both alive once the last holder let go, and every launch would
+/// keep its database open for the life of the process.
 @Test @MainActor func theStoreDoesNotKeepTheHostAlive() throws {
     try withFreshDatabase { database in
         weak var released: ModuleHost<AppModule>?
@@ -176,6 +176,10 @@ private let defaultWindow = "/view/\(BuiltInTaskViews.inbox)"
 /// Every model a host held when it published the next one, in order, from the one it held when this began.
 /// An observer is told as an assignment begins, before the value changes, so what it reads is the model being
 /// replaced, and it observes again for the next one; the last published is the host's `model` itself.
+///
+/// The observer holds the host weakly. The last one it registers is never told, so the host's registrar keeps it,
+/// and one that held the host would keep the host, its root and the store with its connection open for the rest
+/// of the test process, over a directory `withFreshDatabase` has deleted.
 @MainActor private final class Publications {
     private(set) var models: [AppModule.Model] = []
 
@@ -184,10 +188,11 @@ private let defaultWindow = "/view/\(BuiltInTaskViews.inbox)"
     }
 
     private func observe(_ host: ModuleHost<AppModule>) {
-        withObservationTracking { _ = host.model } onChange: { [weak self] in
+        withObservationTracking { _ = host.model } onChange: { [weak self, weak host] in
             MainActor.assumeIsolated {
-                self?.models.append(host.model)
-                self?.observe(host)
+                guard let self, let host else { return }
+                self.models.append(host.model)
+                self.observe(host)
             }
         }
     }

@@ -117,6 +117,25 @@ import FeatureModule
     #expect(handed == [.turned(to: 2)], "the handler was listening: an output after it reaches it")
 }
 
+/// A handler is still answering the event in flight, so an action it sends waits its turn as anything else that
+/// arrives in flight does: it has not begun when the handler's `send` returns, so the handler goes on over the state
+/// its output came from, and it runs once the handler has returned.
+@Test @MainActor func anActionTheHandlerSendsWaitsForTheHandlerToReturn() {
+    let recorder = Recorder()
+    let host = ModuleHost(recorder) { _ in }
+    var stepsWhenTheSendReturned: [Recorder.Step] = []
+    host.onOutput = { [unowned host] _ in
+        host.send(.counted)
+        stepsWhenTheSendReturned = recorder.steps
+    }
+    host.send(.pageTurned)
+    #expect(stepsWhenTheSendReturned == [.began(.action(.pageTurned)), .ended(.action(.pageTurned))])
+    #expect(recorder.steps == [
+        .began(.action(.pageTurned)), .ended(.action(.pageTurned)),
+        .began(.action(.counted)), .ended(.action(.counted)),
+    ])
+}
+
 /// How many times an observer was told. On the main actor, because that is where the host assigns its model,
 /// and an observer is told inside the assignment.
 @MainActor private final class Notified {
