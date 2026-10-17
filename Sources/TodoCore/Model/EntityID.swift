@@ -35,11 +35,6 @@ extension EntityID {
     ///
     /// Read whole: `UUID(uuidString:)` stops reading at a NUL and answers for what came before it, so the id it
     /// read is held against the string, both lowercase, and a string with anything after the id is refused.
-    ///
-    /// `package`, as `String.trimmed()` is: every caller is in this package, the routes that read an id from a
-    /// path, and a member widens only as far as a call site forces (`docs/style.md`, "Tightest visibility by
-    /// default"). Beside `init(_:)`, which wraps what the store already holds, it makes `.map(EntityID.init)`
-    /// ambiguous, so the core names that one `init(_:)` where it maps.
     package init(uuidString text: String) throws(EntityIDParseError) {
         guard let read = UUID(uuidString: text)?.uuidString.lowercased(), read == text.lowercased() else {
             throw EntityIDParseError(input: text)
