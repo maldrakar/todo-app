@@ -168,39 +168,40 @@ import TodoCore
 }
 
 /// One host per window, the composition risk a host per window brings back (`docs/specs/navigation.md`, "Risks";
-/// ADR-0008): the window's view, hosted in a window of its own, makes its host when the window appears and never
-/// again. The count is of the hosts `makeHost` made, and not of the entrances still alive, because the change set
-/// that forces the redraw also prunes the entrances of released hosts, which would hide a second host made and
-/// dropped by the redraw.
+/// ADR-0008): each window's view, hosted in a window of its own, makes a host of its own when the window appears and
+/// never again. Two windows make two hosts, which one host shared by every window, the `static let` the scene held
+/// in #93, would not. The count is of the hosts `makeHost` made, and not of the entrances still alive, because the
+/// change set that forces the redraw also prunes the entrances of released hosts, which would hide a second host
+/// made and dropped by the redraw.
 ///
 /// The window's view sits where the scene puts it, in a content closure that runs more than once for a window, twice
 /// for the first window of the Mac executable on 2026-10-18, and hands the window a new value of the view on every run.
-/// Here that closure runs again on every model the writer publishes, so the change set that redraws the window hands
-/// it a new value too, and a host made where the value is made, rather than kept in the view's state, is made again.
+/// Here that closure runs again on every model the writer publishes, so the change set that redraws the windows hands
+/// each a new value too, and a host made where the value is made, rather than kept in the view's state, is made again.
 @Test @MainActor func aWindowMakesOneHost() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
         let writer = try app.makeHost(path: nil)
-        let redraws = Redraws()
-        let window = NSWindow(contentViewController: NSHostingController(
-            rootView: ContentClosure(writer: writer, redraws: redraws) { WindowView(app: app, path: nil) }
-        ))
-        // An `NSWindow` made in code is released by its own `close()` unless told otherwise, which under ARC
-        // releases it a second time.
-        window.isReleasedWhenClosed = false
-        window.orderFront(nil)
-        defer {
-            window.contentViewController = nil
-            window.close()
+        let redraws = [Redraws(), Redraws()]
+        let windows = redraws.map { redraws in
+            hostInAWindow(ContentClosure(writer: writer, redraws: redraws) { WindowView(app: app, path: nil) })
         }
-        turnTheRunLoop(until: { app.hostsMade == 2 })
-        #expect(app.hostsMade == 2, "the writer's host, and the one the window made when it appeared")
+        defer {
+            for window in windows {
+                window.contentViewController = nil
+                window.close()
+            }
+        }
+        turnTheRunLoop(until: { app.hostsMade == 3 })
+        #expect(app.hostsMade == 3, "the writer's host, and one for each window, made when it appeared")
 
-        let before = redraws.count
+        let before = redraws.map(\.count)
+        let redrawn = { zip(redraws, before).allSatisfy { $0.count > $1 } }
         writer.send(.taskViewList(.createFolderButtonTapped))
-        turnTheRunLoop(until: { redraws.count > before })
-        #expect(redraws.count > before, "the change set redrew the window and handed it a new value of its view")
-        #expect(app.hostsMade == 2, "and the redraw made no host")
+        turnTheRunLoop(until: redrawn)
+        settleTheRunLoop()
+        #expect(redrawn(), "the change set redrew both windows and handed each a new value of its view")
+        #expect(app.hostsMade == 3, "and the redraw made no host")
     }
 }
 
@@ -232,12 +233,30 @@ private struct ContentClosure<Content: View>: View {
     }
 }
 
+/// A window of its own around `rootView`, on screen, as the scene puts a window's content in one.
+@MainActor private func hostInAWindow(_ rootView: some View) -> NSWindow {
+    let window = NSWindow(contentViewController: NSHostingController(rootView: rootView))
+    // An `NSWindow` made in code is released by its own `close()` unless told otherwise, which under ARC releases it
+    // a second time.
+    window.isReleasedWhenClosed = false
+    window.orderFront(nil)
+    return window
+}
+
 /// Turns the main run loop, where AppKit and SwiftUI do their work, until `condition` holds or five seconds have
 /// passed, whichever comes first; the caller's expectation says which.
 @MainActor private func turnTheRunLoop(until condition: () -> Bool) {
     let deadline = Date.now.addingTimeInterval(5)
     while !condition(), Date.now < deadline {
         RunLoop.main.run(until: Date.now.addingTimeInterval(0.05))
+    }
+}
+
+/// Turns the main run loop ten more passes of a fiftieth of a second each, so that work one pass behind what a wait
+/// saw has run before the expectations are read: a bounded wait, not a timing assertion (`docs/style.md`).
+@MainActor private func settleTheRunLoop() {
+    for _ in 0..<10 {
+        RunLoop.main.run(until: Date.now.addingTimeInterval(0.02))
     }
 }
 
