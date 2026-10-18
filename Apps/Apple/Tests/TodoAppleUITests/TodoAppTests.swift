@@ -169,9 +169,9 @@ import TodoCore
 
 /// One host per window, the composition risk a host per window brings back (`docs/specs/navigation.md`, "Risks";
 /// ADR-0008): the window's view, hosted in a window of its own, makes its host when the window appears and never
-/// again. The count is of calls to `makeHost`, and not of the entrances still alive, because the change set that
-/// forces the redraw also prunes the entrances of released hosts, which would hide a second host made and dropped by
-/// the redraw.
+/// again. The count is of the hosts `makeHost` made, and not of the entrances still alive, because the change set
+/// that forces the redraw also prunes the entrances of released hosts, which would hide a second host made and
+/// dropped by the redraw.
 ///
 /// The window's view sits where the scene puts it, in a content closure that runs more than once for a window, twice
 /// for the first window of the Mac executable on 2026-10-18, and hands the window a new value of the view on every run.
@@ -196,9 +196,10 @@ import TodoCore
         turnTheRunLoop(until: { app.hostsMade == 2 })
         #expect(app.hostsMade == 2, "the writer's host, and the one the window made when it appeared")
 
+        let before = redraws.count
         writer.send(.taskViewList(.createFolderButtonTapped))
-        turnTheRunLoop(until: { redraws.count > 1 })
-        #expect(redraws.count > 1, "the change set redrew the window and handed it a new value of its view")
+        turnTheRunLoop(until: { redraws.count > before })
+        #expect(redraws.count > before, "the change set redrew the window and handed it a new value of its view")
         #expect(app.hostsMade == 2, "and the redraw made no host")
     }
 }

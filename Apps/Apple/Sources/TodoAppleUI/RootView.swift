@@ -19,12 +19,17 @@ struct RootView: View {
     /// pane's column too, where it can be read.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    /// Which of the split view's columns are shown, which only the view can know: the person hides the sidebar with
+    /// the toolbar's button, and the platform hides it where the window leaves no room. Read for whether the sidebar
+    /// is beside the pane, and handed to the split view, which writes it.
+    @State private var columnVisibility = NavigationSplitViewVisibility.automatic
+
     init(host: ModuleHost<AppModule>) {
         self.host = host
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
         } detail: {
             NavigationStack(path: stackPath) {
@@ -47,12 +52,13 @@ struct RootView: View {
                 }
             }
             // The sidebar's sentence is about the pane that stayed when another could not be opened, so it shows
-            // beside the pane: on the Mac and the iPad the sidebar's own column is beside it and draws it under the
-            // rows, and in a narrow window, where the sidebar is a screen the pane is pushed over, it is drawn here.
-            // On 2026-10-18, in the iOS 26.3 simulator, "The list could not be opened." stood under the list that
-            // stayed; on the Mac it stood under the sidebar's rows alone.
+            // beside the pane: under the sidebar's rows where the sidebar's column is beside the pane, and here where
+            // it is not, in a narrow window, where the sidebar is a screen the pane is pushed over, and with the
+            // sidebar's column hidden. On 2026-10-18 "The list could not be opened." stood here alone on iPhone and
+            // on the iPad, whose split view hid the sidebar in portrait and in landscape and reported `detailOnly`
+            // (the iOS 26.3 simulator), and under the sidebar's rows alone on the Mac, its sidebar shown.
             .safeAreaInset(edge: .bottom) {
-                if isNarrow, let problem = host.model.taskViewList.problem {
+                if isSidebarAway, let problem = host.model.taskViewList.problem {
                     Text(problem)
                         .padding()
                 }
@@ -72,7 +78,7 @@ struct RootView: View {
     /// A path and not `navigationDestination(item:)` bound to the head, which spec section 6 names, because the item
     /// lost the task a window opens with: on 2026-10-18, on macOS 26.7 under Swift 6.4.0, a window made from a path
     /// naming a task drew its list with nothing pushed, and the item binding's first write, as the window appeared,
-    /// was nil, which went to the list as its back button and closed the task, with nothing in the log. The same
+    /// was nil, which went to the list as its back button and closed the task, with no runtime warning. The same
     /// window over this path showed the task pushed and wrote nothing. A route into another view's task while a
     /// task was open pushed the new task over the new list either way. This is the fallback the spec's "Risks" name,
     /// a map and not a decision: the state is the route's as before. In the iOS 26.3 simulator the same path at
@@ -107,6 +113,7 @@ struct RootView: View {
         Button("Quick Entry", systemImage: "plus") { host.send(.quickEntryButtonTapped) }
     }
 
-    /// Whether the split view is one stack, which it is in a narrow window (spec section 6).
-    private var isNarrow: Bool { horizontalSizeClass == .compact }
+    /// Whether the sidebar is not beside the pane: the split view is one stack in a narrow window (spec section 6),
+    /// and its sidebar's column is hidden when the person or the platform hid it.
+    private var isSidebarAway: Bool { horizontalSizeClass == .compact || columnVisibility == .detailOnly }
 }

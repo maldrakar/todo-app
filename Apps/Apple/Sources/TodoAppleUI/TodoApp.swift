@@ -31,8 +31,8 @@ final class TodoApp {
     /// held weakly, which is what says whether the entrance still leads anywhere.
     private var entrances: [Entrance] = []
 
-    /// How many times `makeHost` has been called, which is how many hosts have been made, read by the test that
-    /// holds a window to one host (`docs/specs/navigation.md`, "Risks"). It counts calls and not the entrances
+    /// How many hosts `makeHost` has made, one for every call that returned one, read by the test that holds a
+    /// window to one host (`docs/specs/navigation.md`, "Risks"). It counts the hosts made and not the entrances
     /// still alive: a host made and dropped by a redraw leaves an entrance that the next fan-out prunes, and the
     /// change set that forces the redraw is a fan-out, so a count of live entrances would hide the second host.
     private(set) var hostsMade = 0
@@ -82,7 +82,6 @@ final class TodoApp {
     /// the next fan-out passes it by. It throws what the root's `init` throws, the store's error when the sidebar
     /// cannot be read, and its caller acts on the throw.
     func makeHost(path: String?) throws -> ModuleHost<AppModule> {
-        hostsMade += 1
         let route = path.flatMap { try? AppModule.Route(path: $0) } ?? .default
         let root = try AppModule(store: store, route: route)
         // Replaced before `init` returns, since `init` hands the host's entrance over as its last step, so the
@@ -90,6 +89,7 @@ final class TodoApp {
         var deliver: @MainActor (AppModule.Event) -> Void = { _ in }
         let host = ModuleHost(root) { deliver = $0 }
         entrances.append(Entrance(host: host, deliver: deliver))
+        hostsMade += 1
         return host
     }
 

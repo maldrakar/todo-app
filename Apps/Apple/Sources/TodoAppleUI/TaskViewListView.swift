@@ -18,6 +18,12 @@ struct TaskViewListView: View {
     /// property while `body` runs, so that a change runs `body` again.
     @State private var emptiedHighlights = 0
 
+    /// Whether the app can open a window beside this one, which the platform reports (`docs/specs/navigation.md`,
+    /// sections 5 and 10). Read on 2026-10-18: true on the Mac; false on iPhone, its Info.plist declaring multiple
+    /// scenes or not; on the iPad true only with that declaration, which Task 9's Info.plist makes, and false without
+    /// it (the iOS 26.3 simulator).
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
+
     init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) {
         self.model = model
         self.send = send
@@ -39,11 +45,15 @@ struct TaskViewListView: View {
                 #if !os(watchOS)
                 // Not on the watch, where the modifier is deprecated since watchOS 7, so the watch's build, a compile
                 // check in this epic (`docs/specs/navigation.md`, section 8), leaves the whole menu out, Rename with
-                // it. Open in New Window asks for a window of its own, and the root passes the request on as its
-                // output, which the host drops until a handler is installed (#95).
+                // it.
                 .contextMenu {
                     Button("Rename") { send(.renameMenuItemChosen(row.id)) }
-                    Button("Open in New Window") { send(.openInNewWindowMenuItemChosen(row.id)) }
+                    // Only where a window can open beside this one, which iPhone cannot (`docs/specs/navigation.md`,
+                    // section 5). It asks for the window, and the root passes the request on as its output, which
+                    // the host drops until a handler is installed (#95).
+                    if supportsMultipleWindows {
+                        Button("Open in New Window") { send(.openInNewWindowMenuItemChosen(row.id)) }
+                    }
                 }
                 #endif
             }
