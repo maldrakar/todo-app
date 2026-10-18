@@ -58,7 +58,9 @@ struct RootView: View {
             // it is not, in a narrow window, where the sidebar is a screen the pane is pushed over, and when the split
             // view reports the sidebar's column hidden. On 2026-10-18 "The list could not be opened." stood here alone
             // on iPhone and on the iPad in portrait, whose split view hid the sidebar and reported `detailOnly` (the
-            // iOS 26.3 simulator), and under the sidebar's rows alone on the Mac, its sidebar shown.
+            // iOS 26.3 simulator), and on the Mac whose toolbar button had hidden the sidebar, which reported
+            // `detailOnly` too; on the Mac with its sidebar shown it stood under the sidebar's rows alone, and it moved
+            // between the two as the button hid and showed the sidebar.
             .safeAreaInset(edge: .bottom) {
                 if isSidebarAway, let problem = host.model.taskViewList.problem {
                     // On a material across the pane, so that the rows scrolling under it do not show through: the
