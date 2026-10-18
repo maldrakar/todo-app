@@ -36,9 +36,16 @@ struct TaskViewListView: View {
                 // The tree as the flat rows carry it: a number to indent by, so that drawing it decides nothing
                 // (`TaskViewList`).
                 .padding(.leading, CGFloat(row.depth) * 16)
+                #if !os(watchOS)
+                // Not on the watch, where the modifier is deprecated since watchOS 7, so the watch's build, a compile
+                // check in this epic (`docs/specs/navigation.md`, section 8), leaves the whole menu out, Rename with
+                // it. Open in New Window asks for a window of its own, and the root passes the request on as its
+                // output, which the host drops until a handler is installed (#95).
                 .contextMenu {
                     Button("Rename") { send(.renameMenuItemChosen(row.id)) }
+                    Button("Open in New Window") { send(.openInNewWindowMenuItemChosen(row.id)) }
                 }
+                #endif
             }
             .focused($isListFocused)
             // The list takes the keyboard when it appears, so that the arrow keys move the highlight from the

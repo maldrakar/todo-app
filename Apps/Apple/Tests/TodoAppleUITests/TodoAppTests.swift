@@ -1,6 +1,8 @@
 import Testing
+import AppKit
 import Foundation
 import Observation
+import SwiftUI
 import AppFeature
 import DeviceFile
 import TaskViewListFeature
@@ -165,9 +167,78 @@ import TodoCore
     }
 }
 
+/// One host per window, the composition risk a host per window brings back (`docs/specs/navigation.md`, "Risks";
+/// ADR-0008): the window's view, hosted in a window of its own, makes its host when the window appears and never
+/// again. The count is of calls to `makeHost`, and not of the entrances still alive, because the change set that
+/// forces the redraw also prunes the entrances of released hosts, which would hide a second host made and dropped by
+/// the redraw.
+///
+/// The window's view sits where the scene puts it, in a content closure that runs more than once for a window, twice
+/// for the first window of the Mac executable on 2026-10-18, and hands the window a new value of the view on every run.
+/// Here that closure runs again on every model the writer publishes, so the change set that redraws the window hands
+/// it a new value too, and a host made where the value is made, rather than kept in the view's state, is made again.
+@Test @MainActor func aWindowMakesOneHost() throws {
+    try withFreshDatabase { database in
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        let writer = try app.makeHost(path: nil)
+        let redraws = Redraws()
+        let window = NSWindow(contentViewController: NSHostingController(
+            rootView: ContentClosure(writer: writer, redraws: redraws) { WindowView(app: app, path: nil) }
+        ))
+        // An `NSWindow` made in code is released by its own `close()` unless told otherwise, which under ARC
+        // releases it a second time.
+        window.isReleasedWhenClosed = false
+        window.orderFront(nil)
+        defer {
+            window.contentViewController = nil
+            window.close()
+        }
+        turnTheRunLoop(until: { app.hostsMade == 2 })
+        #expect(app.hostsMade == 2, "the writer's host, and the one the window made when it appeared")
+
+        writer.send(.taskViewList(.createFolderButtonTapped))
+        turnTheRunLoop(until: { redraws.count > 1 })
+        #expect(redraws.count > 1, "the change set redrew the window and handed it a new value of its view")
+        #expect(app.hostsMade == 2, "and the redraw made no host")
+    }
+}
+
 /// The default window's path: the Inbox's list, which the sidebar chooses itself, nothing open in it and no quick
 /// entry.
 private let defaultWindow = "/view/\(BuiltInTaskViews.inbox)"
+
+/// A scene's content closure in miniature: its body hands the window a new value of its content on every run, and
+/// it runs again on every model the writer publishes.
+private struct ContentClosure<Content: View>: View {
+    let writer: ModuleHost<AppModule>
+    let redraws: Redraws
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        let _ = redraws.record(writer.model)
+        content()
+    }
+}
+
+/// How many times a content closure ran, kept outside the view so that counting does not redraw it.
+@MainActor private final class Redraws {
+    private(set) var count = 0
+
+    /// Counts a run. It takes the model a run reads so that the read is the call, which is what makes the next
+    /// model the writer publishes run the closure again.
+    func record(_ model: AppModule.Model) {
+        count += 1
+    }
+}
+
+/// Turns the main run loop, where AppKit and SwiftUI do their work, until `condition` holds or five seconds have
+/// passed, whichever comes first; the caller's expectation says which.
+@MainActor private func turnTheRunLoop(until condition: () -> Bool) {
+    let deadline = Date.now.addingTimeInterval(5)
+    while !condition(), Date.now < deadline {
+        RunLoop.main.run(until: Date.now.addingTimeInterval(0.05))
+    }
+}
 
 /// The order in which two things happened, on the main actor, where the host assigns its model and an observer
 /// is told inside the assignment.

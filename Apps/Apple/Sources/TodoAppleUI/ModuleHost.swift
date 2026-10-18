@@ -4,9 +4,9 @@ import Observation
 
 /// The one object in the app that SwiftUI observes: it holds a routable module and publishes its model and its route
 /// (`docs/specs/navigation.md`, section 5). In the app the module is the root of a window, and each window has a host
-/// of its own. The window's view holds it, and every other view gets from the view above it the part of the model it
-/// draws and a closure over its own actions (`docs/specs/feature-module-architecture.md`, section 3), so no other view
-/// names the host.
+/// of its own. The window's view holds it and the root view draws it, and every other view gets from the view above it
+/// the part of the model it draws and a closure over its own actions (`docs/specs/feature-module-architecture.md`,
+/// section 3), so no other view names the host.
 ///
 /// It has two entrances and hands each to one caller. `send(_:)` is a view's, and with `model`, `route` and the handler
 /// the window's view puts in `onOutput` it is all a view gets: a closure over `UserAction` cannot spell an event of the
