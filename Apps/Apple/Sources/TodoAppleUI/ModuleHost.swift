@@ -2,25 +2,29 @@
 import FeatureModule
 import Observation
 
-/// The one object in the app that SwiftUI observes: it holds the root module and publishes its model (spec
-/// section 5). The root view holds it, and every other view gets from the view above it the part of the model
-/// it draws and a closure over its own actions (spec section 3), so no other view names the host.
+/// The one object in the app that SwiftUI observes: it holds a routable module and publishes its model and its route
+/// (`docs/specs/navigation.md`, section 5). In the app the module is the root of a window, and each window has a host
+/// of its own. The window's view holds it, and every other view gets from the view above it the part of the model it
+/// draws and a closure over its own actions (`docs/specs/feature-module-architecture.md`, section 3), so no other view
+/// names the host.
 ///
-/// It has two entrances and hands each to one caller. `send(_:)` is a view's, and with `model` it is all a
-/// view gets: a closure over `UserAction` cannot spell an event of the world. The world's entrance takes every
-/// event, and it is handed once, in `init`, to the composition root, which gives it to the store.
+/// It has two entrances and hands each to one caller. `send(_:)` is a view's, and with `model`, `route` and the handler
+/// the window's view puts in `onOutput` it is all a view gets: a closure over `UserAction` cannot spell an event of the
+/// world. The world's entrance takes every event, and it is handed once, in `init`, to the composition root, which
+/// hands it every change set the store reports.
 ///
-/// Both lead to one queue, because the module's own write comes back through the second entrance before the
-/// first has returned: send to the root, send to the list, write to the store, `onChange`, deliver
-/// `.changed`. Whatever arrives while an event is in flight waits, and is sent after that event returns, so a
-/// module never sees its own write in the middle of its own update. Everything runs on the main actor, so
-/// the queue is an array and needs no lock.
+/// Both lead to one queue, because the module's own write comes back through the second entrance before the first has
+/// returned: send to the root, send to the list, write to the store, `onChange`, deliver `.changed`. Whatever arrives
+/// while an event is in flight waits, and is sent after that event returns, so a module never sees its own write in the
+/// middle of its own update. A change set another window's write reports arrives through the same entrance, and a host
+/// with nothing in flight takes it at once, inside that window's event: the store has committed before it reports, and
+/// no module writes in answer to `.changed` (`docs/specs/navigation.md`, section 5). Everything runs on the main actor,
+/// so the queue is an array and needs no lock.
 ///
-/// What the module answers is dropped until #93 hands it to the handler the window's view installs (spec section
-/// 5). Nothing is lost meanwhile: the root's one answer, a window to open, comes from a menu item that no view
-/// draws before #94. In the app the module is the root.
+/// What the module answers goes to `onOutput`, the handler for the window's view to install, since what the root asks
+/// for, a window to open, only the platform can do (`docs/specs/navigation.md`, section 5).
 @MainActor @Observable
-final class ModuleHost<M: FeatureModule> {
+final class ModuleHost<M: Routable> {
     /// The module's model as it stood when the last event returned.
     ///
     /// Assigned after every event, many of which leave it equal: a module computes its model from its state
@@ -33,6 +37,30 @@ final class ModuleHost<M: FeatureModule> {
     /// is assigned whole and never changed in place.
     private(set) var model: M.Model
 
+    /// The module's route as it stood when the last event returned: the address of what the window shows,
+    /// published beside the model for the window to write down and to be restored from
+    /// (`docs/specs/navigation.md`, sections 5 and 7).
+    ///
+    /// Read from the module after every event and assigned whole, as `model` is and for the same reasons: a route is
+    /// computed by its module on every read, and the setter tells no observer of an equal one.
+    private(set) var route: M.Event.Route
+
+    /// The handler of what the module answers, for the window's view to install, since the view is where the
+    /// platform is within reach (`docs/specs/navigation.md`, section 5).
+    ///
+    /// It is handed each output after the host has published the model and the route the event left, so a
+    /// handler that opens a window opens it on the state the output came from, and while it runs the event is
+    /// still in flight, so an action it sends waits its turn. An output that arrives with no handler is
+    /// dropped, and not kept for one installed later, which would act on a gesture made before anything could
+    /// answer it. Left out of observation, because no view draws it, and an observer of it would be told of
+    /// every installation for nothing.
+    ///
+    /// The host holds the handler, so a handler holds the host weakly or unowned: one that captured it would
+    /// close a cycle, host to handler to host, and a closed window's host would never be released and would go
+    /// on taking every change set (probed 2026-10-17 under Swift 6.4.0: a strong capture kept the host after its
+    /// last holder let go, and a weak one did not).
+    @ObservationIgnored var onOutput: ((M.Output) -> Void)?
+
     private let module: M
 
     /// The event in flight, first, and those that arrived while it ran, in the order they arrived. An empty
@@ -40,15 +68,18 @@ final class ModuleHost<M: FeatureModule> {
     /// every append and removal through the registrar for an observer that cannot exist, since it is private.
     @ObservationIgnored private var pending: [M.Event] = []
 
-    /// Hands the world's entrance to `world`, once, after every property is set.
+    /// Hands the world's entrance to `world`, once, after every property is set. It sends the module no
+    /// `.created`, which is how a parent takes the first choice of a child it made: the module a host holds has
+    /// no parent, and the root answers its own `.created` with nothing, its `init` having told its children.
     ///
-    /// The entrance holds the host weakly. The composition root gives it to the store as `onChange`, and the
-    /// store is held by the module the host holds, so a strong one would close a cycle through the store:
-    /// releasing the host would release nothing, and its database would stay open for the life of the
-    /// process, beside whatever store is opened over the same file next (`Store`, ADR-0005).
+    /// The entrance holds the host weakly. The composition root keeps it for as long as the composition root
+    /// lives, which in the app is the life of the process, so a strong one would keep the host as long: a
+    /// closed window's host and its module would never be released, and would go on taking every change set
+    /// the store reports (`docs/specs/navigation.md`, section 5).
     init(_ module: M, world: (@escaping @MainActor (M.Event) -> Void) -> Void) {
         self.module = module
         self.model = module.model
+        self.route = module.route
         world { [weak self] event in self?.deliver(event) }
     }
 
@@ -60,9 +91,12 @@ final class ModuleHost<M: FeatureModule> {
         pending.append(event)
         guard pending.count == 1 else { return }
         while let next = pending.first {
-            // Dropped, for the reason on the type: nothing hands it on before #93.
-            _ = module.send(next)
+            let output = module.send(next)
             model = module.model
+            route = module.route
+            // Handed on while the event is still first in the queue, so that whatever the handler sends waits
+            // its turn, as everything that arrives in flight does.
+            if let output { onOutput?(output) }
             pending.removeFirst()
         }
     }
