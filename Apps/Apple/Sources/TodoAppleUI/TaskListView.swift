@@ -18,7 +18,16 @@ struct TaskListView: View {
     var body: some View {
         VStack(spacing: 0) {
             List(model.rows) { row in
-                Button(row.title) { send(.rowTapped(row.id)) }
+                // The whole row is the button, its title at the leading edge and the rest of the row a place to
+                // click too: as a bordered button on the Mac the row answered only on the bezel around its title.
+                Button {
+                    send(.rowTapped(row.id))
+                } label: {
+                    Text(row.title)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
             }
             // Under the rows, as the sidebar draws its own. A sentence written while a task covered the list, a
             // link to a task that is gone among them, is first seen when the task is popped (`TaskList`).

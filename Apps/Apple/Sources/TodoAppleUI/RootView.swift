@@ -19,9 +19,9 @@ struct RootView: View {
     /// pane's column too, where it can be read.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    /// Which of the split view's columns are shown, which only the view can know: the person hides the sidebar with
-    /// the toolbar's button, and the platform hides it where the window leaves no room. Read for whether the sidebar
-    /// is beside the pane, and handed to the split view, which writes it.
+    /// Which of the split view's columns are shown, which only the view can know (`docs/style.md`, "Views"): handed
+    /// to the split view, which writes it as it lays its columns out, and read for whether the sidebar is beside the
+    /// pane.
     @State private var columnVisibility = NavigationSplitViewVisibility.automatic
 
     init(host: ModuleHost<AppModule>) {
@@ -43,7 +43,9 @@ struct RootView: View {
                 }
                 .toolbar { quickEntryButton }
                 // The path holds the open task's head and never its model (spec section 6), and the destination
-                // draws the screen out of the list's model, which carries it.
+                // draws the screen out of the list's model, which carries it. It is registered for `EntityID`, which
+                // `ViewID` is too, and draws the open task whatever value it is handed, so a second kind of screen
+                // pushed into this stack needs a type of its own for its destination.
                 .navigationDestination(for: TaskID.self) { _ in
                     if let task = host.model.taskViewList.taskList?.task {
                         TaskScreenView(model: task)
@@ -53,14 +55,19 @@ struct RootView: View {
             }
             // The sidebar's sentence is about the pane that stayed when another could not be opened, so it shows
             // beside the pane: under the sidebar's rows where the sidebar's column is beside the pane, and here where
-            // it is not, in a narrow window, where the sidebar is a screen the pane is pushed over, and with the
-            // sidebar's column hidden. On 2026-10-18 "The list could not be opened." stood here alone on iPhone and
-            // on the iPad, whose split view hid the sidebar in portrait and in landscape and reported `detailOnly`
-            // (the iOS 26.3 simulator), and under the sidebar's rows alone on the Mac, its sidebar shown.
+            // it is not, in a narrow window, where the sidebar is a screen the pane is pushed over, and when the split
+            // view reports the sidebar's column hidden. On 2026-10-18 "The list could not be opened." stood here alone
+            // on iPhone and on the iPad in portrait, whose split view hid the sidebar and reported `detailOnly` (the
+            // iOS 26.3 simulator), and under the sidebar's rows alone on the Mac, its sidebar shown.
             .safeAreaInset(edge: .bottom) {
                 if isSidebarAway, let problem = host.model.taskViewList.problem {
+                    // On a material across the pane, so that the rows scrolling under it do not show through: the
+                    // regular one, since the bar's is unavailable on watchOS and a condition here would be about the
+                    // look alone (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
                     Text(problem)
                         .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(.regularMaterial)
                 }
             }
         }
@@ -106,14 +113,15 @@ struct RootView: View {
         })
     }
 
-    /// The toolbar's quick entry button, on each screen of the stack, the list and the task pushed over it, so that
-    /// it is on whatever pane is open. Not on the split view: there it stood on the Mac's toolbar and on no screen of
-    /// iPhone's collapsed stack, where each screen has a bar of its own (2026-10-18, the iOS 26.3 simulator).
+    /// The toolbar's quick entry button, on each screen of the stack, its root, the list or the placeholder drawn
+    /// when no list is open, and the task pushed over it, so that it is on whatever pane is open. Not on the split
+    /// view: there it stood on the Mac's toolbar and on no screen of iPhone's collapsed stack, where each screen has a
+    /// bar of its own (2026-10-18, the iOS 26.3 simulator).
     private var quickEntryButton: some View {
         Button("Quick Entry", systemImage: "plus") { host.send(.quickEntryButtonTapped) }
     }
 
     /// Whether the sidebar is not beside the pane: the split view is one stack in a narrow window (spec section 6),
-    /// and its sidebar's column is hidden when the person or the platform hid it.
+    /// or it reports its sidebar's column hidden, `detailOnly`, as the iPad's did in portrait (2026-10-18).
     private var isSidebarAway: Bool { horizontalSizeClass == .compact || columnVisibility == .detailOnly }
 }
