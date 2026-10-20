@@ -319,10 +319,11 @@ import TodoCore
 
 /// A window writes its route into its value in the group as soon as it is made, which is what the Mac restores it from
 /// (`docs/specs/navigation.md`, section 7): a window opened with no value, here the first of a launch with
-/// `TODO_ROUTE`, carries the route it opened on from then on, and not nil.
+/// `TODO_ROUTE`, carries the route it opened on from then on, and not nil. The route names Today and not quick entry,
+/// so that the test puts up no sheet in the window it holds on screen.
 @Test @MainActor func aWindowWritesItsRouteIntoItsValueWhenItIsMade() throws {
     try withFreshDatabase { database in
-        let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
+        let path = "/view/\(BuiltInTaskViews.today)"
         let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
         let value = Value()
         let window = hostInAWindow(WindowView(app: app, path: Binding(get: { value.path }, set: { value.path = $0 })))
