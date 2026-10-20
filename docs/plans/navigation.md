@@ -715,7 +715,7 @@ extension TodoApp {
 
 **Rules.**
 
-- The step runs the `xcodebuild` command Task 9 ran, `xcodebuild -project Apps/Apple/Todo.xcodeproj -scheme Todo -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath "$RUNNER_TEMP/xcode-ios" CODE_SIGNING_ALLOWED=NO build`, with `DEVELOPER_DIR` naming the image's Xcode 27, unsigned, after the Apple package's tests, and prints `xcodebuild -version` first so the log names what built. It runs on `main` and on demand only, as the whole job does.
+- The step runs the `xcodebuild` command Task 9 ran, `xcodebuild -project Apps/Apple/Todo.xcodeproj -scheme Todo -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath "$RUNNER_TEMP/xcode-ios" CODE_SIGNING_ALLOWED=NO build`, with `DEVELOPER_DIR` naming the image's Xcode 27, unsigned, after the Apple package's tests, and prints `xcodebuild -version` first so the log names what built. It runs on `main` and on demand only, as the whole job does. The comment above the compile checks of `TodoAppleUI`, "kept compiling for the platforms that have no app yet" (`ci.yml`, read 2026-10-20), changes with the step, since iOS has had an app since Task 9 and only the watch has none.
 - `README.md` gains what the window holds now (the link's form after `todo://` and `TODO_ROUTE` for the Mac are there since Task 8, and running the iPhone and iPad app from Xcode and from the simulator commands since Task 9); the status paragraph says M3 shipped and M4 is next; `docs/process.md` section 10 and `CLAUDE.md`'s toolchain and CI notes follow.
 - ADR-0009's status moves to Accepted, with the amendments of ADR-0006 to ADR-0008 already carrying their merged PR numbers.
 
