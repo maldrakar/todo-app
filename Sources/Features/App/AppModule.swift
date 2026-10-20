@@ -66,8 +66,9 @@ public final class AppModule: Routable {
         case route(Route)
         /// A link into the live window that does not read as a route, delivered by the composition root through the
         /// entrance a link that reads takes as `.route` (spec section 7). It is an event of the world and not a
-        /// `UserAction`, because a link is no control a person pressed and a view has no way to send it. It carries
-        /// no text, since the sentence is all the window shows of it.
+        /// `UserAction`, because a link is no control a person pressed: a view's closure spells user actions alone, and
+        /// the link reaches the host through the composition root's way in. It carries no text, since the sentence is
+        /// all the window shows of it.
         ///
         /// It moves nothing but the root's sentence: the window stays as it was, and the root says the link could
         /// not be opened, since what failed is no child's (the owner, 2026-10-16). A window restored from a text that
