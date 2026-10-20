@@ -92,8 +92,8 @@ import TodoCore
     }
 }
 
-/// The Mac executable has no URL scheme, so a link is handed to it at launch, in `TODO_ROUTE`, and read with the route's
-/// codec as a link is (`docs/specs/navigation.md`, section 7).
+/// The Mac executable has no URL scheme, so a link is handed to it at launch, in `TODO_ROUTE`, and read with the
+/// route's codec as a link is (`docs/specs/navigation.md`, section 7).
 @Test @MainActor func aLaunchRouteIsReadFromTheEnvironment() throws {
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)/task/\(TaskID())?quick-entry"
@@ -106,7 +106,8 @@ import TodoCore
 @Test @MainActor func anEmptyLaunchRouteIsNil() throws {
     try withFreshDatabase { database in
         for route in ["", "/view", nil] as [String?] {
-            let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": route].compactMapValues { $0 })
+            let environment = ["TODO_DB": database, "TODO_ROUTE": route].compactMapValues { $0 }
+            let app = try TodoApp.launch(environment: environment)
             #expect(app.launchRoute == nil, "\(String(describing: route))")
         }
     }
@@ -159,9 +160,9 @@ import TodoCore
     }
 }
 
-/// The route is the URL's path and query alone, so a URL that says more, a host, a user or a fragment, gives none rather
-/// than a route that drops what it said: `todo://view/<id>`, one slash short, reads `view` as the host, and the other
-/// forms have a path that would read without them.
+/// The route is the URL's path and query alone, so a URL that says more, a host, a user or a fragment, gives none
+/// rather than a route that drops what it said: `todo://view/<id>`, one slash short, reads `view` as the host, and the
+/// other forms have a path that would read without them.
 @Test @MainActor func aURLWithAHostOrAFragmentGivesNil() throws {
     let today = BuiltInTaskViews.today
     for text in ["todo://view/\(today)", "todo://localhost/view/\(today)", "todo://user@/view/\(today)",
@@ -170,8 +171,8 @@ import TodoCore
     }
 }
 
-/// A link the system opened in a window goes to that window's host alone, through its world entrance, as a route applied
-/// (`docs/specs/navigation.md`, section 7): the other window stays where it was.
+/// A link the system opened in a window goes to that window's host alone, through its world entrance, as a route
+/// applied (`docs/specs/navigation.md`, section 7): the other window stays where it was.
 @Test @MainActor func aLinkOpensItsRouteInItsOwnWindow() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
@@ -292,7 +293,9 @@ import TodoCore
         let writer = try app.makeWindow(path: nil).host
         let redraws = [Redraws(), Redraws()]
         let windows = redraws.map { redraws in
-            hostInAWindow(ContentClosure(writer: writer, redraws: redraws) { WindowView(app: app, path: .constant(nil)) })
+            hostInAWindow(ContentClosure(writer: writer, redraws: redraws) {
+                WindowView(app: app, path: .constant(nil))
+            })
         }
         defer {
             for window in windows {
@@ -311,6 +314,29 @@ import TodoCore
         #expect(redrawn(), "the change set redrew both windows and handed each a new value of its view")
         #expect(app.hostsMade == 3, "and the redraw made no host")
     }
+}
+
+/// A window writes its route into its value in the group as soon as it is made, which is what the Mac restores it from
+/// (`docs/specs/navigation.md`, section 7): a window opened with no value, here the first of a launch with
+/// `TODO_ROUTE`, carries the route it opened on from then on, and not nil.
+@Test @MainActor func aWindowWritesItsRouteIntoItsValueWhenItIsMade() throws {
+    try withFreshDatabase { database in
+        let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
+        let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
+        let value = Value()
+        let window = hostInAWindow(WindowView(app: app, path: Binding(get: { value.path }, set: { value.path = $0 })))
+        defer {
+            window.contentViewController = nil
+            window.close()
+        }
+        turnTheRunLoop(until: { value.path != nil })
+        #expect(value.path == path)
+    }
+}
+
+/// A window's value in its group, kept outside the view as the group keeps it.
+@MainActor private final class Value {
+    var path: String?
 }
 
 /// The default window's path: the Inbox's list, which the sidebar chooses itself, nothing open in it and no quick
