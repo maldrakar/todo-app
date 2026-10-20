@@ -295,7 +295,7 @@ import TodoCore
         let redraws = [Redraws(), Redraws()]
         let windows = redraws.map { redraws in
             hostInAWindow(ContentClosure(writer: writer, redraws: redraws) {
-                WindowView(app: app, path: .constant(nil))
+                WindowView(app: app, value: .constant(nil))
             })
         }
         defer {
@@ -317,28 +317,63 @@ import TodoCore
     }
 }
 
+/// Open in New Window opens a window of its own every time, on the view a window shows too, because a value an open
+/// window already has brings that window forward instead of opening one (probed 2026-10-20, macOS 26.7.1): two
+/// requests for one route are two values, each with an identity of its own.
+@Test func twoRequestsForOneRouteAreTwoValues() {
+    let path = "/view/\(BuiltInTaskViews.inbox)"
+    #expect(WindowView.Value(path: path) != WindowView.Value(path: path))
+}
+
 /// A window writes its route into its value in the group as soon as it is made, which is what the Mac restores it from
 /// (`docs/specs/navigation.md`, section 7): a window opened with no value, here the first of a launch with
-/// `TODO_ROUTE`, carries the route it opened on from then on, and not nil. The route names Today and not quick entry,
-/// so that the test puts up no sheet in the window it holds on screen.
+/// `TODO_ROUTE`, carries one from then on whose text is the route it opened on. The route names Today and not quick
+/// entry, so that the test puts up no sheet in the window it holds on screen.
 @Test @MainActor func aWindowWritesItsRouteIntoItsValueWhenItIsMade() throws {
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)"
         let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
-        let value = Value()
-        let window = hostInAWindow(WindowView(app: app, path: Binding(get: { value.path }, set: { value.path = $0 })))
+        let kept = Kept()
+        let window = hostInAWindow(WindowView(app: app, value: kept.binding))
         defer {
             window.contentViewController = nil
             window.close()
         }
-        turnTheRunLoop(until: { value.path != nil })
-        #expect(value.path == path)
+        turnTheRunLoop(until: { kept.value != nil })
+        #expect(kept.value?.path == path)
+    }
+}
+
+/// A window keeps its identity through every write and moves its route's text alone, so its value stays its own and
+/// no request for another window can equal it: a window made with a value whose text the root writes back otherwise,
+/// `/`, which opens the Inbox, carries the Inbox's path under the identity it was made with.
+@Test @MainActor func aWindowKeepsItsIdentityThroughItsWrite() throws {
+    try withFreshDatabase { database in
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        let made = WindowView.Value(path: "/")
+        let kept = Kept(made)
+        let window = hostInAWindow(WindowView(app: app, value: kept.binding))
+        defer {
+            window.contentViewController = nil
+            window.close()
+        }
+        turnTheRunLoop(until: { kept.value?.path != "/" })
+        #expect(kept.value == WindowView.Value(id: made.id, path: defaultWindow))
     }
 }
 
 /// A window's value in its group, kept outside the view as the group keeps it.
-@MainActor private final class Value {
-    var path: String?
+@MainActor private final class Kept {
+    var value: WindowView.Value?
+
+    init(_ value: WindowView.Value? = nil) {
+        self.value = value
+    }
+
+    /// The binding the window's view is handed, as the group hands it the window's value.
+    var binding: Binding<WindowView.Value?> {
+        Binding(get: { self.value }, set: { self.value = $0 })
+    }
 }
 
 /// The default window's path: the Inbox's list, which the sidebar chooses itself, nothing open in it and no quick
