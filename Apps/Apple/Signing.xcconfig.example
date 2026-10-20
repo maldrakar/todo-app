@@ -1,0 +1,2 @@
+// Copied to Signing.xcconfig beside it, with the Team ID of the Apple developer account that signs the app for a device after the equals sign.
+DEVELOPMENT_TEAM =

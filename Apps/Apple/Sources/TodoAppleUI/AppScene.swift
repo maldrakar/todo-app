@@ -1,8 +1,9 @@
 // Apps/Apple/Sources/TodoAppleUI/AppScene.swift
 import SwiftUI
 
-/// The app's scene, and the one thing this library exports: the executable's `@main` is its only caller from
-/// outside, and the app targets of the other platforms will be the same one line (ADR-0008).
+/// The app's scene, and the one thing this library exports: its callers from outside are the `@main` of the Mac
+/// executable and the `@main` of the iOS app target, whose body is the same one line in each, as the watch's will be
+/// (ADR-0008).
 ///
 /// A window group, so that the Mac opens as many windows as are asked for, Cmd-N among them, each made by its own
 /// view around a host of its own (`docs/specs/navigation.md`, section 5). On the Mac and on iOS the group's value is

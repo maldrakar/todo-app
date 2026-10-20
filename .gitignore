@@ -4,3 +4,5 @@
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+xcuserdata/
+Apps/Apple/Signing.xcconfig

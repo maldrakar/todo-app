@@ -1,0 +1,6 @@
+// The base configuration of the Todo target in Todo.xcodeproj: it reads the signing team from Signing.xcconfig when
+// that file exists. Signing.xcconfig is the owner's and git ignores it, so CI and a fresh checkout have none: Xcode
+// 27.1 stopped the build when a target's base configuration file was missing, and with this optional include it built
+// for the simulator unsigned and printed nothing about it (probed 2026-10-20). Signing.xcconfig.example says what goes
+// in it.
+#include? "Signing.xcconfig"
