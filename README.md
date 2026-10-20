@@ -111,8 +111,8 @@ reason.
 The iPhone and iPad app is the Xcode project `Apps/Apple/Todo.xcodeproj`: one app target whose `@main`, in
 `Apps/Apple/Sources/todo-ios`, opens the same scene from `TodoAppleUI`, with an Info.plist that registers the `todo`
 scheme and lets the iPad open more than one window (ADR-0008). Its file, `project.xcproj`, is the JSON project file
-that Xcode 27 is the first to read. Open the project in Xcode, choose the Todo scheme and a simulator, and run; or,
-from the repository's root:
+that Xcode 27 is the first to read. Open the project in Xcode, choose the scheme `Todo`, the app's and not `todo`, the
+command-line demo's, which Xcode lists beside it, choose a simulator, and run; or, from the repository's root:
 
 ```sh
 xcodebuild -project Apps/Apple/Todo.xcodeproj -scheme Todo -destination 'generic/platform=iOS Simulator' \
@@ -125,14 +125,24 @@ xcrun simctl openurl booted 'todo:///view/00000000-0000-4000-8000-000000000002/t
 ```
 
 The app keeps its database in its own container, at `Library/Application Support/todo/todo.sqlite` under the
-directory `xcrun simctl get_app_container booted dev.maldrakar.todo data` prints, so the demo fills it with `TODO_DB`
-set to that path while the app is not running. iOS asks "Open in “Todo”?" before it hands the app a link from
-`simctl openurl`. After the system ends the app in the background, the next launch opens the window on the route it
-showed.
+directory `xcrun simctl get_app_container booted dev.maldrakar.todo data` prints, made by the app's first launch. The
+demo fills it with `TODO_DB` set to that path, once the app is stopped:
+
+```sh
+xcrun simctl terminate booted dev.maldrakar.todo
+CONTAINER="$(xcrun simctl get_app_container booted dev.maldrakar.todo data)"
+TODO_DB="$CONTAINER/Library/Application Support/todo/todo.sqlite" swift run todo add "Buy milk"
+```
+
+iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
+the background, the next launch opens the window on the route it showed.
 
 A device needs signing: copy `Apps/Apple/Signing.xcconfig.example` to `Apps/Apple/Signing.xcconfig`, which git
-ignores, put the Team ID of your Apple developer account in it, and Xcode signs the app automatically under that
-team. A checkout without it builds for the simulator unsigned.
+ignores, put the Team ID of your Apple developer account in it, sign in to that account under Xcode's Settings >
+Accounts, and Xcode signs the app automatically under that team. The team goes in `Signing.xcconfig` and never
+through the target's Signing & Capabilities editor, where Xcode's error without a team points: the editor writes the
+team into `project.xcproj`, which is committed. A checkout without `Signing.xcconfig` builds for the simulator
+unsigned.
 
 `project.xcproj` is written by hand and kept in the form Apple's `xcprojformatter` writes: `swift test` in
 `Apps/Apple` fails when it is not, and the formatter puts it right.
