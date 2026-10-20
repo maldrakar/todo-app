@@ -417,3 +417,131 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     #expect(app.model.taskViewList.selection == before.selection)
     #expect(app.route.path == "/view/\(work.view)")
 }
+
+/// The root's own sentence, for a link the composition root could not read (the owner, 2026-10-16, answering the
+/// spec's open question; `docs/specs/navigation.md`, section 7).
+private let linkSentence = "The link could not be opened."
+
+/// A link that does not read moves nothing in the window: the sidebar, the list, by the same instance, the task open in
+/// it and quick entry with its draft stay as they were, and so does the route. The root says so in a sentence of its
+/// own, since what failed is no child's.
+@Test func anUnreadableLinkLeavesTheWindowAndSaysSo() throws {
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "Buy milk"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(open)?quick-entry"))
+    #expect(app.send(.action(.quickEntry(.titleFieldChanged("Call the")))) == nil)
+    let rows = try rowsBeforeAnUnreadTask(in: app, of: store)
+    let before = app.model
+    let route = app.route
+    #expect(before.problem == nil, "nothing is said before the link; without that this proves nothing")
+    #expect(app.send(.unreadableLink) == nil)
+    #expect(app.model.taskViewList == before.taskViewList)
+    #expect(app.model.taskViewList.taskList?.rows == rows, "the same list, since a list made afresh reads the task written since")
+    #expect(app.model.quickEntry == before.quickEntry)
+    #expect(app.model.problem == linkSentence)
+    #expect(app.route == route)
+}
+
+/// Every link that does not read says so: a second one in a row leaves the window as one did, and one after the
+/// sentence was taken away says it again.
+@Test func everyUnreadableLinkSaysSo() throws {
+    let store = try makeStore()
+    let app = try AppModule(store: store)
+    let once = try AppModule(store: store)
+    #expect(once.send(.unreadableLink) == nil)
+    #expect(once.model.problem == linkSentence, "one link said so; this is the setup")
+    #expect(app.send(.unreadableLink) == nil)
+    #expect(app.send(.unreadableLink) == nil)
+    #expect(app.model == once.model)
+    #expect(app.send(.route(.default)) == nil)
+    #expect(app.model.problem == nil, "the route took the sentence away; this is the setup")
+    #expect(app.send(.unreadableLink) == nil)
+    #expect(app.model == once.model)
+}
+
+/// A link that reads is applied as every route is, and takes the root's sentence away, a route the sidebar cannot open
+/// included, which the sidebar answers with a sentence of its own: the window then draws what a window that never had
+/// the link that did not read draws (the owner, 2026-10-16: a successful route clears a sentence at its start).
+@Test func aRouteTakesTheRootsSentenceAway() throws {
+    let store = try makeStore()
+    let gone = try taggedView("Errands", in: store)
+    try store.delete(view: gone.view)
+    let app = try AppModule(store: store)
+    let twin = try AppModule(store: store)
+    for route in [try Route(path: "/view/\(BuiltInTaskViews.today)?quick-entry"), try Route(path: "/view/\(gone.view)")] {
+        #expect(app.send(.unreadableLink) == nil)
+        #expect(app.model.problem == linkSentence, "the sentence is the setup; without it this proves nothing")
+        #expect(app.send(.route(route)) == nil)
+        #expect(twin.send(.route(route)) == nil)
+        #expect(app.model == twin.model)
+        #expect(app.route == twin.route)
+    }
+    #expect(app.model.taskViewList.problem == "The list could not be opened.", "the sidebar said why it opened nothing")
+}
+
+/// The Quick Entry button is the root's own gesture, so it takes the root's sentence away, with quick entry down and
+/// with it up, which the button keeps with its draft (the controller's ruling T5-10, the owner, 2026-10-20).
+@Test func theQuickEntryButtonTakesTheRootsSentenceAway() throws {
+    let store = try makeStore()
+    let app = try AppModule(store: store)
+    let twin = try AppModule(store: store)
+    let presses: [[AppModule.UserAction]] = [
+        [.quickEntryButtonTapped],
+        [.quickEntry(.titleFieldChanged("Buy milk")), .quickEntryButtonTapped],
+    ]
+    for actions in presses {
+        #expect(app.send(.unreadableLink) == nil)
+        #expect(app.model.problem == linkSentence, "the sentence is the setup; without it this proves nothing")
+        for action in actions {
+            #expect(app.send(.action(action)) == nil)
+            #expect(twin.send(.action(action)) == nil)
+        }
+        #expect(app.model == twin.model)
+    }
+    #expect(app.model.quickEntry?.draft == "Buy milk", "the second press found quick entry up and kept it")
+}
+
+/// A gesture in one of the root's children is that child's, so it leaves the root's sentence, as a gesture in the list
+/// leaves the sidebar's: a choice in the sidebar, a tap in the list it opened and a keystroke in quick entry each move
+/// their own module, as they do in a window that never had the link, and the sentence stays.
+@Test func aGestureInAChildLeavesTheRootsSentence() throws {
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "Buy milk"))
+    let app = try AppModule(store: store, route: try Route(path: "/?quick-entry"))
+    let twin = try AppModule(store: store, route: try Route(path: "/?quick-entry"))
+    #expect(app.send(.unreadableLink) == nil)
+    let gestures: [AppModule.UserAction] = [
+        .taskViewList(.rowSelected(BuiltInTaskViews.today)),
+        .taskViewList(.rowSelected(inbox)),
+        .taskViewList(.taskList(.rowTapped(open))),
+        .quickEntry(.titleFieldChanged("Call the bank")),
+    ]
+    for gesture in gestures {
+        #expect(app.send(.action(gesture)) == nil)
+        #expect(twin.send(.action(gesture)) == nil)
+    }
+    #expect(twin.model.taskViewList.taskList?.task?.title == "Buy milk", "the gestures moved the window; this is the setup")
+    #expect(twin.model.quickEntry?.draft == "Call the bank", "and quick entry took the keystroke")
+    #expect(app.model.taskViewList == twin.model.taskViewList)
+    #expect(app.model.quickEntry == twin.model.quickEntry)
+    #expect(app.model.problem == linkSentence)
+    #expect(app.route == twin.route)
+}
+
+/// A change another window or another device made answers nothing a person was told, and neither does being created,
+/// so both leave the root's sentence while the change is read as in any window.
+@Test func aChangeOrBeingCreatedLeavesTheRootsSentence() throws {
+    let store = try makeStore()
+    let app = try AppModule(store: store)
+    let twin = try AppModule(store: store)
+    #expect(app.send(.unreadableLink) == nil)
+    let changes = try changeSet(of: store) { try store.createTask(NewTask(title: "Buy milk")) }
+    for event in [AppModule.Event.changed(changes), .created] {
+        #expect(app.send(event) == nil)
+        #expect(twin.send(event) == nil)
+    }
+    #expect(twin.model.taskViewList.taskList?.rows.map(\.title) == ["Buy milk"], "the change was read; this is the setup")
+    #expect(app.model.taskViewList == twin.model.taskViewList)
+    #expect(app.model.quickEntry == twin.model.quickEntry)
+    #expect(app.model.problem == linkSentence)
+}
