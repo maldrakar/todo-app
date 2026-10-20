@@ -42,16 +42,6 @@ struct RootView: View {
                     }
                 }
                 .toolbar { quickEntryButton }
-                // The path holds the open task's head and never its model (spec section 6), and the destination
-                // draws the screen out of the list's model, which carries it. It is registered for `EntityID`, which
-                // `ViewID` is too, and draws the open task whatever value it is handed, so a second kind of screen
-                // pushed into this stack needs a type of its own for its destination.
-                .navigationDestination(for: TaskID.self) { _ in
-                    if let task = host.model.taskViewList.taskList?.task {
-                        TaskScreenView(model: task)
-                            .toolbar { quickEntryButton }
-                    }
-                }
             }
             // The sidebar's sentence is about the pane that stayed when another could not be opened, so it shows
             // beside the pane: under the sidebar's rows where the sidebar's column is beside the pane, and here where
@@ -115,10 +105,10 @@ struct RootView: View {
         })
     }
 
-    /// The toolbar's quick entry button, on each screen of the stack, its root, the list or the placeholder drawn
-    /// when no list is open, and the task pushed over it, so that it is on whatever pane is open. Not on the split
-    /// view: there it stood on the Mac's toolbar and on no screen of iPhone's collapsed stack, where each screen has a
-    /// bar of its own (2026-10-18, the iOS 26.3 simulator).
+    /// The toolbar's quick entry button, on the root of the stack, the list or the placeholder drawn when no list is
+    /// open, and not on the task pushed over it, which has none (the owner, 2026-10-20). Not on the split view: there
+    /// it stood on the Mac's toolbar and on no screen of iPhone's collapsed stack, where each screen has a bar of its
+    /// own (2026-10-18, the iOS 26.3 simulator).
     private var quickEntryButton: some View {
         Button("Quick Entry", systemImage: "plus") { host.send(.quickEntryButtonTapped) }
     }
