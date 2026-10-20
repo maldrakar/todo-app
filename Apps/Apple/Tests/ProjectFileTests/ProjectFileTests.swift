@@ -12,13 +12,14 @@ import XcodeProjectFormat
     _ = try decodedProject()
 }
 
-/// The shell is one app target and nothing more, its code the library's: the package it links is this one, at the
-/// project's own directory, and the product it links is `TodoAppleUI`.
+/// The shell is one app target and nothing more, its code the library's: an application for iPhone and iPad, the
+/// package it links is this one, at the project's own directory, and the product it links is `TodoAppleUI`.
 @Test func theProjectHasOneApplicationTargetOverTheLibrary() throws {
     let project = try decodedProject()
     #expect(project.targets.map(\.name) == ["Todo"])
     let target = try #require(project.targets.first).commonProperties
     #expect(target.productTypeID == XCSchema.ProductTypeID(productTypeID: "com.apple.product-type.application"))
+    #expect(target.buildSettings["SDKROOT"] == .string("iphoneos"))
     #expect(target.buildSettings["PRODUCT_BUNDLE_IDENTIFIER"] == .string("dev.maldrakar.todo"))
     let thisPackage = XCSchema.SwiftPackage(location: .local(XCSchema.LocalSwiftPackage(path: ".")), traits: [])
     #expect(project.packages == [thisPackage])
