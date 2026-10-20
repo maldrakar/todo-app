@@ -151,10 +151,11 @@ final class TodoApp {
         /// Takes a link the system opened in this window to this window's host, through its world entrance, the one
         /// `.changed` comes through: `.route` when the link reads (`TodoApp.route(from:)`), and the root's
         /// `.unreadableLink` when it does not, which leaves the window as it was and says so
-        /// (`docs/specs/navigation.md`, section 7). The view hands over the URL and never holds the entrance, which is
-        /// the composition root's and never a view's (section 5): a closure over a URL cannot spell an event of the
-        /// world. It holds the host weakly, as the entrance does, so a window's view that lets go of its window lets
-        /// go of the host.
+        /// (`docs/specs/navigation.md`, section 7). Both are events of the world, and through this the window's view
+        /// delivers only what the codec reads from a URL, a `.route`, any a URL can spell, or `.unreadableLink`, and
+        /// never `.changed` or `.created`; it never holds the entrance itself, which stays the composition root's
+        /// (section 5; the owner, 2026-10-20). It holds the host weakly, as the entrance does, so a window's view that
+        /// lets go of its window lets go of the host.
         let open: @MainActor (URL) -> Void
     }
 

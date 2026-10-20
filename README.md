@@ -89,12 +89,13 @@ refused with a sentence under the list, and Esc keeps the old title. New Folder,
 the end of the top level, chosen and with its field open.
 
 Cmd-N opens another window on the Inbox, and Open in New Window, in a row's context menu, opens that view in a
-window of its own, or brings forward the window that already shows it; every window shows what the others write.
-`TODO_ROUTE` is the route the first window opens, in the text form a link carries after `todo://`: a path,
-`/view/<id>` or `/view/<id>/task/<id>`, with `?quick-entry` after it to open quick entry too. One that does not
-read opens the Inbox, as no `TODO_ROUTE` does, and one naming a view that is gone opens no list and says so under
-the sidebar. The executable has no bundle, so no `todo://` link reaches it while it runs, and macOS does not
-restore its windows after a relaunch; both need the app with a bundle that the Xcode shell builds (#96).
+window of its own, or brings forward a window whose route is exactly that view's list, with no task pushed and no
+quick entry up; every window shows what the others write. `TODO_ROUTE` is the route the first window opens, in the
+text form a link carries after `todo://`: a path, `/view/<id>` or `/view/<id>/task/<id>`, with `?quick-entry` after
+it to open quick entry too. One that does not read opens the Inbox, as no `TODO_ROUTE` does, and one naming a view
+that is gone opens no list and says so under the sidebar. The executable has no bundle, so no `todo://` link
+reaches it while it runs, and macOS does not restore its windows after a relaunch. No bundled Mac app exists in
+this milestone: the Xcode shell (#96) builds the iPhone and iPad app, and the Mac stays on `todo-mac`.
 
 `TODO_DB` is the database's whole path and `TODO_DEVICE` the device it is written under, each read as unset when
 it is exported empty. Without `TODO_DB` the app opens `~/Library/Application Support/todo/todo.sqlite`, and the

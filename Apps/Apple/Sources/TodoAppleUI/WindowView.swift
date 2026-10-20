@@ -92,8 +92,10 @@ struct WindowView: View {
     /// Installs the handler of the root's output on the window's host, right after the window is made, so that it is
     /// there before any gesture can draw an output out: a window opened on the route the root asks for, with the
     /// route's text as the new window's value (`docs/specs/navigation.md`, section 5). A value an open window already
-    /// has brings that window forward and opens none, so Open in New Window on the view a window shows brings that
-    /// window forward; two windows whose routes come to the same value both stay (2026-10-20, macOS 26.7.1).
+    /// has brings that window forward and opens none, so Open in New Window, which asks for the view's list alone,
+    /// `/view/<id>`, brings forward a window whose route is exactly that list, and opens a new window beside one on
+    /// that view with a task pushed or quick entry up, whose value is another; two windows whose routes come to the
+    /// same value both stay (2026-10-20, macOS 26.7.1).
     ///
     /// The handler captures the action alone. The host holds its handler, so a handler that held the host would
     /// close a cycle, host to handler to host, and a closed window's host would never be released and would go on
