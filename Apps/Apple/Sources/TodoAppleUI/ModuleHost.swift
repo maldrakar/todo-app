@@ -58,7 +58,7 @@ final class ModuleHost<M: Routable> {
     /// answer it. Left out of observation, because no view draws it, and an observer of it would be told of
     /// every installation for nothing.
     ///
-    /// The host holds the handler, so a handler holds the host weakly or unowned: one that captured it would
+    /// The host holds the handler, so a handler holds the host weakly or not at all: one that captured it would
     /// close a cycle, host to handler to host, and a closed window's host would never be released and would go
     /// on taking every change set (probed 2026-10-17 under Swift 6.4.0: a strong capture kept the host after its
     /// last holder let go, and a weak one did not).

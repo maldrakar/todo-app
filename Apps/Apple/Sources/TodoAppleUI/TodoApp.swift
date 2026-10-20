@@ -47,7 +47,9 @@ final class TodoApp {
     ///
     /// It is the first window's, and only when that window has no path of its own; every later window made with none,
     /// Cmd-N's, opens the default window (the owner, 2026-10-20). One that does not read opens the default window and
-    /// says nothing, as a path a window was restored from does: no window is there yet to say it in.
+    /// says nothing, as a path a window was restored from does: it is the developer's stand-in for a link on the
+    /// executable that has no bundle, and the owner kept an unreadable one silent, as the plan's rule has it
+    /// (2026-10-20).
     let launchRoute: AppModule.Route?
 
     private init(store: Store, launchRoute: AppModule.Route?) {
@@ -93,8 +95,8 @@ final class TodoApp {
     /// said in its window (`Window.open`). A route whose views or tasks are gone is read, and opens what still exists,
     /// as the root's own children say (`docs/specs/navigation.md`, section 3). The first window made with no path
     /// opens `launchRoute` instead of the default route, when there is one, and the first window made at all spends
-    /// it, with a path or without: the window's view hands over the value its window was opened with and never knows
-    /// of a launch route, so whether a window is the first is decided here (the owner, 2026-10-20).
+    /// it, with a path or without: the window's view hands over the text of the value its window was opened with and
+    /// never knows of a launch route, so whether a window is the first is decided here (the owner, 2026-10-20).
     ///
     /// The host's world entrance is kept for the fan-out and handed to the window inside `open`, and the host itself is
     /// not kept: its caller, the window's view, holds the window for as long as the window lives (`WindowView`), and
