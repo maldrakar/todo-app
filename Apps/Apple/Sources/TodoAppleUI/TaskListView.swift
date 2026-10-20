@@ -41,8 +41,9 @@ struct TaskListView: View {
         // The path holds the open task's head and never its model (spec section 6), and the destination draws the
         // screen out of the list's model, which carries it. It is registered for `EntityID`, which `ViewID` is too,
         // and draws the open task whatever value it is handed, so a second kind of screen pushed into this stack needs
-        // a type of its own for its destination. On 2026-10-20, in the iOS 26.3 simulator, a window made from a path
-        // naming a task showed the task pushed, and a route into another view's task pushed it over the new list.
+        // a type of its own for its destination. On 2026-10-20, on the Mac and in the iOS 26.3 simulator, a window
+        // made from a path naming a task showed the task pushed, and a route into another view's task pushed it over
+        // the new list.
         .navigationDestination(for: TaskID.self) { _ in
             if let task = model.task {
                 TaskScreenView(model: task)

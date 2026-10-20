@@ -36,16 +36,18 @@ struct TaskViewListView: View {
                     if let draft = row.draft {
                         TitleField(draft: draft, send: send)
                     } else {
-                        // A tap anywhere on the row is the row's choice, the highlighted row's too, which the List
-                        // does not report: on the Mac a click on the highlighted row moves no highlight and writes no
+                        // A tap on the title is the row's choice, the highlighted row's too, which the List does not
+                        // report: on the Mac a click on the highlighted row moves no highlight and writes no
                         // selection, so the task open in its list stayed open, where a click on the highlighted view
-                        // closes it (`TaskViewList`). The title fills the row so that the whole row takes the tap,
-                        // which replaces the List's own selection there; the arrow keys still go through `selection`.
-                        // On 2026-10-18, on the Mac: a click on a view's title or on the rest of its row chose it,
-                        // one action each, and on the highlighted view closed its task. A tap on the title alone,
-                        // sent only for the highlighted row, left a click on another view's title choosing nothing.
-                        // On 2026-10-20, in the iOS 26.3 simulator, a tap on another view's row pushed its list on
-                        // iPhone, and on the iPad a tap on the highlighted view closed its task.
+                        // closes it (`TaskViewList`). The title fills the row to its trailing edge so that the tap
+                        // covers the row past the title's text, and it replaces the List's own selection there; the
+                        // row's insets and a nested row's indent stay the List's, and the arrow keys still go
+                        // through `selection`. On 2026-10-18, on the Mac: a click on a view's title or on the rest of
+                        // its row chose it, one action each, and on the highlighted view closed its task; the same
+                        // day, a tap on the title's text alone, sent only for the highlighted row, left a click on
+                        // another view's title choosing nothing. On 2026-10-20, in the iOS 26.3 simulator, a tap on
+                        // another view's row pushed its list on iPhone, and on the iPad a tap on the highlighted view
+                        // closed its task.
                         Text(row.title)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(.rect)
