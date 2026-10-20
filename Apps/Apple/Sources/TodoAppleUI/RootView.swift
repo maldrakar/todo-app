@@ -65,7 +65,9 @@ struct RootView: View {
             }
         }
         // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
-        // window and not under one column, on the same material as the pane's sentence, for the same reason.
+        // window and not under one column, on the same material as the pane's sentence, for the same reason. On
+        // 2026-10-20, on macOS 26.7.1, it stood across the bottom of the window under the sidebar and the pane, and the
+        // sidebar's column ended above it.
         .safeAreaInset(edge: .bottom) {
             if let problem = host.model.problem {
                 Text(problem)

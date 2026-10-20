@@ -11,7 +11,8 @@ import Observation
 /// It has two entrances and hands each to one caller. `send(_:)` is a view's, and with `model`, `route` and the handler
 /// the window's view puts in `onOutput` it is all a view gets: a closure over `UserAction` cannot spell an event of the
 /// world. The world's entrance takes every event, and it is handed once, in `init`, to the composition root, which
-/// hands it every change set the store reports.
+/// hands it every change set the store reports, and every link the system opens in the host's window as a route, or
+/// as the root's sentence when the link does not read (`TodoApp.Window.open`).
 ///
 /// Both lead to one queue, because the module's own write comes back through the second entrance before the first has
 /// returned: send to the root, send to the list, write to the store, `onChange`, deliver `.changed`. Whatever arrives
