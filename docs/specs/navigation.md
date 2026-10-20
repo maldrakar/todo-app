@@ -148,6 +148,8 @@ The root view keeps its `NavigationSplitView` (the two- or three-column containe
 
 **A link that cannot be read is ignored silently in this epic.** The root has no sentence of its own since M2, and giving it one for this alone is not proposed here; it is an open question for the owner.
 
+> **Amended 2026-10-20, from the owner's answers in chat of 2026-10-16 and 2026-10-20 (#95).** A link that cannot be read leaves the window as it was, and the root says "The link could not be opened." in a sentence of its own, drawn across the bottom of the window. The composition root delivers such a link through the same entrance as a route, as an event of the world of its own, and the root writes the sentence and moves nothing else. A successful route takes the sentence away at its start, and so does the Quick Entry button, the root's own gesture, while a gesture in one of the root's children and a change leave it. A window restored from a string that does not read still opens the default window and says nothing.
+
 **The Mac executable has no URL scheme.** An executable without a bundle cannot register `todo://`, so on the Mac built by SwiftPM a link is fed at launch through an environment variable, the way `TODO_DB` names the database, and a running `todo-mac` cannot be reached by a link until the app has a bundle. The app the Xcode shell builds registers the scheme in its Info.plist, and the iPhone and the iPad are where a link into a running app is checked by hand.
 
 ### 8. The web and the watch, on paper
@@ -294,6 +296,7 @@ sequenceDiagram
 ## Open questions
 
 - **A link that cannot be read.** Ignored silently in this epic, since the root has no sentence of its own. Whether the root should get one for this, and say "the link could not be opened", is the owner's call.
+  > **Amended 2026-10-20, from the owner's answers in chat of 2026-10-16 and 2026-10-20 (#95).** Answered: the root says "The link could not be opened." in a sentence of its own, cleared by a successful route and by the Quick Entry button (section 7).
 - **Folding the world's events into one case.** `.changed` is forwarded in one line per child per parent today, and `.route` is the seat's. When the change of the day arrives in M4 as a third event every parent forwards, `Event` may gain one case `.world(WorldEvent)` that every parent forwards in one line regardless of how many events the world has. Not done here, because nothing needs it yet.
 - **Fan-out to an idle host inside another host's event, or deferred to the next turn.** Section 5 chooses the first with the rule that a module never writes in answer to `.changed`; the plan's probe confirms it or switches to the second.
 - **Two windows on one route.** Whether `WindowGroup(for:)` lets two windows carry equal values once their routes converge, or brings the first forward when the second is asked for. Harmless either way for "open in new window"; settled by a probe in the plan.
