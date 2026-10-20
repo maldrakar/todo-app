@@ -480,7 +480,8 @@ private let linkSentence = "The link could not be opened."
 }
 
 /// The Quick Entry button is the root's own gesture, so it takes the root's sentence away, with quick entry down and
-/// with it up, which the button keeps with its draft (the controller's ruling T5-10, the owner, 2026-10-20).
+/// with it up, which the button keeps with its draft (the owner's rule of 2026-10-16 that a module's sentence goes with
+/// its own gestures, and their decision of 2026-10-20 for the root's).
 @Test func theQuickEntryButtonTakesTheRootsSentenceAway() throws {
     let store = try makeStore()
     let app = try AppModule(store: store)

@@ -155,8 +155,9 @@ public final class AppModule: Routable {
             // highlight and the list, and quick entry is reconciled with the route's quick entry (spec section 3, the
             // third flow). A route with no quick entry drops a live one and its draft, a link from outside included,
             // since a draft is session state, which no route carries (spec section 2). The root's sentence goes at the
-            // start, as every module's goes at the start of a route (the owner, 2026-10-16): the link read, and what
-            // the route cannot open is the child's to say, as the sidebar says a list it could not open.
+            // start, as the list's goes at the start of a route, and the sidebar's unless a field is open (the owner,
+            // 2026-10-16): the link read, and what the route cannot open is the child's to say, as the sidebar says a
+            // list it could not open.
             state.problem = nil
             let output = react(to: state.taskViewList.send(.route(route.sidebar)))
             react(to: state.quickEntry.apply(route.quickEntry))
