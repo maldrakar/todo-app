@@ -205,10 +205,11 @@ public final class TaskViewList: Routable {
             //
             // The sentence goes with the event that produced it (spec, "The sidebar in M2"), except while a
             // field is open: then the sentence on screen is what explains the field, and this gesture leaves
-            // the field where it is. A click on another row while the field holds an empty name loses the
-            // field's focus first, so the refusal that sets the sentence arrives before this; cleared here, it
-            // would leave an empty field with the caret in it and nothing saying why. The owner chose this in
-            // chat on 2026-10-12.
+            // the field where it is. A click on another row while the field holds an empty name can lose the
+            // field's focus first, as it did through the List's own selection, so that the refusal that sets the
+            // sentence arrives before this; cleared here, it would leave an empty field with the caret in it and
+            // nothing saying why. Through the row's tap, on the Mac on 2026-10-20, this came first and the refusal
+            // after it, with the same sentence on screen at the end. The owner chose this in chat on 2026-10-12.
             //
             // An open field stays open where it is. Losing focus is an action of its own, and the view is
             // what knows whether the field lost it: a module that read a selection change as a focus change

@@ -31,6 +31,12 @@ final class TodoApp {
     /// held weakly, which is what says whether the entrance still leads anywhere.
     private var entrances: [Entrance] = []
 
+    /// How many hosts `makeHost` has made, one for every call that returned one, read by the test that holds a
+    /// window to one host (`docs/specs/navigation.md`, "Risks"). It counts the hosts made and not the entrances
+    /// still alive: a host made and dropped by a redraw leaves an entrance that the next fan-out prunes, and the
+    /// change set that forces the redraw is a fan-out, so a count of live entrances would hide the second host.
+    private(set) var hostsMade = 0
+
     private init(store: Store) {
         self.store = store
     }
@@ -71,10 +77,10 @@ final class TodoApp {
     /// #95's. A route whose views or tasks are gone is read, and opens what still exists, as the root's own children
     /// say (`docs/specs/navigation.md`, section 3).
     ///
-    /// The host's world entrance is kept for the fan-out and the host itself is not: its caller holds it for as long
-    /// as the window lives, and once the caller lets go the host is released and the next fan-out passes it by. It
-    /// throws what the root's `init` throws, the store's error when the sidebar cannot be read, and its caller acts on
-    /// the throw.
+    /// The host's world entrance is kept for the fan-out and the host itself is not: its caller, the window's view,
+    /// holds it for as long as the window lives (`WindowView`), and once the caller lets go the host is released and
+    /// the next fan-out passes it by. It throws what the root's `init` throws, the store's error when the sidebar
+    /// cannot be read, and its caller acts on the throw.
     func makeHost(path: String?) throws -> ModuleHost<AppModule> {
         let route = path.flatMap { try? AppModule.Route(path: $0) } ?? .default
         let root = try AppModule(store: store, route: route)
@@ -83,6 +89,7 @@ final class TodoApp {
         var deliver: @MainActor (AppModule.Event) -> Void = { _ in }
         let host = ModuleHost(root) { deliver = $0 }
         entrances.append(Entrance(host: host, deliver: deliver))
+        hostsMade += 1
         return host
     }
 

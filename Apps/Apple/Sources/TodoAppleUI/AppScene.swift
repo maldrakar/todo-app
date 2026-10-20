@@ -1,35 +1,29 @@
 // Apps/Apple/Sources/TodoAppleUI/AppScene.swift
-import AppFeature
 import SwiftUI
 
-// Behind `#if os(macOS)` because iOS and watchOS have no `Window`. What they put on screen as their scene is decided
-// when the Xcode project brings them (ADR-0008); until then the library compiles for both without one.
-#if os(macOS)
 /// The app's scene, and the one thing this library exports: the executable's `@main` is its only caller from
-/// outside (ADR-0008).
+/// outside, and the app targets of the other platforms will be the same one line (ADR-0008).
+///
+/// A window group, so that the Mac opens as many windows as are asked for, Cmd-N among them, each made by its own
+/// view around a host of its own (`docs/specs/navigation.md`, section 5). On the Mac and on iOS the group's value is
+/// the window's route in its text form, a `String`, which is `Codable` and `Hashable`, what the group asks of its
+/// value; a window opened with none, the first and every Cmd-N, opens the default window. On watchOS the group takes
+/// no value, because `WindowGroup(for:)`, `openWindow` and `handlesExternalEvents` are unavailable there (a file
+/// typechecked against the watchOS 10 SDK on 2026-10-14), and its one window opens the default window: a departure
+/// from the spec's group with a value on every Apple platform, and the scene's one platform condition. The watch is a
+/// compile check in this epic (spec section 8).
 public struct AppScene: Scene {
     public init() {}
 
-    /// One `Window` and not yet a `WindowGroup`. The composition root makes a host per window, and the scene
-    /// that opens a window per route, each window making and holding its own host, is #94's; until then a
-    /// second window over the one host here would draw the first one's highlight and open field again.
     public var body: some Scene {
-        Window("Todo", id: "main") {
-            RootView(host: AppScene.host)
+        #if os(watchOS)
+        WindowGroup {
+            WindowView(app: TodoApp.shared, path: nil)
         }
+        #else
+        WindowGroup("Todo", for: String.self) { $path in
+            WindowView(app: TodoApp.shared, path: path)
+        }
+        #endif
     }
-
-    /// The host of the one window, made from no path, so that it opens as the default window, the first time the
-    /// window's view reads it. A `static let`, initialised once, where the initial value of a `@State` is evaluated on
-    /// every creation of its struct and each evaluation would make another host and another root
-    /// (`docs/specs/navigation.md`, "Risks"; ADR-0008). A window that cannot be made ends the process with the error,
-    /// as a launch that throws does.
-    private static let host: ModuleHost<AppModule> = {
-        do {
-            return try TodoApp.shared.makeHost(path: nil)
-        } catch {
-            fatalError("The window could not be made: \(error)")
-        }
-    }()
 }
-#endif

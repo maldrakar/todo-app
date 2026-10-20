@@ -18,6 +18,12 @@ struct TaskViewListView: View {
     /// property while `body` runs, so that a change runs `body` again.
     @State private var emptiedHighlights = 0
 
+    /// Whether the app can open a window beside this one, which the platform reports (`docs/specs/navigation.md`,
+    /// sections 5 and 10). Read on 2026-10-18: true on the Mac; false on iPhone, its Info.plist declaring multiple
+    /// scenes or not; on the iPad true only with that declaration, which Task 9's Info.plist makes, and false without
+    /// it (the iOS 26.3 simulator).
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
+
     init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) {
         self.model = model
         self.send = send
@@ -30,15 +36,41 @@ struct TaskViewListView: View {
                     if let draft = row.draft {
                         TitleField(draft: draft, send: send)
                     } else {
+                        // A tap on the title is the row's choice, the highlighted row's too, which the List does not
+                        // report: on the Mac a click on the highlighted row moves no highlight and writes no
+                        // selection, so the task open in its list stayed open, where a click on the highlighted view
+                        // closes it (`TaskViewList`). The title fills the row to its trailing edge so that the tap
+                        // covers the row past the title's text, and it replaces the List's own selection there; the
+                        // row's insets and a nested row's indent stay the List's, and the arrow keys still go
+                        // through `selection`. On 2026-10-18, on the Mac: a click on a view's title or on the rest of
+                        // its row chose it, one action each, and on the highlighted view closed its task; the same
+                        // day, a tap on the title's text alone, sent only for the highlighted row, left a click on
+                        // another view's title choosing nothing. On 2026-10-20, in the iOS 26.3 simulator, a tap on
+                        // another view's row pushed its list on iPhone, and on the iPad a tap on the highlighted view
+                        // closed its task.
                         Text(row.title)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(.rect)
+                            .onTapGesture { send(.rowSelected(row.id)) }
                     }
                 }
                 // The tree as the flat rows carry it: a number to indent by, so that drawing it decides nothing
                 // (`TaskViewList`).
                 .padding(.leading, CGFloat(row.depth) * 16)
+                #if !os(watchOS)
+                // Not on the watch, where the modifier is deprecated since watchOS 7, so the watch's build, a compile
+                // check in this epic (`docs/specs/navigation.md`, section 8), leaves the whole menu out, Rename with
+                // it.
                 .contextMenu {
                     Button("Rename") { send(.renameMenuItemChosen(row.id)) }
+                    // Only where a window can open beside this one, which iPhone cannot (`docs/specs/navigation.md`,
+                    // section 5). It asks for the window, and the root passes the request on as its output, which
+                    // the host drops until a handler is installed (#95).
+                    if supportsMultipleWindows {
+                        Button("Open in New Window") { send(.openInNewWindowMenuItemChosen(row.id)) }
+                    }
                 }
+                #endif
             }
             .focused($isListFocused)
             // The list takes the keyboard when it appears, so that the arrow keys move the highlight from the
