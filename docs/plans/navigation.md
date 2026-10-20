@@ -715,8 +715,8 @@ extension TodoApp {
 
 **Rules.**
 
-- The step runs the `xcodebuild` command of Task 9 with `DEVELOPER_DIR` naming the image's Xcode 27, unsigned, after the Apple package's tests, and prints `xcodebuild -version` first so the log names what built. It runs on `main` and on demand only, as the whole job does.
-- `README.md` gains running the iPhone app from Xcode and the simulator command, and what the window holds now (the link's form after `todo://` and `TODO_ROUTE` for the Mac are there since Task 8); the status paragraph says M3 shipped and M4 is next; `docs/process.md` section 10 and `CLAUDE.md`'s toolchain and CI notes follow.
+- The step runs the `xcodebuild` command Task 9 ran, `xcodebuild -project Apps/Apple/Todo.xcodeproj -scheme Todo -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath "$RUNNER_TEMP/xcode-ios" CODE_SIGNING_ALLOWED=NO build`, with `DEVELOPER_DIR` naming the image's Xcode 27, unsigned, after the Apple package's tests, and prints `xcodebuild -version` first so the log names what built. It runs on `main` and on demand only, as the whole job does.
+- `README.md` gains what the window holds now (the link's form after `todo://` and `TODO_ROUTE` for the Mac are there since Task 8, and running the iPhone and iPad app from Xcode and from the simulator commands since Task 9); the status paragraph says M3 shipped and M4 is next; `docs/process.md` section 10 and `CLAUDE.md`'s toolchain and CI notes follow.
 - ADR-0009's status moves to Accepted, with the amendments of ADR-0006 to ADR-0008 already carrying their merged PR numbers.
 
 **Tests.**
@@ -727,7 +727,8 @@ extension TodoApp {
 **Verified facts and traps.**
 
 - The macOS job's existing shape: compile checks for iOS and watchOS, the Apple package's build and tests, the builds with Xcode's toolchain (`ci.yml`, read 2026-10-14).
-- Trap: an `xcodebuild` without `-destination` and without `-scheme` builds the target for the SDK named; a scheme is not committed unless the project format needs one, which Task 9 finds out.
+- 2026-10-20 (Task 9, Xcode 27.1): the command Task 9's section named, `xcodebuild -project Apps/Apple/Todo.xcodeproj -target Todo -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build`, does not build this project. With `-target` and no scheme the index store's path is empty, so `-index-store-path` takes the next argument for its value: the core's C target then fails to make its index store, and a Swift target receives the C++ hardening define as a condition and warns. With `COMPILER_INDEX_STORE_ENABLE=NO` it fails next on module maps, because that layout builds each package into a `build/` beside its own manifest, the core's at the repository's root and `Apps/Apple`'s beside it, and `TodoAppleUI` finds none of the core's; it also leaves both `build/` directories in the checkout. `-derivedDataPath` is refused without `-scheme`.
+- 2026-10-20 (Task 9, Xcode 27.1): the command in the rule above builds with no scheme committed, since `xcodebuild` makes one for the target, `Todo`, beside one for each package product. The generic destination builds arm64 and x86_64. No package-resolution flag is needed: Xcode's graph is the two local packages alone, the test dependency of `Apps/Apple` staying out of it, and it writes no `Package.resolved`. The result bundle counts 181 warnings, every one clang's in the core's vendored `sqlite3.c`, which a clean `swift build` of `Apps/Apple` prints too, and the log prints each once per architecture; the log's `appintentsmetadataprocessor` line, "warning: Metadata extraction skipped", is the tool's and not one of them.
 
 ## Self-review against the spec
 
