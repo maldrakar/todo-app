@@ -7,22 +7,24 @@ import SwiftUI
 /// A window group, so that the Mac opens as many windows as are asked for, Cmd-N among them, each made by its own
 /// view around a host of its own (`docs/specs/navigation.md`, section 5). On the Mac and on iOS the group's value is
 /// the window's route in its text form, a `String`, which is `Codable` and `Hashable`, what the group asks of its
-/// value; a window opened with none, the first and every Cmd-N, opens the default window. On watchOS the group takes
-/// no value, because `WindowGroup(for:)`, `openWindow` and `handlesExternalEvents` are unavailable there (a file
-/// typechecked against the watchOS 10 SDK on 2026-10-14), and its one window opens the default window: a departure
-/// from the spec's group with a value on every Apple platform, and the scene's one platform condition. The watch is a
-/// compile check in this epic (spec section 8).
+/// value, and the window's view writes the route back into it after every change, which is what the Mac restores a
+/// window from (section 7); a window opened with none, the first and every Cmd-N, opens the default window, or the
+/// route `TODO_ROUTE` named for the first (`TodoApp.makeWindow`). On watchOS the group takes no value, because
+/// `WindowGroup(for:)`, `openWindow` and `handlesExternalEvents` are unavailable there (a file typechecked against the
+/// watchOS 10 SDK on 2026-10-14), and its one window opens the default window: a departure from the spec's group with
+/// a value on every Apple platform, and the scene's one platform condition. The watch is a compile check in this epic
+/// (spec section 8).
 public struct AppScene: Scene {
     public init() {}
 
     public var body: some Scene {
         #if os(watchOS)
         WindowGroup {
-            WindowView(app: TodoApp.shared, path: nil)
+            WindowView(app: TodoApp.shared, path: .constant(nil))
         }
         #else
         WindowGroup("Todo", for: String.self) { $path in
-            WindowView(app: TodoApp.shared, path: path)
+            WindowView(app: TodoApp.shared, path: $path)
         }
         #endif
     }

@@ -3,14 +3,15 @@ import AppFeature
 import SwiftUI
 import TodoCore
 
-/// The root of the tree of views, and beside the window's view, which holds the host, the one view that names it: it
-/// hands each child's view its part of the root's model and a closure that wraps the child's actions in the root's,
-/// and draws the one tree every Apple platform has (`docs/specs/navigation.md`, section 6). A split view with the
-/// sidebar beside a stack whose root is the list of the chosen view's tasks, the task screen pushed in that stack, and
-/// quick entry as a sheet over all of it: on the Mac and the iPad the columns stay and the task pushes inside the
-/// detail column, and on iPhone SwiftUI collapses the split view into one stack, sidebar, list, task. The containers
-/// are this epic's choice and the modules know nothing of them; what any tree keeps is that every binding is read
-/// from the model and set only by sending an action.
+/// The root of the tree of views, and beside the window's view, which holds the window and its host, the one view that
+/// names the host: it hands each child's view its part of the root's model and a closure that wraps the child's
+/// actions in the root's, and draws the one tree every Apple platform has (`docs/specs/navigation.md`, section 6), with
+/// the root's own sentence across the bottom of the window. A split view with the sidebar beside a stack whose root is
+/// the list of the chosen view's tasks, the task screen pushed in that stack, and quick entry as a sheet over all of
+/// it: on the Mac and the iPad the columns stay and the task pushes inside the detail column, and on iPhone SwiftUI
+/// collapses the split view into one stack, sidebar, list, task. The containers are this epic's choice and the modules
+/// know nothing of them; what any tree keeps is that every binding is read from the model and set only by sending an
+/// action.
 struct RootView: View {
     private let host: ModuleHost<AppModule>
 
@@ -61,6 +62,16 @@ struct RootView: View {
                         .frame(maxWidth: .infinity)
                         .background(.regularMaterial)
                 }
+            }
+        }
+        // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
+        // window and not under one column, on the same material as the pane's sentence, for the same reason.
+        .safeAreaInset(edge: .bottom) {
+            if let problem = host.model.problem {
+                Text(problem)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(.regularMaterial)
             }
         }
         .sheet(isPresented: isQuickEntryUp) {

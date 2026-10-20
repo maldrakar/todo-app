@@ -65,7 +65,7 @@ struct TaskViewListView: View {
                     Button("Rename") { send(.renameMenuItemChosen(row.id)) }
                     // Only where a window can open beside this one, which iPhone cannot (`docs/specs/navigation.md`,
                     // section 5). It asks for the window, and the root passes the request on as its output, which
-                    // the host drops until a handler is installed (#95).
+                    // the window's view answers by opening the window (`WindowView`).
                     if supportsMultipleWindows {
                         Button("Open in New Window") { send(.openInNewWindowMenuItemChosen(row.id)) }
                     }
