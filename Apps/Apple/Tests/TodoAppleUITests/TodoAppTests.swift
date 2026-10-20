@@ -160,12 +160,13 @@ import TodoCore
     }
 }
 
-/// The route is the URL's path and query alone, so a URL that says more, a host, a user or a fragment, gives none
-/// rather than a route that drops what it said: `todo://view/<id>`, one slash short, reads `view` as the host, and the
-/// other forms have a path that would read without them.
+/// The route is the URL's path and query alone, so a URL that says more, a host, a user, a password, a port or a
+/// fragment, gives none rather than a route that drops what it said: `todo://view/<id>`, one slash short, reads `view`
+/// as the host, and the other forms have a path that would read without them.
 @Test @MainActor func aURLWithAHostOrAFragmentGivesNil() throws {
     let today = BuiltInTaskViews.today
     for text in ["todo://view/\(today)", "todo://localhost/view/\(today)", "todo://user@/view/\(today)",
+                 "todo://:secret@/view/\(today)", "todo://:80/view/\(today)",
                  "todo:///view/\(today)#notes", "todo:///view/\(today)#"] {
         #expect(TodoApp.route(from: try #require(URL(string: text))) == nil, "\(text)")
     }

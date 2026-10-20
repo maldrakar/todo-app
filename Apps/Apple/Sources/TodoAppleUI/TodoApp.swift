@@ -122,14 +122,22 @@ final class TodoApp {
     ///
     /// A link is the window's route in its text form behind the app's scheme, `todo:///view/<id>/task/<id>`, so the
     /// scheme is stripped and the rest is what the route reads (`docs/specs/navigation.md`, section 7). The scheme is
-    /// not checked: the system opens in the app only the scheme the app registers. A URL with a host, a user or a
-    /// port, `todo://view/<id>` one slash short among them, or with a fragment, gives nil rather than a route that
-    /// drops what it said: on 2026-10-20, under Swift 6.4.0 on macOS 26.7.1, `URL` read `view` as the host of
-    /// `todo://view/<id>`, and an empty host, not none, under `todo://user@/view`.
+    /// not checked, so a URL of another scheme reads by the same rule: a `file://` URL reads as a route only when its
+    /// path is a route's, `/view/<id>`, and as a link that does not read otherwise.
+    ///
+    /// Between the scheme and the path a link has an empty authority, and anything in it, a host, a user, a password
+    /// or a port, gives nil, as a fragment does, rather than a route that drops what it said; `todo://view/<id>`, one
+    /// slash short, has `view` for its host. The empty authority is a host that is absent or empty, whichever `URL`
+    /// answers, and the user, the password and the port are refused by name, so the guard leans on neither answer: on
+    /// 2026-10-20, under Swift 6.4.0 on macOS 26.7.1, `URL` answered no host for `todo:///view/<id>` and an empty one
+    /// beside the user of `todo://user@/view`, the empty user and the password of `todo://:secret@/view` and the port
+    /// of `todo://:80/view`.
     ///
     /// Static, because it reads nothing of the composition root, so the window's way in that calls it holds none.
     static func route(from url: URL) -> AppModule.Route? {
-        guard url.host(percentEncoded: true) == nil, url.fragment(percentEncoded: true) == nil else { return nil }
+        guard (url.host(percentEncoded: true) ?? "").isEmpty, url.user(percentEncoded: true) == nil,
+              url.password(percentEncoded: true) == nil, url.port == nil, url.fragment(percentEncoded: true) == nil
+        else { return nil }
         let query = url.query(percentEncoded: true).map { "?" + $0 } ?? ""
         return try? AppModule.Route(path: url.path(percentEncoded: true) + query)
     }
