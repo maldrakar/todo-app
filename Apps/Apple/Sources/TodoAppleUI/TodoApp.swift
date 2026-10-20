@@ -7,7 +7,9 @@ import TodoCore
 /// The composition root: one store per process, opened at launch under the device's identity, and a host per window,
 /// each around a root of its own made from the window's path, with every change set the store reports handed to every
 /// host still alive (`docs/specs/navigation.md`, section 5), where the feature-module spec's "one host and one root
-/// per process" becomes "one host per window, one store per process".
+/// per process" becomes "one host per window, one store per process". A link the system opens in a window reaches that
+/// window's host through the same entrance as the change sets, by a way in handed to the window when it is made
+/// (section 7).
 @MainActor
 final class TodoApp {
     /// The composition root of this process, put together the first time anything reads it. A `static let` is
@@ -31,14 +33,28 @@ final class TodoApp {
     /// held weakly, which is what says whether the entrance still leads anywhere.
     private var entrances: [Entrance] = []
 
-    /// How many hosts `makeHost` has made, one for every call that returned one, read by the test that holds a
-    /// window to one host (`docs/specs/navigation.md`, "Risks"). It counts the hosts made and not the entrances
-    /// still alive: a host made and dropped by a redraw leaves an entrance that the next fan-out prunes, and the
-    /// change set that forces the redraw is a fan-out, so a count of live entrances would hide the second host.
+    /// How many windows `makeWindow` has made, each with a host of its own, one for every call that returned one: read
+    /// by the test that holds a window to one host (`docs/specs/navigation.md`, "Risks"), and by `makeWindow`, for
+    /// whether the launch route is spent. It counts the hosts made and not the entrances still alive: a host made and
+    /// dropped by a redraw leaves an entrance that the next fan-out prunes, and the change set that forces the redraw
+    /// is a fan-out, so a count of live entrances would hide the second host.
     private(set) var hostsMade = 0
 
-    private init(store: Store) {
+    /// The route `TODO_ROUTE` named at launch, and nil when it is unset or does not read, an empty one among them,
+    /// since a route's text begins with `/`. The executable SwiftPM builds for the Mac has no bundle, so no URL scheme
+    /// reaches it, and a link is handed to it here, the way `TODO_DB` names the database (`docs/specs/navigation.md`,
+    /// section 7).
+    ///
+    /// It is the first window's, and only when that window has no path of its own; every later window made with none,
+    /// Cmd-N's, opens the default window (the owner, 2026-10-20). One that does not read opens the default window and
+    /// says nothing, as a path a window was restored from does: it is the developer's stand-in for a link on the
+    /// executable that has no bundle, and the owner kept an unreadable one silent, as the plan's rule has it
+    /// (2026-10-20).
+    let launchRoute: AppModule.Route?
+
+    private init(store: Store, launchRoute: AppModule.Route?) {
         self.store = store
+        self.launchRoute = launchRoute
     }
 
     /// The store at its path, the composition root around it, and the store's `onChange` wired to the fan-out.
@@ -46,7 +62,8 @@ final class TodoApp {
     /// `TODO_DB` is the database's whole path and `TODO_DEVICE` the identity it is written under, each unset
     /// when exported empty, as the demo reads them: that is how one machine runs two copies of the app as two
     /// devices. Without `TODO_DEVICE` the identity is the one kept beside the database, and the first launch
-    /// over a database mints one and keeps it there (ADR-0005).
+    /// over a database mints one and keeps it there (ADR-0005). `TODO_ROUTE` is the first window's route
+    /// (`launchRoute`).
     ///
     /// It throws whatever the store or the file system throws, and its caller acts on the throw: in the app a
     /// launch that failed is fatal and says why (`docs/specs/feature-module-architecture.md`, section 5).
@@ -60,7 +77,8 @@ final class TodoApp {
         // that is not there. The open has already recorded the new id in `own_devices`, so a launch that then
         // cannot keep it leaves that row behind and the next launch mints another.
         if held == nil { try DeviceFile.keep(device, beside: database) }
-        let app = TodoApp(store: store)
+        let launchRoute = environment["TODO_ROUTE"].flatMap { try? AppModule.Route(path: $0) }
+        let app = TodoApp(store: store, launchRoute: launchRoute)
         // Weakly, because the composition root holds the store: a strong one would close a cycle through the
         // store, and the database would stay open for the life of the process, beside whatever store is opened
         // over the same file next (`Store`, ADR-0005).
@@ -68,29 +86,79 @@ final class TodoApp {
         return app
     }
 
-    /// A host for a window: the root made from the path, or from the default route when the path is nil or does not
-    /// read.
+    /// A window: a host around a root made from the path, or from the default route when there is none or it does not
+    /// read, and the window's way in for a link.
     ///
     /// A path is the window's route in its one text form, kept by the window to be restored from
     /// (`docs/specs/navigation.md`, section 7). One that does not read, written by another version of the app or by
     /// hand, opens the default window and says nothing, which is restoration's rule; a link that does not read is
-    /// #95's. A route whose views or tasks are gone is read, and opens what still exists, as the root's own children
-    /// say (`docs/specs/navigation.md`, section 3).
+    /// said in its window (`Window.open`). A route whose views or tasks are gone is read, and opens what still exists,
+    /// as the root's own children say (`docs/specs/navigation.md`, section 3). The first window made with no path
+    /// opens `launchRoute` instead of the default route, when there is one, and the first window made at all spends
+    /// it, with a path or without: the window's view hands over the text of the value its window was opened with and
+    /// never knows of a launch route, so whether a window is the first is decided here (the owner, 2026-10-20).
     ///
-    /// The host's world entrance is kept for the fan-out and the host itself is not: its caller, the window's view,
-    /// holds it for as long as the window lives (`WindowView`), and once the caller lets go the host is released and
-    /// the next fan-out passes it by. It throws what the root's `init` throws, the store's error when the sidebar
-    /// cannot be read, and its caller acts on the throw.
-    func makeHost(path: String?) throws -> ModuleHost<AppModule> {
-        let route = path.flatMap { try? AppModule.Route(path: $0) } ?? .default
+    /// The host's world entrance is kept for the fan-out and handed to the window inside `open`, and the host itself is
+    /// not kept: its caller, the window's view, holds the window for as long as the window lives (`WindowView`), and
+    /// once the caller lets go the host is released and the next fan-out passes it by. It throws what the root's
+    /// `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the throw.
+    func makeWindow(path: String?) throws -> Window {
+        let unspentLaunchRoute = hostsMade == 0 ? launchRoute : nil
+        let route = path.map { (try? AppModule.Route(path: $0)) ?? .default } ?? unspentLaunchRoute ?? .default
         let root = try AppModule(store: store, route: route)
         // Replaced before `init` returns, since `init` hands the host's entrance over as its last step, so the
         // placeholder is never what is kept.
-        var deliver: @MainActor (AppModule.Event) -> Void = { _ in }
-        let host = ModuleHost(root) { deliver = $0 }
+        var entrance: @MainActor (AppModule.Event) -> Void = { _ in }
+        let host = ModuleHost(root) { entrance = $0 }
+        let deliver = entrance
         entrances.append(Entrance(host: host, deliver: deliver))
         hostsMade += 1
-        return host
+        // Over the entrance alone, which holds the host weakly, and never over the host or the composition root.
+        return Window(host: host) { url in
+            deliver(TodoApp.route(from: url).map(AppModule.Event.route) ?? .unreadableLink)
+        }
+    }
+
+    /// The route a link carries, the URL's path and query read with the route's codec as they are written, still
+    /// percent-encoded, and nil when they do not read or the URL says more than a route has room for.
+    ///
+    /// A link is the window's route in its text form behind the app's scheme, `todo:///view/<id>/task/<id>`, so the
+    /// scheme is stripped and the rest is what the route reads (`docs/specs/navigation.md`, section 7). The scheme is
+    /// not checked, so a URL of another scheme reads by the same rule: a `file://` URL reads as a route only when its
+    /// path is a route's, `/view/<id>`, and as a link that does not read otherwise.
+    ///
+    /// Between the scheme and the path a link has an empty authority, and anything in it, a host, a user, a password
+    /// or a port, gives nil, as a fragment does, rather than a route that drops what it said; `todo://view/<id>`, one
+    /// slash short, has `view` for its host. The empty authority is a host that is absent or empty, whichever `URL`
+    /// answers, and the user, the password and the port are refused by name, so the guard leans on neither answer: on
+    /// 2026-10-20, under Swift 6.4.0 on macOS 26.7.1, `URL` answered no host for `todo:///view/<id>` and an empty one
+    /// beside the user of `todo://user@/view`, the empty user and the password of `todo://:secret@/view` and the port
+    /// of `todo://:80/view`.
+    ///
+    /// Static, because it reads nothing of the composition root, so the window's way in that calls it holds none.
+    static func route(from url: URL) -> AppModule.Route? {
+        guard (url.host(percentEncoded: true) ?? "").isEmpty, url.user(percentEncoded: true) == nil,
+              url.password(percentEncoded: true) == nil, url.port == nil, url.fragment(percentEncoded: true) == nil
+        else { return nil }
+        let query = url.query(percentEncoded: true).map { "?" + $0 } ?? ""
+        return try? AppModule.Route(path: url.path(percentEncoded: true) + query)
+    }
+
+    /// What a window's view is handed once, when its window first appears: the window's host, and the window's way
+    /// in for a link (the owner, 2026-10-20). The view holds it for as long as the window lives, and nothing else does.
+    struct Window {
+        /// The window's host, which the window's view draws and sends its actions to.
+        let host: ModuleHost<AppModule>
+
+        /// Takes a link the system opened in this window to this window's host, through its world entrance, the one
+        /// `.changed` comes through: `.route` when the link reads (`TodoApp.route(from:)`), and the root's
+        /// `.unreadableLink` when it does not, which leaves the window as it was and says so
+        /// (`docs/specs/navigation.md`, section 7). Both are events of the world, and through this the window's view
+        /// delivers only what the codec reads from a URL, a `.route`, any a URL can spell, or `.unreadableLink`, and
+        /// never `.changed` or `.created`; it never holds the entrance itself, which stays the composition root's
+        /// (section 5; the owner, 2026-10-20). It holds the host weakly, as the entrance does, so a window's view that
+        /// lets go of its window lets go of the host.
+        let open: @MainActor (URL) -> Void
     }
 
     /// Hands what a commit touched to every host still alive, in the order they were made, and forgets the

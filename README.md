@@ -79,12 +79,23 @@ cd Apps/Apple
 swift run todo-mac
 # in a second terminal, also in Apps/Apple: another database, another device
 TODO_DB=/tmp/second.sqlite swift run todo-mac
+# the first window opens on a route, here a task in Today
+TODO_ROUTE=/view/00000000-0000-4000-8000-000000000002/task/<task id> swift run todo-mac
 ```
 
-It opens one window: the list of views in a sidebar, and beside it the tasks of the view chosen there. Rename,
+It opens a window: the list of views in a sidebar, and beside it the tasks of the view chosen there. Rename,
 in a row's context menu, opens a field on the row: Return or a click away keeps the new title, a blank one is
 refused with a sentence under the list, and Esc keeps the old title. New Folder, on the toolbar, adds a folder at
 the end of the top level, chosen and with its field open.
+
+Cmd-N opens another window on the Inbox, and Open in New Window, in a row's context menu, opens that view in a
+window of its own, every time, on the view a window shows too; every window shows what the others write.
+`TODO_ROUTE` is the route the first window opens, in the text form a link carries after `todo://`: a path,
+`/view/<id>` or `/view/<id>/task/<id>`, with `?quick-entry` after it to open quick entry too. One that does not
+read opens the Inbox, as no `TODO_ROUTE` does, and one naming a view that is gone opens no list and says so under
+the sidebar. The executable has no bundle, so no `todo://` link reaches it while it runs, and macOS does not
+restore its windows after a relaunch. No bundled Mac app exists in this milestone: the Xcode shell (#96) builds the
+iPhone and iPad app, and the Mac stays on `todo-mac`.
 
 `TODO_DB` is the database's whole path and `TODO_DEVICE` the device it is written under, each read as unset when
 it is exported empty. Without `TODO_DB` the app opens `~/Library/Application Support/todo/todo.sqlite`, and the

@@ -5,7 +5,8 @@ import TaskViewListFeature
 import TodoCore
 
 /// The root of the tree of modules, and the one module a host holds (spec section 1): the sidebar, with the list of
-/// the chosen view's tasks it opened, and quick entry when it is up.
+/// the chosen view's tasks it opened, quick entry when it is up, and the root's own sentence when a link into the
+/// window could not be read.
 ///
 /// It knows its two children and what each asks for, and nothing below them. The task open in the list is the
 /// list's, so this module never learns that a list opens a task, and its code does not grow when the task screen
@@ -19,7 +20,8 @@ import TodoCore
 /// a window is restored from and what the web's address bar shows, each through the route's one text form, `path`
 /// (spec section 2).
 public final class AppModule: Routable {
-    /// What the root view draws: each child's model as the child computes it, carried whole.
+    /// What the root view draws: each child's model as the child computes it, carried whole, and the root's own
+    /// sentence.
     public struct Model: Equatable, Sendable {
         /// The sidebar's own model, which carries the list open in it and the sentence it says.
         public let taskViewList: TaskViewList.Model
@@ -27,6 +29,11 @@ public final class AppModule: Routable {
         /// Quick entry's own model while it is up, and nil when it is not; it is drawn as a sheet on every Apple
         /// platform (spec section 5).
         public let quickEntry: QuickEntry.Model?
+
+        /// What went wrong in the window and is no child's to say, as the finished sentence the view shows, and nil
+        /// when there is nothing to say: a link that could not be read, which no child was handed (the owner,
+        /// 2026-10-16, answering the spec's open question). What a child says about itself is in its own model.
+        public let problem: String?
     }
 
     /// What the root view may send: what its children's views send, each wrapped in the case of the child it is
@@ -43,7 +50,8 @@ public final class AppModule: Routable {
     }
 
     /// Everything that reaches the root: an action a view sent, a change the store committed, which the root
-    /// hands to every child, and the two events of a routable module, `.created` and `.route` (spec section 3).
+    /// hands to every child, the two events of a routable module, `.created` and `.route` (spec section 3), and a
+    /// link that could not be read.
     public enum Event: RoutedEvent {
         /// What a view sent, lifted by the host.
         case action(UserAction)
@@ -56,6 +64,17 @@ public final class AppModule: Routable {
         /// A route applied to the live window, a link into it or the browser's back and forward buttons (spec
         /// sections 7 and 8), and never by a view, whose closure spells user actions alone.
         case route(Route)
+        /// A link into the live window that does not read as a route, delivered by the composition root through the
+        /// entrance a link that reads takes as `.route` (spec section 7). It is an event of the world and not a
+        /// `UserAction`, because a link is no control a person pressed: a view's closure spells user actions alone, and
+        /// the link reaches the host through the composition root's way in. It carries no text, since the sentence is
+        /// all the window shows of it.
+        ///
+        /// It moves nothing but the root's sentence: the window stays as it was, and the root says the link could
+        /// not be opened, since what failed is no child's (the owner, 2026-10-16). A window restored from a text that
+        /// does not read is made on the default route and says nothing, which is restoration's rule, so this comes
+        /// from a link alone.
+        case unreadableLink
     }
 
     /// What the root asks of the platform, since there is no module above it.
@@ -76,7 +95,8 @@ public final class AppModule: Routable {
     private var state: State
 
     /// Made from the window's route, the one way a window is made: at launch and for a new window, and from the
-    /// text a window was restored from (spec sections 5 and 7).
+    /// text a window was restored from (spec sections 5 and 7). It says nothing of its own: the root's sentence
+    /// answers a link into a live window.
     ///
     /// The sidebar is made from its part of the route, and opens the list in its own `init`: on the route's list
     /// when it names one, and on the view the sidebar starts on otherwise, the Inbox for the default window, so
@@ -114,26 +134,39 @@ public final class AppModule: Routable {
             react(to: state.quickEntry.send(.action(action)))
             return nil
         case .action(.quickEntryButtonTapped):
-            // A quick entry already up has the head of every quick entry, so its seat keeps it, draft and all.
+            // The root's own gesture, so the root's sentence goes with it, as each module's sentence goes with its own
+            // gestures; a gesture in a child is the child's, and leaves it (the owner, 2026-10-20). A quick entry
+            // already up has the head of every quick entry, so its seat keeps it, draft and all.
+            state.problem = nil
             react(to: state.quickEntry.apply(QuickEntry.Route()))
             return nil
         case .changed(let changes):
             // Every child gets the change, one line each, and decides for itself whether it reads it; the sidebar
             // hands it on to the list, and a child whose subject is gone asks to be closed through its answer. The
-            // root reads the store for nothing of its own (spec section 3, ADR-0006, amendment of 2026-10-14).
+            // root reads the store for nothing of its own (spec section 3, ADR-0006, amendment of 2026-10-14), and
+            // its sentence stays: a change answers nothing a person was told.
             let output = react(to: state.taskViewList.send(.changed(changes)))
             react(to: state.quickEntry.send(.changed(changes)))
             return output
         case .created:
+            // The sentence included: being created answers nothing a person was told.
             return nil
         case .route(let route):
             // A link into the live window, or the browser's back button: the sidebar takes its part, which moves the
             // highlight and the list, and quick entry is reconciled with the route's quick entry (spec section 3, the
             // third flow). A route with no quick entry drops a live one and its draft, a link from outside included,
-            // since a draft is session state, which no route carries (spec section 2).
+            // since a draft is session state, which no route carries (spec section 2). The root's sentence goes at the
+            // start, as the list's goes at the start of a route, and the sidebar's unless a field is open (the owner,
+            // 2026-10-16): the link read, and what the route cannot open is the child's to say, as the sidebar says a
+            // list it could not open.
+            state.problem = nil
             let output = react(to: state.taskViewList.send(.route(route.sidebar)))
             react(to: state.quickEntry.apply(route.quickEntry))
             return output
+        case .unreadableLink:
+            // A second link that does not read says it again, over a sentence still on screen or one taken away.
+            state.problem = Problem.unreadableLink.sentence
+            return nil
         }
     }
 
@@ -164,9 +197,9 @@ public final class AppModule: Routable {
         }
     }
 
-    /// Everything the root holds between two events: the sidebar and the seat of quick entry. One value, moved by
-    /// the cases of `send`, from which the model and the route are computed on every read (owner's reviews of #77
-    /// and #101).
+    /// Everything the root holds between two events: the sidebar, the seat of quick entry and the root's sentence. One
+    /// value, moved by the cases of `send`, from which the model and the route are computed on every read (owner's
+    /// reviews of #77 and #101).
     ///
     /// The sidebar is a field and not a seat. A seat makes, keeps, replaces and drops a child, and the sidebar,
     /// whose head is `NoHead` and which a window always has, needs none of the four; a seat's optional route and
@@ -177,8 +210,20 @@ public final class AppModule: Routable {
     private struct State {
         let taskViewList: TaskViewList
         var quickEntry: Seat<QuickEntry, Never>
+        var problem: String?
 
-        /// The model the root view draws: each child's, as the child computes it.
-        var model: Model { Model(taskViewList: taskViewList.model, quickEntry: quickEntry.model) }
+        /// The model the root view draws: each child's, as the child computes it, and the root's sentence.
+        var model: Model { Model(taskViewList: taskViewList.model, quickEntry: quickEntry.model, problem: problem) }
+    }
+
+    /// What can go wrong in this module, with the sentence each one reads as.
+    private enum Problem {
+        case unreadableLink
+
+        var sentence: String {
+            switch self {
+            case .unreadableLink: "The link could not be opened."
+            }
+        }
     }
 }

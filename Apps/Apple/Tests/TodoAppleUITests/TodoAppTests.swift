@@ -54,8 +54,8 @@ import TodoCore
         weak var releasedRoot: TodoApp?
         do {
             let app = try TodoApp.launch(environment: ["TODO_DB": database])
-            let host = try app.makeHost(path: nil)
-            released = host
+            let window = try app.makeWindow(path: nil)
+            released = window.host
             releasedRoot = app
         }
         #expect(released == nil)
@@ -64,30 +64,140 @@ import TodoCore
 }
 
 /// A window made from no path is the default window.
-@Test @MainActor func aHostMadeFromNoPathIsTheDefaultWindow() throws {
+@Test @MainActor func aWindowMadeFromNoPathIsTheDefaultWindow() throws {
     try withFreshDatabase { database in
-        let host = try TodoApp.launch(environment: ["TODO_DB": database]).makeHost(path: nil)
+        let host = try TodoApp.launch(environment: ["TODO_DB": database]).makeWindow(path: nil).host
         #expect(host.route.path == defaultWindow)
     }
 }
 
 /// A window restored or linked to opens on its path, the sidebar's part and the query alike.
-@Test @MainActor func aHostMadeFromAPathOpensIt() throws {
+@Test @MainActor func aWindowMadeFromAPathOpensIt() throws {
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
-        let host = try TodoApp.launch(environment: ["TODO_DB": database]).makeHost(path: path)
+        let host = try TodoApp.launch(environment: ["TODO_DB": database]).makeWindow(path: path).host
         #expect(host.route.path == path)
     }
 }
 
 /// A path that does not read is the default window, silently, which is restoration's rule (`docs/specs/navigation.md`,
-/// section 7): a path that would have opened Today but for a task with no id is refused whole, and nothing of it is
-/// opened.
-@Test @MainActor func aHostMadeFromAnUnreadablePathIsTheDefaultWindow() throws {
+/// section 7): a path that would have opened Today but for a task with no id is refused whole, nothing of it is
+/// opened, and the root says nothing, its sentence being a link's.
+@Test @MainActor func aWindowMadeFromAnUnreadablePathIsTheDefaultWindow() throws {
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)/task"
-        let host = try TodoApp.launch(environment: ["TODO_DB": database]).makeHost(path: path)
+        let host = try TodoApp.launch(environment: ["TODO_DB": database]).makeWindow(path: path).host
         #expect(host.route.path == defaultWindow)
+        #expect(host.model.problem == nil)
+    }
+}
+
+/// The Mac executable has no URL scheme, so a link is handed to it at launch, in `TODO_ROUTE`, and read with the
+/// route's codec as a link is (`docs/specs/navigation.md`, section 7).
+@Test @MainActor func aLaunchRouteIsReadFromTheEnvironment() throws {
+    try withFreshDatabase { database in
+        let path = "/view/\(BuiltInTaskViews.today)/task/\(TaskID())?quick-entry"
+        let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
+        #expect(app.launchRoute == (try AppModule.Route(path: path)))
+    }
+}
+
+/// A `TODO_ROUTE` exported empty names no route, and neither does one that does not read, nor none at all.
+@Test @MainActor func anEmptyLaunchRouteIsNil() throws {
+    try withFreshDatabase { database in
+        for route in ["", "/view", nil] as [String?] {
+            let environment = ["TODO_DB": database, "TODO_ROUTE": route].compactMapValues { $0 }
+            let app = try TodoApp.launch(environment: environment)
+            #expect(app.launchRoute == nil, "\(String(describing: route))")
+        }
+    }
+}
+
+/// `TODO_ROUTE` goes to the first window made with no path of its own and is spent there: every later window made with
+/// none, Cmd-N's, opens the default window (the owner, 2026-10-20).
+@Test @MainActor func theFirstWindowMadeWithNoPathOpensTheLaunchRoute() throws {
+    try withFreshDatabase { database in
+        let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
+        let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
+        #expect(try app.makeWindow(path: nil).host.route.path == path)
+        #expect(try app.makeWindow(path: nil).host.route.path == defaultWindow)
+    }
+}
+
+/// A first window with a path of its own, one the system restored, opens that path and spends the launch route all the
+/// same, so a window made after it with none opens the default window.
+@Test @MainActor func aFirstWindowWithAPathOfItsOwnSpendsTheLaunchRoute() throws {
+    try withFreshDatabase { database in
+        let restored = "/view/\(BuiltInTaskViews.today)"
+        let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": "/?quick-entry"])
+        #expect(try app.makeWindow(path: restored).host.route.path == restored)
+        #expect(try app.makeWindow(path: nil).host.route.path == defaultWindow)
+    }
+}
+
+/// A link is the scheme and the window's route in its text form, `todo:///view/<id>/task/<id>`: the scheme is stripped
+/// and the rest read with the route's codec (`docs/specs/navigation.md`, section 7).
+@Test @MainActor func aURLWithTheSchemeReadsAsARoute() throws {
+    let path = "/view/\(BuiltInTaskViews.today)/task/\(TaskID())"
+    #expect(TodoApp.route(from: try #require(URL(string: "todo://" + path))) == (try AppModule.Route(path: path)))
+}
+
+/// The query is the link's too: `todo:///view/<id>?quick-entry` opens the view with quick entry up.
+@Test @MainActor func aURLWithTheQueryReadsAsARoute() throws {
+    let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
+    let url = try #require(URL(string: "todo://" + path))
+    let route = try #require(TodoApp.route(from: url))
+    #expect(route == (try AppModule.Route(path: path)))
+    #expect(route.quickEntry != nil)
+}
+
+/// A link whose path or query does not read gives no route, which its window answers with the root's sentence: a task
+/// with no id, a segment no route owns, an empty item in the query, and no path at all.
+@Test @MainActor func anUnreadableURLGivesNil() throws {
+    let today = BuiltInTaskViews.today
+    for text in ["todo:///view/\(today)/task", "todo:///settings", "todo:///view/\(today)?", "todo:"] {
+        #expect(TodoApp.route(from: try #require(URL(string: text))) == nil, "\(text)")
+    }
+}
+
+/// The route is the URL's path and query alone, so a URL that says more, a host, a user, a password, a port or a
+/// fragment, gives none rather than a route that drops what it said: `todo://view/<id>`, one slash short, reads `view`
+/// as the host, and the other forms have a path that would read without them.
+@Test @MainActor func aURLWithAHostOrAFragmentGivesNil() throws {
+    let today = BuiltInTaskViews.today
+    for text in ["todo://view/\(today)", "todo://localhost/view/\(today)", "todo://user@/view/\(today)",
+                 "todo://:secret@/view/\(today)", "todo://:80/view/\(today)",
+                 "todo:///view/\(today)#notes", "todo:///view/\(today)#"] {
+        #expect(TodoApp.route(from: try #require(URL(string: text))) == nil, "\(text)")
+    }
+}
+
+/// A link the system opened in a window goes to that window's host alone, through its world entrance, as a route
+/// applied (`docs/specs/navigation.md`, section 7): the other window stays where it was.
+@Test @MainActor func aLinkOpensItsRouteInItsOwnWindow() throws {
+    try withFreshDatabase { database in
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        let linked = try app.makeWindow(path: nil)
+        let other = try app.makeWindow(path: nil)
+        let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
+        linked.open(try #require(URL(string: "todo://" + path)))
+        #expect(linked.host.route.path == path)
+        #expect(linked.host.model.problem == nil)
+        #expect(other.host.route.path == defaultWindow)
+    }
+}
+
+/// A link that does not read leaves its window where it was, and the root says so in that window alone.
+@Test @MainActor func anUnreadableLinkSaysSoInItsOwnWindow() throws {
+    try withFreshDatabase { database in
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        let path = "/view/\(BuiltInTaskViews.today)"
+        let linked = try app.makeWindow(path: path)
+        let other = try app.makeWindow(path: nil)
+        linked.open(try #require(URL(string: "todo://view/\(BuiltInTaskViews.today)")))
+        #expect(linked.host.model.problem == "The link could not be opened.")
+        #expect(linked.host.route.path == path)
+        #expect(other.host.model.problem == nil)
     }
 }
 
@@ -99,13 +209,13 @@ import TodoCore
 @Test @MainActor func everyLiveHostOverOneStoreReceivesAChange() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let first = try app.makeHost(path: nil)
-        let writer = try app.makeHost(path: "/?quick-entry")
-        let third = try app.makeHost(path: nil)
+        let first = try app.makeWindow(path: nil).host
+        let writer = try app.makeWindow(path: "/?quick-entry").host
+        let third = try app.makeWindow(path: nil).host
         let before = first.model
         writer.send(.quickEntry(.titleFieldChanged("Milk")))
         writer.send(.quickEntry(.addButtonTapped))
-        let opened = try app.makeHost(path: nil)
+        let opened = try app.makeWindow(path: nil).host
         #expect(opened.model != before, "the write moved what a window draws")
         #expect(first.model == opened.model, "the window made before the writer")
         #expect(writer.model == opened.model, "the writer, its quick entry closed")
@@ -119,8 +229,8 @@ import TodoCore
 @Test @MainActor func anIdleHostTakesAChangeInsideAnotherHostsEvent() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let first = try app.makeHost(path: nil)
-        let second = try app.makeHost(path: nil)
+        let first = try app.makeWindow(path: nil).host
+        let second = try app.makeWindow(path: nil).host
         let order = Order()
         withObservationTracking { _ = second.model } onChange: {
             MainActor.assumeIsolated { order.steps.append(.secondModelMoved) }
@@ -138,7 +248,7 @@ import TodoCore
 @Test @MainActor func aHostInFlightQueuesTheChange() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeHost(path: "/?quick-entry")
+        let host = try app.makeWindow(path: "/?quick-entry").host
         host.send(.quickEntry(.titleFieldChanged("Milk")))
         let publications = Publications(by: host)
         host.send(.quickEntry(.addButtonTapped))
@@ -153,16 +263,16 @@ import TodoCore
 @Test @MainActor func aClosedWindowsHostIsReleasedAndReceivesNothing() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let writer = try app.makeHost(path: nil)
+        let writer = try app.makeWindow(path: nil).host
         weak var closed: ModuleHost<AppModule>?
         do {
-            let host = try app.makeHost(path: nil)
-            closed = host
+            let window = try app.makeWindow(path: nil)
+            closed = window.host
         }
-        let later = try app.makeHost(path: nil)
+        let later = try app.makeWindow(path: nil).host
         #expect(closed == nil)
         writer.send(.taskViewList(.createFolderButtonTapped))
-        let opened = try app.makeHost(path: nil)
+        let opened = try app.makeWindow(path: nil).host
         #expect(later.model == opened.model, "the fan-out after the closed window reached the window after it")
     }
 }
@@ -170,7 +280,7 @@ import TodoCore
 /// One host per window, the composition risk a host per window brings back (`docs/specs/navigation.md`, "Risks";
 /// ADR-0008): each window's view, hosted in a window of its own, makes a host of its own when the window appears and
 /// never again. Two windows make two hosts, which one host shared by every window, the `static let` the scene held
-/// in #93, would not. The count is of the hosts `makeHost` made, and not of the entrances still alive, because the
+/// in #93, would not. The count is of the windows `makeWindow` made, and not of the entrances still alive, because the
 /// change set that forces the redraw also prunes the entrances of released hosts, which would hide a second host
 /// made and dropped by the redraw.
 ///
@@ -181,10 +291,12 @@ import TodoCore
 @Test @MainActor func aWindowMakesOneHost() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let writer = try app.makeHost(path: nil)
+        let writer = try app.makeWindow(path: nil).host
         let redraws = [Redraws(), Redraws()]
         let windows = redraws.map { redraws in
-            hostInAWindow(ContentClosure(writer: writer, redraws: redraws) { WindowView(app: app, path: nil) })
+            hostInAWindow(ContentClosure(writer: writer, redraws: redraws) {
+                WindowView(app: app, value: .constant(nil))
+            })
         }
         defer {
             for window in windows {
@@ -202,6 +314,65 @@ import TodoCore
         settleTheRunLoop()
         #expect(redrawn(), "the change set redrew both windows and handed each a new value of its view")
         #expect(app.hostsMade == 3, "and the redraw made no host")
+    }
+}
+
+/// Open in New Window opens a window of its own every time, on the view a window shows too, because a value an open
+/// window already has brings that window forward instead of opening one (probed 2026-10-20, macOS 26.7.1): two
+/// requests for one route are two values, each with an identity of its own.
+@Test func twoRequestsForOneRouteAreTwoValues() {
+    let path = "/view/\(BuiltInTaskViews.inbox)"
+    #expect(WindowView.Value(path: path) != WindowView.Value(path: path))
+}
+
+/// A window writes its route into its value in the group as soon as it is made, which is what the Mac restores it from
+/// (`docs/specs/navigation.md`, section 7): a window opened with no value, here the first of a launch with
+/// `TODO_ROUTE`, carries one from then on whose text is the route it opened on. The route names Today and not quick
+/// entry, so that the test puts up no sheet in the window it holds on screen.
+@Test @MainActor func aWindowWritesItsRouteIntoItsValueWhenItIsMade() throws {
+    try withFreshDatabase { database in
+        let path = "/view/\(BuiltInTaskViews.today)"
+        let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
+        let kept = Kept()
+        let window = hostInAWindow(WindowView(app: app, value: kept.binding))
+        defer {
+            window.contentViewController = nil
+            window.close()
+        }
+        turnTheRunLoop(until: { kept.value != nil })
+        #expect(kept.value?.path == path)
+    }
+}
+
+/// A window keeps its identity through every write and moves its route's text alone, so its value stays its own and
+/// no request for another window can equal it: a window made with a value whose text the root writes back otherwise,
+/// `/`, which opens the Inbox, carries the Inbox's path under the identity it was made with.
+@Test @MainActor func aWindowKeepsItsIdentityThroughItsWrite() throws {
+    try withFreshDatabase { database in
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        let made = WindowView.Value(path: "/")
+        let kept = Kept(made)
+        let window = hostInAWindow(WindowView(app: app, value: kept.binding))
+        defer {
+            window.contentViewController = nil
+            window.close()
+        }
+        turnTheRunLoop(until: { kept.value?.path != "/" })
+        #expect(kept.value == WindowView.Value(id: made.id, path: defaultWindow))
+    }
+}
+
+/// A window's value in its group, kept outside the view as the group keeps it.
+@MainActor private final class Kept {
+    var value: WindowView.Value?
+
+    init(_ value: WindowView.Value? = nil) {
+        self.value = value
+    }
+
+    /// The binding the window's view is handed, as the group hands it the window's value.
+    var binding: Binding<WindowView.Value?> {
+        Binding(get: { self.value }, set: { self.value = $0 })
     }
 }
 
@@ -310,7 +481,7 @@ private struct ContentClosure<Content: View>: View {
 /// over the same file is the only one open.
 @MainActor private func launchAndCreateAFolder(_ environment: [String: String]) throws -> ViewID {
     let app = try TodoApp.launch(environment: environment)
-    let host = try app.makeHost(path: nil)
+    let host = try app.makeWindow(path: nil).host
     let before = Set(host.model.taskViewList.rows.map(\.id))
     host.send(.taskViewList(.createFolderButtonTapped))
     return try #require(Set(host.model.taskViewList.rows.map(\.id)).subtracting(before).first)

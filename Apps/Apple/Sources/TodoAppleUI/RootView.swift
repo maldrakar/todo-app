@@ -3,14 +3,15 @@ import AppFeature
 import SwiftUI
 import TodoCore
 
-/// The root of the tree of views, and beside the window's view, which holds the host, the one view that names it: it
-/// hands each child's view its part of the root's model and a closure that wraps the child's actions in the root's,
-/// and draws the one tree every Apple platform has (`docs/specs/navigation.md`, section 6). A split view with the
-/// sidebar beside a stack whose root is the list of the chosen view's tasks, the task screen pushed in that stack, and
-/// quick entry as a sheet over all of it: on the Mac and the iPad the columns stay and the task pushes inside the
-/// detail column, and on iPhone SwiftUI collapses the split view into one stack, sidebar, list, task. The containers
-/// are this epic's choice and the modules know nothing of them; what any tree keeps is that every binding is read
-/// from the model and set only by sending an action.
+/// The root of the tree of views, and beside the window's view, which holds the window and its host, the one view that
+/// names the host: it hands each child's view its part of the root's model and a closure that wraps the child's
+/// actions in the root's, and draws the one tree every Apple platform has (`docs/specs/navigation.md`, section 6), with
+/// the root's own sentence across the bottom of the window. A split view with the sidebar beside a stack whose root is
+/// the list of the chosen view's tasks, the task screen pushed in that stack, and quick entry as a sheet over all of
+/// it: on the Mac and the iPad the columns stay and the task pushes inside the detail column, and on iPhone SwiftUI
+/// collapses the split view into one stack, sidebar, list, task. The containers are this epic's choice and the modules
+/// know nothing of them; what any tree keeps is that every binding is read from the model and set only by sending an
+/// action.
 struct RootView: View {
     private let host: ModuleHost<AppModule>
 
@@ -53,14 +54,16 @@ struct RootView: View {
             // between the two as the button hid and showed the sidebar.
             .safeAreaInset(edge: .bottom) {
                 if isSidebarAway, let problem = host.model.taskViewList.problem {
-                    // On a material across the pane, so that the rows scrolling under it do not show through: the
-                    // regular one, since the bar's is unavailable on watchOS and a condition here would be about the
-                    // look alone (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
-                    Text(problem)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(.regularMaterial)
+                    sentenceStrip(problem)
                 }
+            }
+        }
+        // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
+        // window and not under one column, drawn as the pane's sentence is. On 2026-10-20, on macOS 26.7.1, it stood
+        // across the bottom of the window under the sidebar and the pane, and the sidebar's column ended above it.
+        .safeAreaInset(edge: .bottom) {
+            if let problem = host.model.problem {
+                sentenceStrip(problem)
             }
         }
         .sheet(isPresented: isQuickEntryUp) {
@@ -103,6 +106,16 @@ struct RootView: View {
             guard !isUp else { return }
             host.send(.quickEntry(.cancelButtonTapped))
         })
+    }
+
+    /// A sentence across the width of what it is drawn under, the pane or the window, on a material so that the rows
+    /// scrolling under it do not show through: the regular one, since the bar's is unavailable on watchOS and a
+    /// condition here would be about the look alone (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
+    private func sentenceStrip(_ sentence: String) -> some View {
+        Text(sentence)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial)
     }
 
     /// The toolbar's quick entry button, on the root of the stack, the list or the placeholder drawn when no list is
