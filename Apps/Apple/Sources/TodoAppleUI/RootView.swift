@@ -54,26 +54,16 @@ struct RootView: View {
             // between the two as the button hid and showed the sidebar.
             .safeAreaInset(edge: .bottom) {
                 if isSidebarAway, let problem = host.model.taskViewList.problem {
-                    // On a material across the pane, so that the rows scrolling under it do not show through: the
-                    // regular one, since the bar's is unavailable on watchOS and a condition here would be about the
-                    // look alone (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
-                    Text(problem)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(.regularMaterial)
+                    sentenceStrip(problem)
                 }
             }
         }
         // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
-        // window and not under one column, on the same material as the pane's sentence, for the same reason. On
-        // 2026-10-20, on macOS 26.7.1, it stood across the bottom of the window under the sidebar and the pane, and the
-        // sidebar's column ended above it.
+        // window and not under one column, drawn as the pane's sentence is. On 2026-10-20, on macOS 26.7.1, it stood
+        // across the bottom of the window under the sidebar and the pane, and the sidebar's column ended above it.
         .safeAreaInset(edge: .bottom) {
             if let problem = host.model.problem {
-                Text(problem)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(.regularMaterial)
+                sentenceStrip(problem)
             }
         }
         .sheet(isPresented: isQuickEntryUp) {
@@ -116,6 +106,16 @@ struct RootView: View {
             guard !isUp else { return }
             host.send(.quickEntry(.cancelButtonTapped))
         })
+    }
+
+    /// A sentence across the width of what it is drawn under, the pane or the window, on a material so that the rows
+    /// scrolling under it do not show through: the regular one, since the bar's is unavailable on watchOS and a
+    /// condition here would be about the look alone (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
+    private func sentenceStrip(_ sentence: String) -> some View {
+        Text(sentence)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial)
     }
 
     /// The toolbar's quick entry button, on the root of the stack, the list or the placeholder drawn when no list is

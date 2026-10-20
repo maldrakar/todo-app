@@ -57,7 +57,7 @@ struct WindowView: View {
         if let window {
             takingLinks(RootView(host: window.host))
                 .onOpenURL(perform: window.open)
-                .onChange(of: window.host.route.path) { _, route in keep(route) }
+                .onChange(of: window.host.route.path) { _, routeText in keep(routeText) }
         } else {
             // A view that fills the window, because a view with nothing in it never appears: on 2026-10-18 an
             // `onAppear` on a `Group` holding nothing never ran in a window of the group, and the window stayed
@@ -80,9 +80,9 @@ struct WindowView: View {
 
     /// Writes the window's route down where a relaunch reads it, the group's value and the scene's storage, as it is
     /// when the window is made and after every change.
-    private func keep(_ route: String) {
-        path = route
-        storedPath = route
+    private func keep(_ routeText: String) {
+        path = routeText
+        storedPath = routeText
     }
 
     #if !os(watchOS)
