@@ -4,7 +4,7 @@ A reminders app in the spirit of Things 3, with one shared core and native UI pe
 
 - Target platforms: iOS, macOS, iPadOS, watchOS, and the web via WASM.
 - The shared core is written in Swift and restricted to the standard library and FoundationEssentials, so that it compiles for every target above (ADR-0001).
-- UI is platform-specific: SwiftUI is the likely choice for Apple platforms, React for the web. Both are decided during implementation.
+- UI is platform-specific: the Apple apps are built in SwiftUI, and React is the likely choice for the web, decided when the web client is built.
 
 ## Status
 
@@ -144,11 +144,11 @@ TODO_DB="$CONTAINER/Library/Application Support/todo/todo.sqlite" swift run todo
 ```
 
 The window holds the Mac's views. iPhone shows them as one stack, the sidebar, a view's list over it and a task over
-the list, and Back or a swipe from the left edge goes back one screen; a swipe down closes quick entry's sheet as
-Cancel does. On the iPad, Open in New Window, in a sidebar row's context menu, opens that view in a window of its
-own. A link opens its view or task in the window it reaches, and one that does not read, `todo://view/<id>` one slash
-short among them, leaves the window as it was and says "The link could not be opened." across its bottom, until the
-Quick Entry button or a link that reads takes the sentence away.
+the list, and the back button or a swipe from the left edge goes back one screen; a swipe down closes quick entry's
+sheet as Cancel does. On the iPad, Open in New Window, in a sidebar row's context menu, opens that view in a window
+of its own. A link opens its view or task in the window it reaches, and one that does not read, `todo://view/<id>`
+one slash short among them, leaves the window as it was and says "The link could not be opened." across its bottom,
+until the Quick Entry button or a link that reads takes the sentence away.
 
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.
@@ -178,9 +178,11 @@ What that last step measures is `wasm-size-probe`, an executable that exists to 
 the product. The budget is about what a web client downloads, and the `todo` demo is the wrong stand-in for
 one: it carries an argument parser, a formatter and a usage text no browser will ever load. The probe instead
 does what a web entry point will: it builds the root module over a store in memory and drives it — choose a
-view, rename it, make a folder — and beside it calls the public API of `TodoCore` directly — write through a
-store, read a page, search, exchange a journal, take a snapshot — because the linker keeps what a client calls,
-and a number measured on calls that were dead-stripped is a number for a binary nobody ships.
+view, rename it, make a folder, follow a link with `?quick-entry`, file a task through quick entry, push the task
+and go back, open quick entry again and cancel it, choose Open in New Window on a view — and beside it calls the
+public API of `TodoCore` directly — write through a store, read a page, search, exchange a journal, take a
+snapshot — because the linker keeps what a client calls, and a number measured on calls that were dead-stripped
+is a number for a binary nobody ships.
 
 The budget is 6.3125 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
 CI runs and the command to run locally. It is the root module and the core as they stand with four percent to
@@ -195,7 +197,7 @@ A second job, on GitHub's `xcode-27` macOS runner and with Xcode 27.1, the Xcode
 every step, first checks that Xcode's own toolchain is the version `.swift-version` pins, since the image is a
 preview whose Xcode can change under the job. It then compiles `TodoCore`, and `TodoAppleUI` from `Apps/Apple`,
 against the iOS and watchOS SDKs, builds and tests `Apps/Apple` with the pinned toolchain, and builds the root
-package and `Apps/Apple` with Xcode's toolchain too. Those last two builds stay because Apple accepts store
+package and `Apps/Apple` with Xcode's toolchain too. Those two builds stay because Apple accepts store
 builds from Xcode's toolchain, and because they are what shows that, from Xcode 27 on, the pinned toolchain and
 Xcode's are one version (ADR-0008). Its last step builds the iPhone and iPad app from `Apps/Apple/Todo.xcodeproj`
 for the simulator, unsigned, with the `xcodebuild` command "Running on iPhone and iPad" gives and the derived data
