@@ -1,0 +1,60 @@
+{
+  "default-configuration": "Release",
+  "configurations": [
+    "Debug",
+    "Release",
+  ],
+  "localizations": {
+    "development": "en",
+  },
+  "packages": [
+    {
+      "kind": "local",
+      "path": ".",
+    },
+  ],
+  "files": [
+    {
+      "kind": "group",
+      "path": "Sources/todo-ios",
+      "children": [
+        { "path": "Info.plist" },
+        { "path": "TodoIOS.swift", "target-membership": [ "Todo/compile-sources" ] },
+      ],
+    },
+    { "path": "Todo.xcconfig" },
+  ],
+  "targets": [
+    {
+      "name": "Todo",
+      "id": "Todo",
+      "product-type": "application",
+      "specialized-configurations": [
+        { "name": "Debug", "file": "Todo.xcconfig" },
+        { "name": "Release", "file": "Todo.xcconfig" },
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+      ],
+      "package-product-members": [
+        {
+          "product-name": "TodoAppleUI",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+      "build-settings": {
+        "ALWAYS_SEARCH_USER_PATHS": "NO",
+        "CODE_SIGN_STYLE": "Automatic",
+        "INFOPLIST_FILE": "Sources/todo-ios/Info.plist",
+        "IPHONEOS_DEPLOYMENT_TARGET": "17.0",
+        "PRODUCT_BUNDLE_IDENTIFIER": "dev.maldrakar.todo",
+        "PRODUCT_NAME": "Todo",
+        "SDKROOT": "iphoneos",
+        "SWIFT_VERSION": "6.0",
+        "TARGETED_DEVICE_FAMILY": "1,2",
+      },
+    },
+  ],
+  "products-group": null,
+}

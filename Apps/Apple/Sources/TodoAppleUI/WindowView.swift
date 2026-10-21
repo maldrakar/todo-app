@@ -33,8 +33,9 @@ struct WindowView: View {
     /// The window's value in its group, the window's route in its text form beside an identity of the window's own
     /// (`Value`): nil for a window opened with none, the first of a launch, every Cmd-N and the window a link opens at
     /// a launch, which gets one at its first write. Its text is read once, when the window is made, and written after
-    /// every change of the route, which is what the Mac restores the window from (`docs/specs/navigation.md`,
-    /// section 7).
+    /// every change of the route. It is what a relaunch restores the window from, on the Mac
+    /// (`docs/specs/navigation.md`, section 7) and on iOS: on 2026-10-20, in the iOS 26.3 simulator, the scene's saved
+    /// state held this value, and a scene the system had ended in the background was made again from it.
     ///
     /// Writing it moves neither the window nor this view (spec, "Risks"): on 2026-10-20, on macOS 26.7.1, three
     /// writes of the text left the window its number, its one host and its view, and each read back as written. The Mac
@@ -42,9 +43,11 @@ struct WindowView: View {
     /// restored no window after Cmd-Q, and the throwaway bundle restored every window with its value.
     @Binding private var value: Value?
 
-    /// The same text, kept by the scene, which is what iPhone restores a scene from (`docs/specs/navigation.md`,
-    /// section 7). Read when the window has no value of its own, and written beside it, on every platform, since a view
-    /// holds no platform condition for where a relaunch reads.
+    /// The same text, kept by the scene (`docs/specs/navigation.md`, section 7), and written beside the value on every
+    /// platform, since a view holds no platform condition for where a relaunch reads. It is read only when the window
+    /// has no value of its own: always on the watch, whose group takes no value, and not at a relaunch on iOS, where a
+    /// restored scene brought its value back too and each window was made from it, this text agreeing (2026-10-20, the
+    /// iOS 26.3 simulator).
     @SceneStorage("route") private var storedPath: String?
 
     /// The window, nil only until the window first appears.

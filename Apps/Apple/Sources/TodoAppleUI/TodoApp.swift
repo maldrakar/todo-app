@@ -174,8 +174,8 @@ final class TodoApp {
     }
 
     /// The database a launch opens when `TODO_DB` names none. Its directory under Application Support is named
-    /// for the app rather than for a bundle identifier, because the app has no bundle to take one from
-    /// (ADR-0008).
+    /// for the app rather than for a bundle identifier, because the Mac executable has no bundle to take one from
+    /// (ADR-0008); on iPhone and iPad Application Support is the app's own container's already.
     private static func defaultDatabase() throws -> String {
         let directory = URL.applicationSupportDirectory.appending(path: "todo", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
