@@ -25,13 +25,28 @@ struct RootView: View {
     /// pane.
     @State private var columnVisibility = NavigationSplitViewVisibility.automatic
 
+    /// Which column a collapsed split view shows on top, which only the view can know (`docs/style.md`, "Views"): a
+    /// row's tap asks for the pane's column, and the split view writes the sidebar's back at the first pop after that,
+    /// the task's or the list's. On iPhone, Back to the sidebar leaves the view highlighted, since the List's write of
+    /// nil is not sent (`TaskViewListView`), so a tap on that view moved no highlight, and the split view, which pushes
+    /// the pane when the highlight moves, pushed nothing (#107). In the iOS 26.3 simulator on 2026-10-21: on iPhone,
+    /// Back and a tap on the highlighted view showed its list again in one push, and a tap on another view pushed its
+    /// list once; a launch showed what it had before, the Inbox's list over the sidebar, a task over both, or the
+    /// sidebar alone for a view that is gone, which a start on the pane's column covered with "Nothing to show"; on the
+    /// iPad, whose split view never collapsed, nothing wrote the column and nothing on screen changed.
+    @State private var preferredCompactColumn = NavigationSplitViewColumn.sidebar
+
     init(host: ModuleHost<AppModule>) {
         self.host = host
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
+        NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $preferredCompactColumn) {
+            TaskViewListView(model: host.model.taskViewList) {
+                host.send(.taskViewList($0))
+            } rowTapped: {
+                preferredCompactColumn = .detail
+            }
         } detail: {
             NavigationStack(path: stackPath) {
                 Group {

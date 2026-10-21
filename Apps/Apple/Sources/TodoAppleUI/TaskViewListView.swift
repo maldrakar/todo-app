@@ -11,6 +11,11 @@ struct TaskViewListView: View {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
 
+    /// Told when a row's title is tapped, after the row's action is sent, for what only the root's view can do about
+    /// the tap: show the pane where a collapsed split view would not, on iPhone the highlighted view's list after Back
+    /// (`RootView`, #107). It carries no row, since the module has the row from the action.
+    private let rowTapped: () -> Void
+
     /// Whether the list has the keyboard, which only the view can know (spec section 2).
     @FocusState private var isListFocused: Bool
 
@@ -24,9 +29,14 @@ struct TaskViewListView: View {
     /// it (the iOS 26.3 simulator).
     @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
 
-    init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) {
+    init(
+        model: TaskViewList.Model,
+        send: @escaping (TaskViewList.UserAction) -> Void,
+        rowTapped: @escaping () -> Void
+    ) {
         self.model = model
         self.send = send
+        self.rowTapped = rowTapped
     }
 
     var body: some View {
@@ -47,11 +57,16 @@ struct TaskViewListView: View {
                         // day, a tap on the title's text alone, sent only for the highlighted row, left a click on
                         // another view's title choosing nothing. On 2026-10-20, in the iOS 26.3 simulator, a tap on
                         // another view's row pushed its list on iPhone, and on the iPad a tap on the highlighted view
-                        // closed its task.
+                        // closed its task. The tap is told to the root's view too, which on iPhone shows the chosen
+                        // view's list, the highlighted one's included (`rowTapped`); the arrow keys do not tell it,
+                        // since a highlight they move is one the split view pushes for itself.
                         Text(row.title)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(.rect)
-                            .onTapGesture { send(.rowSelected(row.id)) }
+                            .onTapGesture {
+                                send(.rowSelected(row.id))
+                                rowTapped()
+                            }
                     }
                 }
                 // The tree as the flat rows carry it: a number to indent by, so that drawing it decides nothing
