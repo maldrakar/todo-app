@@ -99,7 +99,9 @@ struct TaskViewListView: View {
     /// is not sent, since no action takes it, and the model does not change, so nothing the module does would
     /// draw the List again. The view does it: the count moves, `body` runs again, and the List is handed
     /// `model.selection` once more. On 2026-10-12, with the highlight emptied through the accessibility API,
-    /// the row was highlighted again within half a second; without the count it stayed empty.
+    /// the row was highlighted again within half a second; without the count it stayed empty. On a narrow window
+    /// the highlight goes when the list's back button closes the list, which is the module's to do and is sent from
+    /// the stack's path, not from here (`RootView`; the owner, 2026-10-21).
     private var selection: Binding<ViewID?> {
         _ = emptiedHighlights
         return Binding(get: { model.selection }, set: { id in

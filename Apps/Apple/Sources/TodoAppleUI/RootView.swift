@@ -80,7 +80,10 @@ struct RootView: View {
 
     /// The narrow window's tree: the views at the root of one stack, and the list and the task pushed over them as
     /// the route names them (`narrowPath`). The list's screen is the pane the wide window draws, and the task's
-    /// screen is pushed by the list's own destination (`TaskListView`).
+    /// screen is pushed by the list's own destination (`TaskListView`). In the iOS 26.3 simulator on 2026-10-21, on
+    /// an iPhone 17 Pro Max, each rotation from this tree to the split view with a list open printed once that the
+    /// list's `navigationDestination` for `EntityID` was misplaced and ignored, while the pane drew the list and the
+    /// task pushed in it; no rotation wrote either path, and the screen on top before was on top after.
     private var narrowStack: some View {
         NavigationStack(path: narrowPath) {
             sidebar
