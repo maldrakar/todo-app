@@ -141,8 +141,9 @@ A device needs signing: copy `Apps/Apple/Signing.xcconfig.example` to `Apps/Appl
 ignores, put the Team ID of your Apple developer account in it, sign in to that account under Xcode's Settings >
 Accounts, and Xcode signs the app automatically under that team. The team goes in `Signing.xcconfig` and never
 through the target's Signing & Capabilities editor, where Xcode's error without a team points: the editor writes the
-team into `project.xcproj`, which is committed. A checkout without `Signing.xcconfig` builds for the simulator
-unsigned.
+team into `project.xcproj`, which is committed. A personal team's app does not launch on the phone until the phone
+trusts its developer, under Settings > General > VPN & Device Management. A checkout without `Signing.xcconfig`
+builds for the simulator unsigned.
 
 `project.xcproj` is written by hand and kept in the form Apple's `xcprojformatter` writes: `swift test` in
 `Apps/Apple` fails when it is not, and the formatter puts it right.
