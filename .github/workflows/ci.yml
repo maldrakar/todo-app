@@ -124,8 +124,9 @@ jobs:
       - name: Compile the core for watchOS
         run: swift build --target TodoCore --triple arm64_32-apple-watchos10.0 --sdk "$(xcrun --sdk watchos --show-sdk-path)"
 
-      # The library every Apple app target will import, kept compiling for the platforms that have no app yet
-      # (ADR-0008).
+      # The library the Apple apps import, compiled with the pinned toolchain where no build below reaches it: for
+      # watchOS, which has no app yet, and for the iOS device, since the iPhone app is built at the end for the
+      # simulator, with Xcode's toolchain (ADR-0008).
       - name: Compile the Apple UI library for iOS
         working-directory: Apps/Apple
         run: swift build --target TodoAppleUI --triple arm64-apple-ios17.0 --sdk "$(xcrun --sdk iphoneos --show-sdk-path)"
@@ -151,3 +152,12 @@ jobs:
       - name: Build the Apple package with Xcode's toolchain
         working-directory: Apps/Apple
         run: /usr/bin/swift build --scratch-path "$RUNNER_TEMP/xcode-apple"
+
+      # The command `README.md` gives, with the derived data under `$RUNNER_TEMP`, outside the checkout, as the scratch
+      # paths above: the one step that builds the Xcode project, which the Apple package's tests decode and do not
+      # build. The version first, so that the log names the Xcode that built.
+      - name: Build the iPhone app for the simulator
+        run: |
+          set -eu
+          xcodebuild -version
+          xcodebuild -project Apps/Apple/Todo.xcodeproj -scheme Todo -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath "$RUNNER_TEMP/xcode-ios" CODE_SIGNING_ALLOWED=NO build
