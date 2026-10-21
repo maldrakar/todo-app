@@ -158,14 +158,17 @@ private func rowsBeforeAnUnreadTask(in list: TaskViewList, of store: Store) thro
 
 /// With no list open the button moves nothing, the sentence included: the platform can write a path without the
 /// list after a close the model drove, a list whose view went under it, as the task list's own back button can.
+/// Here a link to a view that is gone leaves a sentence over the list on Work, and a peer then deletes Work.
 @Test func theListsBackButtonWithNoListOpenMovesNothing() throws {
     let store = try makeStore()
-    let gone = try store.createView(NewTaskView(title: "Work"))
-    try store.delete(view: gone)
-    let list = try TaskViewList(store: store, route: on(gone))
+    let work = try store.createView(NewTaskView(title: "Work"))
+    let list = try TaskViewList(store: store, route: on(work))
+    _ = list.send(.route(on(ViewID())))
+    let deleted = try changeSet(of: store) { try store.delete(view: work) }
+    _ = list.send(.changed(deleted))
     let before = list.model
-    #expect(before.taskList == nil, "no list is open; this is the setup")
-    #expect(before.problem == "The list could not be opened.", "and a sentence stands, which must stay")
+    #expect(before.taskList == nil, "the list closed with its view; this is the setup")
+    #expect(before.problem == "The list could not be opened.", "and the link's sentence stands, which must stay")
     #expect(list.send(.action(.listBackButtonTapped)) == nil)
     #expect(list.model == before)
 }

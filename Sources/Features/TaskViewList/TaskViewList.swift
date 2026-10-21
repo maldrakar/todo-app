@@ -54,8 +54,8 @@ public final class TaskViewList: Routable {
         public let selection: ViewID?
 
         /// The open list's own model, which this module carries to the list's view whole and decides nothing
-        /// in, and nil when no list is open: when the module was made on a view that is gone, and after the view
-        /// the list was on is gone.
+        /// in, and nil when no list is open: when the module was made on a view that is gone, after the view the
+        /// list was on is gone, and after the list's back button closed it.
         public let taskList: TaskList.Model?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
@@ -230,13 +230,14 @@ public final class TaskViewList: Routable {
             return nil
         case .action(.listBackButtonTapped):
             // The list is closed with the task open in it, and the highlight goes with it: on a narrow window the
-            // list is a screen pushed over this one, and a person who went back from it has nothing chosen, as
-            // System Settings has nothing chosen on iPhone after Back (owner, 2026-10-21). The route then names no
-            // list, which a window restored from opens on the Inbox, as a new one does (owner, the same day). On a
-            // wide window the list has no back button, so the highlight there still cannot be removed.
+            // list is a screen pushed over this one, and Back closes that screen, so nothing stays chosen (owner,
+            // 2026-10-21), as iPhone's System Settings leaves nothing chosen after Back. The route then names no list,
+            // which a window restored from opens on the Inbox, as a new one does (owner, the same day). On a wide
+            // window the list has no back button, so the highlight there still cannot be removed; a window that
+            // widens after this shows the views with nothing chosen and no list until one is chosen.
             //
-            // With no list open it moves nothing, the sentence included: the platform writes the stack's path back
-            // after a pop the model drove, a list whose view is gone, and that write is no gesture of a person's.
+            // With no list open it moves nothing, the sentence included: the platform can write the stack's path
+            // back after a pop the model drove, a list whose view is gone, and that write is no gesture of a person's.
             // Otherwise the sentence goes, as with a click, except while a field is open, whose sentence explains
             // it and which this gesture leaves where it is.
             guard state.taskList.model != nil else { return nil }

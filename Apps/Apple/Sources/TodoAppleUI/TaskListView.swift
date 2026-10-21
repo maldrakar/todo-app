@@ -4,10 +4,11 @@ import TaskListFeature
 import TodoCore
 
 /// The tasks of one view, drawn as the list assembled them, a row's tap sent as the one action its control is named
-/// for (`docs/style.md`). It is the root of the stack in the window's detail column, and the task open in the list is
-/// pushed over it: the list draws the task's screen out of its own model, as a parent draws its child, and the root
-/// view binds the stack's path to the open task's head (`docs/specs/navigation.md`, section 6). What opens is the
-/// list's to decide, so a row reports the tap and nothing else.
+/// for (`docs/style.md`). It is the root of the stack in a wide window's detail column, and a screen pushed over the
+/// views in a narrow window's one stack, and the task open in the list is pushed over it either way: the list draws
+/// the task's screen out of its own model, as a parent draws its child, and the root view binds the stack's path to
+/// the route (`docs/specs/navigation.md`, section 6, amended 2026-10-21). What opens is the list's to decide, so a
+/// row reports the tap and nothing else.
 struct TaskListView: View {
     private let model: TaskList.Model
     private let send: (TaskList.UserAction) -> Void

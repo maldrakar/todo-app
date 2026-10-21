@@ -89,8 +89,9 @@ struct RootView: View {
             sidebar
                 .navigationDestination(for: PushedList.self) { _ in
                     pane
-                        // The sidebar's sentence on the screen pushed over the sidebar's rows, which draw it too
-                        // when they are on top, so it shows beside the pane once, as in the wide window.
+                        // The sidebar's sentence on the list's screen, pushed over the sidebar's rows, which draw it
+                        // when they are on top, so it shows once on either screen. A task pushed over the list does
+                        // not show it, nor does the wide window's pane with its sidebar hidden, which is #110.
                         .safeAreaInset(edge: .bottom) {
                             if let problem = host.model.taskViewList.problem {
                                 sentenceStrip(problem)
@@ -151,7 +152,7 @@ struct RootView: View {
     /// window, and one without the list goes to the views as the list's back button, which closes the list and the
     /// highlight with it (`TaskViewList`); a pop from the task straight to the views, through the back button's
     /// menu, is that one write. A write that still holds the task sends nothing, since only the module opens one.
-    /// The write SwiftUI makes after a pop the model drove reaches a module with nothing open at that depth, which
+    /// A write SwiftUI can make after a pop the model drove reaches a module with nothing open at that depth, which
     /// moves nothing (`TaskList`, `TaskViewList`).
     private var narrowPath: Binding<NavigationPath> {
         Binding(get: {

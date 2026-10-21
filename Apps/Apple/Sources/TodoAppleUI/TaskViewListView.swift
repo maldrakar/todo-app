@@ -4,7 +4,7 @@ import TaskViewListFeature
 import TodoCore
 
 /// The list of views, drawn as the module assembled it, every gesture sent as the one action its control is
-/// named for (spec section 2). A deselect is no gesture here: the highlight cannot be removed (`selection`). It
+/// named for (spec section 2). A deselect is no gesture here: the List cannot remove the highlight (`selection`). It
 /// knows nothing about renaming beyond what a row says: a row with a `draft` draws a field, and every other row
 /// its title.
 struct TaskViewListView: View {
