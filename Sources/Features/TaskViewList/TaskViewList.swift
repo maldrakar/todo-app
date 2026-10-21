@@ -98,6 +98,9 @@ public final class TaskViewList: Routable {
     public enum UserAction: Equatable, Sendable {
         /// A row of the list, clicked or moved onto with the arrow keys.
         case rowSelected(ViewID)
+        /// The back button of the open list where the list is a screen pushed over this one, on a narrow window;
+        /// the swipe back sends it too.
+        case listBackButtonTapped
         /// The row's Rename menu item.
         case renameMenuItemChosen(ViewID)
         /// The text of the open field, on every keystroke.
@@ -224,6 +227,22 @@ public final class TaskViewList: Routable {
             state.selection = id
             if state.rename == nil { state.problem = nil }
             apply(list: TaskList.Route(head: id))
+            return nil
+        case .action(.listBackButtonTapped):
+            // The list is closed with the task open in it, and the highlight goes with it: on a narrow window the
+            // list is a screen pushed over this one, and a person who went back from it has nothing chosen, as
+            // System Settings has nothing chosen on iPhone after Back (owner, 2026-10-21). The route then names no
+            // list, which a window restored from opens on the Inbox, as a new one does (owner, the same day). On a
+            // wide window the list has no back button, so the highlight there still cannot be removed.
+            //
+            // With no list open it moves nothing, the sentence included: the platform writes the stack's path back
+            // after a pop the model drove, a list whose view is gone, and that write is no gesture of a person's.
+            // Otherwise the sentence goes, as with a click, except while a field is open, whose sentence explains
+            // it and which this gesture leaves where it is.
+            guard state.taskList.model != nil else { return nil }
+            state.selection = nil
+            if state.rename == nil { state.problem = nil }
+            state.taskList.drop()
             return nil
         case .action(.renameMenuItemChosen(let id)):
             // The title comes off the row and not out of a read: the row is what the person chose the menu
