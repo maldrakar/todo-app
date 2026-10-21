@@ -33,7 +33,10 @@ struct RootView: View {
     /// Back and a tap on the highlighted view showed its list again in one push, and a tap on another view pushed its
     /// list once; a launch showed what it had before, the Inbox's list over the sidebar, a task over both, or the
     /// sidebar alone for a view that is gone, which a start on the pane's column covered with "Nothing to show"; on the
-    /// iPad, whose split view never collapsed, it wrote nothing to the column and nothing on screen changed.
+    /// iPad, whose split view never collapsed, it wrote nothing to the column and nothing on screen changed. On an
+    /// iPhone 17 Pro Max, whose split view expands in landscape, a list shown this way, with a task opened and closed
+    /// over it, was under the sidebar after a rotation there and back, where a list opened at launch or by a moved
+    /// highlight stayed on top (#114).
     @State private var preferredCompactColumn = NavigationSplitViewColumn.sidebar
 
     init(host: ModuleHost<AppModule>) {
