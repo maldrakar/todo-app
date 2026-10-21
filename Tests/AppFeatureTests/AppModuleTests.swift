@@ -402,6 +402,20 @@ private func rowsBeforeAnUnreadTask(in app: AppModule, of store: Store, tags: Se
     #expect(app.route.path == "/view/\(inbox)")
 }
 
+/// The list's back button on a narrow window closes the list with its task, and the window's path is then the
+/// default one, which a relaunch opens on the Inbox, as a new window (owner, 2026-10-21).
+@Test func theListsBackButtonLeavesTheWindowOnTheDefaultPath() throws {
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "Buy milk"))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(open)"))
+    #expect(app.send(.action(.taskViewList(.listBackButtonTapped))) == nil)
+    #expect(app.model.taskViewList.taskList == nil)
+    #expect(app.model.taskViewList.selection == nil)
+    #expect(app.route.path == "/")
+    let relaunched = try AppModule(store: store, route: try Route(path: app.route.path))
+    #expect(relaunched.route.path == "/view/\(inbox)")
+}
+
 /// A link to a view that is gone leaves the list that was open, and the sidebar says so in its own model (spec
 /// section 3). The sidebar holds no row for a view that is gone, so its highlight stays where it was too.
 @Test func aLinkToAViewThatIsGoneLeavesTheListAndASentence() throws {

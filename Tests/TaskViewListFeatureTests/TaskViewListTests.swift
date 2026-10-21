@@ -98,6 +98,81 @@ private func rowsBeforeAnUnreadTask(in list: TaskViewList, of store: Store) thro
     #expect(list.route == on(BuiltInTaskViews.inbox))
 }
 
+/// Where the list is a screen pushed over the views, on a narrow window, its back button closes it: the list goes
+/// with the task open in it, and the highlight goes too, since the screen the person chose is closed and nothing
+/// stays chosen (owner, 2026-10-21). The route then names no list.
+@Test func theListsBackButtonClosesTheListAndTheHighlight() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let list = try TaskViewList(store: store, route: on(BuiltInTaskViews.inbox, task: id))
+    #expect(list.model.taskList?.task?.title == "Buy milk", "the task is open; this is the setup")
+    #expect(list.send(.action(.listBackButtonTapped)) == nil)
+    #expect(list.model.taskList == nil)
+    #expect(list.model.selection == nil)
+    #expect(list.model.rows.filter(\.isSelected).isEmpty)
+    #expect(list.route == .init(list: nil))
+}
+
+/// After the list's back button, the view that was highlighted is chosen like any other: a click opens its list
+/// again and a link does too, each a change the narrow window pushes the list for (#107, #113).
+@Test func aClickOrARouteAfterTheListsBackButtonOpensTheListAgain() throws {
+    let store = try makeStore()
+    let clicked = try TaskViewList(store: store, route: .init(list: nil))
+    _ = clicked.send(.action(.listBackButtonTapped))
+    #expect(clicked.send(.action(.rowSelected(BuiltInTaskViews.inbox))) == nil)
+    #expect(clicked.model.selection == BuiltInTaskViews.inbox)
+    #expect(clicked.model.taskList == (try listOn(BuiltInTaskViews.inbox, in: store)))
+    #expect(clicked.route == on(BuiltInTaskViews.inbox))
+    let linked = try TaskViewList(store: store, route: .init(list: nil))
+    _ = linked.send(.action(.listBackButtonTapped))
+    #expect(linked.send(.route(on(BuiltInTaskViews.inbox))) == nil)
+    #expect(linked.model.selection == BuiltInTaskViews.inbox)
+    #expect(linked.model.taskList == (try listOn(BuiltInTaskViews.inbox, in: store)))
+    #expect(linked.route == on(BuiltInTaskViews.inbox))
+}
+
+/// The sentence goes with this gesture as it does with a click, except while a field is open, whose sentence
+/// explains it and which the gesture leaves where it is: the list closes either way.
+@Test func theListsBackButtonTakesTheSentenceExceptAnOpenFieldsOne() throws {
+    let store = try makeStore()
+    let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
+    let list = try TaskViewList(store: store, route: .init(list: nil))
+    try store.delete(view: gone)
+    _ = list.send(.action(.rowSelected(gone)))
+    #expect(list.model.problem == "The list could not be opened.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.model.taskList != nil, "the Inbox's list stayed open; this is the setup")
+    #expect(list.send(.action(.listBackButtonTapped)) == nil)
+    #expect(list.model.problem == nil)
+    #expect(list.model.taskList == nil)
+    let renaming = try TaskViewList(store: store, route: .init(list: nil))
+    _ = renaming.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
+    _ = renaming.send(.action(.titleFieldChanged(" ")))
+    _ = renaming.send(.action(.titleFieldSubmitted))
+    #expect(renaming.model.problem == "A title cannot be empty.", "the field's refusal is the setup")
+    #expect(renaming.send(.action(.listBackButtonTapped)) == nil)
+    #expect(renaming.model.problem == "A title cannot be empty.")
+    #expect(renaming.model.rows.first(where: { $0.id == BuiltInTaskViews.today })?.draft == " ", "the field stays open on the draft")
+    #expect(renaming.model.taskList == nil)
+    #expect(renaming.model.selection == nil)
+}
+
+/// With no list open the button moves nothing, the sentence included: the platform can write a path without the
+/// list after a close the model drove, a list whose view went under it, as the task list's own back button can.
+/// Here a link to a view that is gone leaves a sentence over the list on Work, and a peer then deletes Work.
+@Test func theListsBackButtonWithNoListOpenMovesNothing() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work"))
+    let list = try TaskViewList(store: store, route: on(work))
+    _ = list.send(.route(on(ViewID())))
+    let deleted = try changeSet(of: store) { try store.delete(view: work) }
+    _ = list.send(.changed(deleted))
+    let before = list.model
+    #expect(before.taskList == nil, "the list closed with its view; this is the setup")
+    #expect(before.problem == "The list could not be opened.", "and the link's sentence stands, which must stay")
+    #expect(list.send(.action(.listBackButtonTapped)) == nil)
+    #expect(list.model == before)
+}
+
 /// Being created is the one event that nobody chose, and the list has nothing to say in answer: it opened the
 /// list of the view it starts on in its `init`, as the task list opens its task screen in its own. Nothing moves,
 /// the sentence included, since being created answers nothing a person was told.

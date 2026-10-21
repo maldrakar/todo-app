@@ -144,11 +144,12 @@ TODO_DB="$CONTAINER/Library/Application Support/todo/todo.sqlite" swift run todo
 ```
 
 The window holds the Mac's views. iPhone shows them as one stack, the sidebar, a view's list over it and a task over
-the list, and the back button or a swipe from the left edge goes back one screen; a swipe down closes quick entry's
-sheet as Cancel does. On the iPad, Open in New Window, in a sidebar row's context menu, opens that view in a window
-of its own. A link opens its view or task in the window it reaches, and one that does not read, `todo://view/<id>`
-one slash short among them, leaves the window as it was and says "The link could not be opened." across its bottom,
-until the Quick Entry button or a link that reads takes the sentence away.
+the list, and the back button or a swipe from the left edge goes back one screen; back on the sidebar, the list is
+closed and no view stays highlighted. A swipe down closes quick entry's sheet as Cancel does. On the iPad, Open in
+New Window, in a sidebar row's context menu, opens that view in a window of its own. A link opens its view or task
+in the window it reaches, and one that does not read, `todo://view/<id>` one slash short among them, leaves the
+window as it was and says "The link could not be opened." across its bottom, until the Quick Entry button or a link
+that reads takes the sentence away.
 
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.
