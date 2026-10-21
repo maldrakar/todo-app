@@ -33,7 +33,7 @@ struct RootView: View {
     /// Back and a tap on the highlighted view showed its list again in one push, and a tap on another view pushed its
     /// list once; a launch showed what it had before, the Inbox's list over the sidebar, a task over both, or the
     /// sidebar alone for a view that is gone, which a start on the pane's column covered with "Nothing to show"; on the
-    /// iPad, whose split view never collapsed, nothing wrote the column and nothing on screen changed.
+    /// iPad, whose split view never collapsed, it wrote nothing to the column and nothing on screen changed.
     @State private var preferredCompactColumn = NavigationSplitViewColumn.sidebar
 
     init(host: ModuleHost<AppModule>) {

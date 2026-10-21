@@ -58,8 +58,9 @@ struct TaskViewListView: View {
                         // another view's title choosing nothing. On 2026-10-20, in the iOS 26.3 simulator, a tap on
                         // another view's row pushed its list on iPhone, and on the iPad a tap on the highlighted view
                         // closed its task. The tap is told to the root's view too, which on iPhone shows the chosen
-                        // view's list, the highlighted one's included (`rowTapped`); the arrow keys do not tell it,
-                        // since a highlight they move is one the split view pushes for itself.
+                        // view's list, the highlighted one's included (`rowTapped`). The arrow keys do not tell it: a
+                        // highlight that moves is what the split view pushes the pane for, as a tap on another view
+                        // pushed its list before the tap told the root anything (#107; not probed with the keys).
                         Text(row.title)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(.rect)
