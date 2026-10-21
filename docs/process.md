@@ -333,8 +333,9 @@ the iOS and watchOS SDKs, builds and tests `Apps/Apple`, and builds
 both packages with Xcode's toolchain too. Those builds stay because
 Apple accepts store builds from Xcode's toolchain, and because they are
 what shows that, from Xcode 27 on, the pinned toolchain and Xcode's are
-one version (ADR-0008). The job runs on `main` and on demand and never
-on a pull request.
+one version (ADR-0008). Its last step builds the iPhone and iPad app
+from the Xcode project for the simulator, unsigned. The job runs on
+`main` and on demand and never on a pull request.
 
 Constraint: a private repository on the free plan has 2000 Actions
 minutes per month, and macOS runners consume them at a 10x multiplier,

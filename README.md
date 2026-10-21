@@ -14,7 +14,12 @@ describe, filters, sorts and groups them into pages, searches titles and notes, 
 another copy of itself; it builds and passes its suite on the host and on wasm32, and `todo` drives all of it
 from a command line. M2 built the module contract in the shared core, the list of views and the root module
 over it, which pass their suites on the host and on wasm32 as the core does, and the macOS app in `Apps/Apple`
-that hosts them. `M3 Navigation` is next, and product functionality follows as `M4`.
+that hosts them. `M3 Navigation`, not yet released, has built the screens below the sidebar, the list of a view's
+tasks and a task's own screen, and quick entry, each held by the module that opens it (ADR-0009); a route for every
+screen, and one text form for a window's route, which is the link and what the window is restored from; and a host
+per window over one store per process. Its modules pass their suites on the host and on wasm32 as M2's do, the
+macOS app opens more than one window, and the iPhone and iPad app, built from the Xcode project in `Apps/Apple` over
+the same views, takes links and restores its windows. Product functionality, `M4`, is next.
 
 ## Documents
 
@@ -70,9 +75,10 @@ machines claim one identity. `TODO_DEVICE` names it instead, which is how one ma
 
 ## Running the app
 
-`todo-mac` is the macOS app and the runnable part of `M2`. It lives in `Apps/Apple`, a package of its own beside
-the root one, because the root package is built on Linux and for wasm32, where there is no SwiftUI (ADR-0007);
-swiftly finds the root's `.swift-version` from there, so it builds with the same pinned toolchain.
+`todo-mac` is the macOS app, the runnable part of `M2` and, beside the iPhone and iPad app below, of `M3`. It lives
+in `Apps/Apple`, a package of its own beside the root one, because the root package is built on Linux and for
+wasm32, where there is no SwiftUI (ADR-0007); swiftly finds the root's `.swift-version` from there, so it builds
+with the same pinned toolchain.
 
 ```sh
 cd Apps/Apple
@@ -86,7 +92,10 @@ TODO_ROUTE=/view/00000000-0000-4000-8000-000000000002/task/<task id> swift run t
 It opens a window: the list of views in a sidebar, and beside it the tasks of the view chosen there. Rename,
 in a row's context menu, opens a field on the row: Return or a click away keeps the new title, a blank one is
 refused with a sentence under the list, and Esc keeps the old title. New Folder, on the toolbar, adds a folder at
-the end of the top level, chosen and with its field open.
+the end of the top level, chosen and with its field open. A click on a task pushes its screen, which shows its title,
+over the list, and the back button returns to the list. Quick Entry, the + on the list's toolbar, opens a sheet with
+a title field: Return or Add puts the task in the Inbox and closes the sheet, a blank title is refused with a
+sentence in the sheet, and Cancel or Esc closes it and writes nothing.
 
 Cmd-N opens another window on the Inbox, and Open in New Window, in a row's context menu, opens that view in a
 window of its own, every time, on the view a window shows too; every window shows what the others write.
@@ -133,6 +142,13 @@ xcrun simctl terminate booted dev.maldrakar.todo
 CONTAINER="$(xcrun simctl get_app_container booted dev.maldrakar.todo data)"
 TODO_DB="$CONTAINER/Library/Application Support/todo/todo.sqlite" swift run todo add "Buy milk"
 ```
+
+The window holds the Mac's views. iPhone shows them as one stack, the sidebar, a view's list over it and a task over
+the list, and Back or a swipe from the left edge goes back one screen; a swipe down closes quick entry's sheet as
+Cancel does. On the iPad, Open in New Window, in a sidebar row's context menu, opens that view in a window of its
+own. A link opens its view or task in the window it reaches, and one that does not read, `todo://view/<id>` one slash
+short among them, leaves the window as it was and says "The link could not be opened." across its bottom, until the
+Quick Entry button or a link that reads takes the sentence away.
 
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.
@@ -181,5 +197,7 @@ preview whose Xcode can change under the job. It then compiles `TodoCore`, and `
 against the iOS and watchOS SDKs, builds and tests `Apps/Apple` with the pinned toolchain, and builds the root
 package and `Apps/Apple` with Xcode's toolchain too. Those last two builds stay because Apple accepts store
 builds from Xcode's toolchain, and because they are what shows that, from Xcode 27 on, the pinned toolchain and
-Xcode's are one version (ADR-0008). It runs on `main` and on demand, never on a pull request, because macOS
-minutes cost tenfold on a private repository.
+Xcode's are one version (ADR-0008). Its last step builds the iPhone and iPad app from `Apps/Apple/Todo.xcodeproj`
+for the simulator, unsigned, with the `xcodebuild` command "Running on iPhone and iPad" gives and the derived data
+under the runner's temporary directory. The job runs on `main` and on demand, never on a pull request, because
+macOS minutes cost tenfold on a private repository.

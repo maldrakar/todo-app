@@ -1,6 +1,6 @@
 # ADR-0009: Make every screen a child of the screen that opened it, addressed by a route with one text form
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-14
 - Related: `docs/specs/navigation.md` (approved 2026-10-14), #67, #100, ADR-0006, ADR-0007, ADR-0008
 
