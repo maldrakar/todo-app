@@ -1,6 +1,6 @@
 # Spec: Navigation state the view only reads
 
-- Status: Draft
+- Status: Approved 2026-10-22 (revision 2)
 - Owner review: https://claude.ai/artifact/U3wtm2JcKqC9QEZe3p3mJv
 - Issue: #117
 
@@ -32,11 +32,11 @@ The owner reopened navigation before closing M3 (2026-10-21), and settled the sh
 
 ### 1. The opener declares what is open over it
 
-Every screen that can open another keeps, in its own state, what is open over it. It has two slots: one for a push and one for a modal. A slot is empty, or holds the route of the screen opened there, whole, as the opener declared it: its head, what it opens with, and what the opener wants open over it at that moment, which is usually nothing. A tap fills the slot, Back empties it, and nobody but the screen writes it. That is the whole of the decision, and it stays with the opener, as ADR-0009 says: when subtask B opens subtask A, B decides.
+Every screen that can open another keeps, in its own state, what is open over it, in one slot. The platform shows one thing directly over a screen, so the slot is one value with three states: nothing, a pushed screen, or a modal. In code it is an optional enum with two cases, `pushed` and `presented` (the owner, in review). Either case holds the route of the screen opened there, whole, as the opener declared it: its head, what it opens with, and what the opener wants open over it at that moment, which is usually nothing. A tap fills the slot, Back empties it, and nobody but the screen writes it. That is the whole of the decision, and it stays with the opener, as ADR-0009 says: when subtask B opens subtask A, B decides.
 
 On today's screens:
 
-| Screen | Its push slot | Filled by |
+| Screen | What it pushes | Filled by |
 | ------ | ------------- | --------- |
 | the sidebar, `TaskViewList` (the list of views, drawn as a sidebar on the Mac and the iPad and as a screen of its own on a phone) | the list of a view | a click on a view |
 | the list of tasks, `TaskList` (the tasks of one view) | a task | a tap on a row |
@@ -54,7 +54,8 @@ After every event the stack walks up from the base and compares each slot with w
 
 - the same head: the screen above is kept, with its session state, its scroll and its draft;
 - another head: the declared screen is made and told it was created, and it replaces everything above;
-- an empty slot: everything above is dropped.
+- an empty slot: everything above is dropped;
+- a modal: everything above is dropped, and the flow presents the declared screen (section 5).
 
 This is the seat's rule walked along the stack. The new screen is made before the old one is let go, so a screen that cannot be made leaves what was open. Its opener is told that it could not be opened, why, and what stays open, and takes that back as its slot. So "The task is gone." stays the list's sentence, under its rows, as it is today.
 
@@ -85,7 +86,7 @@ flowchart LR
 
 ### 3. Back and links stay one road each
 
-**Back.** The back button, the swipe and the back button's menu all end with SwiftUI writing a shorter path. The view sends what is left, whole, as one action of the window. The flow finds the screen now on top and tells it that what was over it was closed. That screen empties its slot, and the stack drops the rest. A screen cannot keep a slot the person closed, since the screen is already gone from the display (the engineer's call). On iPhone, Back from the list to the views empties the sidebar's slot, and the highlight goes with it: the rule of #107, now with no action of its own (`listBackButtonTapped` goes).
+**Back.** SwiftUI draws the back button and handles it itself, and it never tells the view that the button was tapped. There are three ways back: the button, the swipe from the edge, and the menu a long press on the button opens, which can go back several screens at once. Each ends the same way: SwiftUI writes a shorter path into the binding, and that write is all the view learns. So the view does not say "Back was tapped"; it says where the person went back to, by passing on what SwiftUI wrote, whole, as one action of the window: `.wentBack(to:)`, named for the gesture as ADR-0006 names actions. In a narrow window with the path `[#1 list, #2 task]`, a tap on "‹ Inbox" or a swipe sends `.wentBack(to: [#1])`, and choosing "Views" in the long-press menu sends `.wentBack(to: [])`. The flow finds the screen now on top, the list or the sidebar, and tells it that what was over it was closed. That screen empties its slot, and the stack drops the rest. A screen cannot keep a slot the person closed, since the screen is already gone from the display (the engineer's call). On iPhone, Back from the list to the views empties the sidebar's slot, and the highlight goes with it: the rule of #107, now with no action of its own (`listBackButtonTapped` goes).
 
 **A pop the model drove.** SwiftUI may write the path back after the module has already shortened it, for a task deleted under its screen. The stack keeps only a prefix it holds, by id, so such a write and any id it never gave move nothing.
 
@@ -110,7 +111,9 @@ This moves one rule. `docs/style.md`, "Views", lists the window size among what 
 
 ### 5. Modals
 
-A screen declares a modal in its second slot, as it declares a push. The flow presents it: a modal is a flow of its own, whose base is the declared screen and whose stack holds what is pushed inside it, with the same reconciliation, recursively. What the modal's base answers reaches the screen that declared it.
+A screen declares a modal in its slot, the slot's other case: what is over it is then a modal and not a pushed screen. The flow presents it: a modal is a flow of its own, whose base is the declared screen and whose stack holds what is pushed inside it, with the same reconciliation, recursively. What the modal's base answers reaches the screen that declared it.
+
+Since a screen holds a push or a modal and never both, the screen that declares a modal has nothing pushed over it: it is the top of its stack, and the modal is drawn over it. The price is in a wide window, where the list in the column stands beside the task open in the detail. If the list ever opens a modal, the task closes under it, since the list's slot holds the modal instead. No screen of today or of the M4 backlog does that; when one needs to, the shape is revisited with it.
 
 The engineer's calls, all open to the owner:
 
@@ -120,7 +123,7 @@ The engineer's calls, all open to the owner:
 - a modal's own stack is drawn as one stack in a sheet, whatever the width;
 - how a modal with screens of its own is written in a link is settled with the first such modal, as the navigation spec left the form of an argument.
 
-Built in this epic: the window's own modal slot, which is today's seat for quick entry. A screen's modal slot and a modal with a stack are on paper until a screen needs one.
+Built in this epic: the window's own modal slot, which is today's seat for quick entry. The window is the flow's owner and not a screen of its stack, so it pushes nothing and its slot holds only a modal. The `presented` case of a screen's slot and a modal with a stack are on paper until a screen needs one; until then a screen's slot holds a push or nothing.
 
 ### 6. The view
 
@@ -153,7 +156,7 @@ case .wide(let column, let path):
 
 /// Read from the model; a write is sent back whole, as one action, and interpreted by the module.
 func bound(_ path: [StackElementID]) -> Binding<[StackElementID]> {
-    Binding(get: { path }, set: { host.send(.stackPopped(to: $0)) })
+    Binding(get: { path }, set: { host.send(.wentBack(to: $0)) })
 }
 ```
 
@@ -164,9 +167,9 @@ Gone from the view: `stackPath`, `narrowPath`, `PushedList`, every read of `host
 | Where | Today | After |
 | ----- | ----- | ----- |
 | `FeatureModule` | `Seat`, `Routable`, `RouteValue` | adds the stack, its element id and the protocol of a flow's screens enum; `Seat` stays for the window's modal |
-| `AppModule` (the root, the one module a host holds) | the sidebar as a field, quick entry in a seat, the root's sentence | adds the stack and the width class; its model is the sidebar's model, the layout shape, each element's model by id, quick entry and the sentence; its action gains `.screen(id, action)` and `.stackPopped(to:)` |
-| `TaskViewList` | a seat holding the list; `selection` and `listBackButtonTapped` | a push slot instead of the seat and the selection, and the model's selection is read from it; the model loses `taskList`; the back action goes |
-| `TaskList` | a seat holding the task; `backButtonTapped`; the model carries `task` | a push slot; it hears the task's answers from the stack; the model loses `task`; the back action goes |
+| `AppModule` (the root, the one module a host holds) | the sidebar as a field, quick entry in a seat, the root's sentence | adds the stack and the width class; its model is the sidebar's model, the layout shape, each element's model by id, quick entry and the sentence; its action gains `.screen(id, action)` and `.wentBack(to:)` |
+| `TaskViewList` | a seat holding the list; `selection` and `listBackButtonTapped` | a slot instead of the seat and the selection, and the model's selection is read from it; the model loses `taskList`; the back action goes |
+| `TaskList` | a seat holding the task; `backButtonTapped`; the model carries `task` | a slot; it hears the task's answers from the stack; the model loses `task`; the back action goes |
 | `TaskScreen`, `QuickEntry` | | unchanged |
 | `ModuleHost`, `WindowView` (the window's view, which holds the window's host and takes links) | publish the model and the route, take links | also report the width class |
 | `RootView`, `TaskListView` | assemble the path from the route; a destination in the list | section 6 |
@@ -193,7 +196,7 @@ sequenceDiagram
   V->>V: SwiftUI pushes the task
 ```
 
-**Back twice, narrow window.** SwiftUI writes `[#1]`; the view sends `.stackPopped(to: [#1])`. The flow tells #1 that what was over it was closed; the list empties its slot; the stack drops #2. The text is `/view/<v>`. The second Back writes `[]`; the sidebar is told; it empties its slot, and the highlight goes; the stack drops #1. The text is `/`, and a relaunch opens the Inbox, as a new window does.
+**Back twice, narrow window.** SwiftUI writes `[#1]`; the view sends `.wentBack(to: [#1])`. The flow tells #1 that what was over it was closed; the list empties its slot; the stack drops #2. The text is `/view/<v>`. The second Back writes `[]`; the sidebar is told; it empties its slot, and the highlight goes; the stack drops #1. The text is `/`, and a relaunch opens the Inbox, as a new window does.
 
 **A task deleted while its screen is open, wide window.** The host delivers `.changed`; the stack hands it to every element, base first. #2 finds its task gone and answers that it asks to be closed; the stack hands that answer to #1, which empties its slot; the walk drops #2. The shape is `wide(column: #1, path: [])`, SwiftUI pops, and the write it may make afterwards names a prefix the stack holds, so it moves nothing.
 
@@ -205,6 +208,8 @@ sequenceDiagram
 | The root decides what is pushed (the mini-spec of 2026-10-21) | The owner: the opener decides. The root then held every transition of the app, which is the concern ADR-0009 answered. |
 | Commands: the opener says "push A" to a router, or builds the element of the stack itself (the owner's `StackRouter` draft; Point-Free's `NavigationLink(state:)`) | The owner chose a declaration. A command is a one-shot: a link or a relaunch would have to replay it, and the stack could drift from what the screens think is open. A slot is state, so the stack always follows it. |
 | The view cuts the stack into a column and a path | The owner: the module decides the layout. The cut would be the last piece of navigation the view still does, and a web host would repeat it. |
+| The view draws its own back button and sends a tap on it | It would lose the swipe from the edge and the long-press menu, and the platform's look of Back; SwiftUI's own button reports nothing but the shorter path. |
+| Two slots per screen, a push and a modal, both filled at once | The owner, in review: the platform shows one thing directly over a screen, so the slot is one enum. |
 | `navigationDestination(item:)` per screen | Lost the task a window opened with, macOS 26.7, 2026-10-18 (PR #106, and the comment on `RootView`'s path). |
 | The list view supplying its part of the path and the meaning of a pop | The view would still compose the navigation, a piece per screen; not taken by the owner on 2026-10-21. |
 | Point-Free's swift-navigation or The Composable Architecture as a dependency | ADR-0001 holds the core to the standard library and FoundationEssentials, and ADR-0006 rejected TCA. Their shapes informed this one: an optional per destination, a flat stack with ids, answers through the stack's owner. |
@@ -213,7 +218,6 @@ sequenceDiagram
 ## Open questions
 
 - **The sidebar after a list that could not be opened.** Today the highlight moves to the chosen view and the old list stays beside it, so the two disagree. With the slot as the highlight, the highlight goes back to the list that stays open, and the sidebar says "The list could not be opened." (the engineer's call).
-- **Where a modal of a pushed screen is drawn.** Section 5 draws it over the whole flow, as quick entry is drawn today. A screen in the middle of a stack, with screens pushed over it, may declare one; whether its modal then shows, or waits until the screen is on top again, is settled when the first such modal exists.
 
 ## Risks
 
@@ -225,7 +229,7 @@ sequenceDiagram
 
 ## Decisions to record as ADRs after approval
 
-1. An amendment to ADR-0009: the opener decides what is open over it by declaring it in a slot of its own state; a flow holds the screens open over its base flat, in a stack that follows the declarations after every event by the seat's rule, hands each screen's answer to its opener, and gives each element an id; a modal is a flow of its own, declared the same way; the window's route is the chain of its screens' routes, and its text form does not change.
+1. An amendment to ADR-0009: the opener decides what is open over it by declaring it in one slot of its own state, which holds nothing, a pushed screen or a modal; a flow holds the screens open over its base flat, in a stack that follows the declarations after every event by the seat's rule, hands each screen's answer to its opener, and gives each element an id; a modal is a flow of its own, declared the same way; the window's route is the chain of its screens' routes, and its text form does not change.
 2. An amendment to ADR-0006: the width class of a window is an event of the world, which the view reports and the module answers; the layout of navigation is the module's decision, and the model carries its ready shape.
 3. Two clauses in `docs/style.md`, "Views": the width is reported, not acted on; a view may switch once over the screens of a stack to pick a view per case.
 
