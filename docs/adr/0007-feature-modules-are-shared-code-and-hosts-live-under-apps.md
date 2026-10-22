@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), #63, #67, #100, ADR-0001, ADR-0006, ADR-0009
-- Amended: 2026-10-14, after the approval of the navigation spec, and 2026-10-15, after the owner's review of #100 (see the end)
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), `docs/specs/navigation-state.md` (approved 2026-10-22), #63, #67, #100, #117, ADR-0001, ADR-0006, ADR-0009
+- Amended: 2026-10-14, after the approval of the navigation spec, 2026-10-15, after the owner's review of #100, and 2026-10-22, after the approval of the navigation state spec (see the end)
 
 ## Context
 
@@ -30,3 +30,7 @@ Made with the approval of the navigation spec, `docs/specs/navigation.md`, secti
 ## Amendment, 2026-10-15
 
 Made in the owner's review of #100, the pull request that built the shared form of a parent. The dependency on `TodoCore` that the amendment of 2026-10-14 gave the `FeatureModule` target is withdrawn. A seat is created by its parent with the way to make its child, a closure over the child's own `init` that takes the route and whatever that child needs, so the contract names no dependency, and a screen that needs none, or needs others than the store, needs nothing from it. A module's `init` is no longer a requirement of the contract; it stays where a screen that cannot read what it shows refuses to be made, and the seat throws what that refusal throws. The target holds the module protocols and the seat, and depends on nothing. The amendment of 2026-10-14 stays as it was written, and the rest of the decision holds.
+
+## Amendment, 2026-10-22
+
+Made with the approval of `docs/specs/navigation-state.md` (#117), which ADR-0009's amendment of the same day records. The amendment of 2026-10-15 left the `FeatureModule` target the module protocols and the seat. Beside them it now holds `ScreenStack`, the flat stack a flow holds the screens open over its base in, the id of an element of it, and the protocol of a flow's enum of screens: what every flow needs and nothing of any one screen. None of them names a screen, and the target still depends on nothing. The rest of the decision holds.

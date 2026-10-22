@@ -93,8 +93,22 @@ value a peer wrote is as arbitrary as one a person typed.
   model, and every string about the data arrives finished from its
   module. Its own labels, a button's title or an empty pane's
   placeholder, are its vocabulary, localised by the platform. It keeps
-  only what only it can know, such as focus, scroll, hover, the window
-  size or a drag in progress. (ADR-0006, spec section 2)
+  only what only it can know, such as focus, scroll, hover, the
+  window's width, which it reports (below), or a drag in progress.
+  (ADR-0006, spec section 2)
+- **A view reports the width of its window and decides nothing by
+  it.** It hands the width class, narrow or wide, to the host's
+  entrance for events of the world, as it hands a link, and draws the
+  layout its model gives it: it chooses no tree of containers by the
+  width, assembles no path, and reads no route to decide what to
+  draw. (Owner, 2026-10-22, #117; ADR-0006, amendment of 2026-10-22)
+- **A view may switch over two enums of its model, and no others.**
+  The shape of its layout, and the screens of a stack, the latter in
+  one place per stack, to pick a view per case. It is dispatch and
+  not a condition over data: every case is drawn, with no `default`,
+  so a screen added to a stack and not drawn stops the view
+  compiling. (Navigation state spec, sections 4 and 6, #117; ADR-0006,
+  amendment of 2026-10-22)
 
 ## In a review thread
 
