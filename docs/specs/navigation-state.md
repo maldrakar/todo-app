@@ -1,6 +1,6 @@
 # Spec: Navigation state the view only reads
 
-- Status: Approved 2026-10-22 (revision 2)
+- Status: Approved 2026-10-22 (revision 3)
 - Owner review: https://claude.ai/artifact/U3wtm2JcKqC9QEZe3p3mJv
 - Issue: #117
 
@@ -48,7 +48,7 @@ A slot is part of the screen's route: a screen's route becomes its own head and 
 
 ### 2. The flow holds the screens flat and follows the declarations
 
-A flow is the window today, and a modal with screens of its own tomorrow. It holds its base screen, which for a window is the sidebar, and a stack of the screens open over it, base first. The stack is a new generic value in the `FeatureModule` target, beside `Seat` (the value a parent holds one child in, which makes, keeps, replaces and drops it by the head of its route).
+A flow is the window today, and a modal with screens of its own tomorrow. It holds its base screen, which for a window is the sidebar, and a stack of the screens open over it, base first. The stack, `ScreenStack` (the owner's name, in review), is a new generic value in the `FeatureModule` target, beside `Seat` (the value a parent holds one child in, which makes, keeps, replaces and drops it by the head of its route).
 
 After every event the stack walks up from the base and compares each slot with what stands above it:
 
@@ -166,7 +166,7 @@ Gone from the view: `stackPath`, `narrowPath`, `PushedList`, every read of `host
 
 | Where | Today | After |
 | ----- | ----- | ----- |
-| `FeatureModule` | `Seat`, `Routable`, `RouteValue` | adds the stack, its element id and the protocol of a flow's screens enum; `Seat` stays for the window's modal |
+| `FeatureModule` | `Seat`, `Routable`, `RouteValue` | adds `ScreenStack`, its element id and the protocol of a flow's screens enum; `Seat` stays for the window's modal |
 | `AppModule` (the root, the one module a host holds) | the sidebar as a field, quick entry in a seat, the root's sentence | adds the stack and the width class; its model is the sidebar's model, the layout shape, each element's model by id, quick entry and the sentence; its action gains `.screen(id, action)` and `.wentBack(to:)` |
 | `TaskViewList` | a seat holding the list; `selection` and `listBackButtonTapped` | a slot instead of the seat and the selection, and the model's selection is read from it; the model loses `taskList`; the back action goes |
 | `TaskList` | a seat holding the task; `backButtonTapped`; the model carries `task` | a slot; it hears the task's answers from the stack; the model loses `task`; the back action goes |
