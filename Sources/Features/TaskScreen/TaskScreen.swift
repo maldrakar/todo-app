@@ -5,9 +5,9 @@ import TodoCore
 /// One task on a screen of its own: its title, read from the store, and nothing a person can edit yet.
 ///
 /// It is the screen the list of a view's tasks declares over it, standing over the list in the window's stack, and
-/// the first screen that needed a stack, which is why the navigation epic built one (spec section 10). What it holds is exactly what makes
-/// the navigation to it real: a head, the id of its task, and a title to show that it arrived. The editor is
-/// M4's.
+/// the first screen that needed a stack, which is why the navigation epic built one (spec section 10). What it
+/// holds is exactly what makes the navigation to it real: a head, the id of its task, and a title to show that it
+/// arrived. The editor is M4's.
 ///
 /// It is a routable module (spec section 4): its route is the task's id and has no tail, because nothing
 /// opens inside it yet.

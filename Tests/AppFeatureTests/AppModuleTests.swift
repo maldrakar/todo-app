@@ -467,7 +467,10 @@ private struct FirstScreenIsNoList: Error {}
 }
 
 /// `/` on a live window names no list, so the sidebar declares nothing: the list and the task over it stay, by
-/// their ids, and quick entry, which `/` does not name, closes.
+/// their ids, and quick entry, which `/` does not name, closes. Nothing is written again either: after Back has
+/// closed the task, the sidebar's declaration still names the task its link opened, a declaration that has aged,
+/// and writing it again would be a new one, which the stack would hand the list, reopening the task the person
+/// closed.
 @Test func aRouteThatNamesNoListKeepsTheOneOpen() throws {
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
@@ -480,7 +483,16 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.model.path == path, "the same list and the same task, by their ids")
     #expect(try standing(in: app) == [listOn(work.view, in: store), taskOn(report, in: store)])
     #expect(app.model.quickEntry == nil)
+    #expect(app.model.problem == nil)
     #expect(app.route.path == "/view/\(work.view)/task/\(report)")
+    #expect(app.send(.action(.wentBack(to: [path[0]]))) == nil)
+    #expect(app.send(.route(.default)) == nil)
+    #expect(app.model.taskViewList == (try sidebarOn(work.view, in: store)))
+    #expect(app.model.path == [path[0]], "the same list, by its id, and no task")
+    #expect(try standing(in: app) == [listOn(work.view, in: store)])
+    #expect(app.model.quickEntry == nil)
+    #expect(app.model.problem == nil)
+    #expect(app.route.path == "/view/\(work.view)")
 }
 
 /// A click on the highlighted view declares its list again, a new declaration of the head that stands, so the stack
@@ -687,9 +699,9 @@ private let linkSentence = "The link could not be opened."
 }
 
 /// A gesture in one of the window's modules other than the root is that module's, so it leaves the root's sentence,
-/// as a gesture in the list leaves the sidebar's: a choice in the sidebar, a tap in the list it declared and a
-/// keystroke in quick entry each move their own module, as they do in a window that never had the link, and the
-/// sentence stays.
+/// as a gesture in the list leaves the sidebar's: a choice in the sidebar, a tap in the list it declared, the way
+/// back from the task it pushed and a keystroke in quick entry each move their own module, as they do in a window
+/// that never had the link, and the sentence stays.
 @Test func aGestureInAChildLeavesTheRootsSentence() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
@@ -704,9 +716,11 @@ private let linkSentence = "The link could not be opened."
         for choice in choices { #expect(window.send(.action(choice)) == nil) }
         let list = try #require(window.model.path.first)
         #expect(window.send(.action(.screen(list, .list(.rowTapped(open))))) == nil)
+        #expect(try standing(in: window) == [listOn(inbox, in: store), taskOn(open, in: store)], "the tap pushed the task; this is the setup")
+        #expect(window.send(.action(.wentBack(to: [list]))) == nil)
         #expect(window.send(.action(.quickEntry(.titleFieldChanged("Call the bank")))) == nil)
     }
-    #expect(try standing(in: twin) == [listOn(inbox, in: store), taskOn(open, in: store)], "the gestures moved the window; this is the setup")
+    #expect(try standing(in: twin) == [listOn(inbox, in: store)], "the way back closed the task; this is the setup")
     #expect(twin.model.quickEntry?.draft == "Call the bank", "and quick entry took the keystroke")
     #expect(app.model.taskViewList == twin.model.taskViewList)
     #expect(app.model.path == twin.model.path)

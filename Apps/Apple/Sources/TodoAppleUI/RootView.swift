@@ -92,10 +92,7 @@ struct RootView: View {
     }
 
     /// The narrow window's tree: the views at the root of one stack, and every screen of the model's path pushed
-    /// over them, each drawn by the one destination. In the iOS 26.3 simulator on 2026-10-21, on an iPhone 17 Pro
-    /// Max, each rotation from this tree to the split view with a list open printed once that a destination was
-    /// misplaced and ignored, while the pane drew the list and the task pushed in it; no rotation wrote either path,
-    /// and the screen on top before was on top after.
+    /// over them, each drawn by the one destination.
     private var narrowStack: some View {
         NavigationStack(path: path) {
             sidebar

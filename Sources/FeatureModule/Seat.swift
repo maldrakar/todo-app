@@ -26,11 +26,12 @@ public struct Seat<Child: Routable, Failure: Error> {
     ///
     /// The closure captures the child's dependencies and never the parent. The parent holds the seat in its
     /// state, so a closure holding the parent would be a cycle, parent to state to seat to closure to parent,
-    /// and neither would ever be released. A throwing closure names its error,
-    /// `{ route throws(StoreError) in try TaskList(store: store, route: route) }`, and the parent's state
-    /// declares the seat with that error, `Seat<TaskList, StoreError>`: a closure left to infer its error
-    /// throws `any Error`, which a seat declared so refuses at compile time, where a seat whose type is left
-    /// to inference would take it and become `Seat<TaskList, any Error>`.
+    /// and neither would ever be released. A closure that cannot fail throws nothing, as the root's for quick
+    /// entry, `{ route in QuickEntry(store: store, route: route) }`, held in a `Seat<QuickEntry, Never>`. One that
+    /// can names its error, `{ route throws(StoreError) in try Child(store: store, route: route) }`, and the
+    /// parent's state declares the seat with that error, `Seat<Child, StoreError>`: a closure left to infer its
+    /// error throws `any Error`, which a seat declared so refuses at compile time, where a seat whose type is
+    /// left to inference would take it and become `Seat<Child, any Error>`.
     public init(make: @escaping (Child.Event.Route) throws(Failure) -> Child) {
         self.make = make
     }

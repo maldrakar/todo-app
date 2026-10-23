@@ -64,13 +64,13 @@ extension AppModule {
             /// The list's route, nil for a task's: the part of a route the sidebar reads, as its declaration and as
             /// what stands over it. One accessor per case, since the payload of one case of an optional route does
             /// not typecheck inline in an argument (plan, Task 1, "Verified facts and traps").
-            var list: TaskList.Route? {
+            fileprivate var list: TaskList.Route? {
                 guard case .list(let route) = self else { return nil }
                 return route
             }
 
             /// The task screen's route, nil for a list's: the part of a route a list reads.
-            var task: TaskScreen.Route? {
+            fileprivate var task: TaskScreen.Route? {
                 guard case .task(let route) = self else { return nil }
                 return route
             }

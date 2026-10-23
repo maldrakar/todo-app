@@ -182,14 +182,16 @@ public final class AppModule: Routable {
             return nil
         case .changed(let changes):
             // Every module of the window gets the change and decides for itself whether it reads it: the sidebar
-            // first, then each screen standing over it, bottom up, as the path stood when the change arrived
-            // (navigation state spec, section 8, the third flow). A screen whose subject is gone asks to be closed, its
-            // opener empties its destination, and the walk drops it with what stands over it, whose id the loop then
-            // finds gone and hands nothing. The root reads the store for nothing of its own (spec section 3, ADR-0006,
-            // amendment of 2026-10-14), and its sentence stays: a change answers nothing a person was told. Of what
-            // the sidebar answers the root returns the first drawn, as the stack does within one call.
+            // first, then each screen standing over it, bottom up, as the path stood when the change arrived, which
+            // is read before the sidebar takes it (navigation state spec, section 8, the third flow). A screen whose
+            // subject is gone asks to be closed, its opener empties its destination, and the walk drops it with what
+            // stands over it, whose id the loop then finds gone and hands nothing. The root reads the store for
+            // nothing of its own (spec section 3, ADR-0006, amendment of 2026-10-14), and its sentence stays: a
+            // change answers nothing a person was told. Of what the sidebar answers the root returns the first drawn,
+            // as the stack does within one call.
+            let path = state.stack.path
             var output = react(to: state.stack.send(.changed(changes)))
-            for id in state.stack.path {
+            for id in path {
                 let answer = react(to: state.stack.send(.changed(changes), to: id))
                 output = output ?? answer
             }
