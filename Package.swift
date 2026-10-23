@@ -41,10 +41,13 @@ let package = Package(
         // Where an identity is kept beside its database, in a target of its own because two consumers keep
         // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
         .target(name: "DeviceFile"),
-        // The contract, and beside it the shared form of a parent, the routable module and its seat, and the
-        // error a route's text form is refused with. It depends on nothing: a seat is handed the way to make its
-        // child by the parent, so the contract names no dependency, and a screen that needs none, or others than
-        // the store, needs nothing from it (ADR-0007, amendment of 2026-10-15).
+        // The contract, and beside it what every parent and every flow needs and nothing of any one screen: the
+        // routable module and its seat, the error a route's text form is refused with, the destination a screen
+        // declares what is open over it in, the stack a flow holds the screens over its base in, the id of an
+        // element of it, the protocol of a flow's enum of screens and the notice the stack sends (ADR-0007,
+        // amendment of 2026-10-22). It still depends on nothing: a seat and a stack are handed the way to make
+        // what they hold by their owner, so the contract names no dependency, and a screen that needs none, or
+        // others than the store, needs nothing from it (ADR-0007, amendment of 2026-10-15).
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
