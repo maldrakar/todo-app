@@ -22,9 +22,10 @@ import WASILibc
 /// formatter and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about
 /// the core. This executable does what a web entry point will: it builds the root module over a store in
 /// memory from a window's path, which is the web's address bar, and drives every module of the window — a
-/// selection, a rename and a new folder in the sidebar, a link applied as `.route`, quick entry creating a
-/// task, a tap in the list that pushes the task, the way back, Cancel, and Open in New Window, whose path it
-/// writes down — with the change each write produced, and a path the routes refuse. Beside
+/// selection, a rename and a new folder in the sidebar, a link applied as `.route` through the window's stack,
+/// quick entry creating a task, a tap in the list sent to its element of the stack, which pushes the task, the
+/// way back as the shorter path, Cancel, and Open in New Window, whose path it writes down — with the change each
+/// write produced, and a path the routes refuse. Beside
 /// that it calls the core's public API directly, and each group of calls has a client that ships it. The
 /// writes, the reads, a page and search are what the modules M3 adds will call. The filter codec and the
 /// journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in them
@@ -142,17 +143,20 @@ private enum WasmSizeProbe {
         let renamed = app.model.taskViewList.rows.first(where: \.isSelected)?.title ?? "none"
         perform(.action(.taskViewList(.createFolderButtonTapped)))
         let newFolder = app.model.taskViewList.rows.first(where: \.isSelected)
-        // A link, read from its path and applied, with quick entry up over the Inbox; quick entry files a task,
-        // whose change reaches the list; a tap pushes the task, and the way back pops it; quick entry opened
-        // again is cancelled; and a view asks for a window of its own, whose route is written down.
+        // A link, read from its path and followed through the window's stack, with quick entry up over the Inbox;
+        // quick entry files a task, whose change reaches the list; a tap on the list's element pushes the task,
+        // and the way back, the path one shorter, pops it; quick entry opened again is cancelled; and a view asks
+        // for a window of its own, whose route is written down. The stack is read as the root view reads it, each
+        // id of the path and its screen's model.
         perform(.route(try AppModule.Route(path: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
         perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
         perform(.action(.quickEntry(.addButtonTapped)))
-        let filed = app.model.taskViewList.taskList?.rows.first
-        if let filed { perform(.action(.taskViewList(.taskList(.rowTapped(filed.id))))) }
+        let list = app.model.path.first
+        let filed = list.flatMap { firstRow(of: app.model.screens[$0]) }
+        if let list, let filed { perform(.action(.screen(list, .list(.rowTapped(filed.id))))) }
         let taskRoute = app.route.path
-        let opened = app.model.taskViewList.taskList?.task?.title ?? "none"
-        perform(.action(.taskViewList(.taskList(.backButtonTapped))))
+        let opened = label(app.model.path.last.flatMap { app.model.screens[$0] })
+        perform(.action(.wentBack(to: Array(app.model.path.prefix(1)))))
         perform(.action(.quickEntryButtonTapped))
         let drafted = app.model.quickEntry?.draft ?? "none"
         perform(.action(.quickEntry(.cancelButtonTapped)))
@@ -179,7 +183,7 @@ private enum WasmSizeProbe {
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
         print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
-        print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), list \(root.taskViewList.taskList?.rows.count ?? 0) rows with \(root.taskViewList.taskList?.task == nil ? "nothing" : "a task") open, quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
+        print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), stack \(root.path.map { label(root.screens[$0]) }.joined(separator: " under ")), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
     }
@@ -193,6 +197,24 @@ private enum WasmSizeProbe {
         case .parent(let parent): parent.map(\.rawValue) ?? "root"
         case .status(let status): "status \(status.rawValue)"
         case nil: "everything"
+        }
+    }
+
+    /// What a screen of the window's stack shows, whichever kind it is: one switch over the kinds, as the root
+    /// view's, and one line here.
+    private static func label(_ screen: AppModule.ScreenModel?) -> String {
+        switch screen {
+        case .list(let list)?: "a list of \(list.rows.count) rows"
+        case .task(let task)?: "the task \(task.title)"
+        case nil: "nothing"
+        }
+    }
+
+    /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.
+    private static func firstRow(of screen: AppModule.ScreenModel?) -> (id: TaskID, title: String)? {
+        switch screen {
+        case .list(let list)?: list.rows.first.map { ($0.id, $0.title) }
+        case .task?, nil: nil
         }
     }
 
