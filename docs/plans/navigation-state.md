@@ -1,6 +1,6 @@
 # Plan: Navigation state the view only reads
 
-- Status: Draft
+- Status: Approved 2026-10-23
 - Spec: `docs/specs/navigation-state.md`, approved 2026-10-22
 - Epic: #117
 
