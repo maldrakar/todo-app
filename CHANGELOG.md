@@ -30,6 +30,8 @@ All notable changes to this project are documented in this file. The format foll
 
 - Spec `docs/specs/navigation-state.md`, approved by the owner on 2026-10-22 at revision 3 (#117, PR #118): navigation state the view only reads. The screen that opens another declares in one slot of its own state what is open over it, nothing, a pushed screen or a modal; a flow holds the screens open over its base flat in a `ScreenStack`, which follows the declarations after every event by the seat's rule and hands each screen's answer to its opener; the module decides the layout from the width class the view reports, and the view binds the path it is given and sends a pop back whole as `.wentBack(to:)`; a modal is a flow of its own; the text form of links does not change.
 
+- Implementation plan `docs/plans/navigation-state.md`, from the navigation state spec (#117): three tasks. `Destination`, where a screen declares what is open over it, and the screen stack, in `FeatureModule`, over stub screens; the window's screens standing in one stack, the sidebar and the list declaring in slots, the root holding the stack and the root view binding the path the model gives it; and the layout decided by the module from the width the view reports. The stack's interface was compiled and run over stub screens under Swift 6.4.0, on the host and for wasm32, before it was written down.
+
 ### Changed
 
 - ADR-0006 gains an amendment from the approval of the navigation spec: the opener creates a screen's module and drops it, and the root is the opener of the first screens; `.route` is an event of the world beside `.created` and `.changed`; a screen whose subject is gone asks to be closed.
