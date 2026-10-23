@@ -70,9 +70,9 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | | The destination and the screen stack | `feature`, `core` | |
-| 2 | | The window's screens stand in one stack | `feature`, `core`, `ui-apple` | 1 |
-| 3 | | The module decides the layout | `feature`, `core`, `ui-apple` | 2 |
+| 1 | #121 | The destination and the screen stack | `feature`, `core` | |
+| 2 | #122 | The window's screens stand in one stack | `feature`, `core`, `ui-apple` | 1 |
+| 3 | #123 | The module decides the layout | `feature`, `core`, `ui-apple` | 2 |
 
 The owner reviews this table and the interface of every task below.
 
