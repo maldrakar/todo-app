@@ -1,17 +1,18 @@
 // Apps/Apple/Sources/TodoAppleUI/RootView.swift
 import AppFeature
+import FeatureModule
 import SwiftUI
-import TodoCore
 
 /// The root of the tree of views, and beside the window's view, which holds the window and its host, the one view that
-/// names the host: it hands each child's view its part of the root's model and a closure that wraps the child's
-/// actions in the root's, and draws the tree of the window's width (`docs/specs/navigation.md`, section 6, amended
-/// 2026-10-21), with the root's own sentence across the bottom of the window and quick entry as a sheet over all of
-/// it. A wide window, the Mac's and the iPad's, is a split view with the sidebar beside a stack whose root is the list
-/// of the chosen view's tasks, the task screen pushed in that stack. A narrow window, iPhone's and a narrow iPad's, is
-/// one stack with the views at its root and the list and the task pushed over them. The containers are this epic's
-/// choice and the modules know nothing of them; what any tree keeps is that every binding is read from the model and
-/// set only by sending an action.
+/// names the host: it hands the sidebar's view its model and a closure that wraps its actions in the root's, binds the
+/// window's stack to the path of ids the model gives it, draws each element of it through one switch, and sends a pop
+/// back whole (navigation state spec, sections 3 and 6), with the root's own sentence across the bottom of the window
+/// and quick entry as a sheet over all of it. A wide window, the Mac's and the iPad's, is a split view with the
+/// sidebar beside a stack whose root is the first screen over the sidebar, the list of the chosen view's tasks, and
+/// the rest pushed in that stack. A narrow window, iPhone's and a narrow iPad's, is one stack with the views at its
+/// root and every screen of the path pushed over them. The containers are the view's and the modules know nothing of
+/// them; every binding is read from the model and set only by sending an action, and the stack's path only by
+/// `.wentBack(to:)`. It reads neither the window's route nor which screen opens which.
 struct RootView: View {
     private let host: ModuleHost<AppModule>
 
@@ -20,7 +21,9 @@ struct RootView: View {
     /// state of its own: in the iOS 26.3 simulator on 2026-10-21, on iPhone, a tap on the view still highlighted
     /// after Back pushed nothing (#107); a window opened on the views pushed no list for any tap or link (#116); and
     /// a list closed in the module when Back reached the views was slid back in over them, "Nothing to show" in it.
-    /// A stack of its own has a path, and the path is read from the route, so the screens are the route.
+    /// A stack of its own has a path, and the path is the model's. Choosing the tree here, and cutting the path for
+    /// the wide one, is the interim that #123 moves into the module, which will decide the layout from the width the
+    /// view reports (navigation state spec, section 4).
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     /// Which of the split view's columns are shown, which only the view can know (`docs/style.md`, "Views"): handed
@@ -55,13 +58,23 @@ struct RootView: View {
         }
     }
 
-    /// The wide window's tree: the sidebar beside the pane, and the task pushed in the pane's own stack.
+    /// The wide window's tree: the sidebar beside the detail column, whose stack has the first screen over the
+    /// sidebar at its root, or the placeholder when none stands, and the rest of the path pushed over it.
     private var splitView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
-            NavigationStack(path: stackPath) {
-                pane
+            NavigationStack(path: detailPath) {
+                Group {
+                    if let column = host.model.path.first {
+                        screen(column)
+                    } else {
+                        Text("Nothing to show")
+                            .foregroundStyle(.secondary)
+                            .toolbar { quickEntryButton }
+                    }
+                }
+                .navigationDestination(for: StackElementID.self, destination: screen)
             }
             // The sidebar's sentence is about the pane that stayed when another could not be opened, so it shows
             // beside the pane: under the sidebar's rows where the sidebar's column is beside the pane, and here when
@@ -78,20 +91,18 @@ struct RootView: View {
         }
     }
 
-    /// The narrow window's tree: the views at the root of one stack, and the list and the task pushed over them as
-    /// the route names them (`narrowPath`). The list's screen is the pane the wide window draws, and the task's
-    /// screen is pushed by the list's own destination (`TaskListView`). In the iOS 26.3 simulator on 2026-10-21, on
-    /// an iPhone 17 Pro Max, each rotation from this tree to the split view with a list open printed once that the
-    /// list's `navigationDestination` for `EntityID` was misplaced and ignored, while the pane drew the list and the
-    /// task pushed in it; no rotation wrote either path, and the screen on top before was on top after.
+    /// The narrow window's tree: the views at the root of one stack, and every screen of the model's path pushed
+    /// over them, each drawn by the one destination. In the iOS 26.3 simulator on 2026-10-21, on an iPhone 17 Pro
+    /// Max, each rotation from this tree to the split view with a list open printed once that a destination was
+    /// misplaced and ignored, while the pane drew the list and the task pushed in it; no rotation wrote either path,
+    /// and the screen on top before was on top after.
     private var narrowStack: some View {
-        NavigationStack(path: narrowPath) {
+        NavigationStack(path: path) {
             sidebar
-                .navigationDestination(for: PushedList.self) { _ in
-                    pane
-                        // The sidebar's sentence on the list's screen, pushed over the sidebar's rows, which draw it
-                        // when they are on top, so it shows once on either screen. A task pushed over the list does
-                        // not show it, nor does the wide window's pane with its sidebar hidden, which is #110.
+                .navigationDestination(for: StackElementID.self) { id in
+                    screen(id)
+                        // The sidebar's sentence on every screen pushed over the sidebar's rows, which draw it when
+                        // they are on top, so it shows once on whichever screen is on top, a task's included (#110).
                         .safeAreaInset(edge: .bottom) {
                             if let problem = host.model.taskViewList.problem {
                                 sentenceStrip(problem)
@@ -106,68 +117,47 @@ struct RootView: View {
         TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
     }
 
-    /// The pane: the list of the chosen view's tasks, or a placeholder when none is open, with the Quick Entry
-    /// button on its toolbar.
-    private var pane: some View {
-        Group {
-            if let list = host.model.taskViewList.taskList {
-                TaskListView(model: list) { host.send(.taskViewList(.taskList($0))) }
-            } else {
-                Text("Nothing to show")
-                    .foregroundStyle(.secondary)
-            }
+    /// One switch over the screens the window's stack can hold, the one place they are drawn: it picks a view per
+    /// case, hands it its model and a closure that wraps its actions with its element's id, and decides nothing. Every
+    /// case is drawn, with no `default`, so a kind of screen added to the stack and not drawn stops this view
+    /// compiling (`docs/style.md`, "Views"; navigation state spec, section 6). An id the model no longer holds, one
+    /// SwiftUI still draws while a pop the model drove plays out, draws nothing.
+    ///
+    /// The list carries the Quick Entry button on its toolbar, and the task pushed over it carries none (the owner,
+    /// 2026-10-20).
+    @ViewBuilder private func screen(_ id: StackElementID) -> some View {
+        switch host.model.screens[id] {
+        case .list(let model)?:
+            TaskListView(model: model) { host.send(.screen(id, .list($0))) }
+                .toolbar { quickEntryButton }
+        case .task(let model)?:
+            TaskScreenView(model: model)
+        case nil:
+            EmptyView()
         }
-        .toolbar { quickEntryButton }
     }
 
-    /// The pane's stack's path in the wide window: the head of the task open in the list, or nothing, the route's
-    /// chain below the list mapped into the path the stack pushes the task screen for, read from the route the host
-    /// publishes and moved only by an action (spec section 6, "Risks").
-    ///
-    /// A path and not `navigationDestination(item:)` bound to the head, which spec section 6 names, because the item
-    /// lost the task a window opens with: on 2026-10-18, on macOS 26.7 under Swift 6.4.0, a window made from a path
-    /// naming a task drew its list with nothing pushed, and the item binding's first write, as the window appeared,
-    /// was nil, which went to the list as its back button and closed the task, with no runtime warning. The same
-    /// window over this path showed the task pushed and wrote nothing. A route into another view's task while a
-    /// task was open pushed the new task over the new list either way. This is the fallback the spec's "Risks" name,
-    /// a map and not a decision: the state is the route's as before.
-    ///
-    /// A pop, by the back button or by the swipe back, is one write of the path without the task, which goes to the
-    /// list as its back button. A write of a path that still holds a task sends nothing, since only the module opens
-    /// one. The write SwiftUI makes after a pop the model drove, a task gone under its screen, reaches a list with
-    /// no screen open, which moves nothing, the list's sentence included (`TaskList`).
-    private var stackPath: Binding<[TaskID]> {
-        Binding(get: { host.route.sidebar.list?.task.map { [$0.head] } ?? [] }, set: { path in
-            guard path.isEmpty else { return }
-            host.send(.taskViewList(.taskList(.backButtonTapped)))
-        })
+    /// The narrow stack's path: every id of the model's path, read from the model and moved only by an action. A pop,
+    /// by the back button, the swipe from the edge or the long-press menu that goes back several screens at once, is
+    /// one write of a shorter path, which is sent whole as `.wentBack(to:)` and interpreted by the module (navigation
+    /// state spec, section 3). The write SwiftUI makes after a pop the model drove, a task gone under its screen, is
+    /// a path the module holds already, which moves nothing.
+    private var path: Binding<[StackElementID]> {
+        Binding(get: { host.model.path }, set: { host.send(.wentBack(to: $0)) })
     }
 
-    /// The narrow stack's path: the list open beside the views, then the task open in it, read from the route the
-    /// host publishes and moved only by an action, as the wide window's path is. A `NavigationPath` and not an
-    /// array, because the list's head and the task's are both an `EntityID`, and the task goes in as itself, so that
-    /// the list's own destination pushes its screen.
+    /// The detail column's path in the wide window: the model's path after its first id, which stands at the column's
+    /// root, so that a pop SwiftUI can reach leaves the list in place and the highlight cannot be removed. A write is
+    /// sent whole with the column's id before it, as `.wentBack(to:)`. Cutting the path is the interim #123 moves
+    /// into the module (navigation state spec, section 4).
     ///
-    /// A pop writes a shorter path. One that keeps the list goes to the list as its back button, as in the wide
-    /// window, and one without the list goes to the views as the list's back button, which closes the list and the
-    /// highlight with it (`TaskViewList`); a pop from the task straight to the views, through the back button's
-    /// menu, is that one write. A write that still holds the task sends nothing, since only the module opens one.
-    /// A write SwiftUI can make after a pop the model drove reaches a module with nothing open at that depth, which
-    /// moves nothing (`TaskList`, `TaskViewList`).
-    private var narrowPath: Binding<NavigationPath> {
-        Binding(get: {
-            var path = NavigationPath()
-            if let list = host.route.sidebar.list {
-                path.append(PushedList(head: list.head))
-                if let task = list.task { path.append(task.head) }
-            }
-            return path
-        }, set: { path in
-            switch path.count {
-            case 0: host.send(.taskViewList(.listBackButtonTapped))
-            case 1: host.send(.taskViewList(.taskList(.backButtonTapped)))
-            default: break
-            }
+    /// A path and not `navigationDestination(item:)` per screen, which lost the task a window opens with: on
+    /// 2026-10-18, on macOS 26.7 under Swift 6.4.0, a window made from a path naming a task drew its list with nothing
+    /// pushed, and the item binding's first write, as the window appeared, was nil, which closed the task, with no
+    /// runtime warning. The same window over a path showed the task pushed and wrote nothing.
+    private var detailPath: Binding<[StackElementID]> {
+        Binding(get: { Array(host.model.path.dropFirst()) }, set: { written in
+            host.send(.wentBack(to: Array(host.model.path.prefix(1)) + written))
         })
     }
 
@@ -192,17 +182,11 @@ struct RootView: View {
             .background(.regularMaterial)
     }
 
-    /// The toolbar's quick entry button, on the pane, the list or the placeholder drawn when no list is open, and not
-    /// on the task pushed over it, which has none (the owner, 2026-10-20). Not on the split view: there it stood on
-    /// the Mac's toolbar and on no screen of iPhone's collapsed stack, where each screen has a bar of its own
-    /// (2026-10-18, the iOS 26.3 simulator).
+    /// The toolbar's quick entry button, on the list or on the placeholder drawn when no list stands, and not on the
+    /// task pushed over the list, which has none (the owner, 2026-10-20). Not on the split view: there it stood on the
+    /// Mac's toolbar and on no screen of iPhone's collapsed stack, where each screen has a bar of its own (2026-10-18,
+    /// the iOS 26.3 simulator).
     private var quickEntryButton: some View {
         Button("Quick Entry", systemImage: "plus") { host.send(.quickEntryButtonTapped) }
     }
-}
-
-/// The list as an element of the narrow stack's path, its view's head in a type of its own: a task's head is an
-/// `EntityID` too, and the task's destination is registered for that type (`TaskListView`).
-private struct PushedList: Hashable {
-    let head: ViewID
 }
