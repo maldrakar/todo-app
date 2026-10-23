@@ -80,6 +80,12 @@ private final class StubBase: Routable {
 /// sent and every notice it took. It answers `.created` with its head, its first choice; it empties its
 /// destination when its task asks to be closed, and passes every other answer of its task on to its own
 /// opener, so that a test sees an answer go the whole way down.
+///
+/// Two of its gestures both answer and write its destination, so that a test sees the walk run after an answer
+/// came down and the call return that answer before the one the walk draws: a double tap on a row declares the
+/// row's task, as a tap does, and tells its opener the row was double-tapped; and a list on view 5 does not
+/// take being uncovered, but writes the task it declared again and tells its opener it reopened it, as a screen
+/// that tried to keep a destination the person closed would.
 private final class StubList {
     struct Route: RouteValue {
         let head: Int
@@ -93,6 +99,7 @@ private final class StubList {
 
     enum Event: Equatable, Sendable {
         case rowTapped(Int)
+        case rowDoubleTapped(Int)
         case created
         case declared(Route)
         case answered(StubTask.Output)
@@ -102,6 +109,8 @@ private final class StubList {
 
     enum Output: Equatable, Sendable {
         case opened(Int)
+        case doubleTapped(Int)
+        case reopened(Int)
         case passedOn(StubTask.Output)
     }
 
@@ -124,8 +133,14 @@ private final class StubList {
         received.append(event)
         switch event {
         case .rowTapped(let task): declare(StubTask.Route(head: task, subtask: nil))
+        case .rowDoubleTapped(let task):
+            declare(StubTask.Route(head: task, subtask: nil))
+            return .doubleTapped(task)
         case .created: return .opened(head)
         case .declared(let route): declare(route.task)
+        case .uncovered where head == 5:
+            declare(destination.pushed)
+            return .reopened(head)
         case .answered(.closeRequested), .uncovered: declare(nil)
         case .answered(let output): return .passedOn(output)
         case .notOpened(_, let stillOpen): declare(stillOpen)
@@ -503,7 +518,8 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
 /// An answer goes down: the task's to the list that opened it, the list's to the base, and the base's out of
 /// the call, to the flow's owner (spec section 2, "Answers go to the opener"). When one call draws more than one
 /// answer from the base, the owner gets the first drawn, the base's answer to the event itself before any the
-/// walk draws.
+/// walk draws, and for an event handed to an element the answer that came down from it: the walk runs after
+/// that answer all the same.
 @Test func anAnswerGoesToTheOpenerAndTheBasesAnswerToTheOwner() throws {
     var stack = stubStack(on: link(list: 1, task: 7))
     #expect(stack.send(.created) == .heard(.created), "the base's answer to the event, before the two the walk drew")
@@ -513,6 +529,15 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     let route = StubList.Route(head: 1, task: StubTask.Route(head: 7, subtask: nil))
     let received: [StubList.Event] = [.created, .answered(.opened(7)), .answered(.tapped(7))]
     #expect(stack.models[path[0]] == .list(StubList.Model(route: route, received: received)))
+
+    // A double tap on a row answers and declares the row's task, whose answer to `.created` the walk draws.
+    var tapped = stubStack(on: link(list: 1))
+    _ = tapped.send(.created)
+    let list = try #require(tapped.path.first)
+    let answer = tapped.send(.list(.rowDoubleTapped(8)), to: list)
+    #expect(answer == .heard(.answered(.doubleTapped(8))), "the answer that came down, before the one the walk drew")
+    #expect(tapped.baseModel.received.last == .answered(.passedOn(.opened(8))), "the one the walk drew")
+    #expect(tapped.path.count == 2, "the walk ran after the answer came down, and made the task")
 }
 
 /// A screen that asks to be closed, as one whose subject is gone does, is dropped through its opener: the
@@ -534,7 +559,9 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
 
 /// The way back drops what was over the screen the person went back to before that screen hears of it, so it
 /// cannot keep a destination the person closed; the screen now on top is the base when the path is empty
-/// (spec section 3).
+/// (spec section 3). A list on view 5, which writes its task again when uncovered, gets a new task and not the
+/// one the person went back from, since that one is gone already; the walk runs after the answer that came
+/// down, which the call returns before the one the walk draws.
 @Test func wentBackDropsWhatWasAboveAndTellsTheScreenNowOnTop() throws {
     var stack = stubStack(on: link(list: 1, task: 7))
     _ = stack.send(.created)
@@ -548,6 +575,19 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     #expect(stack.wentBack(to: []) == .heard(.uncovered))
     #expect(stack.path.isEmpty)
     #expect(stack.baseModel.pushed == nil, "the base emptied its destination, and its highlight with it")
+
+    var keeping = stubStack(on: link(list: 5, task: 7))
+    _ = keeping.send(.created)
+    let closed = keeping.path
+    try #require(closed.count == 2)
+    #expect(keeping.wentBack(to: [closed[0]]) == .heard(.answered(.reopened(5))), "the answer that came down")
+    #expect(keeping.baseModel.received.last == .answered(.passedOn(.opened(7))), "the one the walk drew")
+    let reopened = keeping.path
+    try #require(reopened.count == 2, "the walk ran after the answer came down, and followed the list's write")
+    #expect(reopened[0] == closed[0])
+    #expect(reopened[1] != closed[1], "a new task, since the one the person went back from was dropped first")
+    let task = StubTask.Model(route: StubTask.Route(head: 7, subtask: nil), received: [.created])
+    #expect(keeping.models[reopened[1]] == .task(task))
 }
 
 /// The way back moves only a strict prefix of the path the stack holds, so a write SwiftUI makes after a pop

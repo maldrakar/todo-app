@@ -22,15 +22,16 @@ public struct StackElementID: Hashable, Sendable {
 /// no event reaches the base without the walk after it. The elements over it are the cases of the owner's enum
 /// of screens, in `path`, bottom up, each with an id the stack hands out.
 ///
-/// After every call the stack walks up from the base, and at each opener, the base or an element, whose
-/// destination holds a write the stack has not followed, it follows that write by the seat's rule: a write that
-/// declares nothing drops everything above the opener; one with the head of the screen above keeps that screen,
-/// with its session state, and hands it `.declared(route)` once; another head makes the declared screen before
-/// anything is let go, replaces everything above with it and hands it `.created`. A screen that cannot be made
-/// leaves what stands, and its opener takes `.notOpened` with the route of what still stands over it. What a
-/// screen answers goes down: its opener takes `.answered(output)`, the opener's answer goes to its own opener,
-/// and the base's answers come back out of the call, to the owner (spec section 2, "Answers go to the
-/// opener").
+/// After every call it takes, whether or not the call moved anything, the stack walks up from the base; a call
+/// it refuses, an event for an id it does not hold or a way back to a path it does not hold, moves nothing and
+/// does not walk. At each opener, the base or an element, whose destination holds a write the stack has not
+/// followed, the walk follows that write by the seat's rule: a write that declares nothing drops everything
+/// above the opener; one with the head of the screen above keeps that screen, with its session state, and
+/// hands it `.declared(route)` once; another head makes the declared screen before anything is let go,
+/// replaces everything above with it and hands it `.created`. A screen that cannot be made leaves what stands,
+/// and its opener takes `.notOpened` with the route of what still stands over it. What a screen answers goes
+/// down: its opener takes `.answered(output)`, the opener's answer goes to its own opener, and the base's
+/// answers come back out of the call, to the owner (spec section 2, "Answers go to the opener").
 ///
 /// A struct holding classes, like `Seat`: the owner keeps it in a `var` of its own state, and a call that moves
 /// what stands is a mutation of that state, which the owner's model, computed from the state, shows at its next
@@ -129,8 +130,9 @@ public struct ScreenStack<Screen: StackScreen> {
         return walk(after: hand(.uncovered, to: path.count))
     }
 
-    /// The walk after a call, which runs on every call that moved something, and returns `answer`, the base's
-    /// answer the call itself drew, or, when the call drew none, the first the walk drew.
+    /// The walk after every call the stack takes, whether or not the call moved anything, and after none it
+    /// refuses. It returns `answer`, the base's answer the call itself drew, or, when the call drew none, the
+    /// first the walk drew.
     ///
     /// It goes up the openers, passing over each whose write mark it has followed, and follows the first new
     /// write it meets, which it records as followed first. It then starts again from the base, so that a lower
