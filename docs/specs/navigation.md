@@ -1,6 +1,7 @@
 # Spec: Navigation
 
 - Status: Approved 2026-10-14 (revision 4)
+- Amended in part: by `docs/specs/navigation-state.md` (approved 2026-10-22), see the notes of that date
 - Owner review: https://claude.ai/artifact/Y9Wdu9U1ZtC65xZb9LcLEv
 - Issue: #67
 
@@ -41,6 +42,8 @@ The decisions below were made with the owner in a brainstorming session on 2026-
 
 ### 1. Every screen is a child of the screen that opened it
 
+> **Amended 2026-10-22, with the approval of `docs/specs/navigation-state.md` (#117).** The opener still decides what opens over it and hears its `Output`, but no longer holds it: it declares the screen in one slot of its state, `pushed` or `presented`, and the screens open over a flow's base stand flat in a `ScreenStack`, which follows the declarations after every event. The window's root holds every screen of the window's stack and decides none of its transitions. The difference between a push and a sheet comes back into the core, since the opener says which it declares, and the layout is the module's (ADR-0009 and ADR-0006, amendments of 2026-10-22).
+
 This is the owner's choice, and the answer to the first question. The root holds the first screens and nothing below them; every screen holds the screens it opens itself. The tree of live modules is the navigation state, which is what the feature-module spec already said in its section 4, taken at its word.
 
 In this epic the root, `AppModule` (the one module a host holds, composing the list of views and the pane beside it), holds three children: the sidebar, `TaskViewList` (the list of views a person keeps, drawn as a sidebar on the Mac and as a screen of its own on a phone), the pane, a list of the chosen view's tasks, and quick entry, when it is open. The list of tasks holds the task screen opened from it. The root knows its three children and what each asks for; it never learns that a list opens a task, and it does not grow when the task screen learns to open a tag picker.
@@ -80,6 +83,8 @@ One codec, three uses: a link from outside the app, the state a window is restor
 
 ### 3. One entrance for navigation: apply a route
 
+> **Amended 2026-10-22, with the approval of `docs/specs/navigation-state.md` (#117).** Navigation inside a module is a write of its own slot, by its own gesture, by Back or by `.route` for a link and a relaunch, and the stack's walk after the event is the one reconciliation. The way back is the window's action `.wentBack(to:)`, the path SwiftUI wrote passed on whole, and the flow tells the screen now on top that what was over it was closed. The flows below give way to those of the navigation state spec, section 8.
+
 Inside a module, navigation has one entrance: apply a route. A tap on a task is "the current route plus a child, applied". A link is "the route it carries, applied". A relaunch is "the saved route, applied". The way back is "the route without the child, applied". One piece of code and four occasions for it, so that what a link opens and what a tap opens cannot drift apart.
 
 Applying a route is a reconciliation and not a rebuild. For each child seat, the incoming route's segment is compared with the live child's head: the same head keeps the child alive, with its session state, and hands it the rest of the route to apply to its own children; a different head replaces it; no segment drops it. Without this, a link into an open task would recreate the list and lose the half-typed name of a folder in the sidebar.
@@ -99,6 +104,8 @@ A module is created from its route, with the store: `init(store:route:)` throws 
 **A screen whose subject is gone asks to be closed.** Today the root reads the store itself on every `.changed` that names its pane's view, and closes the pane when the view is gone. With a module in the seat that knowledge is the child's, not the parent's: the list whose view was deleted and the task screen whose task was deleted answer `.changed` with an output that says so, and the parent drops the child. On iPhone that is a pop; on the Mac an empty column. It is the same mechanism as the way back, with the occasion coming from the store instead of the platform. The M2 rule that a pane on a view that is gone is a pane on nothing holds; only who knows it moves.
 
 ### 4. The shared form of a parent: an addressed module and its seat
+
+> **Amended 2026-10-22, with the approval of `docs/specs/navigation-state.md` (#117).** For the screens of a stack, the lines a parent writes per child, the `Model` field, the `UserAction` case and the forwarding of actions and of `.changed`, move into the enum of screens the flow's owner declares, and the opener keeps only its reaction to the child's `Output`. The `FeatureModule` target holds `ScreenStack`, its element id and the protocol of that enum beside the seat (ADR-0007, amendment of 2026-10-22); the seat stays for the window's quick entry.
 
 The duties `AppModule` carries for its one child in M2 are every parent's now. Written once per parent, they would make six copies of the root, which is the cost the owner's concern is really about. So they are collected into two things beside the contract, in the `FeatureModule` target.
 
@@ -133,6 +140,8 @@ The window, when it appears, creates its host from its value, and after every ev
 **Quick entry** is the root's child on every platform and is drawn as a sheet on every Apple platform. Its swipe down, Esc or Cancel button arrive as the root's action `.quickEntryDismissed`, and the root applies its route without it; when quick entry has created its task it asks to be closed through its output, and the root drops it, which is the modal's own half of the way back. The floating panel Things has on the Mac is not this epic's: it needs a global shortcut and a bundle, and it would make the module's home depend on the platform, with a parent in the root on iPhone and no parent on the Mac, which is exactly what the issue forbids. If it is wanted later, it is a window of its own over a `ModuleHost<QuickEntry>` in a task of its own, and the host already allows it, being generic over the module.
 
 ### 6. One tree of views on every Apple platform
+
+> **Amended 2026-10-22, with the approval of `docs/specs/navigation-state.md` (#117).** The root view no longer chooses its tree by the window's width or reads its path from the route. It reports the width class, and the model gives it the ready shape, narrow or wide, whose path it binds; every pushed screen is drawn through one destination over the ids of the stack's elements, and the list's back button and `listBackButtonTapped` go. A new tree of views, a third column, say, is a new case of the module's layout shape and no longer a change inside the Apple package alone (navigation state spec, sections 4 and 6).
 
 **The containers are the epic's choice; the rule they obey is the product's.** `NavigationSplitView` and `NavigationStack` are what this epic draws on macOS, iPhone and iPad today. Modules, routes and the text form know nothing of them: no SwiftUI container appears in the decisions listed for ADRs at the end, which name the seat, the route and the host alone. A later tree of views, a container of the product's own, three columns the way Notes has them, whatever M4 and the milestones after it want, replaces this one inside the Apple package with no change to the core and no new ADR. The one thing any tree must keep is the rule below: every binding is read from the model and set only by sending an action.
 
@@ -216,6 +225,8 @@ The epic is a milestone of its own, `M3 Navigation`, and product functionality m
 ## Components and data flow
 
 > **Amended 2026-10-16, in the owner's review of #103.** The task list is the sidebar's child, since a choice in the sidebar opens it: ADR-0009's rule, every screen is a child of the screen that opened it, applied. The sidebar is a field of the root's state and not a seat, and the root holds quick entry in a seat.
+
+> **Amended 2026-10-22, with the approval of `docs/specs/navigation-state.md` (#117).** The diagrams below draw the tree of M3. The navigation state spec, section 2, draws the window's flow as it becomes: the sidebar as the base, the list and the task flat in the stack over it, and quick entry in the root's own slot.
 
 The tree of modules in one window, each module with its route, and the view tree that draws it:
 
