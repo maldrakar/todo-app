@@ -38,10 +38,14 @@ public protocol RoutedEvent: FeatureEvent {
 /// and a contract that named it would hand every screen a dependency some have no use for (owner's review of
 /// #100). That `init` is where a screen that cannot read what it shows refuses to be made, which is why it
 /// may throw: its parent keeps whatever was open and says so in its own model (spec section 3). The parent
-/// hands the way to make the child to the seat that holds it (`Seat`).
+/// hands the way to make the child to the seat that holds it (`Seat`), and a flow's owner hands the way to make
+/// each kind of screen to its stack (`ScreenStack`).
 ///
-/// `route` is assembled from the module's state, its own head and its children's routes, and holds no
-/// session state: it is what the next launch opens again, not a record of gestures (spec section 2).
+/// `route` is assembled from the module's state, its own head and what it holds open: what it declared over it
+/// in its destination, or the routes of the children it holds in seats. It holds no session state: it is what
+/// the next launch opens again, not a record of gestures (spec section 2). A flow's owner writes its route from
+/// what stands in its stack instead, so that a declaration that has aged never reaches the text (navigation state
+/// spec, section 3).
 public protocol Routable: FeatureModule where Event: RoutedEvent {
     var route: Event.Route { get }
 }

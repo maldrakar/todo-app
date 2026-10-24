@@ -35,7 +35,7 @@ private final class StubBase: Routable {
         case action(UserAction)
         case created
         case route(Route)
-        case answered(StubList.Output)
+        case destinationAnswered(StubList.Output)
         case uncovered
         case notOpened(Refusal, stillOpen: StubList.Route?)
     }
@@ -53,22 +53,22 @@ private final class StubBase: Routable {
     private var received: [Event] = []
 
     init(route: Route) {
-        declare(route.list)
+        setDestination(route.list)
     }
 
     func send(_ event: Event) -> Output? {
         received.append(event)
         switch event {
-        case .action(.viewClicked(let view)): declare(StubList.Route(head: view, task: nil))
-        case .route(let route): declare(route.list)
-        case .uncovered: declare(nil)
-        case .notOpened(_, let stillOpen): declare(stillOpen)
-        case .action(.buttonTapped), .created, .answered: break
+        case .action(.viewClicked(let view)): setDestination(StubList.Route(head: view, task: nil))
+        case .route(let route): setDestination(route.list)
+        case .uncovered: setDestination(nil)
+        case .notOpened(_, let stillOpen): setDestination(stillOpen)
+        case .action(.buttonTapped), .created, .destinationAnswered: break
         }
         return .heard(event)
     }
 
-    private func declare(_ list: StubList.Route?) {
+    private func setDestination(_ list: StubList.Route?) {
         destination.declare(list.map { .pushed($0) })
     }
 }
@@ -102,7 +102,7 @@ private final class StubList {
         case rowDoubleTapped(Int)
         case created
         case declared(Route)
-        case answered(StubTask.Output)
+        case destinationAnswered(StubTask.Output)
         case uncovered
         case notOpened(Refusal, stillOpen: StubTask.Route?)
     }
@@ -126,29 +126,29 @@ private final class StubList {
 
     init(route: Route) {
         head = route.head
-        declare(route.task)
+        setDestination(route.task)
     }
 
     func send(_ event: Event) -> Output? {
         received.append(event)
         switch event {
-        case .rowTapped(let task): declare(StubTask.Route(head: task, subtask: nil))
+        case .rowTapped(let task): setDestination(StubTask.Route(head: task, subtask: nil))
         case .rowDoubleTapped(let task):
-            declare(StubTask.Route(head: task, subtask: nil))
+            setDestination(StubTask.Route(head: task, subtask: nil))
             return .doubleTapped(task)
         case .created: return .opened(head)
-        case .declared(let route): declare(route.task)
+        case .declared(let route): setDestination(route.task)
         case .uncovered where head == 5:
-            declare(destination.pushed)
+            setDestination(destination.pushed)
             return .reopened(head)
-        case .answered(.closeRequested), .uncovered: declare(nil)
-        case .answered(let output): return .passedOn(output)
-        case .notOpened(_, let stillOpen): declare(stillOpen)
+        case .destinationAnswered(.closeRequested), .uncovered: setDestination(nil)
+        case .destinationAnswered(let output): return .passedOn(output)
+        case .notOpened(_, let stillOpen): setDestination(stillOpen)
         }
         return nil
     }
 
-    private func declare(_ task: StubTask.Route?) {
+    private func setDestination(_ task: StubTask.Route?) {
         destination.declare(task.map { .pushed($0) })
     }
 }
@@ -178,7 +178,7 @@ private final class StubTask {
         case buttonTapped
         case created
         case declared(Route)
-        case answered(Output)
+        case destinationAnswered(Output)
         case uncovered
         case notOpened(Refusal, stillOpen: Route?)
     }
@@ -204,25 +204,25 @@ private final class StubTask {
     init(route: Route, gone: Bool) {
         head = route.head
         self.gone = gone
-        declare(route.subtask)
+        setDestination(route.subtask)
     }
 
     func send(_ event: Event) -> Output? {
         received.append(event)
         switch event {
-        case .subtaskTapped(let subtask): declare(subtask)
+        case .subtaskTapped(let subtask): setDestination(subtask)
         case .closeButtonTapped: return .closeRequested
         case .buttonTapped: return .tapped(head)
         case .created: return gone ? .closeRequested : .opened(head)
-        case .declared(let route): declare(route.subtask)
-        case .answered(.closeRequested), .uncovered: declare(nil)
-        case .answered: break
-        case .notOpened(_, let stillOpen): declare(stillOpen?.head)
+        case .declared(let route): setDestination(route.subtask)
+        case .destinationAnswered(.closeRequested), .uncovered: setDestination(nil)
+        case .destinationAnswered: break
+        case .notOpened(_, let stillOpen): setDestination(stillOpen?.head)
         }
         return nil
     }
 
-    private func declare(_ subtask: Int?) {
+    private func setDestination(_ subtask: Int?) {
         destination.declare(subtask.map { .pushed(Route(head: $0, subtask: nil)) })
     }
 }
@@ -317,19 +317,19 @@ private enum Screen: StackScreen {
         switch (self, notice) {
         case (.list, .created): return send(.list(.created))
         case (.list, .declared(.list(let route))): return send(.list(.declared(route)))
-        case (.list, .answered(.task(let output))): return send(.list(.answered(output)))
+        case (.list, .destinationAnswered(.task(let output))): return send(.list(.destinationAnswered(output)))
         case (.list, .uncovered): return send(.list(.uncovered))
         case (.list, .notOpened(let refusal, let stillOpen)):
             return send(.list(.notOpened(refusal, stillOpen: stillOpen?.task)))
         case (.task, .created): return send(.task(.created))
         case (.task, .declared(.task(let route))): return send(.task(.declared(route)))
-        case (.task, .answered(.task(let output))): return send(.task(.answered(output)))
+        case (.task, .destinationAnswered(.task(let output))): return send(.task(.destinationAnswered(output)))
         case (.task, .uncovered): return send(.task(.uncovered))
         case (.task, .notOpened(let refusal, let stillOpen)):
             return send(.task(.notOpened(refusal, stillOpen: stillOpen?.task)))
-        case (.list, .declared(.task)), (.list, .answered(.list)):
+        case (.list, .declared(.task)), (.list, .destinationAnswered(.list)):
             return nil
-        case (.task, .declared(.list)), (.task, .answered(.list)):
+        case (.task, .declared(.list)), (.task, .destinationAnswered(.list)):
             return nil
         }
     }
@@ -347,10 +347,10 @@ private enum Screen: StackScreen {
 
     static func take(_ notice: StackNotice<Screen>, base: StubBase) -> StubBase.Output? {
         switch notice {
-        case .answered(.list(let output)): return base.send(.answered(output))
+        case .destinationAnswered(.list(let output)): return base.send(.destinationAnswered(output))
         case .uncovered: return base.send(.uncovered)
         case .notOpened(let refusal, let stillOpen): return base.send(.notOpened(refusal, stillOpen: stillOpen?.list))
-        case .created, .declared, .answered(.task): return nil
+        case .created, .declared, .destinationAnswered(.task): return nil
         }
     }
 
@@ -390,10 +390,14 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     let path = stack.path
     try #require(path.count == 2)
     let task = StubTask.Route(head: 7, subtask: nil)
-    let list = StubList.Model(route: StubList.Route(head: 1, task: task), received: [.created, .answered(.opened(7))])
+    let received: [StubList.Event] = [.created, .destinationAnswered(.opened(7))]
+    let list = StubList.Model(route: StubList.Route(head: 1, task: task), received: received)
     #expect(stack.models[path[0]] == .list(list))
     #expect(stack.models[path[1]] == .task(StubTask.Model(route: task, received: [.created])))
-    #expect(stack.baseModel.received == [.created, .answered(.opened(1)), .answered(.passedOn(.opened(7)))])
+    let heard: [StubBase.Event] = [
+        .created, .destinationAnswered(.opened(1)), .destinationAnswered(.passedOn(.opened(7))),
+    ]
+    #expect(stack.baseModel.received == heard)
 }
 
 /// A screen's first choice is its answer to `.created`, and it reaches the screen's opener on the line every
@@ -404,10 +408,10 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     var stack = stubStack(on: link(list: 1))
     _ = stack.send(.created)
     let list = try #require(stack.path.first)
-    #expect(stack.baseModel.received == [.created, .answered(.opened(1))])
-    #expect(stack.send(.list(.rowTapped(8)), to: list) == .heard(.answered(.passedOn(.opened(8)))))
+    #expect(stack.baseModel.received == [.created, .destinationAnswered(.opened(1))])
+    #expect(stack.send(.list(.rowTapped(8)), to: list) == .heard(.destinationAnswered(.passedOn(.opened(8)))))
     let route = StubList.Route(head: 1, task: StubTask.Route(head: 8, subtask: nil))
-    let received: [StubList.Event] = [.created, .rowTapped(8), .answered(.opened(8))]
+    let received: [StubList.Event] = [.created, .rowTapped(8), .destinationAnswered(.opened(8))]
     #expect(stack.models[list] == .list(StubList.Model(route: route, received: received)))
 }
 
@@ -420,7 +424,7 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     let list = try #require(stack.path.first)
     #expect(stack.send(.list(.rowTapped(8)), to: list) == nil, "the list acted on the answer and passed nothing on")
     #expect(stack.path == [list])
-    let received: [StubList.Event] = [.created, .rowTapped(8), .answered(.closeRequested)]
+    let received: [StubList.Event] = [.created, .rowTapped(8), .destinationAnswered(.closeRequested)]
     #expect(stack.models[list] == .list(StubList.Model(route: StubList.Route(head: 1, task: nil), received: received)))
 }
 
@@ -437,7 +441,7 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     _ = stack.send(.action(.viewClicked(1)))
     #expect(stack.path == [list])
     let declared = StubList.Route(head: 1, task: nil)
-    let received: [StubList.Event] = [.created, .rowTapped(7), .answered(.opened(7)), .declared(declared)]
+    let received: [StubList.Event] = [.created, .rowTapped(7), .destinationAnswered(.opened(7)), .declared(declared)]
     #expect(stack.models[list] == .list(StubList.Model(route: declared, received: received)))
 }
 
@@ -500,7 +504,7 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     _ = stack.send(.action(.buttonTapped))
     #expect(stack.models == models, "the destination taken back is not handed to the list")
     let heard: [StubBase.Event] = [
-        .created, .answered(.opened(1)), .answered(.passedOn(.opened(7))),
+        .created, .destinationAnswered(.opened(1)), .destinationAnswered(.passedOn(.opened(7))),
         .action(.viewClicked(99)), .notOpened(Refusal(head: .list(99)), stillOpen: open),
         .action(.buttonTapped),
     ]
@@ -509,7 +513,8 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     _ = stack.send(.list(.rowTapped(99)), to: path[0])
     #expect(stack.path == path)
     let received: [StubList.Event] = [
-        .created, .answered(.opened(7)), .rowTapped(99), .notOpened(Refusal(head: .task(99)), stillOpen: task),
+        .created, .destinationAnswered(.opened(7)), .rowTapped(99),
+        .notOpened(Refusal(head: .task(99)), stillOpen: task),
     ]
     #expect(stack.models[path[0]] == .list(StubList.Model(route: open, received: received)))
     #expect(stack.models[path[1]] == models[path[1]], "the task that stood stands")
@@ -525,9 +530,9 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     #expect(stack.send(.created) == .heard(.created), "the base's answer to the event, before the two the walk drew")
     let path = stack.path
     try #require(path.count == 2)
-    #expect(stack.send(.task(.buttonTapped), to: path[1]) == .heard(.answered(.passedOn(.tapped(7)))))
+    #expect(stack.send(.task(.buttonTapped), to: path[1]) == .heard(.destinationAnswered(.passedOn(.tapped(7)))))
     let route = StubList.Route(head: 1, task: StubTask.Route(head: 7, subtask: nil))
-    let received: [StubList.Event] = [.created, .answered(.opened(7)), .answered(.tapped(7))]
+    let received: [StubList.Event] = [.created, .destinationAnswered(.opened(7)), .destinationAnswered(.tapped(7))]
     #expect(stack.models[path[0]] == .list(StubList.Model(route: route, received: received)))
 
     // A double tap on a row answers and declares the row's task, whose answer to `.created` the walk draws.
@@ -535,8 +540,9 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     _ = tapped.send(.created)
     let list = try #require(tapped.path.first)
     let answer = tapped.send(.list(.rowDoubleTapped(8)), to: list)
-    #expect(answer == .heard(.answered(.doubleTapped(8))), "the answer that came down, before the one the walk drew")
-    #expect(tapped.baseModel.received.last == .answered(.passedOn(.opened(8))), "the one the walk drew")
+    let cameDown: StubBase.Output = .heard(.destinationAnswered(.doubleTapped(8)))
+    #expect(answer == cameDown, "the answer that came down, before the one the walk drew")
+    #expect(tapped.baseModel.received.last == .destinationAnswered(.passedOn(.opened(8))), "the one the walk drew")
     #expect(tapped.path.count == 2, "the walk ran after the answer came down, and made the task")
 }
 
@@ -552,7 +558,7 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     #expect(stack.send(.task(.closeButtonTapped), to: path[1]) == nil)
     #expect(stack.path == [path[0]])
     let route = StubList.Route(head: 1, task: nil)
-    let received: [StubList.Event] = [.created, .answered(.opened(7)), .answered(.closeRequested)]
+    let received: [StubList.Event] = [.created, .destinationAnswered(.opened(7)), .destinationAnswered(.closeRequested)]
     #expect(stack.models[path[0]] == .list(StubList.Model(route: route, received: received)))
     #expect(stack.baseModel == base, "the list acted on the answer and passed nothing on")
 }
@@ -570,7 +576,7 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     #expect(stack.wentBack(to: [path[0]]) == nil, "the list answers nothing to being uncovered")
     #expect(stack.path == [path[0]])
     let route = StubList.Route(head: 1, task: nil)
-    let received: [StubList.Event] = [.created, .answered(.opened(7)), .uncovered]
+    let received: [StubList.Event] = [.created, .destinationAnswered(.opened(7)), .uncovered]
     #expect(stack.models[path[0]] == .list(StubList.Model(route: route, received: received)))
     #expect(stack.wentBack(to: []) == .heard(.uncovered))
     #expect(stack.path.isEmpty)
@@ -580,8 +586,9 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     _ = keeping.send(.created)
     let closed = keeping.path
     try #require(closed.count == 2)
-    #expect(keeping.wentBack(to: [closed[0]]) == .heard(.answered(.reopened(5))), "the answer that came down")
-    #expect(keeping.baseModel.received.last == .answered(.passedOn(.opened(7))), "the one the walk drew")
+    let cameDown = keeping.wentBack(to: [closed[0]])
+    #expect(cameDown == .heard(.destinationAnswered(.reopened(5))), "the answer that came down")
+    #expect(keeping.baseModel.received.last == .destinationAnswered(.passedOn(.opened(7))), "the one the walk drew")
     let reopened = keeping.path
     try #require(reopened.count == 2, "the walk ran after the answer came down, and followed the list's write")
     #expect(reopened[0] == closed[0])
@@ -630,7 +637,7 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     #expect(path[1] != path[2])
     let lower = StubTask.Model(
         route: StubTask.Route(head: 7, subtask: 8),
-        received: [.created, .subtaskTapped(8), .answered(.opened(8))]
+        received: [.created, .subtaskTapped(8), .destinationAnswered(.opened(8))]
     )
     let upper = StubTask.Model(route: StubTask.Route(head: 8, subtask: nil), received: [.created])
     #expect(stack.models[path[1]] == .task(lower))

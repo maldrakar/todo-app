@@ -4,10 +4,10 @@ import TodoCore
 
 /// One task on a screen of its own: its title, read from the store, and nothing a person can edit yet.
 ///
-/// It is the first screen opened from below the root, the child of the list of a view's tasks, and the first
-/// that needs a stack, which is why the epic builds one (spec section 10). What it holds is exactly what makes
-/// the navigation to it real: a head, the id of its task, and a title to show that it arrived. The editor is
-/// M4's.
+/// It is the screen the list of a view's tasks declares over it, standing over the list in the window's stack, and
+/// the first screen that needed a stack, which is why the navigation epic built one (spec section 10). What it
+/// holds is exactly what makes the navigation to it real: a head, the id of its task, and a title to show that it
+/// arrived. The editor is M4's.
 ///
 /// It is a routable module (spec section 4): its route is the task's id and has no tail, because nothing
 /// opens inside it yet.
@@ -23,7 +23,7 @@ public final class TaskScreen: Routable {
     /// its word and nothing more of its spelling.
     public struct Route: RouteValue {
         /// The task the screen is on, which is what makes this screen this one: a route to another task is
-        /// another screen, which the seat holding this one makes in its place (spec section 3).
+        /// another screen, which the window's stack makes in place of this one (navigation state spec, section 2).
         public let head: TaskID
 
         public init(head: TaskID) {
@@ -59,19 +59,20 @@ public final class TaskScreen: Routable {
         case action(UserAction)
         case changed(ChangeSet)
 
-        /// The parent has just made this screen: sent once by the seat that holds it, right after `init`. The
-        /// screen has no choice to report, so it answers nothing.
+        /// The window's stack has just made this screen: sent once, right after `init`. The screen has no choice
+        /// to report, so it answers nothing.
         case created
 
-        /// A route onto this same task, which is the only route a live screen is handed: a seat sends `.route`
-        /// only when the head is the one it holds, so the screen reads the tail, and there is none.
+        /// A route onto this same task, which is the only route a live screen is handed: the stack hands a screen
+        /// its opener's declaration only when the head is the one it holds, so the screen reads the tail, and there
+        /// is none.
         case route(Route)
     }
 
     public enum Output: Equatable, Sendable {
-        /// The task is gone, so the screen asks its parent to drop it (spec section 3): the stack it was pushed
-        /// onto pops on every platform (spec section 6), and the mechanism is the way back's with the store as
-        /// the occasion.
+        /// The task is gone, so the screen asks its opener, the list, to close it (spec section 3): the list declares
+        /// nothing over it, the window's stack drops it and pops on every platform (spec section 6), and the
+        /// mechanism is the way back's with the store as the occasion.
         case closeRequested
     }
 
@@ -89,9 +90,9 @@ public final class TaskScreen: Routable {
 
     /// Made from its route, the one way a screen is made (spec section 3). A task the store does not hold, one
     /// deleted since a link was written or one a peer deleted under a tap, is refused with `.notFound` and the
-    /// task's id: a screen on a task that is gone is not made, and the parent, which catches what this
-    /// throws, keeps what was open and says so (spec section 3, the fourth flow). A store that cannot be read
-    /// throws what it threw, which the parent tells apart from a task that is gone.
+    /// task's id: a screen on a task that is gone is not made, and the window's stack, which catches what this
+    /// throws, keeps what was open, while the list says so (spec section 3, the fourth flow). A store that cannot
+    /// be read throws what it threw, which the list tells apart from a task that is gone.
     public init(store: Store, route: Route) throws(StoreError) {
         guard let task = try store.task(route.head) else { throw .notFound(route.head) }
         self.store = store

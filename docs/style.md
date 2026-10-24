@@ -81,10 +81,10 @@ value a peer wrote is as arbitrary as one a person typed.
   state is a second copy of the same values, and the two disagree
   the moment one is moved without the other. (PR #77, #101)
 - **A user action names the control and the gesture, never what the
-  module does about it.** `rowTapped(id)` and `backButtonTapped`, not
-  `openTask(id)` or `taskScreenDismissed`: the view reports what the
-  person did, and what that means, opening a task or closing a
-  screen, is the module's to decide. (PR #66, #101)
+  module does about it.** `rowTapped(id)`, `quickEntryButtonTapped`
+  and `wentBack(to:)`, not `openTask(id)` or `taskScreenDismissed`:
+  the view reports what the person did, and what that means, opening
+  a task or closing a screen, is the module's to decide. (PR #66, #101)
 
 ## Views
 

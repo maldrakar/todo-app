@@ -4,7 +4,7 @@ import TaskListFeature
 import TodoCore
 
 /// The views a person keeps, flattened out of the store's tree into the list they are chosen from, and the list
-/// of the chosen view's tasks, which that choice opens.
+/// of the chosen view's tasks, which that choice declares open over them.
 ///
 /// Named for what it holds and not for where it is put: the same list is a sidebar beside a Mac window and a
 /// screen of its own on a phone, and a module that knew which one it was would be two modules.
@@ -13,14 +13,16 @@ import TodoCore
 /// number and decides nothing, and the walk that builds them never recurses over a chain that arrived from
 /// sync (`docs/style.md`).
 ///
-/// It is the task list's parent. A choice here opens the list of that view's tasks, so the list is this module's
-/// child, held in a seat of its own, by the rule that every screen is a child of the screen that opened it
-/// (ADR-0009), drawn on a phone as the screen pushed after this one and on the Mac as the pane beside it. The root
-/// never learns that a choice opens a list.
+/// It is the base of its window's stack, and the task list's opener. A choice here declares the list of that view's
+/// tasks in this module's destination, and the window's stack makes, keeps and drops the list (ADR-0009, amendment of
+/// 2026-10-22): the module holds no screen, and hears what the list asks for as `.destinationAnswered`. The list is
+/// drawn on a phone as the screen pushed over this one and on the Mac as the pane beside it. The root never learns that
+/// a choice opens a list. The destination is the highlight too, so the two are one fact and cannot disagree (navigation
+/// state spec, section 1).
 ///
 /// It is a routable module, one that can be opened (spec section 4): its route has no head, because a window
-/// has one list of views, and its tail is the route of the list open in it, so that a link to a view opens its
-/// list here, highlighted, and the route a window writes down names the view and the task open in its list.
+/// has one list of views, and its tail is the route of the list it declared, so that a link to a view declares its
+/// list here, highlighted, and the route a window writes down names the view and the task declared in its list.
 public final class TaskViewList: Routable {
     public struct Model: Equatable, Sendable {
         public struct Row: Equatable, Sendable {
@@ -37,8 +39,7 @@ public final class TaskViewList: Routable {
             ///
             /// The draft is the module's, put on the row when the model is assembled and never kept in one.
             /// A read replaces every row, so a draft that lived in a row would be emptied by a peer's edit
-            /// arriving while a person was typing. What ends it is its row going, which `reread` decides
-            /// for the draft and for the highlight alike.
+            /// arriving while a person was typing. What ends it is its row going, which `reread` decides.
             public let draft: String?
         }
 
@@ -51,12 +52,12 @@ public final class TaskViewList: Routable {
         /// It is the highlight `Row.isSelected` carries, held a second way because it is read a second way: a
         /// list bound to one value reads this, and a client that draws row by row reads the row. Both come
         /// off the same drawn rows when the model is assembled, so they name the same row or none.
+        ///
+        /// The highlight is the view of the list this module declared, where a row holds it (navigation state spec,
+        /// "Open questions"): nil when it declared nothing, and when the view it declared has no row, a view that is
+        /// gone or not yet synced, so a highlight goes with its row by computation and a row that arrives later
+        /// lights up only if its list is still declared.
         public let selection: ViewID?
-
-        /// The open list's own model, which this module carries to the list's view whole and decides nothing
-        /// in, and nil when no list is open: when the module was made on a view that is gone, after the view the
-        /// list was on is gone, and after the list's back button closed it.
-        public let taskList: TaskList.Model?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one
@@ -65,16 +66,16 @@ public final class TaskViewList: Routable {
         public let problem: String?
     }
 
-    /// The address of the module in its window: no head, and the route of the list open in it as the tail (spec
-    /// section 4).
+    /// The address of the module in its window: no head, and the route of the list declared over it as the tail
+    /// (spec section 4).
     public struct Route: RouteValue {
         /// The same for every one, which is what keeps the one a window holds alive on every route it is
         /// handed: it is never made again by a link, so a name half typed in it survives one.
         public var head: NoHead { NoHead() }
 
-        /// The list open beside the views, whose head is the view it lists, so that the highlight and the list
-        /// cannot name two views in a route. Nil says nothing of the list, which then follows the highlight: at
-        /// creation it opens on the Inbox, and on a live module the list stays as it is (owner, 2026-10-16).
+        /// The list declared over the views, whose head is the view it lists and is the highlight, so that the
+        /// highlight and the list cannot name two views in a route. Nil says nothing of the list: at creation the
+        /// module declares the Inbox's, and on a live module what it declared stays as it is (owner, 2026-10-16).
         public let list: TaskList.Route?
 
         public init(list: TaskList.Route?) {
@@ -98,9 +99,6 @@ public final class TaskViewList: Routable {
     public enum UserAction: Equatable, Sendable {
         /// A row of the list, clicked or moved onto with the arrow keys.
         case rowSelected(ViewID)
-        /// The back button of the open list where the list is a screen pushed over this one, on a narrow window;
-        /// the swipe back sends it too.
-        case listBackButtonTapped
         /// The row's Rename menu item.
         case renameMenuItemChosen(ViewID)
         /// The text of the open field, on every keystroke.
@@ -115,30 +113,40 @@ public final class TaskViewList: Routable {
         case createFolderButtonTapped
         /// The row's Open in New Window menu item, on the Mac and the iPad.
         case openInNewWindowMenuItemChosen(ViewID)
-        /// An action of the open list, handed to it as it came. With no list open it moves nothing, and it never
-        /// touches this module's sentence: a sentence goes with this module's own gestures and a route, and a
-        /// gesture in the list is the list's, as a gesture on the task screen leaves the list's own sentence.
-        case taskList(TaskList.UserAction)
     }
 
     public enum Event: RoutedEvent {
         case action(UserAction)
         case changed(ChangeSet)
 
-        /// The parent has just created this module: sent once, by the module that holds it, right after
-        /// `init`. It is not the creation of a folder, which is `createFolderButtonTapped` and a write; it is
-        /// this module's own creation, and it writes nothing. It is an event of the world and not a
+        /// The parent has just created this module: sent once, by the module that holds it, through the window's
+        /// stack, right after `init`. It is not the creation of a folder, which is `createFolderButtonTapped` and a
+        /// write; it is this module's own creation, and it writes nothing. It is an event of the world and not a
         /// `UserAction`, because nobody did anything and a view has no way to send it (spec section 2).
         ///
         /// It is answered with nothing and moves nothing, the sentence included: the module was made from a
-        /// route its parent chose and already knows, and it opened the list of the view it starts on in its
-        /// `init`, as the task list opens its task screen in its own.
+        /// route its parent chose and already knows, and it declared the list of the view it starts on in its
+        /// `init`, as the task list declares its task in its own.
         case created
 
-        /// A route applied to the live module, by a link or by the root reconciling its window: an event of the
-        /// world, like `.changed`, that no view can send (ADR-0006, amendment of 2026-10-14). The head never
-        /// differs, so it is the tail alone that the module reads.
+        /// A route handed to the live module, by a link into the root's window: an event of the world, like
+        /// `.changed`, that no view can send (ADR-0006, amendment of 2026-10-14). The head never differs, so it is
+        /// the tail alone that the module reads.
         case route(Route)
+
+        /// What the list declared over this module answered, which the window's stack hands the module, its opener
+        /// (ADR-0009, amendment of 2026-10-22, point 2).
+        case destinationAnswered(TaskList.Output)
+
+        /// The person went back to the views, and the list over them is gone already (navigation state spec,
+        /// section 3): on a narrow window the list is a screen pushed over this one, which the back button, the
+        /// swipe from the edge and the long-press menu close.
+        case uncovered
+
+        /// The list this module declared could not be made: why, and the route of the list that still stands over
+        /// the module, nil when none does, which the module takes back as its destination (navigation state spec,
+        /// section 2, and "Open questions").
+        case notOpened(StoreError, stillOpen: TaskList.Route?)
     }
 
     public enum Output: Equatable, Sendable {
@@ -152,46 +160,40 @@ public final class TaskViewList: Routable {
     /// list holds is in one place and the model cannot disagree with it (owner's review of #101).
     public var model: Model { state.model }
 
-    /// The route of the module, assembled from its seat and never kept beside it (spec section 4): the route of
-    /// the list open in it, which names the view that list is on and the task open in it, so that what a window
-    /// writes down is what is open, and a highlight with no list behind it is written as nothing.
-    public var route: Route { Route(list: state.taskList.route) }
+    /// The route of the module, assembled from its destination and never kept beside it (spec section 4): the route
+    /// of the list it declared, which names the view that list is on and the task declared in it. The window's stack
+    /// writes the window down from what stands instead, so a declaration that has aged never reaches the text
+    /// (navigation state spec, section 3).
+    public var route: Route { Route(list: state.destination.pushed) }
+
+    /// What the module declared over it, the list of a view or nothing, which the window's stack reads after every
+    /// event and follows (ADR-0009, amendment of 2026-10-22, point 2), and which is the highlight.
+    public var destination: Destination<TaskList.Route> { state.destination }
 
     private let store: Store
 
     private var state: State
 
-    /// Made from its route, the one way it is made (spec section 3): it starts on the view the route's list
-    /// names, or on the Inbox when the route names none, and opens the list in its seat, here, the way the task
-    /// list opens its task screen in its own `init`: on the route's list when the route names one, with the task
-    /// in it, and otherwise on the view it starts on.
+    /// Made from its route, the one way it is made (spec section 3): it declares the route's list whole, with the
+    /// task in it, when the route names one, and the Inbox's list otherwise, the way the task list declares the
+    /// task its route names in its own `init`. The window's stack makes the list in its first walk.
     ///
-    /// That start is highlighted only when a row holds it, whichever its source, because a highlight kept anyway
-    /// would light up the moment a peer's change brought the row in — a link to a view not yet synced here —
-    /// beside a list that was never opened on it. It is the invariant `createFolder` holds for the same reason:
-    /// what this module puts on a row of its own accord goes onto a row the list holds. A list the route names is
-    /// opened whether or not a row holds its view, and one that cannot be made, its view gone or not yet synced,
-    /// is said in `problem`; the Inbox this module falls back on is opened only when a row holds it, so a person
-    /// who deleted it is told nothing, having asked for nothing.
+    /// The Inbox this module falls back on is declared only when a row holds it, so a person who deleted it is told
+    /// nothing, having asked for nothing, and no highlight waits for the row: one would light up the moment a peer's
+    /// change brought the row in, beside a list that was never opened on it. It is the invariant `createFolder` holds
+    /// for the same reason: what this module puts on a row of its own accord goes onto a row the list holds. A list
+    /// the route names is declared whether or not a row holds its view; one the stack cannot make, its view gone or
+    /// not yet synced, comes back as `.notOpened`, which takes the declaration back and says so in `problem`.
     ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
     /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own read
-    /// throws: a list that cannot be made leaves the seat empty and says so in `problem`.
+    /// throws.
     public init(store: Store, route: Route) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
-        let start = route.list?.head ?? BuiltInTaskViews.inbox
-        // The seat is built once, here, with the way to make the list: a closure over the list's own `init` that
-        // captures the store and never this module. The module holds the seat in its state, so a closure
-        // holding the module would close a cycle, module to state to seat to closure to module, and none of them
-        // would ever be released (`Seat.init`). Its error is named, so that the seat's type below is checked
-        // against it rather than widened to `any Error`.
-        let taskList = Seat<TaskList, StoreError> { route throws(StoreError) in
-            try TaskList(store: store, route: route)
-        }
+        let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
-        let selection = rows.contains(where: { $0.id == start }) ? start : nil
-        self.state = State(rows: rows, selection: selection, taskList: taskList)
-        if let list = route.list ?? state.selection.map({ TaskList.Route(head: $0) }) { apply(list: list) }
+        self.state = State(rows: rows, destination: Destination())
+        setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
 
     public func send(_ event: Event) -> Output? {
@@ -200,11 +202,12 @@ public final class TaskViewList: Routable {
         // of #77 and #101).
         switch event {
         case .action(.rowSelected(let id)):
-            // The list's route on the view, applied every time, the highlighted row's own included: choosing the
-            // row that is already chosen is still a choice. On the view the list is on, the seat keeps the list
-            // and the route's empty tail closes the task open in it, so a click on the highlighted view returns
-            // to its list, as System Settings does on the Mac and a second tap on a tab does on iOS (owner,
-            // 2026-10-16); on another view the seat makes a new list.
+            // The list's route on the view, declared every time, the highlighted row's own included: choosing the
+            // row that is already chosen is still a choice, and every declaration is a new write. On the view the
+            // list is on, the stack keeps the list and hands it the declaration, whose empty tail closes the task
+            // open in it, so a click on the highlighted view returns to its list, as System Settings does on the
+            // Mac and a second tap on a tab does on iOS (owner, 2026-10-16); on another view the stack makes a new
+            // list. The highlight is the declaration, so it moves with it.
             //
             // The sentence goes with the event that produced it (spec, "The sidebar in M2"), except while a
             // field is open: then the sentence on screen is what explains the field, and this gesture leaves
@@ -219,31 +222,13 @@ public final class TaskViewList: Routable {
             // would settle or drop a person's half-typed name on a gesture they need not have made. The
             // owner settled this in chat on 2026-09-22, and `.titleFieldLostFocus` is the other half of it.
             //
-            // The sentence goes before the list is applied, so that a list the click cannot open writes a fresh
-            // one: it answers this click, and the one it replaces answered something earlier. It does so with a
-            // field open too, over the field's own sentence, which the rule above keeps from being cleared and not
-            // from being answered: the new sentence answers the gesture just made, the field stays open on its
-            // draft, and Return brings the field's refusal back.
-            state.selection = id
+            // The sentence goes before the list is declared, so that a list the click cannot open writes a fresh
+            // one when the stack says so: it answers this click, and the one it replaces answered something earlier.
+            // It does so with a field open too, over the field's own sentence, which the rule above keeps from being
+            // cleared and not from being answered: the new sentence answers the gesture just made, the field stays
+            // open on its draft, and Return brings the field's refusal back.
             if state.rename == nil { state.problem = nil }
-            apply(list: TaskList.Route(head: id))
-            return nil
-        case .action(.listBackButtonTapped):
-            // The list is closed with the task open in it, and the highlight goes with it: on a narrow window the
-            // list is a screen pushed over this one, and Back closes that screen, so nothing stays chosen (owner,
-            // 2026-10-21), as iPhone's System Settings leaves nothing chosen after Back. The route then names no list,
-            // which a window restored from opens on the Inbox, as a new one does (owner, the same day). On a wide
-            // window the list has no back button, so the highlight there still cannot be removed; a window that
-            // widens after this shows the views with nothing chosen and no list until one is chosen.
-            //
-            // With no list open it moves nothing, the sentence included: the platform can write the stack's path
-            // back after a pop the model drove, a list whose view is gone, and that write is no gesture of a person's.
-            // Otherwise the sentence goes, as with a click, except while a field is open, whose sentence explains
-            // it and which this gesture leaves where it is.
-            guard state.taskList.model != nil else { return nil }
-            state.selection = nil
-            if state.rename == nil { state.problem = nil }
-            state.taskList.drop()
+            setDestination(TaskList.Route(head: id))
             return nil
         case .action(.renameMenuItemChosen(let id)):
             // The title comes off the row and not out of a read: the row is what the person chose the menu
@@ -297,31 +282,56 @@ public final class TaskViewList: Routable {
             // there asks for nothing, the way the Rename menu item on one opens no field.
             guard state.rows.contains(where: { $0.id == id }) else { return nil }
             return .openInWindow(Route(list: TaskList.Route(head: id)))
-        case .action(.taskList(let action)):
-            // Handed on as it came, and with no list open the empty seat answers nothing, which is where the
-            // platform's write through a binding lands after a close the model drove, and nothing moves. The
-            // sentence stays: a gesture in the list is the list's, and this module's sentence goes with its own
-            // gestures and a route.
-            react(to: state.taskList.send(.action(action)))
-            return nil
         case .created:
             // Nothing moves, the sentence included, because being created answers nothing a person was told,
-            // and nothing is answered: `init` opened the list already.
+            // and nothing is answered: `init` declared the list already.
             return nil
         case .route(let route):
             // The route's choice and not a person's, and its parent already knows it, so it is answered with nothing
             // (spec section 3, the third flow). The sentence goes at its start, a route that names no list included,
             // except while a field is open, whose sentence explains it and which the route leaves where it is, as a
-            // click does (owner, 2026-10-16). A list the route cannot open writes a fresh sentence, over an open
-            // field's too, as a click's does. A route carries no session state and keeps what did not change (spec
-            // sections 2 and 3): it moves the highlight onto its list's view when a row holds it, a link to a view that
-            // is gone leaving the highlight where it is, and applies its list to the seat, which keeps the list on the
-            // same view and replaces it on another. A route that names no list leaves the highlight and the list alone,
-            // because the default window chooses the Inbox itself, at creation and never again (owner, 2026-10-16).
+            // click does (owner, 2026-10-16). A list the route cannot open writes a fresh sentence when the stack
+            // says so, over an open field's too, as a click's does. A route carries no session state (spec section
+            // 2): it declares its list whole, and the stack keeps what did not change, the list on the same view
+            // with the task in it, and replaces the list on another (navigation state spec, section 3). A route that
+            // names no list declares nothing, since a declaration written again would be a new one, which the stack
+            // hands the list, closing what was opened in it since: the default window chooses the Inbox itself, at
+            // creation and never again (owner, 2026-10-16).
             if state.rename == nil { state.problem = nil }
             guard let list = route.list else { return nil }
-            if state.rows.contains(where: { $0.id == list.head }) { state.selection = list.head }
-            apply(list: list)
+            setDestination(list)
+            return nil
+        case .destinationAnswered(.closeRequested):
+            // The list's view is gone, so the list asked to be closed (spec section 3), and this module declares
+            // nothing over it: the stack drops the list with whatever stands over it, and the route names no list.
+            // The highlight went with its row already, by computation; the sentence stays, since the answer is no
+            // gesture. The arm names the list's one answer, so that an answer it learns to give stops this file
+            // compiling until this module has decided what it means (spec section 4).
+            setDestination(nil)
+            return nil
+        case .uncovered:
+            // The list is gone already, and this module cannot keep a destination the person closed (navigation
+            // state spec, section 3), so the highlight goes with it: on a narrow window the list is a screen pushed
+            // over this one, and Back closes that screen, so nothing stays chosen (owner, 2026-10-21), as iPhone's
+            // System Settings leaves nothing chosen after Back. The route then names no list, which a window
+            // restored from opens on the Inbox, as a new one does (owner, the same day). On a wide window the list
+            // stands in a column of its own and no Back reaches it, so the highlight there still cannot be removed;
+            // a window that widens after this shows the views with nothing chosen and no list until one is chosen.
+            //
+            // The stack tells only a module with a list over it, so the platform's write after a pop the model drove
+            // reaches nobody. The sentence goes, as with a click, except while a field is open, whose sentence
+            // explains it and which this gesture leaves where it is.
+            if state.rename == nil { state.problem = nil }
+            setDestination(nil)
+            return nil
+        case .notOpened(_, let stillOpen):
+            // The list could not be made, its view gone or not yet synced, or its tasks unread, and the stack keeps
+            // what stood. This module takes that back as its destination, so that the declaration is tried once and
+            // the highlight returns to the list that is open, or goes when none is (navigation state spec, section
+            // 2, and "Open questions"), and says so, over an open field's sentence too, since it answers the gesture
+            // or the link just made. It has one sentence for every refusal.
+            setDestination(stillOpen)
+            state.problem = Problem.couldNotOpenList.sentence
             return nil
         case .changed(let changes):
             // Every edit to a task is a commit that touched no view, and the rows are the same afterwards, so
@@ -342,45 +352,29 @@ public final class TaskViewList: Routable {
                     if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
                 }
             }
-            // The open list gets the change whatever the rows did, since what it shows is its view's tasks and
-            // only it reads them, and a list whose view is gone asks to be closed. Nothing is written in answer
-            // (spec section 5).
-            react(to: state.taskList.send(.changed(changes)))
+            // The destination stays: the list over this module reads the change itself, handed it by the window
+            // after this module, and a list whose view is gone asks to be closed. The highlight on a row that went
+            // goes by computation. Nothing is written in answer (spec section 5).
             return nil
         }
     }
 
-    /// Applies a route to the list's seat, the one road to it: the seat keeps the list on the same view and
-    /// hands it the route, which opens, keeps or closes the task in it, and makes a new list on another view
-    /// (spec section 3). A list that cannot be made, its view gone or its tasks unread, leaves the one that was
-    /// open, since the seat makes the new one before it lets the old one go, and this module says so (spec
-    /// section 3). What the seat hands back goes through `react(to:)`, the line every answer of the list takes.
-    private func apply(list route: TaskList.Route) {
-        do {
-            react(to: try state.taskList.apply(route))
-        } catch {
-            state.problem = Problem.couldNotOpenList.sentence
-        }
-    }
-
-    /// What the open list asked for, whichever event drew it out: to be closed, because its view is gone, and this
-    /// module drops it with the task open in it (spec section 3). One path for every answer, with no `default`, so
-    /// that an answer the list learns to give stops this file compiling until this module has decided what it
-    /// means (spec section 4).
-    private func react(to output: TaskList.Output?) {
-        switch output {
-        case .closeRequested?: state.taskList.drop()
-        case nil: break
-        }
+    /// Declares the list of a view over this module, or nothing: a click, a route, a new folder, the way back and
+    /// the stack's notices each arrive here, so what a click opens and what a link opens cannot drift apart (spec
+    /// section 3). Every call is a new write, which the window's stack follows at the walk after the event, and the
+    /// highlight is what it declares.
+    private func setDestination(_ list: TaskList.Route?) {
+        state.destination.declare(list.map { .pushed($0) })
     }
 
     /// Reads the tree again and keeps of this person's session whatever the new rows still hold.
     ///
-    /// The selection goes silently when its row does: a highlight that outlived its row is one nobody can
-    /// see and a detail pane nobody asked for, and a person whose highlight moved was not interrupted. A
-    /// rename goes with a sentence, because a person typing a name was, and the sentence is the one a
-    /// refused write gives for the same fact, since a peer's delete is that fact arriving by another route
-    /// (owner's review of #77). Both are dropped here rather than left to be discovered by the next write.
+    /// A rename goes when its row does, with a sentence, because a person typing a name was interrupted, and the
+    /// sentence is the one a refused write gives for the same fact, since a peer's delete is that fact arriving by
+    /// another route (owner's review of #77). It is dropped here rather than left to be discovered by the next
+    /// write. What this module declared stays: the highlight goes silently with its row by computation, a person
+    /// whose highlight moved was not interrupted, and the list on a view that is gone asks to be closed on its own
+    /// `.changed`, which this module answers by declaring nothing.
     ///
     /// The rows on screen are never cleared by a read that failed, because they are assigned last and a
     /// throw leaves them where they were: `send` cannot throw (ADR-0006), and a list emptied by a failed
@@ -394,9 +388,6 @@ public final class TaskViewList: Routable {
     /// 2026-09-24).
     private func reread() throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
-        if let selection = state.selection, !rows.contains(where: { $0.id == selection }) {
-            state.selection = nil
-        }
         if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
             // The name comes off the rows as they still are: the ones being read in no longer hold the
             // view, and after the assignment below there is nothing left to call it. A row already gone
@@ -495,20 +486,19 @@ public final class TaskViewList: Routable {
             return
         }
         // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
-        // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` and
-        // on `.route` without one. Here the read that just ran is the only thing that can say whether the
-        // list holds the row. It does not cover `.rowSelected`, which stores the id a view names without
-        // asking the rows (left as it shipped, see #77).
+        // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` for
+        // the Inbox it falls back on. Here the read that just ran is the only thing that can say whether the
+        // list holds the row. It does not cover `.rowSelected` and `.route`, which declare the list of the id
+        // they name without asking the rows, and which the stack hands back when the list cannot be made.
         //
         // A peer can have deleted the folder between the write and this read, and a highlight on a row
         // that came back deleted is a highlight on nothing.
         guard state.rows.contains(where: { $0.id == id }) else { return }
-        state.selection = id
         state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
-        // The highlight moved without anybody choosing a row, and the folder's list opens as a click would have
-        // opened it. Only where the highlight actually moved: a list on a folder the module is not highlighting
-        // is the divergence this prevents.
-        apply(list: TaskList.Route(head: id))
+        // The highlight moves without anybody choosing a row, because the folder's list is declared as a click
+        // would have declared it: the highlight is the declaration, so a list on a folder the module is not
+        // highlighting cannot happen.
+        setDestination(TaskList.Route(head: id))
     }
 
     /// The tree as one read produced it. `views()` answers parents before children with the effective parent
@@ -531,38 +521,38 @@ public final class TaskViewList: Routable {
     /// this module writes is English.
     private static let newFolderTitle = "New folder"
 
-    /// Everything this module holds between two events: the rows as the last read produced them, the row a
-    /// person chose, the rename they have open, the seat with the list in it, and the sentence they were last
-    /// told. One entity, moved field by field, from which the model is computed on every read, so that nothing
-    /// on screen is state in its own right and there is no second copy to keep in step (owner's reviews of #77
-    /// and #101).
+    /// Everything this module holds between two events: the rows as the last read produced them, the rename a
+    /// person has open, the list declared over the module, and the sentence they were last told. One entity, moved
+    /// field by field, from which the model is computed on every read, so that nothing on screen is state in its
+    /// own right and there is no second copy to keep in step (owner's reviews of #77 and #101): the highlight is
+    /// read off the destination, and is not kept beside it.
     ///
     /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the
     /// array inside it is copy-on-write, so a class buys nothing here and would put a second reference type
-    /// into a module that is already one. The seat is a struct holding a class, so a call that changes what it
-    /// holds is a mutation of this state, and it is a field of the state because the tree of live modules is
-    /// the navigation state (`docs/specs/feature-module-architecture.md`, section 4).
+    /// into a module that is already one. The destination is a field of the state because what a screen declared
+    /// over it is the navigation state, which the window's stack follows (ADR-0009, amendment of 2026-10-22).
     private struct State {
         var rows: [ReadRow]
-        var selection: ViewID?
         var rename: Rename?
-        var taskList: Seat<TaskList, StoreError>
+        var destination: Destination<TaskList.Route>
         var problem: String?
 
         /// The model a view draws: the rows with this person's session projected onto them — the highlight
-        /// on the row they chose, the draft on the row they are renaming — the highlighted row's id, the
-        /// list's model as the list computes it, and the sentence, if any.
+        /// on the row of the view whose list is declared, the draft on the row they are renaming — the
+        /// highlighted row's id, and the sentence, if any.
         var model: Model {
+            let declared = destination.pushed?.head
             let drawn = rows.map {
                 Model.Row(
                     id: $0.id, title: $0.title, depth: $0.depth,
-                    isSelected: $0.id == selection, draft: rename?.text(on: $0.id)
+                    isSelected: $0.id == declared, draft: rename?.text(on: $0.id)
                 )
             }
-            // Read off the drawn rows and not copied from `selection`: `.rowSelected` keeps an id without asking
-            // the rows, and an id no row carries highlights nothing, so the model names no row for it either.
+            // Read off the drawn rows and not copied from the destination: `.rowSelected` and `.route` declare the
+            // list of an id without asking the rows, and an id no row carries highlights nothing, so the model names
+            // no row for it either.
             let selection = drawn.first(where: \.isSelected)?.id
-            return Model(rows: drawn, selection: selection, taskList: taskList.model, problem: problem)
+            return Model(rows: drawn, selection: selection, problem: problem)
         }
 
         /// One row of the list as a read of the store produced it, before anything about this person's

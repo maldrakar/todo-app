@@ -30,7 +30,7 @@ public struct StackElementID: Hashable, Sendable {
 /// hands it `.declared(route)` once; another head makes the declared screen before anything is let go,
 /// replaces everything above with it and hands it `.created`. A screen that cannot be made leaves what stands,
 /// and its opener takes `.notOpened` with the route of what still stands over it. What a screen answers goes
-/// down: its opener takes `.answered(output)`, the opener's answer goes to its own opener, and the base's
+/// down: its opener takes `.destinationAnswered(output)`, the opener's answer goes to its own opener, and the base's
 /// answers come back out of the call, to the owner (spec section 2, "Answers go to the opener").
 ///
 /// A struct holding classes, like `Seat`: the owner keeps it in a `var` of its own state, and a call that moves
@@ -111,7 +111,7 @@ public struct ScreenStack<Screen: StackScreen> {
     /// one it dropped since the view read it, moves nothing and answers nothing.
     public mutating func send(_ event: Screen.Event, to id: StackElementID) -> Screen.Base.Output? {
         guard let index = elements.firstIndex(where: { $0.id == id }) else { return nil }
-        let answer = elements[index].screen.send(event).flatMap { hand(.answered($0), to: index) }
+        let answer = elements[index].screen.send(event).flatMap { hand(.destinationAnswered($0), to: index) }
         return walk(after: answer)
     }
 
@@ -205,7 +205,7 @@ public struct ScreenStack<Screen: StackScreen> {
         var level = level
         while level > 0 {
             guard let answer = elements[level - 1].screen.take(notice) else { return nil }
-            notice = .answered(answer)
+            notice = .destinationAnswered(answer)
             level -= 1
         }
         return Screen.take(notice, base: base)

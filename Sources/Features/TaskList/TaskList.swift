@@ -3,18 +3,19 @@ import FeatureModule
 import TaskScreenFeature
 import TodoCore
 
-/// The tasks of one view, by title, and the task opened from among them.
+/// The tasks of one view, by title, and the task declared open over them.
 ///
-/// It is the sidebar's child, opened by a choice there and held in a seat of the sidebar's (ADR-0009), and it is
-/// drawn in the pane beside the sidebar on the Mac. The task screen opened from a row is its child, held in a seat
-/// of its own, so neither the sidebar nor the root learns that a list opens a task, and their code does not grow
-/// when the task screen learns to open something (spec section 1); the task screen's route reads and writes its
-/// own part of the window's path then, as this list's route does. What it holds is what makes the navigation real
-/// and nothing more; sections, grouping, ordering and completion are M4's (spec section 10).
+/// It is declared by the sidebar, by a choice there, and stands in its window's stack over the sidebar, drawn in the
+/// pane beside it on the Mac. A tap on a row declares the task screen over it in its destination, and the window's
+/// stack makes, keeps and drops that screen (ADR-0009, amendment of 2026-10-22): the list holds no screen and draws
+/// none, and hears what the screen asks for as `.destinationAnswered`. Neither the sidebar nor the root learns that a
+/// list opens a task, and their code does not grow when the task screen learns to open something (navigation state
+/// spec, section 2); the task screen's route reads and writes its own part of the window's path then, as this list's
+/// route does. What it holds is what makes the navigation real and nothing more; sections, grouping, ordering and
+/// completion are M4's (spec section 10).
 ///
-/// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the
-/// task open in it, so that a link to a task opens the list with the task screen in it, and the route a window
-/// writes down names both.
+/// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the task it
+/// declared, so that a link to a task declares the task over the list, and the route a window writes down names both.
 public final class TaskList: Routable {
     public struct Model: Equatable, Sendable {
         /// One task of the view, as the last read of the view's tasks answered.
@@ -26,27 +27,23 @@ public final class TaskList: Routable {
         /// The view's tasks, in the order the view's query gives them.
         public let rows: [Row]
 
-        /// The open task screen's model, which the list carries to the screen's view whole and decides nothing
-        /// in, and nil when no task is open.
-        public let task: TaskScreen.Model?
-
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one
         /// would be a view holding logic (spec section 2).
         public let problem: String?
     }
 
-    /// The address of the list: the view it lists, and the task open in it as the tail (spec section 2).
+    /// The address of the list: the view it lists, and the task declared over it as the tail (spec section 2).
     ///
     /// In a window's path it is `view/<id>` followed by the task screen's part, and this route reads and writes
     /// its own part and hands the rest to the task screen's route, knowing that route's word and nothing more of
     /// its spelling.
     public struct Route: RouteValue {
         /// The view the list is on, which is what makes this list this one: a route to another view is
-        /// another list, which the seat holding this one makes in its place (spec section 3).
+        /// another list, which the window's stack makes in place of this one (navigation state spec, section 2).
         public let head: ViewID
 
-        /// The route of the task screen open in the list, and nil when none is.
+        /// The route of the task screen declared over the list, and nil when none is.
         public let task: TaskScreen.Route?
 
         public init(head: ViewID, task: TaskScreen.Route? = nil) {
@@ -88,34 +85,45 @@ public final class TaskList: Routable {
     }
 
     /// What a view may send, each case named for the gesture and never for the operation it triggers (ADR-0006).
+    /// The way back from the task is not one: SwiftUI reports it only as the shorter path it wrote, which the root
+    /// view sends the window whole, and the stack tells the list `.uncovered` (navigation state spec, section 3).
     public enum UserAction: Equatable, Sendable {
         /// A row of the list, tapped or clicked.
         case rowTapped(TaskID)
-        /// The back button of the task screen, tapped, or the swipe back that does the same: SwiftUI reports
-        /// both as one write of nil through the binding that pushed the screen. It names the control and the
-        /// gesture, and closing the screen is what the list decides it means (owner's review of #101), where
-        /// the spec has `taskClosed` (`docs/plans/navigation.md`, Deviations).
-        case backButtonTapped
     }
 
     public enum Event: RoutedEvent {
         case action(UserAction)
         case changed(ChangeSet)
 
-        /// The parent has just made this list: sent once, by the seat that holds it, right after `init`. The
-        /// list was made from a route its parent chose and already knows, the task in it included, so it has
-        /// nothing to report and answers nothing.
+        /// The window's stack has just made this list: sent once, right after `init`. The list was made from a route
+        /// its opener declared and already knows, the task in it included, so it has nothing to report and answers
+        /// nothing.
         case created
 
-        /// A route applied to the live list, by a link or by its parent reconciling the window: an event of the
-        /// world that no view can send (ADR-0006, amendment of 2026-10-14). The head of a live list never
-        /// changes, so it is the tail alone that the list reads.
+        /// A route handed to the live list, which its opener declared again with this list's head, by a link or by a
+        /// click on the list's view: an event of the world that no view can send (ADR-0006, amendment of
+        /// 2026-10-14), which the stack hands the list once, as `.declared` (navigation state spec, section 2). The
+        /// head of a live list never changes, so it is the tail alone that the list reads.
         case route(Route)
+
+        /// What the task screen declared over this list answered, which the stack hands the list, its opener
+        /// (ADR-0009, amendment of 2026-10-22, point 2).
+        case destinationAnswered(TaskScreen.Output)
+
+        /// The person went back to this list, and the task screen over it is gone already (navigation state spec,
+        /// section 3).
+        case uncovered
+
+        /// The task the list declared could not be made: why, and the route of the task screen that still stands
+        /// over the list, nil when none does, which the list takes back as its destination (navigation state spec,
+        /// section 2).
+        case notOpened(StoreError, stillOpen: TaskScreen.Route?)
     }
 
     public enum Output: Equatable, Sendable {
-        /// The view is gone, so the list asks its parent to drop it (spec section 3); the task screen open in it
-        /// goes with it.
+        /// The view is gone, so the list asks its opener to close it (spec section 3); the stack drops the task
+        /// screen over it with it.
         case closeRequested
     }
 
@@ -123,10 +131,14 @@ public final class TaskList: Routable {
     /// list holds is in one place and the model cannot disagree with it (owner's review of #101).
     public var model: Model { state.model }
 
-    /// The route the list is on, assembled and never kept beside its state (spec section 4): its own head, and
-    /// as the tail the route of the task screen in its seat, which names a task only while a screen is open on
-    /// it.
-    public var route: Route { Route(head: head, task: state.task.route) }
+    /// The route the list is on, assembled and never kept beside its state (spec section 4): its own head, and as
+    /// the tail the task it declared. The window's stack writes the window down from what stands instead, so a
+    /// declaration that has aged never reaches the text (navigation state spec, section 3).
+    public var route: Route { Route(head: head, task: state.destination.pushed) }
+
+    /// What the list declared over it, the task screen or nothing, which the window's stack reads after every event
+    /// and follows (ADR-0009, amendment of 2026-10-22, point 2).
+    public var destination: Destination<TaskScreen.Route> { state.destination }
 
     private let head: ViewID
 
@@ -134,28 +146,21 @@ public final class TaskList: Routable {
 
     private var state: State
 
-    /// Made from its route, the one way a list is made (spec section 3): the rows of the view the head names,
-    /// and the task screen the tail names, opened in the list's seat.
+    /// Made from its route, the one way a list is made (spec section 3): the rows of the view the head names, and
+    /// the task the tail names declared over them, which the stack makes in the walk after the list is made.
     ///
     /// Throws when the view's tasks cannot be read, a view that is gone among them, which the query refuses
     /// with `.notFound` and the view's id: a list that came up empty would look like a view with nothing in it,
-    /// and its parent keeps what was open and says so (spec section 3). A task screen that cannot be made does
-    /// not stop the list: a link to a task that is gone opens the view it names, with no task open and a
-    /// sentence saying why, which is what still exists (spec section 3, the fourth flow).
+    /// and the stack keeps what was open while the list's opener says so (navigation state spec, section 2). A task
+    /// that cannot be made does not stop the list: a link to a task that is gone opens the view it names, and the
+    /// stack tells the list, which says why with no task open, which is what still exists (spec section 3, the
+    /// fourth flow).
     public init(store: Store, route: Route) throws(StoreError) {
         let rows = try TaskList.rows(of: store, in: route.head)
-        // The seat is built once, here, with the way to make the screen: a closure over the screen's own
-        // `init` that captures the store and never this list. The list holds the seat in its state, so a
-        // closure holding the list would close a cycle, list to state to seat to closure to list, and none of
-        // them would ever be released (`Seat.init`). Its error is named, so that the seat's type below is
-        // checked against it rather than widened to `any Error`.
-        let task = Seat<TaskScreen, StoreError> { route throws(StoreError) in
-            try TaskScreen(store: store, route: route)
-        }
         self.head = route.head
         self.store = store
-        self.state = State(rows: rows, task: task, problem: nil)
-        apply(route)
+        self.state = State(rows: rows, destination: Destination(), problem: nil)
+        setDestination(route.task)
     }
 
     public func send(_ event: Event) -> Output? {
@@ -165,42 +170,48 @@ public final class TaskList: Routable {
             // sidebar's menu items do nothing on a row it does not hold: the tap is on something no longer on
             // screen, and what it would open is a task this view does not show.
             guard state.rows.contains(where: { $0.id == id }) else { return nil }
-            // The sentence goes with a tap on a row, the one gesture made on the list itself, and it goes before
-            // the route is applied, so that a task that cannot be made writes a fresh one: it answers this tap,
-            // and the one it replaces answered something earlier.
+            // The sentence goes with a tap on a row, the one gesture made on the list itself, and it goes before the
+            // task is declared, so that a task that cannot be made writes a fresh one when the stack says so: it
+            // answers this tap, and the one it replaces answered something earlier.
             state.problem = nil
-            apply(Route(head: head, task: TaskScreen.Route(head: id)))
-            return nil
-        case .action(.backButtonTapped):
-            // The way back is the route without the task, applied (spec section 3, the second flow). It is a
-            // gesture on the screen that covered the list, so it leaves the list's sentence: one written while
-            // the screen was up, by a link to a task that is gone or a reread that failed, is one the person
-            // first sees now that the list is uncovered. With no screen open it moves nothing at all, since an
-            // empty seat has nothing to drop: the view sends this action when the platform writes nil through
-            // its binding, and the platform writes one after a pop the model drove as well, as after
-            // `.closeRequested`, when nobody tapped anything, which is why the sidebar ignores a field action
-            // with no field open (#81).
-            apply(Route(head: head))
+            setDestination(TaskScreen.Route(head: id))
             return nil
         case .created:
-            // The sentence stays: the parent sends this right after `init`, and a sentence written there, a link
-            // to a task that is gone, would be erased before anyone read it. Being created answers no gesture.
+            // Being created answers no gesture, so it moves nothing, the sentence included.
             return nil
         case .route(let route):
-            // The route's own head is not read: a seat hands a live list only a route with its head, and the
-            // head of a live module never changes (spec section 3). The sentence goes at the start, as it does
-            // for a tap: a route is what a link or a click in the sidebar asks of this list, and the sentence on
-            // screen answered something earlier (owner, 2026-10-16). A route whose task cannot be made writes a
-            // fresh one, inside `apply`.
+            // The route's own head is not read: the stack hands a live list only a route with its head, and the head
+            // of a live module never changes (spec section 3). The sentence goes at the start, as it does for a tap:
+            // a route is what a link or a click in the sidebar asks of this list, and the sentence on screen
+            // answered something earlier (owner, 2026-10-16). A task the route names that cannot be made writes a
+            // fresh one, on `.notOpened`.
             state.problem = nil
-            apply(route)
+            setDestination(route.task)
+            return nil
+        case .destinationAnswered(.closeRequested), .uncovered:
+            // The task screen asked to be closed, its task gone (spec section 3), or the person went back to the list
+            // and the screen is gone already, and a list cannot keep a destination the person closed (navigation
+            // state spec, section 3). Either way the list declares nothing over it, the stack drops the screen, and
+            // the route names no task. Neither is a gesture on the list, so the sentence stays: one written while
+            // the screen was up, by a link to a task that is gone or a reread that failed, is one the person first
+            // sees now that the list is uncovered. The stack tells only a list with a screen over it, so the
+            // platform's write after a pop the model drove reaches nobody. The arm names the screen's one answer, so
+            // that an answer it learns to give stops this file compiling until the list has decided what it means
+            // (spec section 4).
+            setDestination(nil)
+            return nil
+        case .notOpened(let error, let stillOpen):
+            // What still stands is taken back, so that the declaration is tried once and the screen that was open
+            // stays (navigation state spec, section 2), and the list says why under its rows.
+            setDestination(stillOpen)
+            state.problem = TaskList.problem(error).sentence
             return nil
         case .changed(let changes):
             do {
-                // Only a change naming this view can have deleted it, and the view's read tells. A view that is
-                // gone is answered at once: the parent drops this list and the seat with it (spec section 3), so
-                // rows read here and a change handed to the screen would be work for nothing. A read that fails
-                // is a reread that failed, and the catch below says so.
+                // Only a change naming this view can have deleted it, and the view's read tells. A view that is gone
+                // is answered at once: the opener closes this list, and the stack drops it with the task screen over
+                // it (spec section 3), so rows read here would be work for nothing. A read that fails is a reread
+                // that failed, and the catch below says so.
                 if changes.views.contains(head) {
                     guard try store.view(head) != nil else { return .closeRequested }
                 }
@@ -213,42 +224,17 @@ public final class TaskList: Routable {
                 // what the person was told about something they did or a link asked for.
                 if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
-            // The open screen gets the change whatever the rows did, since what it shows is its own task's and
-            // only it reads that.
-            react(to: state.task.send(.changed(changes)))
+            // The destination stays: the task screen over the list reads the change itself, handed it by the window,
+            // and asks to be closed when its task is gone.
             return nil
         }
     }
 
-    /// Applies a route to the list, which is the one entrance to navigation inside it: a tap, a link, a relaunch
-    /// and the way back each arrive here as a route, so what a tap opens and what a link opens cannot drift
-    /// apart (spec section 3).
-    ///
-    /// The head is this list's own and the tail is all that moves: the seat keeps the screen on the same task,
-    /// replaces it on another and drops it on none. A screen that cannot be made leaves the one that was open,
-    /// since the seat makes the new one before it lets the old one go, and the list says why in its own model
-    /// (spec section 3). What the seat hands back goes through `react(to:)`, the line every answer of the
-    /// screen goes through.
-    private func apply(_ route: Route) {
-        do {
-            react(to: try state.task.apply(route.task))
-        } catch {
-            state.problem = TaskList.problem(error).sentence
-        }
-    }
-
-    /// What the task screen asked for, whichever event drew it out: its answer to `.created`, which is nothing
-    /// today, and its answer to a change. One path for every answer, with no `default`, so that an answer the
-    /// screen learns to give stops this file compiling until the list has decided what it means (spec section 4).
-    private func react(to output: TaskScreen.Output?) {
-        switch output {
-        case .closeRequested?:
-            // The task is gone, and so is the screen on it (spec section 3): the stack it was pushed onto pops
-            // back to the list on every platform (spec section 6), and the route names no task.
-            state.task.drop()
-        case nil:
-            break
-        }
+    /// Declares the task screen over the list, or nothing: a tap, a route, the way back and the stack's notices
+    /// each arrive here, so what a tap opens and what a link opens cannot drift apart (spec section 3). Every call
+    /// is a new write, which the window's stack follows at the walk after the event.
+    private func setDestination(_ task: TaskScreen.Route?) {
+        state.destination.declare(task.map { .pushed($0) })
     }
 
     /// Whether a change can have moved this view's tasks. Which tasks a view holds is its query's to say, and
@@ -278,10 +264,10 @@ public final class TaskList: Routable {
         return try store.tasks(in: view, today: today).map { Model.Row(id: $0.id, title: $0.title) }
     }
 
-    /// The sentence a screen that could not be made reads as. `.notFound` is the task being gone, which is what
-    /// a link written before a delete, or a tap on a row a peer's delete has not yet reached, looks like from
-    /// here. Anything else is the store failing to read a task that may well be there, and calling that "gone"
-    /// would put on screen something that is not true.
+    /// The sentence a task that could not be made reads as. `.notFound` is the task being gone, which is what a link
+    /// written before a delete, or a tap on a row a peer's delete has not yet reached, looks like from here. Anything
+    /// else is the store failing to read a task that may well be there, and calling that "gone" would put on screen
+    /// something that is not true.
     private static func problem(_ error: StoreError) -> Problem {
         switch error {
         case .notFound: .taskIsGone
@@ -289,22 +275,19 @@ public final class TaskList: Routable {
         }
     }
 
-    /// Everything the list holds between two events: the rows as the last read produced them, the seat with the
-    /// task screen in it, and the sentence a person was last told. One value, moved field by field, and the
-    /// one place any of it is kept: the model is computed from it on every read (owner's reviews of #77 and
-    /// #101).
+    /// Everything the list holds between two events: the rows as the last read produced them, what it declared over
+    /// them, and the sentence a person was last told. One value, moved field by field, and the one place any of it
+    /// is kept: the model is computed from it on every read (owner's reviews of #77 and #101).
     ///
-    /// The seat is a field of the state and not a property beside it, because the tree of live modules is the
-    /// navigation state (`docs/specs/feature-module-architecture.md`, section 4): the screen open in the list is
-    /// part of what the list holds.
+    /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
+    /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
     private struct State {
         var rows: [Model.Row]
-        var task: Seat<TaskScreen, StoreError>
+        var destination: Destination<TaskScreen.Route>
         var problem: String?
 
-        /// The model a view draws: the rows, the open screen's model as the screen computes it, and the
-        /// sentence, if any.
-        var model: Model { Model(rows: rows, task: task.model, problem: problem) }
+        /// The model a view draws: the rows and the sentence, if any.
+        var model: Model { Model(rows: rows, problem: problem) }
     }
 
     /// What can go wrong in this module, with the sentence each one reads as. The store's own error stays here:

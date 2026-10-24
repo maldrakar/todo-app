@@ -6,6 +6,14 @@ import TaskScreenFeature
 import TodoCore
 import SQLiteKit
 
+private let inbox = BuiltInTaskViews.inbox
+
+/// The model of a list made now on a view, with nothing declared over it, which is what a list is compared with
+/// after an event: the rows as a read now answers them and no sentence.
+private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
+    try TaskList(store: store, route: .init(head: view)).model
+}
+
 /// The rows are the query's answer in the query's order, which is the rank and not the order the tasks were
 /// written in, and a task the view does not select has no row.
 @Test func aListShowsTheViewsTasksInQueryOrder() throws {
@@ -14,18 +22,18 @@ import SQLiteKit
     let second = try store.createTask(NewTask(title: "Second"))
     let third = try store.createTask(NewTask(title: "Third"), at: .start)
     try store.createTask(NewTask(title: "Someday", when: Day(year: 2030, month: 1, day: 1)))
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))
-    let query = try store.tasks(in: BuiltInTaskViews.inbox, today: Day(millisSinceEpoch: Store.systemNow()))
+    let list = try TaskList(store: store, route: .init(head: inbox))
+    let query = try store.tasks(in: inbox, today: Day(millisSinceEpoch: Store.systemNow()))
     #expect(list.model.rows.map(\.id) == query.map(\.id))
     #expect(list.model.rows.map(\.id) == [third, first, second], "a task with a day is not the Inbox's")
     #expect(list.model.rows.map(\.title) == ["Third", "First", "Second"])
-    #expect(list.model.task == nil)
     #expect(list.model.problem == nil)
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
+    #expect(list.destination.pushed == nil)
+    #expect(list.route == .init(head: inbox))
 }
 
-/// A list on a view that is gone is not made, and its `init` says which view it looked for: the query refuses a
-/// view it does not hold, and the parent keeps what was open and says so (spec section 3).
+/// A list on a view that is gone is not made, and its `init` says which view it looked for: the stack keeps what
+/// was open, and the list's opener says so (spec section 2).
 @Test func aListOnAGoneViewIsNotMade() throws {
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
@@ -35,151 +43,159 @@ import SQLiteKit
     #expect(throws: StoreError.notFound(unknown)) { try TaskList(store: store, route: .init(head: unknown)) }
 }
 
-/// A link to a task, or a window restored onto one, makes the list with the task screen open in it, and the
-/// route says so; being created afterwards moves nothing, since the screen was made in `init`.
-@Test func aListCreatedWithATaskOpensIt() throws {
+/// A link to a task, or a window restored onto one, makes the list with the task declared over it, which the
+/// window's stack then makes (spec section 3): the list holds no screen and draws none, and its route names the
+/// task it declared. Being created afterwards moves nothing, the declaration included.
+@Test func aListCreatedWithATaskDeclaresIt() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let route = TaskList.Route(head: BuiltInTaskViews.inbox, task: .init(head: id))
+    let route = TaskList.Route(head: inbox, task: .init(head: id))
     let list = try TaskList(store: store, route: route)
-    #expect(list.model.task == (try TaskScreen(store: store, route: .init(head: id))).model)
-    #expect(list.model.task?.title == "Buy milk")
+    #expect(list.destination.pushed == route.task)
+    #expect(list.model == (try listOn(inbox, in: store)), "the rows and no sentence: the task is the stack's to make")
     #expect(list.route == route)
-    #expect(list.model.problem == nil)
     let before = list.model
     #expect(list.send(.created) == nil)
     #expect(list.model == before)
+    #expect(list.destination.pushed == route.task)
 }
 
-/// A link to a task deleted since opens what still exists: the list, with no task open and a sentence saying
-/// why (spec section 3, the fourth flow). The parent sends `.created` right after `init`, so the sentence has to
-/// outlive it to be read at all.
-@Test func aListCreatedWithAGoneTaskOpensTheListAndSaysSo() throws {
-    let store = try makeStore()
-    let kept = try store.createTask(NewTask(title: "Call the bank"))
-    let gone = try store.createTask(NewTask(title: "Buy milk"))
-    try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
-    #expect(list.model.rows.map(\.id) == [kept])
-    #expect(list.model.task == nil)
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox), "no task is open, so the route names none")
-    #expect(list.model.problem == "The task is gone.")
-    let told = list.model
-    #expect(list.send(.created) == nil)
-    #expect(list.model == told, "being created answers no gesture, so the sentence stays")
-}
-
-/// A tap is the route with the task as its tail, applied: the list it leaves is the one a link to the task makes.
-@Test func aTapOpensTheTaskAndTheRouteSaysSo() throws {
+/// A tap on a row declares the row's task, the route a link to it declares, so what a tap opens and what a link
+/// opens are one thing, and the route says so.
+@Test func aTapDeclaresTheTaskAndTheRouteSaysSo() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     try store.createTask(NewTask(title: "Call the bank"))
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))
+    let list = try TaskList(store: store, route: .init(head: inbox))
     #expect(list.send(.action(.rowTapped(id))) == nil)
-    let linked = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))
+    let linked = try TaskList(store: store, route: .init(head: inbox, task: .init(head: id)))
+    #expect(list.destination.pushed == TaskScreen.Route(head: id))
     #expect(list.model == linked.model, "what a tap opens and what a link opens are one thing")
-    #expect(list.model.task?.title == "Buy milk")
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))
+    #expect(list.route == linked.route)
+    #expect(list.route == .init(head: inbox, task: .init(head: id)))
 }
 
 /// A row the list does not hold is no row to tap, even for a task the store would open: this one was written
-/// after the list read its rows, and its change has not arrived. Nothing moves, the sentence included.
+/// after the list read its rows, and its change has not arrived. Nothing moves, the destination and the sentence
+/// included.
 @Test func aTapOnARowNotInTheListOpensNothing() throws {
     let store = try makeStore()
     let gone = try store.createTask(NewTask(title: "Buy milk"))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     let told = list.model
     #expect(told.problem != nil, "the sentence is the setup; without it this proves nothing about it")
     let unread = try store.createTask(NewTask(title: "Call the bank"))
     #expect(list.send(.action(.rowTapped(unread))) == nil)
     #expect(list.model == told)
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
+    #expect(list.destination.pushed == nil)
+    #expect(list.route == .init(head: inbox))
 }
 
-/// The way back is the route without the task, applied: the list it leaves is the one with nothing open.
-@Test func theBackButtonClosesTheTaskScreen() throws {
-    let store = try makeStore()
-    let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))
-    #expect(list.send(.action(.backButtonTapped)) == nil)
-    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))).model)
-    #expect(list.model.task == nil)
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
-}
-
-/// The way back is a gesture on the screen that covered the list, so it leaves the list's sentence: one written
-/// while the screen was up, here by a link to a task that is gone, is first seen when the list is uncovered.
-@Test func theBackButtonLeavesTheSentenceWrittenUnderIt() throws {
+/// The person went back to the list: the task screen is gone already, so the list empties its destination, which
+/// it cannot keep (spec section 3). It is a gesture on the screen that covered the list, so it leaves the list's
+/// sentence: one written while the screen was up, here by a link to a task that is gone, is first seen when the
+/// list is uncovered.
+@Test func uncoveredEmptiesTheDestinationAndLeavesTheSentence() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: open)))
-    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))) == nil)
-    #expect(list.model.task?.title == "Buy milk", "the screen that was open stays; this is the setup")
-    #expect(list.model.problem == "The task is gone.")
-    #expect(list.send(.action(.backButtonTapped)) == nil)
-    #expect(list.model.task == nil)
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
-    #expect(list.model.problem == "The task is gone.")
-}
-
-/// With no screen open the way back has nothing to close, as with the nil the platform writes after a pop the
-/// model drove, and it moves nothing at all, the sentence included: the sidebar ignores a field action with no
-/// field open for the same reason (#81).
-@Test func theBackButtonWithNoTaskScreenOpenMovesNothing() throws {
-    let store = try makeStore()
-    let gone = try store.createTask(NewTask(title: "Buy milk"))
-    try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    _ = list.send(.route(.init(head: inbox, task: .init(head: gone))))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: .init(head: open)))
+    #expect(list.destination.pushed == .init(head: open), "the screen that was open stays; this is the setup")
     let told = list.model
-    #expect(told.problem != nil, "the sentence is the setup; without it this proves nothing about it")
-    #expect(list.send(.action(.backButtonTapped)) == nil)
+    #expect(told.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.send(.uncovered) == nil)
+    #expect(list.destination.pushed == nil)
     #expect(list.model == told)
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
+    #expect(list.route == .init(head: inbox))
 }
 
-/// A link to another task while one is open: the seat sees another head and replaces the screen (spec
-/// section 3, the third flow).
-@Test func aRouteWithAnotherTaskReplacesTheOpenOne() throws {
+/// A route the stack hands a list it keeps, a link or a click on the list's view in the sidebar, declares the
+/// route's task, another one or none, and takes the sentence away at its start, as a tap does: the sentence on
+/// screen answered something earlier (owner, 2026-10-16). A task the route names that cannot be made is the
+/// stack's to find, and its `.notOpened` writes a fresh sentence.
+@Test func aRouteDeclaresItsTaskAndTakesTheSentenceAway() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let other = try store.createTask(NewTask(title: "Call the bank"))
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: open)))
-    let route = TaskList.Route(head: BuiltInTaskViews.inbox, task: .init(head: other))
-    #expect(list.send(.route(route)) == nil)
-    #expect(list.model == (try TaskList(store: store, route: route)).model)
-    #expect(list.model.task?.title == "Call the bank")
-    #expect(list.route == route)
+    let gone = try store.createTask(NewTask(title: "File the expenses"))
+    try store.delete(task: gone)
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    _ = list.send(.route(.init(head: inbox, task: .init(head: gone))))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: .init(head: open)))
+    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.send(.route(.init(head: inbox, task: .init(head: other)))) == nil)
+    #expect(list.destination.pushed == .init(head: other))
+    #expect(list.model == (try listOn(inbox, in: store)))
+    #expect(list.route == .init(head: inbox, task: .init(head: other)))
+    #expect(list.send(.changed(try unreadableFilter(on: inbox, in: store))) == nil)
+    let rows = list.model.rows
+    #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.", "a second sentence, for the next route to take away")
+    #expect(list.send(.route(.init(head: inbox))) == nil)
+    #expect(list.destination.pushed == nil)
+    #expect(list.model.rows == rows)
+    #expect(list.model.problem == nil)
+    #expect(list.route == .init(head: inbox))
 }
 
-@Test func aRouteWithNoTaskClosesIt() throws {
+/// The task screen asks to be closed when its task is gone, and the stack hands the answer to the list, which
+/// empties its destination and stays, its sentence with it, since the answer is no gesture. The change that
+/// deleted the task rereads the rows and leaves the destination to the screen's answer: what the screen shows is
+/// the screen's to read, and the change reaches it from the window, not through the list (ADR-0009, amendment of
+/// 2026-10-22, point 2).
+@Test func theTasksAnswerToCloseEmptiesTheDestination() throws {
     let store = try makeStore()
-    let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))
-    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox))) == nil)
-    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))).model)
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
+    let open = try store.createTask(NewTask(title: "Buy milk"))
+    let kept = try store.createTask(NewTask(title: "Call the bank"))
+    let gone = try store.createTask(NewTask(title: "File the expenses"))
+    try store.delete(task: gone)
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    _ = list.send(.route(.init(head: inbox, task: .init(head: gone))))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: .init(head: open)))
+    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    let deleted = try changeSet(of: store) { try store.delete(task: open) }
+    #expect(list.send(.changed(deleted)) == nil, "the list's view is still there")
+    #expect(list.model.rows.map(\.id) == [kept])
+    #expect(list.destination.pushed == .init(head: open), "the change closed nothing: the screen answers for itself")
+    let told = list.model
+    #expect(list.send(.destinationAnswered(.closeRequested)) == nil)
+    #expect(list.destination.pushed == nil)
+    #expect(list.model == told)
+    #expect(list.route == .init(head: inbox))
 }
 
-/// A screen that cannot be made leaves the one that was open, and the list says so (spec section 3), whether a
-/// tap or a link asked for it. The task was deleted by a peer whose change has not arrived, so its row is still
-/// there to tap.
-@Test func aTaskThatCannotBeMadeLeavesTheOpenOneAndSaysSo() throws {
+/// What the list declared could not be made, and the stack says why and what still stands over the list, which
+/// the list takes back as its destination, so that the declaration is tried once (spec section 2, and "Risks"). A
+/// task that is gone reads as "The task is gone.", which is what a link written before a delete, or a tap on a row
+/// a peer's delete has not yet reached, looks like from here; any other refusal is the store failing to read a task
+/// that may well be there, and calling that "gone" would put on screen something that is not true. The task was
+/// deleted after the lists read their rows, so its row is still there to tap.
+@Test func aTaskThatCouldNotBeOpenedSaysWhyAndTakesBackWhatStays() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
-    let tapped = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: open)))
-    let linked = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: open)))
+    let tapped = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    let linked = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)))
+    let unread = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
     try store.delete(task: gone)
     #expect(tapped.send(.action(.rowTapped(gone))) == nil)
-    #expect(tapped.model.task?.title == "Buy milk", "the screen that was open stays")
-    #expect(tapped.route == .init(head: BuiltInTaskViews.inbox, task: .init(head: open)))
+    #expect(tapped.destination.pushed == .init(head: gone), "the tap declared the task; this is the setup")
+    #expect(tapped.send(.notOpened(.notFound(gone), stillOpen: .init(head: open))) == nil)
+    #expect(tapped.destination.pushed == .init(head: open), "the screen that was open stays")
+    #expect(tapped.route == .init(head: inbox, task: .init(head: open)))
     #expect(tapped.model.problem == "The task is gone.")
-    #expect(linked.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))) == nil)
+    #expect(linked.send(.notOpened(.notFound(gone), stillOpen: nil)) == nil)
+    #expect(linked.destination.pushed == nil, "made with the task, nothing stands over it")
+    #expect(linked.route == .init(head: inbox))
     #expect(linked.model == tapped.model, "a link to the task meets the same refusal")
-    #expect(linked.route == tapped.route)
+    #expect(unread.send(.notOpened(.invalid("a read that failed"), stillOpen: .init(head: open))) == nil)
+    #expect(unread.destination.pushed == .init(head: open))
+    #expect(unread.model.rows == tapped.model.rows)
+    #expect(unread.model.problem == "The task could not be read.")
 }
 
 /// A change answers for nobody, so it leaves the sentence, and the next tap on a row the list holds takes it away.
@@ -188,43 +204,23 @@ import SQLiteKit
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Write it down")) }
     #expect(list.send(.changed(created)) == nil)
     #expect(list.model.rows.map(\.title) == ["Buy milk", "Write it down"], "the change was read")
     #expect(list.model.problem == "The task is gone.", "and it left the sentence")
     #expect(list.send(.action(.rowTapped(id))) == nil)
-    #expect(list.model.problem == nil)
-    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))).model)
-}
-
-/// A route clears the sentence at its start, as a tap does: it is what a link or a click in the sidebar asks of
-/// the list, and the sentence on screen answered something earlier (owner, 2026-10-16). A route whose task cannot
-/// be made writes a fresh one.
-@Test func aRouteTakesTheSentenceAwayAndATaskItCannotOpenWritesAFreshOne() throws {
-    let store = try makeStore()
-    let id = try store.createTask(NewTask(title: "Buy milk"))
-    let gone = try store.createTask(NewTask(title: "Call the bank"))
-    try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))
-    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
-    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: id)))) == nil)
-    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))).model)
-    #expect(list.model.problem == nil)
-    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox))) == nil)
-    #expect(list.send(.changed(try unreadableFilter(on: BuiltInTaskViews.inbox, in: store))) == nil)
-    #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.", "a second sentence, for the next route to replace")
-    #expect(list.send(.route(.init(head: BuiltInTaskViews.inbox, task: .init(head: gone)))) == nil)
-    #expect(list.model.problem == "The task is gone.")
-    #expect(list.model.task == nil)
+    #expect(list.model == (try listOn(inbox, in: store)))
+    #expect(list.destination.pushed == .init(head: id))
 }
 
 @Test func aChangeNamingATaskRereadsTheRows() throws {
     let store = try makeStore()
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))
+    let list = try TaskList(store: store, route: .init(head: inbox))
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Buy milk")) }
     #expect(list.send(.changed(created)) == nil)
-    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))).model)
+    #expect(list.model == (try listOn(inbox, in: store)))
     #expect(list.model.rows.map(\.title) == ["Buy milk"])
 }
 
@@ -232,7 +228,7 @@ import SQLiteKit
 /// its place: a list that read on any change would have seen the task.
 @Test func aChangeNamingOnlyAnotherViewReadsNothing() throws {
     let store = try makeStore()
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))
+    let list = try TaskList(store: store, route: .init(head: inbox))
     let before = list.model
     try store.createTask(NewTask(title: "Buy milk"))
     let other = try changeSet(of: store) { try store.createView(NewTaskView(title: "Work")) }
@@ -255,9 +251,9 @@ import SQLiteKit
     #expect(list.model.rows.isEmpty)
 }
 
-/// A peer deleted the view and the task open in it, and sync brings both in one change. The list asks to be
-/// closed at once, since its parent drops it with its seat: it rereads nothing, or the row would be gone, and
-/// hands the change to nobody, or the screen would be.
+/// A peer deleted the view and the task declared in it, and sync brings both in one change. The list asks to be
+/// closed at once, since its opener empties its destination and the stack drops the list with whatever stands
+/// over it: it rereads nothing, or the row would be gone, and its destination stays as it was.
 @Test func aViewDeletedUnderTheListAsksToClose() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
@@ -274,23 +270,11 @@ import SQLiteKit
     }
     #expect(list.send(.changed(deleted)) == .closeRequested)
     #expect(list.model == before)
+    #expect(list.destination.pushed == .init(head: id))
 }
 
-/// The task screen asks to be closed, and the list drops it and stays, on the rows read again without the task.
-@Test func aTaskDeletedUnderTheOpenScreenClosesItAndKeepsTheList() throws {
-    let store = try makeStore()
-    let id = try store.createTask(NewTask(title: "Buy milk"))
-    let kept = try store.createTask(NewTask(title: "Call the bank"))
-    let list = try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox, task: .init(head: id)))
-    let deleted = try changeSet(of: store) { try store.delete(task: id) }
-    #expect(list.send(.changed(deleted)) == nil, "the list's view is still there")
-    #expect(list.model == (try TaskList(store: store, route: .init(head: BuiltInTaskViews.inbox))).model)
-    #expect(list.model.rows.map(\.id) == [kept])
-    #expect(list.route == .init(head: BuiltInTaskViews.inbox))
-}
-
-/// The view is still there and its tasks can no longer be listed. The list keeps the rows and the open task, says
-/// the tasks could not be read and the list may be out of date, and the next tap on a row it holds takes the
+/// The view is still there and its tasks can no longer be listed. The list keeps the rows and what it declared,
+/// says the tasks could not be read and the list may be out of date, and the next tap on a row it holds takes the
 /// sentence away.
 @Test func aRereadThatFailsKeepsTheRowsAndSaysSo() throws {
     let store = try makeStore()
@@ -300,10 +284,11 @@ import SQLiteKit
     let before = list.model
     #expect(list.send(.changed(try unreadableFilter(on: work, in: store))) == nil, "the view is there, so the list stays")
     #expect(list.model.rows == before.rows)
-    #expect(list.model.task == before.task)
     #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.")
+    #expect(list.destination.pushed == .init(head: id))
     #expect(list.send(.action(.rowTapped(id))) == nil)
     #expect(list.model == before)
+    #expect(list.destination.pushed == .init(head: id))
 }
 
 /// A change answers for nobody, so a reread that fails says nothing over a sentence already on screen, here the
@@ -315,12 +300,14 @@ import SQLiteKit
     let gone = try store.createTask(NewTask(title: "Buy milk"))
     try store.delete(task: gone)
     let list = try TaskList(store: store, route: .init(head: work))
-    #expect(list.send(.route(.init(head: work, task: .init(head: gone)))) == nil)
+    _ = list.send(.route(.init(head: work, task: .init(head: gone))))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
     let told = list.model
     #expect(list.send(.changed(try unreadableFilter(on: work, in: store))) == nil)
     #expect(list.model == told)
 }
+
 
 /// A view and a task as the command line prints their ids, the lowercase UUID string of `EntityID`. Fixed, so
 /// that a refusal can name them and a failure reads the same on every run.

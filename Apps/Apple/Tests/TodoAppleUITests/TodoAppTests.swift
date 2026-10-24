@@ -254,7 +254,7 @@ import TodoCore
         host.send(.quickEntry(.addButtonTapped))
         let models = publications.models.dropFirst() + [host.model]
         #expect(models.map(\.quickEntry) == [nil, nil])
-        #expect(models.map { $0.taskViewList.taskList?.rows.map(\.title) } == [[], ["Milk"]])
+        #expect(models.map(listTitles) == [[], ["Milk"]])
     }
 }
 
@@ -374,6 +374,13 @@ import TodoCore
     var binding: Binding<WindowView.Value?> {
         Binding(get: { self.value }, set: { self.value = $0 })
     }
+}
+
+/// The titles of the list standing first over the sidebar in a window's model, read as the root view reads it, the
+/// first id of the path and its screen's model, and nil when no list stands there.
+private func listTitles(_ model: AppModule.Model) -> [String]? {
+    guard let id = model.path.first, case .list(let list)? = model.screens[id] else { return nil }
+    return list.rows.map(\.title)
 }
 
 /// The default window's path: the Inbox's list, which the sidebar chooses itself, nothing open in it and no quick

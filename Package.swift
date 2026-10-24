@@ -51,20 +51,25 @@ let package = Package(
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
-        // features it opens, which are its children, held in seats of its own (ADR-0009), and never on a
-        // sibling or on the root module (ADR-0007). The sidebar opens the task list, and the task list opens
-        // the task screen.
+        // features whose routes its destination holds, the screens it declares open over it (ADR-0009,
+        // amendment of 2026-10-22), and never on a sibling or on the root module (ADR-0007). The sidebar
+        // declares the task list, and the task list declares the task screen.
         .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskListFeature"], path: "Sources/Features/TaskViewList"),
         .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
         .target(name: "QuickEntryFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/QuickEntry"),
         // The root module, which is the features' parent and not one of them: it depends on them, since
-        // composing them is what it is for, and none of them depends on it (ADR-0007). It opens the sidebar and
-        // quick entry, its children, and depends on those alone (ADR-0009): the task list is the sidebar's, and
-        // each route reads and writes its own part of the window's path, so the root names nothing below them.
+        // composing them is what it is for, and none of them depends on it (ADR-0007). It holds its window's
+        // stack, so it depends on every kind of screen that can stand in it, the sidebar its base, the task
+        // list and the task screen over it, and on quick entry, its modal (ADR-0009, amendment of 2026-10-22,
+        // point 3). Which screen declares which stays in the features, and each route reads and writes its
+        // own part of the window's path, so the root decides none of the transitions.
         .target(
             name: "AppFeature",
-            dependencies: ["TodoCore", "FeatureModule", "TaskViewListFeature", "QuickEntryFeature"],
+            dependencies: [
+                "TodoCore", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature",
+                "QuickEntryFeature",
+            ],
             path: "Sources/Features/App"
         ),
         // The test helpers as an ordinary target: a test target cannot be depended on, and every feature's
@@ -92,7 +97,7 @@ let package = Package(
         .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(
             name: "AppFeatureTests",
-            dependencies: ["AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature", "TodoCore", "TestSupport"]
+            dependencies: ["AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport"]
         ),
     ],
     swiftLanguageModes: [.v6]
