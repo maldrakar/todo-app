@@ -173,8 +173,8 @@ swift run xcprojformatter --update Todo.xcodeproj
 
 ## Continuous integration
 
-Every pull request runs one Linux job: build, the suite on the host, the same suite on wasm32 under WasmKit,
-and a release wasm build measured against a size budget.
+Every pull request runs two jobs. The first, on Linux, runs build, the suite on the host, the same suite on
+wasm32 under WasmKit, and a release wasm build measured against a size budget.
 
 What that last step measures is `wasm-size-probe`, an executable that exists to be measured and is no part of
 the product. The budget is about what a web client downloads, and the `todo` demo is the wrong stand-in for
@@ -203,5 +203,6 @@ package and `Apps/Apple` with Xcode's toolchain too. Those two builds stay becau
 builds from Xcode's toolchain, and because they are what shows that, from Xcode 27 on, the pinned toolchain and
 Xcode's are one version (ADR-0008). Its last step builds the iPhone and iPad app from `Apps/Apple/Todo.xcodeproj`
 for the simulator, unsigned, with the `xcodebuild` command "Running on iPhone and iPad" gives and the derived data
-under the runner's temporary directory. The job runs on `main` and on demand, never on a pull request, because
-macOS minutes cost tenfold on a private repository.
+under the runner's temporary directory. The job runs on every pull request, because GitHub-hosted runners cost
+nothing on a public repository. If the repository goes private again, the job goes back to `main` and on demand,
+because macOS minutes cost tenfold there.

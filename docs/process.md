@@ -322,11 +322,11 @@ first public release.
 
 ## 10. Continuous integration
 
-CI is two jobs. The Linux job runs on every pull request: build, the
-test suite on the host, the same suite on wasm32 under WasmKit, and a
-release wasm build checked against the size budget in
-`scripts/wasm-size.sh`, which is one script so that the run in CI and
-the run on a laptop are the same command. The macOS job first checks
+CI is two jobs, and both run on every pull request, on `main` and on
+demand. The Linux job runs build, the test suite on the host, the same
+suite on wasm32 under WasmKit, and a release wasm build checked against
+the size budget in `scripts/wasm-size.sh`, which is one script so that
+the run in CI and the run on a laptop are the same command. The macOS job first checks
 that Xcode's toolchain is the version `.swift-version` pins, then
 compiles the core, and the Apple UI library from `Apps/Apple`, against
 the iOS and watchOS SDKs, builds and tests `Apps/Apple`, and builds
@@ -334,15 +334,17 @@ both packages with Xcode's toolchain too. Those builds stay because
 Apple accepts store builds from Xcode's toolchain, and because they are
 what shows that, from Xcode 27 on, the pinned toolchain and Xcode's are
 one version (ADR-0008). Its last step builds the iPhone and iPad app
-from the Xcode project for the simulator, unsigned. The job runs on
-`main` and on demand and never on a pull request.
+from the Xcode project for the simulator, unsigned.
 
-Constraint: a private repository on the free plan has 2000 Actions
-minutes per month, and macOS runners consume them at a 10x multiplier,
-which leaves roughly 200 macOS minutes. CI stays lean, and that is why
-the Apple job is off the pull-request path: a change that needs it
-before a merge is started from the Actions tab. If that becomes tight,
-the option left is making the repository public.
+Constraint: the macOS job runs on pull requests only while the
+repository is public. The repository was made public on 2026-10-24, when
+the private plan's minutes ran out, and GitHub-hosted runners, the
+macOS one included, cost nothing on a public repository. A private
+repository on the free plan has 2000 Actions minutes per month, and
+macOS runners consume them at a 10x multiplier, which leaves roughly
+200 macOS minutes. If the repository goes private again, the macOS job
+goes back to `main` and on demand, and a change that needs it before a
+merge starts it from the Actions tab.
 
 ## 11. M0 deliverables
 

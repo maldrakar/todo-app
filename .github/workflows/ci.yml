@@ -70,9 +70,7 @@ jobs:
         run: scripts/wasm-size.sh
 
   apple:
-    # macOS minutes cost tenfold, so this job runs on main and on demand, not on every pull request.
     name: iOS and watchOS, the app and Xcode's toolchain
-    if: github.event_name != 'pull_request'
     runs-on: xcode-27
     # One Xcode for every step, the one the app is built with: its SDKs for the compile checks and its toolchain
     # for the builds at the end.
