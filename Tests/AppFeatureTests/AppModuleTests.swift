@@ -333,6 +333,40 @@ private struct FirstScreenIsNoList: Error {}
     }
 }
 
+/// A way back is read against the layout the root has when the write arrives, and not the one the view bound it
+/// from; the two differ only when the width moved between the binding and the write. On 2026-10-24, in the iOS 26.3
+/// simulator, no write crossed a change of tree, so this pins what such a write does, and a change to it is a
+/// deliberate one. The empty path a wide window's detail column writes, landing after the window narrowed, reads as
+/// the narrow window's and closes the list and the task, the highlight with them, as Back to the views does. The narrow
+/// path holding the list alone, landing after the window widened, reads as the list over the column, a path the stack
+/// holds whole, and moves nothing.
+@Test func aWayBackIsReadAgainstTheLayoutTheRootHasWhenItArrives() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let route = try Route(path: "/view/\(inbox)/task/\(id)")
+
+    let narrowed = try AppModule(store: store, route: route, width: .wide)
+    let backToTheViews = try AppModule(store: store, route: route, width: .narrow)
+    #expect(narrowed.send(.widthChanged(.narrow)) == nil)
+    #expect(narrowed.send(.action(.wentBack(to: []))) == nil)
+    #expect(backToTheViews.send(.action(.wentBack(to: []))) == nil)
+    #expect(narrowed.model.layout == .narrow(path: []), "the list and the task closed")
+    #expect(narrowed.model.taskViewList.selection == nil, "and the highlight with them")
+    #expect(narrowed.model == backToTheViews.model)
+    #expect(narrowed.route == backToTheViews.route)
+    #expect(narrowed.route.path == "/")
+
+    let widened = try AppModule(store: store, route: route, width: .narrow)
+    let list = try #require(idsOverTheSidebar(in: widened.model).first)
+    #expect(widened.send(.widthChanged(.wide)) == nil)
+    let model = widened.model
+    let widenedRoute = widened.route
+    #expect(widened.send(.action(.wentBack(to: [list]))) == nil)
+    #expect(widened.model == model)
+    #expect(widened.route == widenedRoute)
+    #expect(try standing(in: widened) == [listOn(inbox, in: store), taskOn(id, in: store)], "the task still open")
+}
+
 /// The width a window already has, reported again, moves nothing, in either width: a view that reports its width
 /// when it first draws, as the window's view does, tells a window made with that width nothing new.
 @Test func theSameWidthAgainMovesNothing() throws {

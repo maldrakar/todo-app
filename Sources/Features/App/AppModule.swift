@@ -91,11 +91,13 @@ public final class AppModule: Routable {
         case screen(StackElementID, ScreenAction)
         /// The way back, by the back button, the swipe from the edge or the long-press menu that goes back several
         /// screens at once, which SwiftUI reports only as the shorter path it wrote into the path of the layout and the
-        /// root view hands on whole (navigation state spec, section 3). The root reads it against the layout it was
-        /// bound from: narrow, as the whole of what stands over the sidebar, and wide, as what stands over the
-        /// column, so the column is never popped (section 4). Named for the gesture: what it closes is the stack's to
-        /// work out, and a path that is not a shorter prefix of the one it holds, the write SwiftUI makes after a pop
-        /// the model drove among them, moves nothing.
+        /// root view hands on whole (navigation state spec, section 3). The root reads it against the layout it has
+        /// when the write arrives, which is the one the view bound unless the width moved in between: narrow, as the
+        /// whole of what stands over the sidebar, and wide, as what stands over the column, so the column is never
+        /// popped (section 4). A write the view bound in the other layout, one that lands after the width moved, is
+        /// read in the layout the root has: on 2026-10-24, in the iOS 26.3 simulator, no write crossed a change of
+        /// tree. Named for the gesture: what it closes is the stack's to work out, and a path that is not a shorter
+        /// prefix of the one it holds, the write SwiftUI makes after a pop the model drove among them, moves nothing.
         case wentBack(to: [StackElementID])
         /// An action of quick entry, handed to it as it came; with no quick entry up it moves nothing.
         case quickEntry(QuickEntry.UserAction)
@@ -209,11 +211,12 @@ public final class AppModule: Routable {
             // holds moves nothing. The root's sentence stays, since a gesture on a screen is that screen's.
             return react(to: state.stack.send(.action(action), to: id))
         case .action(.wentBack(let path)):
-            // Read against the layout the view bound it from, so that in a wide window the column goes before it and
-            // no write can pop the column (navigation state spec, section 4). The stack drops what was over the
-            // screen now on top and tells that screen, which empties its destination (section 3). A path it does not
-            // hold as a shorter prefix moves nothing, which is where SwiftUI's write after a pop the model drove
-            // lands, in either layout. The root's sentence stays, since the way back is a gesture on the screens.
+            // Read against the layout the root has as the write arrives, the one the view bound unless the width moved
+            // in between, which no write crossed in the probes of 2026-10-24, so that in a wide window the column goes
+            // before it and no write can pop the column (navigation state spec, section 4). The stack drops what was
+            // over the screen now on top and tells that screen, which empties its destination (section 3). A path it
+            // does not hold as a shorter prefix moves nothing, which is where SwiftUI's write after a pop the model
+            // drove lands, in either layout. The root's sentence stays, since the way back is a gesture on the screens.
             return react(to: state.stack.wentBack(to: state.stackPath(wentBackTo: path)))
         case .action(.quickEntry(let action)):
             // Cancel included, which closes quick entry by its own answer. With no quick entry up the empty seat
@@ -336,10 +339,11 @@ public final class AppModule: Routable {
             }
         }
 
-        /// The stack's path that a way back to `written` stands for, `written` being the path of the layout the
-        /// view bound, which SwiftUI wrote one or more screens shorter: narrow, the whole of the stack's path; wide,
-        /// the path over the column, so the column's id goes before it and the column is never popped (navigation
-        /// state spec, section 4). With nothing in the column nothing stands, and whatever was written moves nothing.
+        /// The stack's path that a way back to `written` stands for, read against the layout as it is now, which is
+        /// the one the view bound `written` from unless the width moved in between: narrow, the whole of the stack's
+        /// path; wide, the path over the column, so the column's id goes before it and the column is never popped
+        /// (navigation state spec, section 4). With nothing in the column nothing stands, and whatever was written
+        /// moves nothing.
         func stackPath(wentBackTo written: [StackElementID]) -> [StackElementID] {
             switch layout {
             case .wide(let column?, _): [column] + written
