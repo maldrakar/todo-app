@@ -153,7 +153,8 @@ public final class TaskList: Routable {
     /// Made from its route, the one way a list is made (spec section 3): the title and the rows of the view the head
     /// names, and the task the tail names declared over them, which the stack makes in the walk after the list is
     /// made. The view is read for its title and then once more by the query of its tasks, which reads it and hands
-    /// back only the tasks: a second read by its id, once per list made.
+    /// back only the tasks, and each read of a view reads the table of views whole (`Store.view(_:)`): a list made
+    /// reads that table twice, tens of rows in this epic.
     ///
     /// Throws when the view or its tasks cannot be read, a view that is gone among them, which is refused with
     /// `.notFound` and the view's id: a list that came up empty would look like a view with nothing in it,
@@ -226,7 +227,7 @@ public final class TaskList: Routable {
                 }
                 if TaskList.rereads(on: changes, of: head) { state.rows = try TaskList.rows(of: store, in: head) }
             } catch {
-                // The rows on screen are kept, and the title, since each is assigned only after a read that
+                // Neither the rows on screen nor the title is cleared, since each is assigned only after its own read
                 // succeeded, and a list emptied by a failed read would take with it the only thing left to act on.
                 // The sentence is written only when none is on screen, as in the sidebar: a change answers for
                 // nobody, so it neither clears a sentence nor replaces one, and "may be out of date" would take the
@@ -284,8 +285,8 @@ public final class TaskList: Routable {
         }
     }
 
-    /// Everything the list holds between two events: the rows as the last read produced them, what it declared over
-    /// them, and the sentence a person was last told. One value, moved field by field, and the one place any of it
+    /// Everything the list holds between two events: the view's title and the rows as the last reads produced them,
+    /// what it declared over them, and the sentence a person was last told. One value, moved field by field, and the one place any of it
     /// is kept: the model is computed from it on every read (owner's reviews of #77 and #101).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which

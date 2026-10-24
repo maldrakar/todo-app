@@ -7,7 +7,7 @@ import TaskScreenFeature
 /// `docs/specs/navigation.md`, section 10). The way back is the stack's back button, whose shorter path the root view
 /// hands the window whole, and the list it uncovers closes the task (navigation state spec, section 3). The task's
 /// title is the screen's title too, as every screen the stack pushes has one (#126), so it shows twice, in the bar and
-/// on the screen, on iPhone and on the Mac, until the editor takes the screen's place (M4).
+/// on the screen, until the editor takes the screen's place (M4).
 struct TaskScreenView: View {
     private let model: TaskScreen.Model
 

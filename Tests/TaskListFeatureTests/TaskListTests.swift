@@ -267,20 +267,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     try store.createTask(NewTask(title: "Buy milk"))
     let list = try TaskList(store: store, route: .init(head: work))
     let before = list.model
-    let peer = Store.newDeviceID()
-    let both = try changeSet(of: store) {
-        _ = try store.apply([
-            JournalOperation(
-                entity: .view, entityID: work.rawValue, field: "title", value: .text("Office"),
-                clock: HLC(millis: 1_800_000_000_000, counter: 0), device: peer
-            ),
-            JournalOperation(
-                entity: .view, entityID: work.rawValue, field: "filter", value: .text("{\"kind\":\"reminder_soon\"}"),
-                clock: HLC(millis: 1_800_000_000_000, counter: 1), device: peer
-            ),
-        ])
-    }
-    #expect(list.send(.changed(both)) == nil)
+    #expect(list.send(.changed(try unreadableFilter(on: work, in: store, renamedTo: "Office"))) == nil)
     #expect(list.model.title == "Office")
     #expect(list.model.rows == before.rows)
     #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.")
@@ -429,14 +416,20 @@ private func read(_ segments: [String]) throws(RouteError) -> TaskList.Route {
 }
 
 /// A newer app on a peer gives the view a filter this one cannot read, and the change of that write comes back:
-/// the view is still there, so the list stays, and `tasks(in:today:)` refuses it with `.viewNeedsNewerApp`.
-private func unreadableFilter(on view: ViewID, in store: Store) throws -> ChangeSet {
-    try changeSet(of: store) {
-        _ = try store.apply([
-            JournalOperation(
-                entity: .view, entityID: view.rawValue, field: "filter", value: .text("{\"kind\":\"reminder_soon\"}"),
-                clock: HLC(millis: 1_800_000_000_000, counter: 0), device: Store.newDeviceID()
-            ),
-        ])
+/// the view is still there, so the list stays, and `tasks(in:today:)` refuses it with `.viewNeedsNewerApp`. Given a
+/// title, the same peer renames the view in the same change.
+private func unreadableFilter(on view: ViewID, in store: Store, renamedTo title: String? = nil) throws -> ChangeSet {
+    let peer = Store.newDeviceID()
+    let millis: Int64 = 1_800_000_000_000
+    let filter = JournalOperation(
+        entity: .view, entityID: view.rawValue, field: "filter", value: .text("{\"kind\":\"reminder_soon\"}"),
+        clock: HLC(millis: millis, counter: 0), device: peer
+    )
+    let rename = title.map {
+        JournalOperation(
+            entity: .view, entityID: view.rawValue, field: "title", value: .text($0),
+            clock: HLC(millis: millis, counter: 1), device: peer
+        )
     }
+    return try changeSet(of: store) { _ = try store.apply([filter] + (rename.map { [$0] } ?? [])) }
 }
