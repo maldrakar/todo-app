@@ -29,21 +29,32 @@ struct RootView: View {
     }
 
     var body: some View {
-        // The one switch over the layout, every shape drawn and none by `default` (`docs/style.md`, "Views"). A window
-        // that narrows or widens gets the other shape from the root in the event its view reported, with the same
-        // screens, and is drawn in the other tree.
-        Group {
-            switch host.model.layout {
-            case .narrow(let path):
-                narrowStack(path: path)
-            case .wide(let column, let path):
-                splitView(column: column, path: path)
+        VStack(spacing: 0) {
+            // The one switch over the layout, every shape drawn and none by `default` (`docs/style.md`, "Views"). A
+            // window that narrows or widens gets the other shape from the root in the event its view reported, with the
+            // same screens, and is drawn in the other tree.
+            Group {
+                switch host.model.layout {
+                case .narrow(let path):
+                    narrowStack(path: path)
+                case .wide(let column, let path):
+                    splitView(column: column, path: path)
+                }
             }
-        }
-        // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
-        // window and not under one column, drawn as the pane's sentence is. On 2026-10-20, on macOS 26.7.1, it stood
-        // across the bottom of the window under the sidebar and the pane, and the sidebar's column ended above it.
-        .safeAreaInset(edge: .bottom) {
+            // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
+            // window and not under one column, drawn as the pane's sentence is. Under the containers and not inset over
+            // them, so that they end above it and the sidebar's sentence, under the sidebar's rows or inset on a
+            // screen, stands above it. Inset over them, it covered the sidebar's (#131): in the iOS 26.3 simulator on
+            // 2026-10-24 the inset reached the root screen of a stack alone, and on a screen pushed over it both strips
+            // stood in one frame at the bottom; on 2026-10-25, on macOS 26.7.1, with both sentences sent by a scratch
+            // build, since no link reaches the executable while it runs, the sidebar's stood under the root's strip,
+            // under the rows and at the bottom of the pane alike. Under them, the same day, both showed: on iPhone, and
+            // on the iPad and the Mac with the sidebar hidden, the sidebar's right above the root's; with the sidebar
+            // shown, the sidebar's under its rows and the root's across the window under both columns, which ended
+            // above it. On iPhone the last row of a list scrolled to its end stands above the strip, where under the
+            // inset it stood under it, and when the strip goes it rests 34 pt low, over the home indicator, until the
+            // next scroll. While it shows, the Mac's toolbar draws an opaque bar over the pane where over the inset it
+            // was clear, which the executable cannot show today, since nothing it receives writes the root's sentence.
             if let problem = host.model.problem {
                 sentenceStrip(problem)
             }
@@ -181,8 +192,9 @@ struct RootView: View {
     }
 
     /// A sentence across the width of what it is drawn under, the pane or the window, on a material so that the rows
-    /// scrolling under it do not show through: the regular one, since the bar's is unavailable on watchOS and a
-    /// condition here would be about the look alone (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
+    /// scrolling under the pane's strip do not show through, and the window's, which no row reaches, looks the same:
+    /// the regular one, since the bar's is unavailable on watchOS and a condition here would be about the look alone
+    /// (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
     private func sentenceStrip(_ sentence: String) -> some View {
         Text(sentence)
             .padding()
