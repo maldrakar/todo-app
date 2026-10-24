@@ -77,7 +77,8 @@ public struct ScreenStack<Screen: StackScreen> {
     /// The base's model, which the owner carries into its own whole and decides nothing in.
     public var baseModel: Screen.Base.Model { base.model }
 
-    /// The ids of the screens over the base, bottom up, which the owner hands its view as the path it binds.
+    /// The ids of the screens over the base, bottom up, which the owner hands its view in the shape of its layout,
+    /// whole as one path or cut into a column and a path (spec section 4).
     public var path: [StackElementID] { elements.map(\.id) }
 
     /// The model of each screen over the base, by id, so that the view finds an element's model without a
@@ -116,7 +117,9 @@ public struct ScreenStack<Screen: StackScreen> {
     }
 
     /// Takes the way back, which SwiftUI reports only as the shorter path it wrote, whole, from the back button,
-    /// the swipe from the edge or the long-press menu that goes back several screens at once (spec section 3).
+    /// the swipe from the edge or the long-press menu that goes back several screens at once (spec section 3). The
+    /// path is the stack's: the owner reads what its view sent against the layout it handed the view, a cut path
+    /// with what stands below the cut put back in front (spec section 4).
     ///
     /// It moves only a strict prefix of `path`. An id the stack never gave, a path that is not a prefix, the
     /// same path and a longer one move nothing, so a write SwiftUI makes after a pop the model drove changes
