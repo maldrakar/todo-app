@@ -8,10 +8,10 @@ import TodoCore
 /// It is declared by the sidebar, by a choice there, and stands in its window's stack over the sidebar, drawn in the
 /// pane beside it on the Mac. A tap on a row declares the task screen over it in its destination, and the window's
 /// stack makes, keeps and drops that screen (ADR-0009, amendment of 2026-10-22): the list holds no screen and draws
-/// none, and hears what the screen asks for as `.answered`. Neither the sidebar nor the root learns that a list opens
-/// a task, and their code does not grow when the task screen learns to open something (navigation state spec,
-/// section 2); the task screen's route reads and writes its own part of the window's path then, as this list's route
-/// does. What it holds is what makes the navigation real and nothing more; sections, grouping, ordering and
+/// none, and hears what the screen asks for as `.destinationAnswered`. Neither the sidebar nor the root learns that a
+/// list opens a task, and their code does not grow when the task screen learns to open something (navigation state
+/// spec, section 2); the task screen's route reads and writes its own part of the window's path then, as this list's
+/// route does. What it holds is what makes the navigation real and nothing more; sections, grouping, ordering and
 /// completion are M4's (spec section 10).
 ///
 /// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the task it
@@ -109,7 +109,7 @@ public final class TaskList: Routable {
 
         /// What the task screen declared over this list answered, which the stack hands the list, its opener
         /// (ADR-0009, amendment of 2026-10-22, point 2).
-        case answered(TaskScreen.Output)
+        case destinationAnswered(TaskScreen.Output)
 
         /// The person went back to this list, and the task screen over it is gone already (navigation state spec,
         /// section 3).
@@ -160,7 +160,7 @@ public final class TaskList: Routable {
         self.head = route.head
         self.store = store
         self.state = State(rows: rows, destination: Destination(), problem: nil)
-        declare(route.task)
+        setDestination(route.task)
     }
 
     public func send(_ event: Event) -> Output? {
@@ -174,7 +174,7 @@ public final class TaskList: Routable {
             // task is declared, so that a task that cannot be made writes a fresh one when the stack says so: it
             // answers this tap, and the one it replaces answered something earlier.
             state.problem = nil
-            declare(TaskScreen.Route(head: id))
+            setDestination(TaskScreen.Route(head: id))
             return nil
         case .created:
             // Being created answers no gesture, so it moves nothing, the sentence included.
@@ -186,9 +186,9 @@ public final class TaskList: Routable {
             // answered something earlier (owner, 2026-10-16). A task the route names that cannot be made writes a
             // fresh one, on `.notOpened`.
             state.problem = nil
-            declare(route.task)
+            setDestination(route.task)
             return nil
-        case .answered(.closeRequested), .uncovered:
+        case .destinationAnswered(.closeRequested), .uncovered:
             // The task screen asked to be closed, its task gone (spec section 3), or the person went back to the list
             // and the screen is gone already, and a list cannot keep a destination the person closed (navigation
             // state spec, section 3). Either way the list declares nothing over it, the stack drops the screen, and
@@ -198,12 +198,12 @@ public final class TaskList: Routable {
             // platform's write after a pop the model drove reaches nobody. The arm names the screen's one answer, so
             // that an answer it learns to give stops this file compiling until the list has decided what it means
             // (spec section 4).
-            declare(nil)
+            setDestination(nil)
             return nil
         case .notOpened(let error, let stillOpen):
             // What still stands is taken back, so that the declaration is tried once and the screen that was open
             // stays (navigation state spec, section 2), and the list says why under its rows.
-            declare(stillOpen)
+            setDestination(stillOpen)
             state.problem = TaskList.problem(error).sentence
             return nil
         case .changed(let changes):
@@ -233,7 +233,7 @@ public final class TaskList: Routable {
     /// Declares the task screen over the list, or nothing: a tap, a route, the way back and the stack's notices
     /// each arrive here, so what a tap opens and what a link opens cannot drift apart (spec section 3). Every call
     /// is a new write, which the window's stack follows at the walk after the event.
-    private func declare(_ task: TaskScreen.Route?) {
+    private func setDestination(_ task: TaskScreen.Route?) {
         state.destination.declare(task.map { .pushed($0) })
     }
 

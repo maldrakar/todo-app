@@ -162,7 +162,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     #expect(list.model.rows.map(\.id) == [kept])
     #expect(list.destination.pushed == .init(head: open), "the change closed nothing: the screen answers for itself")
     let told = list.model
-    #expect(list.send(.answered(.closeRequested)) == nil)
+    #expect(list.send(.destinationAnswered(.closeRequested)) == nil)
     #expect(list.destination.pushed == nil)
     #expect(list.model == told)
     #expect(list.route == .init(head: inbox))

@@ -177,7 +177,7 @@ private func sidebarOn(_ view: ViewID, in store: Store) throws -> TaskViewList.M
     #expect(list.model.rows.filter(\.isSelected).isEmpty)
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list, "a reread leaves the destination to the list's answer")
     let told = list.model
-    #expect(list.send(.answered(.closeRequested)) == nil)
+    #expect(list.send(.destinationAnswered(.closeRequested)) == nil)
     #expect(list.destination.pushed == nil)
     #expect(list.model == told)
     #expect(list.route == .init(list: nil))

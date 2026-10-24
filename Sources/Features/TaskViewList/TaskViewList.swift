@@ -14,11 +14,11 @@ import TodoCore
 /// sync (`docs/style.md`).
 ///
 /// It is the base of its window's stack, and the task list's opener. A choice here declares the list of that view's
-/// tasks in this module's destination, and the window's stack makes, keeps and drops the list (ADR-0009, amendment
-/// of 2026-10-22): the module holds no screen, and hears what the list asks for as `.answered`. The list is drawn on
-/// a phone as the screen pushed over this one and on the Mac as the pane beside it. The root never learns that a
-/// choice opens a list. The destination is the highlight too, so the two are one fact and cannot disagree
-/// (navigation state spec, section 1).
+/// tasks in this module's destination, and the window's stack makes, keeps and drops the list (ADR-0009, amendment of
+/// 2026-10-22): the module holds no screen, and hears what the list asks for as `.destinationAnswered`. The list is
+/// drawn on a phone as the screen pushed over this one and on the Mac as the pane beside it. The root never learns that
+/// a choice opens a list. The destination is the highlight too, so the two are one fact and cannot disagree (navigation
+/// state spec, section 1).
 ///
 /// It is a routable module, one that can be opened (spec section 4): its route has no head, because a window
 /// has one list of views, and its tail is the route of the list it declared, so that a link to a view declares its
@@ -136,7 +136,7 @@ public final class TaskViewList: Routable {
 
         /// What the list declared over this module answered, which the window's stack hands the module, its opener
         /// (ADR-0009, amendment of 2026-10-22, point 2).
-        case answered(TaskList.Output)
+        case destinationAnswered(TaskList.Output)
 
         /// The person went back to the views, and the list over them is gone already (navigation state spec,
         /// section 3): on a narrow window the list is a screen pushed over this one, which the back button, the
@@ -193,7 +193,7 @@ public final class TaskViewList: Routable {
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
         self.state = State(rows: rows, destination: Destination())
-        declare(route.list ?? inbox.map { TaskList.Route(head: $0) })
+        setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
 
     public func send(_ event: Event) -> Output? {
@@ -228,7 +228,7 @@ public final class TaskViewList: Routable {
             // cleared and not from being answered: the new sentence answers the gesture just made, the field stays
             // open on its draft, and Return brings the field's refusal back.
             if state.rename == nil { state.problem = nil }
-            declare(TaskList.Route(head: id))
+            setDestination(TaskList.Route(head: id))
             return nil
         case .action(.renameMenuItemChosen(let id)):
             // The title comes off the row and not out of a read: the row is what the person chose the menu
@@ -299,15 +299,15 @@ public final class TaskViewList: Routable {
             // creation and never again (owner, 2026-10-16).
             if state.rename == nil { state.problem = nil }
             guard let list = route.list else { return nil }
-            declare(list)
+            setDestination(list)
             return nil
-        case .answered(.closeRequested):
+        case .destinationAnswered(.closeRequested):
             // The list's view is gone, so the list asked to be closed (spec section 3), and this module declares
             // nothing over it: the stack drops the list with whatever stands over it, and the route names no list.
             // The highlight went with its row already, by computation; the sentence stays, since the answer is no
             // gesture. The arm names the list's one answer, so that an answer it learns to give stops this file
             // compiling until this module has decided what it means (spec section 4).
-            declare(nil)
+            setDestination(nil)
             return nil
         case .uncovered:
             // The list is gone already, and this module cannot keep a destination the person closed (navigation
@@ -322,7 +322,7 @@ public final class TaskViewList: Routable {
             // reaches nobody. The sentence goes, as with a click, except while a field is open, whose sentence
             // explains it and which this gesture leaves where it is.
             if state.rename == nil { state.problem = nil }
-            declare(nil)
+            setDestination(nil)
             return nil
         case .notOpened(_, let stillOpen):
             // The list could not be made, its view gone or not yet synced, or its tasks unread, and the stack keeps
@@ -330,7 +330,7 @@ public final class TaskViewList: Routable {
             // the highlight returns to the list that is open, or goes when none is (navigation state spec, section
             // 2, and "Open questions"), and says so, over an open field's sentence too, since it answers the gesture
             // or the link just made. It has one sentence for every refusal.
-            declare(stillOpen)
+            setDestination(stillOpen)
             state.problem = Problem.couldNotOpenList.sentence
             return nil
         case .changed(let changes):
@@ -363,7 +363,7 @@ public final class TaskViewList: Routable {
     /// the stack's notices each arrive here, so what a click opens and what a link opens cannot drift apart (spec
     /// section 3). Every call is a new write, which the window's stack follows at the walk after the event, and the
     /// highlight is what it declares.
-    private func declare(_ list: TaskList.Route?) {
+    private func setDestination(_ list: TaskList.Route?) {
         state.destination.declare(list.map { .pushed($0) })
     }
 
@@ -498,7 +498,7 @@ public final class TaskViewList: Routable {
         // The highlight moves without anybody choosing a row, because the folder's list is declared as a click
         // would have declared it: the highlight is the declaration, so a list on a folder the module is not
         // highlighting cannot happen.
-        declare(TaskList.Route(head: id))
+        setDestination(TaskList.Route(head: id))
     }
 
     /// The tree as one read produced it. `views()` answers parents before children with the effective parent

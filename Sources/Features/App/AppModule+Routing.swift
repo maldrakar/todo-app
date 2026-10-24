@@ -1,4 +1,4 @@
-// Sources/Features/App/Screen.swift
+// Sources/Features/App/AppModule+Routing.swift
 import FeatureModule
 import TaskListFeature
 import TaskScreenFeature
@@ -125,15 +125,16 @@ extension AppModule {
             switch (self, notice) {
             case (.list(let list), .created): list.send(.created).map(Output.list)
             case (.list(let list), .declared(.list(let route))): list.send(.route(route)).map(Output.list)
-            case (.list(let list), .answered(.task(let output))): list.send(.answered(output)).map(Output.list)
+            case (.list(let list), .destinationAnswered(.task(let output))):
+                list.send(.destinationAnswered(output)).map(Output.list)
             case (.list(let list), .uncovered): list.send(.uncovered).map(Output.list)
             case (.list(let list), .notOpened(let error, let stillOpen)):
                 list.send(.notOpened(error, stillOpen: stillOpen?.task)).map(Output.list)
             case (.task(let task), .created): task.send(.created).map(Output.task)
             case (.task(let task), .declared(.task(let route))): task.send(.route(route)).map(Output.task)
-            case (.list, .declared(.task)), (.list, .answered(.list)), (.task, .declared(.list)):
+            case (.list, .declared(.task)), (.list, .destinationAnswered(.list)), (.task, .declared(.list)):
                 nil
-            case (.task, .answered), (.task, .uncovered), (.task, .notOpened):
+            case (.task, .destinationAnswered), (.task, .uncovered), (.task, .notOpened):
                 nil
             }
         }
@@ -151,10 +152,10 @@ extension AppModule {
 
         static func take(_ notice: StackNotice<Screen>, base: TaskViewList) -> TaskViewList.Output? {
             switch notice {
-            case .answered(.list(let output)): base.send(.answered(output))
+            case .destinationAnswered(.list(let output)): base.send(.destinationAnswered(output))
             case .uncovered: base.send(.uncovered)
             case .notOpened(let error, let stillOpen): base.send(.notOpened(error, stillOpen: stillOpen?.list))
-            case .created, .declared, .answered(.task): nil
+            case .created, .declared, .destinationAnswered(.task): nil
             }
         }
 

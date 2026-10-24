@@ -58,7 +58,7 @@ public protocol StackScreen {
     static func destination(of base: Base) -> Destination<Route>
 
     /// Hands the base a notice and returns its answer, which goes to the owner. The stack never makes the base
-    /// and never declares it, so the base is handed `.answered`, `.uncovered` and `.notOpened`, and never
+    /// and never declares it, so the base is handed `.destinationAnswered`, `.uncovered` and `.notOpened`, and never
     /// `.created` or `.declared`.
     static func take(_ notice: StackNotice<Self>, base: Base) -> Base.Output?
 
@@ -77,8 +77,8 @@ public enum StackNotice<Screen: StackScreen> {
     /// screen, with its session state, and hands it the route declared, once, which the screen reconciles its
     /// own destination to, as a seat hands a kept child its route (spec section 2).
     case declared(Screen.Route)
-    /// The screen right over this one, which this one opened, answered this.
-    case answered(Screen.Output)
+    /// The screen right over this one, which this one declared in its destination, answered this.
+    case destinationAnswered(Screen.Output)
     /// The person went back to this screen: what was over it is gone already, so it empties its destination,
     /// which it cannot keep (spec section 3).
     case uncovered
