@@ -4,27 +4,20 @@ import FeatureModule
 import SwiftUI
 
 /// The root of the tree of views, and beside the window's view, which holds the window and its host, the one view that
-/// names the host: it hands the sidebar's view its model and a closure that wraps its actions in the root's, binds the
-/// window's stack to the path of ids the model gives it, draws each element of it through one switch, and sends a pop
-/// back whole (navigation state spec, sections 3 and 6), with the root's own sentence across the bottom of the window
-/// and quick entry as a sheet over all of it. A wide window, the Mac's and the iPad's, is a split view with the
-/// sidebar beside a stack whose root is the first screen over the sidebar, the list of the chosen view's tasks, and
-/// the rest pushed in that stack. A narrow window, iPhone's and a narrow iPad's, is one stack with the views at its
-/// root and every screen of the path pushed over them. The containers are the view's and the modules know nothing of
-/// them; every binding is read from the model and set only by sending an action, and the stack's path only by
-/// `.wentBack(to:)`. It reads neither the window's route nor which screen opens which.
+/// names the host: it hands the sidebar's view its model and a closure that wraps its actions in the root's, draws the
+/// layout the model gives it, binds each stack to the path of ids the layout carries, draws each element of the
+/// window's stack through one switch, and sends a pop back whole (navigation state spec, sections 3, 4 and 6), with
+/// the root's own sentence across the bottom of the window and quick entry as a sheet over all of it. A wide window,
+/// the Mac's and a wide iPad window, is a split view with the sidebar beside a stack whose root is the layout's column,
+/// the list of the chosen view's tasks, and the layout's path pushed in that stack. A narrow window, iPhone's and a
+/// narrow iPad window, is one stack with the views at its root and every screen of the layout's path pushed over them.
+/// The containers are the view's and the modules know nothing of them; which of the two a window has is the root
+/// module's, decided from the width the window's view reports, and this view switches over the layout once and
+/// chooses nothing by the width (`docs/style.md`, "Views"). Every binding is read from the model and set only by
+/// sending an action, and a stack's path only by `.wentBack(to:)`. It reads neither the window's route nor which
+/// screen opens which.
 struct RootView: View {
     private let host: ModuleHost<AppModule>
-
-    /// Whether the window is narrow, which only the view can know (`docs/style.md`, "Views"), and which chooses the
-    /// tree. A split view in a narrow window collapses into one stack whose screens SwiftUI pushes and pops from
-    /// state of its own: in the iOS 26.3 simulator on 2026-10-21, on iPhone, a tap on the view still highlighted
-    /// after Back pushed nothing (#107); a window opened on the views pushed no list for any tap or link (#116); and
-    /// a list closed in the module when Back reached the views was slid back in over them, "Nothing to show" in it.
-    /// A stack of its own has a path, and the path is the model's. Choosing the tree here, and cutting the path for
-    /// the wide one, is the interim that #123 moves into the module, which will decide the layout from the width the
-    /// view reports (navigation state spec, section 4).
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     /// Which of the split view's columns are shown, which only the view can know (`docs/style.md`, "Views"): handed
     /// to the split view, which writes it as it lays its columns out, and read for whether the sidebar is beside the
@@ -36,11 +29,15 @@ struct RootView: View {
     }
 
     var body: some View {
+        // The one switch over the layout, every shape drawn and none by `default` (`docs/style.md`, "Views"). A window
+        // that narrows or widens gets the other shape from the root in the event its view reported, with the same
+        // screens, and is drawn in the other tree.
         Group {
-            if horizontalSizeClass == .compact {
-                narrowStack
-            } else {
-                splitView
+            switch host.model.layout {
+            case .narrow(let path):
+                narrowStack(path: path)
+            case .wide(let column, let path):
+                splitView(column: column, path: path)
             }
         }
         // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
@@ -58,15 +55,15 @@ struct RootView: View {
         }
     }
 
-    /// The wide window's tree: the sidebar beside the detail column, whose stack has the first screen over the
-    /// sidebar at its root, or the placeholder when none stands, and the rest of the path pushed over it.
-    private var splitView: some View {
+    /// The wide window's tree: the sidebar beside the detail column, whose stack has the layout's column at its root,
+    /// or the placeholder when no screen stands over the sidebar, and the layout's path pushed over it.
+    private func splitView(column: StackElementID?, path: [StackElementID]) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
-            NavigationStack(path: detailPath) {
+            NavigationStack(path: bound(path)) {
                 Group {
-                    if let column = host.model.path.first {
+                    if let column {
                         screen(column)
                     } else {
                         Text("Nothing to show")
@@ -91,10 +88,16 @@ struct RootView: View {
         }
     }
 
-    /// The narrow window's tree: the views at the root of one stack, and every screen of the model's path pushed
+    /// The narrow window's tree: the views at the root of one stack, and every screen of the layout's path pushed
     /// over them, each drawn by the one destination.
-    private var narrowStack: some View {
-        NavigationStack(path: path) {
+    ///
+    /// One stack, and not a split view, which collapses in a narrow window into one stack whose screens SwiftUI
+    /// pushes and pops from state of its own: in the iOS 26.3 simulator on 2026-10-21, on iPhone, a tap on the view
+    /// still highlighted after Back pushed nothing (#107); a window opened on the views pushed no list for any tap or
+    /// link (#116); and a list closed in the module when Back reached the views was slid back in over them, "Nothing
+    /// to show" in it. A stack of its own has a path, and the path is the model's.
+    private func narrowStack(path: [StackElementID]) -> some View {
+        NavigationStack(path: bound(path)) {
             sidebar
                 .navigationDestination(for: StackElementID.self) { id in
                     screen(id)
@@ -134,28 +137,23 @@ struct RootView: View {
         }
     }
 
-    /// The narrow stack's path: every id of the model's path, read from the model and moved only by an action. A pop,
-    /// by the back button, the swipe from the edge or the long-press menu that goes back several screens at once, is
-    /// one write of a shorter path, which is sent whole as `.wentBack(to:)` and interpreted by the module (navigation
-    /// state spec, section 3). The write SwiftUI makes after a pop the model drove, a task gone under its screen, is
-    /// a path the module holds already, which moves nothing.
-    private var path: Binding<[StackElementID]> {
-        Binding(get: { host.model.path }, set: { host.send(.wentBack(to: $0)) })
-    }
-
-    /// The detail column's path in the wide window: the model's path after its first id, which stands at the column's
-    /// root, so that a pop SwiftUI can reach leaves the list in place and the highlight cannot be removed. A write is
-    /// sent whole with the column's id before it, as `.wentBack(to:)`. Cutting the path is the interim #123 moves
-    /// into the module (navigation state spec, section 4).
+    /// A stack's path, the one the layout carries, read from the model and moved only by an action, in both trees. A
+    /// pop, by the back button, the swipe from the edge or the long-press menu that goes back several screens at once,
+    /// is one write of a shorter path, which is sent whole as `.wentBack(to:)`, as SwiftUI wrote it, and the module
+    /// reads it against the layout it gave (navigation state spec, sections 3 and 4): in the wide tree the column is
+    /// not in the path, so no write can pop it and the highlight cannot be removed. The write SwiftUI makes after a pop
+    /// the model drove, a task gone under its screen, is a path the module holds already, which moves nothing.
+    ///
+    /// The getter answers the path the switch over the layout bound, and reads the layout no second time, which would
+    /// be a second condition over it (`docs/style.md`, "Views"): when the model moves, the body runs again and the
+    /// stack is handed a binding over the new path.
     ///
     /// A path and not `navigationDestination(item:)` per screen, which lost the task a window opens with: on
     /// 2026-10-18, on macOS 26.7 under Swift 6.4.0, a window made from a path naming a task drew its list with nothing
     /// pushed, and the item binding's first write, as the window appeared, was nil, which closed the task, with no
     /// runtime warning. The same window over a path showed the task pushed and wrote nothing.
-    private var detailPath: Binding<[StackElementID]> {
-        Binding(get: { Array(host.model.path.dropFirst()) }, set: { written in
-            host.send(.wentBack(to: Array(host.model.path.prefix(1)) + written))
-        })
+    private func bound(_ path: [StackElementID]) -> Binding<[StackElementID]> {
+        Binding(get: { path }, set: { host.send(.wentBack(to: $0)) })
     }
 
     /// Whether quick entry is up, read from the model and moved only by an action (spec section 5). The swipe down
