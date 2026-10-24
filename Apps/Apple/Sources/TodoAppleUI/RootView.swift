@@ -62,11 +62,11 @@ struct RootView: View {
     /// pane: under the sidebar's rows where the sidebar's column is beside the pane, and at the bottom of every screen
     /// of the stack when the split view reports the sidebar's column hidden. On 2026-10-18 the split view reported
     /// `detailOnly` on the iPad in portrait, where it hid the sidebar (the iOS 26.3 simulator), and on the Mac, whose
-    /// toolbar button had hidden the sidebar; on the Mac with its sidebar shown the sentence stood under the
-    /// sidebar's rows alone, and it moved between the two as the button hid and showed the sidebar. On each screen
-    /// and not on the stack, whose inset reached its root screen alone: on 2026-10-24 it stood mid-pane right under
-    /// the placeholder on the iPad (the iOS 26.3 simulator) and on macOS 26.7.1, and a task pushed on the iPad had
-    /// none (#110).
+    /// toolbar button had hidden the sidebar; on the Mac with its sidebar shown the sentence stood under the sidebar's
+    /// rows alone, and it moved between the rows and the pane as the button hid and showed the sidebar. On each screen
+    /// and not on the stack, whose inset reached its root screen alone: on 2026-10-24 it stood mid-pane right under the
+    /// placeholder on the iPad (the iOS 26.3 simulator) and on macOS 26.7.1, and a task pushed on the iPad had none
+    /// (#110).
     private func splitView(column: StackElementID?, path: [StackElementID]) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
@@ -112,9 +112,9 @@ struct RootView: View {
         }
     }
 
-    /// The sidebar's sentence across the bottom of a screen of the window's stack, when `shown`, the one strip both
-    /// trees put on their screens: the sidebar's rows draw it under them, and a screen of the stack draws it where
-    /// the rows are neither beside it nor under it.
+    /// The strip with the sidebar's sentence for a screen of the window's stack, when `shown`, the one strip both trees
+    /// inset at the bottom of their screens: the sidebar's rows put the sentence under them as text of their own, and
+    /// a screen of the stack carries this strip where the rows are out of sight, hidden beside it or covered by it.
     @ViewBuilder private func sidebarSentence(shown: Bool) -> some View {
         if shown, let problem = host.model.taskViewList.problem {
             sentenceStrip(problem)
