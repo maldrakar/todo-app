@@ -6,7 +6,8 @@ import TaskListFeature
 /// for (`docs/style.md`). It is the root of the stack in a wide window's detail column, and a screen pushed over the
 /// views in a narrow window's one stack, and the task the list declared is pushed over it either way, drawn by the
 /// root view's one destination for the window's stack, so the list draws nothing of it (navigation state spec,
-/// section 6). What opens is the list's to decide, so a row reports the tap and nothing else.
+/// section 6). What opens is the list's to decide, so a row reports the tap and nothing else. The screen's title is the
+/// view's, which names the list in the back button's menu over the task (#126).
 struct TaskListView: View {
     private let model: TaskList.Model
     private let send: (TaskList.UserAction) -> Void
@@ -37,5 +38,6 @@ struct TaskListView: View {
                     .padding()
             }
         }
+        .navigationTitle(model.title)
     }
 }
