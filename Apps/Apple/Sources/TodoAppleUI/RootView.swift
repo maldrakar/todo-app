@@ -61,7 +61,7 @@ struct RootView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
-            NavigationStack(path: bound(path)) {
+            NavigationStack(path: stackPath(path)) {
                 Group {
                     if let column {
                         screen(column)
@@ -97,7 +97,7 @@ struct RootView: View {
     /// link (#116); and a list closed in the module when Back reached the views was slid back in over them, "Nothing
     /// to show" in it. A stack of its own has a path, and the path is the model's.
     private func narrowStack(path: [StackElementID]) -> some View {
-        NavigationStack(path: bound(path)) {
+        NavigationStack(path: stackPath(path)) {
             sidebar
                 .navigationDestination(for: StackElementID.self) { id in
                     screen(id)
@@ -140,9 +140,11 @@ struct RootView: View {
     /// A stack's path, the one the layout carries, read from the model and moved only by an action, in both trees. A
     /// pop, by the back button, the swipe from the edge or the long-press menu that goes back several screens at once,
     /// is one write of a shorter path, which is sent whole as `.wentBack(to:)`, as SwiftUI wrote it, and the module
-    /// reads it against the layout it gave (navigation state spec, sections 3 and 4): in the wide tree the column is
-    /// not in the path, so no write can pop it and the highlight cannot be removed. The write SwiftUI makes after a pop
-    /// the model drove, a task gone under its screen, is a path the module holds already, which moves nothing.
+    /// reads it against the layout it has when the write arrives (navigation state spec, sections 3 and 4), the one
+    /// this tree was drawn from unless the width moved in between, which no write crossed in the probes of 2026-10-24:
+    /// in the wide tree the column is not in the path, so no write can pop it and the highlight cannot be removed. The
+    /// write SwiftUI makes after a pop the model drove, a task gone under its screen, is a path the module holds
+    /// already, which moves nothing.
     ///
     /// The getter answers the path the switch over the layout bound, and reads the layout no second time, which would
     /// be a second condition over it (`docs/style.md`, "Views"): when the model moves, the body runs again and the
@@ -152,7 +154,7 @@ struct RootView: View {
     /// 2026-10-18, on macOS 26.7 under Swift 6.4.0, a window made from a path naming a task drew its list with nothing
     /// pushed, and the item binding's first write, as the window appeared, was nil, which closed the task, with no
     /// runtime warning. The same window over a path showed the task pushed and wrote nothing.
-    private func bound(_ path: [StackElementID]) -> Binding<[StackElementID]> {
+    private func stackPath(_ path: [StackElementID]) -> Binding<[StackElementID]> {
         Binding(get: { path }, set: { host.send(.wentBack(to: $0)) })
     }
 
