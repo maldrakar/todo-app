@@ -46,10 +46,11 @@ struct RootView: View {
             // them, so that they end above it and the sidebar's sentence, inset on each screen, stands above it: on iOS
             // an inset over the containers reached the root screen of a stack alone, and on a screen pushed over it
             // both strips stood in one frame at the bottom, the root's over the sidebar's (the iOS 26.3 simulator,
-            // 2026-10-24, #131). Under them, on 2026-10-25, both showed: on iPhone and on the iPad with its sidebar
-            // hidden, the sidebar's right above the root's; on the iPad with its sidebar shown, the sidebar's under its
-            // rows; and on macOS 26.7.1 the root's stood across the bottom of the window under both columns, which
-            // ended above it, as the inset's had on 2026-10-20.
+            // 2026-10-24, #131). Under them, on 2026-10-25, in the iOS 26.3 simulator, both showed: on iPhone and on
+            // the iPad with its sidebar hidden, the sidebar's right above the root's; on the iPad with its sidebar
+            // shown, the sidebar's under its rows and the root's across the whole window. On macOS 26.7.1 the root's
+            // stood across the bottom of the window under both columns, which ended above it, as the inset's had on
+            // 2026-10-20.
             if let problem = host.model.problem {
                 sentenceStrip(problem)
             }
@@ -187,8 +188,9 @@ struct RootView: View {
     }
 
     /// A sentence across the width of what it is drawn under, the pane or the window, on a material so that the rows
-    /// scrolling under it do not show through: the regular one, since the bar's is unavailable on watchOS and a
-    /// condition here would be about the look alone (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
+    /// scrolling under the pane's strip do not show through, and the window's, which no row reaches, looks the same:
+    /// the regular one, since the bar's is unavailable on watchOS and a condition here would be about the look alone
+    /// (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
     private func sentenceStrip(_ sentence: String) -> some View {
         Text(sentence)
             .padding()
