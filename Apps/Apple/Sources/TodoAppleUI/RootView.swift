@@ -29,21 +29,27 @@ struct RootView: View {
     }
 
     var body: some View {
-        // The one switch over the layout, every shape drawn and none by `default` (`docs/style.md`, "Views"). A window
-        // that narrows or widens gets the other shape from the root in the event its view reported, with the same
-        // screens, and is drawn in the other tree.
-        Group {
-            switch host.model.layout {
-            case .narrow(let path):
-                narrowStack(path: path)
-            case .wide(let column, let path):
-                splitView(column: column, path: path)
+        VStack(spacing: 0) {
+            // The one switch over the layout, every shape drawn and none by `default` (`docs/style.md`, "Views"). A
+            // window that narrows or widens gets the other shape from the root in the event its view reported, with the
+            // same screens, and is drawn in the other tree.
+            Group {
+                switch host.model.layout {
+                case .narrow(let path):
+                    narrowStack(path: path)
+                case .wide(let column, let path):
+                    splitView(column: column, path: path)
+                }
             }
-        }
-        // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
-        // window and not under one column, drawn as the pane's sentence is. On 2026-10-20, on macOS 26.7.1, it stood
-        // across the bottom of the window under the sidebar and the pane, and the sidebar's column ended above it.
-        .safeAreaInset(edge: .bottom) {
+            // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
+            // window and not under one column, drawn as the pane's sentence is. Under the containers and not inset over
+            // them, so that they end above it and the sidebar's sentence, inset on each screen, stands above it: on iOS
+            // an inset over the containers reached the root screen of a stack alone, and on a screen pushed over it
+            // both strips stood in one frame at the bottom, the root's over the sidebar's (the iOS 26.3 simulator,
+            // 2026-10-24, #131). Under them, on 2026-10-25, both showed: on iPhone and on the iPad with its sidebar
+            // hidden, the sidebar's right above the root's; on the iPad with its sidebar shown, the sidebar's under its
+            // rows; and on macOS 26.7.1 the root's stood across the bottom of the window under both columns, which
+            // ended above it, as the inset's had on 2026-10-20.
             if let problem = host.model.problem {
                 sentenceStrip(problem)
             }
