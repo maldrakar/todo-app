@@ -57,6 +57,16 @@ struct RootView: View {
 
     /// The wide window's tree: the sidebar beside the detail column, whose stack has the layout's column at its root,
     /// or the placeholder when no screen stands over the sidebar, and the layout's path pushed over it.
+    ///
+    /// The sidebar's sentence is about the pane that stayed when another could not be opened, so it shows beside the
+    /// pane: under the sidebar's rows where the sidebar's column is beside the pane, and at the bottom of every screen
+    /// of the stack when the split view reports the sidebar's column hidden. On 2026-10-18 the split view reported
+    /// `detailOnly` on the iPad in portrait, where it hid the sidebar (the iOS 26.3 simulator), and on the Mac, whose
+    /// toolbar button had hidden the sidebar; on the Mac with its sidebar shown the sentence stood under the
+    /// sidebar's rows alone, and it moved between the two as the button hid and showed the sidebar. On each screen
+    /// and not on the stack, whose inset reached its root screen alone: on 2026-10-24 it stood mid-pane right under
+    /// the placeholder on the iPad (the iOS 26.3 simulator) and on macOS 26.7.1, and a task pushed on the iPad had
+    /// none (#110).
     private func splitView(column: StackElementID?, path: [StackElementID]) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
@@ -68,21 +78,15 @@ struct RootView: View {
                     } else {
                         Text("Nothing to show")
                             .foregroundStyle(.secondary)
+                            // The whole pane, so that the sentence under the placeholder stands at its bottom.
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .toolbar { quickEntryButton }
                     }
                 }
-                .navigationDestination(for: StackElementID.self, destination: screen)
-            }
-            // The sidebar's sentence is about the pane that stayed when another could not be opened, so it shows
-            // beside the pane: under the sidebar's rows where the sidebar's column is beside the pane, and here when
-            // the split view reports the sidebar's column hidden. On 2026-10-18 "The list could not be opened." stood
-            // here alone on the iPad in portrait, whose split view hid the sidebar and reported `detailOnly` (the
-            // iOS 26.3 simulator), and on the Mac whose toolbar button had hidden the sidebar, which reported
-            // `detailOnly` too; on the Mac with its sidebar shown it stood under the sidebar's rows alone, and it moved
-            // between the two as the button hid and showed the sidebar.
-            .safeAreaInset(edge: .bottom) {
-                if columnVisibility == .detailOnly, let problem = host.model.taskViewList.problem {
-                    sentenceStrip(problem)
+                .safeAreaInset(edge: .bottom) { sidebarSentence(shown: columnVisibility == .detailOnly) }
+                .navigationDestination(for: StackElementID.self) { id in
+                    screen(id)
+                        .safeAreaInset(edge: .bottom) { sidebarSentence(shown: columnVisibility == .detailOnly) }
                 }
             }
         }
@@ -103,12 +107,17 @@ struct RootView: View {
                     screen(id)
                         // The sidebar's sentence on every screen pushed over the sidebar's rows, which draw it when
                         // they are on top, so it shows once on whichever screen is on top, a task's included (#110).
-                        .safeAreaInset(edge: .bottom) {
-                            if let problem = host.model.taskViewList.problem {
-                                sentenceStrip(problem)
-                            }
-                        }
+                        .safeAreaInset(edge: .bottom) { sidebarSentence(shown: true) }
                 }
+        }
+    }
+
+    /// The sidebar's sentence across the bottom of a screen of the window's stack, when `shown`, the one strip both
+    /// trees put on their screens: the sidebar's rows draw it under them, and a screen of the stack draws it where
+    /// the rows are neither beside it nor under it.
+    @ViewBuilder private func sidebarSentence(shown: Bool) -> some View {
+        if shown, let problem = host.model.taskViewList.problem {
+            sentenceStrip(problem)
         }
     }
 
@@ -121,7 +130,9 @@ struct RootView: View {
     /// case, hands it its model and a closure that wraps its actions with its element's id, and decides nothing. Every
     /// case is drawn, with no `default`, so a kind of screen added to the stack and not drawn stops this view
     /// compiling (`docs/style.md`, "Views"; navigation state spec, section 6). An id the model no longer holds, one
-    /// SwiftUI still draws while a pop the model drove plays out, draws nothing.
+    /// SwiftUI still draws while a pop plays out, draws nothing and fills the screen, so the sidebar's sentence on
+    /// that screen stays at its bottom: over an empty view it jumped to the middle of the screen sliding away, on
+    /// iPhone and on the iPad (the iOS 26.3 simulator, 2026-10-24, #110).
     ///
     /// The list carries the Quick Entry button on its toolbar, and the task pushed over it carries none (the owner,
     /// 2026-10-20).
@@ -133,7 +144,7 @@ struct RootView: View {
         case .task(let model)?:
             TaskScreenView(model: model)
         case nil:
-            EmptyView()
+            Color.clear
         }
     }
 
