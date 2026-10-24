@@ -26,6 +26,12 @@ Each rule names the review that set it.
 - **One way to build a value.** A default argument over a factory:
   `EntityID()` mints and `EntityID(raw)` wraps, and a `generate()` next
   to `init` is redundant. (PR #31)
+- **A name says what it holds and whose it is.** A type, a property
+  or a case is named for what it carries and for its owner, not for
+  its part in a mechanism: `Destination`, held in a screen's
+  `destination`, and not `Slot`; `.destinationAnswered` and not
+  `.answered`, which says neither whose answer it is nor to what;
+  `setDestination(_:)` and not `declare(_:)`. (PR #120, #125)
 - **A name the core exports is a name its consumers lose.** No exported
   type takes a name a module the consumers import already owns:
   `TodoTask` and not `Task`, which shadowed `_Concurrency.Task`;

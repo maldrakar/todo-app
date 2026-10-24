@@ -24,14 +24,15 @@ import WASILibc
 /// window's path, which is the web's address bar, and drives every module of the window — a selection, a rename
 /// and a new folder in the sidebar, a link applied as `.route` through the window's stack, quick entry creating
 /// a task, a tap in the list sent to its element of the stack, which pushes the task, the way back as the
-/// shorter path, Cancel, and Open in New Window, whose path it writes down — with the change each write
-/// produced, and a path the routes refuse. Beside that it calls the core's public API directly, and each group
-/// of calls has a client that ships it. The writes, the reads, a page and search are what the modules M3 adds
-/// will call. The filter codec and the journal exchange are the web host's own, which is where the spec leaves
-/// the gaps #23 found in them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under
-/// the platform clock a web entry point passes. A group dropped because no module makes its calls would take
-/// out code the web client still ships. What a client calls is what the linker has to keep, so the number the
-/// job prints is the root module and the core a web client cannot dead-strip its way out of shipping.
+/// shorter path, the window narrowing, Cancel, and Open in New Window, whose path it writes down — with the
+/// change each write produced, and a path the routes refuse, and it reads the layout the root cuts for the
+/// window's width. Beside that it calls the core's public API directly, and each group of calls has a client
+/// that ships it. The writes, the reads, a page and search are what the modules M3 adds will call. The filter
+/// codec and the journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in
+/// them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the platform clock a
+/// web entry point passes. A group dropped because no module makes its calls would take out code the web client
+/// still ships. What a client calls is what the linker has to keep, so the number the job prints is the root
+/// module and the core a web client cannot dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.
@@ -126,7 +127,9 @@ private enum WasmSizeProbe {
         let appStore = try Store.openInMemory(device: Store.newDeviceID(), now: { fixedNow })
         var pending: [ChangeSet] = []
         appStore.onChange = { pending.append($0) }
-        let app = try AppModule(store: appStore, route: try AppModule.Route(path: "/"))
+        // Made wide, as a browser window opens, and narrowed further down, so that the layout the root cuts by the
+        // width is in the measurement in both its shapes.
+        let app = try AppModule(store: appStore, route: try AppModule.Route(path: "/"), width: .wide)
         @discardableResult
         func perform(_ event: AppModule.Event) -> AppModule.Output? {
             let output = app.send(event)
@@ -143,19 +146,22 @@ private enum WasmSizeProbe {
         perform(.action(.taskViewList(.createFolderButtonTapped)))
         let newFolder = app.model.taskViewList.rows.first(where: \.isSelected)
         // A link, read from its path and followed through the window's stack, with quick entry up over the Inbox;
-        // quick entry files a task, whose change reaches the list; a tap on the list's element pushes the task,
-        // and the way back, the path one shorter, pops it; quick entry opened again is cancelled; and a view asks
-        // for a window of its own, whose route is written down. The stack is read as the root view reads it, each
-        // id of the path and its screen's model.
+        // quick entry files a task, whose change reaches the list; a tap on the list's element, in the column,
+        // pushes the task, and the way back, the detail's path one shorter, which is empty, pops it and leaves the
+        // list; the window narrows, which moves the layout alone; quick entry opened again is cancelled; and a view
+        // asks for a window of its own, whose route is written down. The layout is read for what stands over the
+        // sidebar, each id and its screen's model, and printed through one switch over its shapes, as the root view
+        // draws it.
         perform(.route(try AppModule.Route(path: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
         perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
         perform(.action(.quickEntry(.addButtonTapped)))
-        let list = app.model.path.first
+        let list = idsOverTheSidebar(in: app.model.layout).first
         let filed = list.flatMap { firstRow(of: app.model.screens[$0]) }
         if let list, let filed { perform(.action(.screen(list, .list(.rowTapped(filed.id))))) }
         let taskRoute = app.route.path
-        let opened = label(app.model.path.last.flatMap { app.model.screens[$0] })
-        perform(.action(.wentBack(to: Array(app.model.path.prefix(1)))))
+        let opened = label(idsOverTheSidebar(in: app.model.layout).last.flatMap { app.model.screens[$0] })
+        perform(.action(.wentBack(to: [])))
+        perform(.widthChanged(.narrow))
         perform(.action(.quickEntryButtonTapped))
         let drafted = app.model.quickEntry?.draft ?? "none"
         perform(.action(.quickEntry(.cancelButtonTapped)))
@@ -182,7 +188,7 @@ private enum WasmSizeProbe {
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
         print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
-        print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), stack \(root.path.map { label(root.screens[$0]) }.joined(separator: " under ")), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
+        print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
     }
@@ -206,6 +212,27 @@ private enum WasmSizeProbe {
         case .list(let list)?: "a list of \(list.rows.count) rows"
         case .task(let task)?: "the task \(task.title)"
         case nil: "nothing"
+        }
+    }
+
+    /// The window's layout as a line, its shape and what stands in it: one switch over the shapes, as the root
+    /// view's, and one line here.
+    private static func label(_ layout: AppModule.Layout, screens: [StackElementID: AppModule.ScreenModel]) -> String {
+        switch layout {
+        case .narrow(let path):
+            "narrow, \(path.map { label(screens[$0]) }.joined(separator: " under ")) over the sidebar"
+        case .wide(let column, let path):
+            "wide, \(label(column.flatMap { screens[$0] })) in the column and \(path.count) over it"
+        }
+    }
+
+    /// The ids of the screens standing over the sidebar, bottom up, whichever the shape of the layout: the column,
+    /// when a screen stands there, before the path.
+    private static func idsOverTheSidebar(in layout: AppModule.Layout) -> [StackElementID] {
+        switch layout {
+        case .narrow(let path): path
+        case .wide(let column?, let path): [column] + path
+        case .wide(nil, let path): path
         }
     }
 

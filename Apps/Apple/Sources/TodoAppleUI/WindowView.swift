@@ -2,10 +2,10 @@
 import AppFeature
 import SwiftUI
 
-/// The view of one window: it makes the window from the window's path once, when the window first appears, holds it
-/// for as long as the window lives, draws the root over its host, hands it the links the system opens in it, writes
-/// its route back after every change, and opens the windows the root asks for (`docs/specs/navigation.md`, sections 5
-/// and 7).
+/// The view of one window: it makes the window from the window's path and its width class once, when the window first
+/// appears, holds it for as long as the window lives, draws the root over its host, hands it the links the system
+/// opens in it and the window's width class as it changes, writes its route back after every change, and opens the
+/// windows the root asks for (`docs/specs/navigation.md`, sections 5 and 7; navigation state spec, section 4).
 ///
 /// The window is kept in the view's state, which SwiftUI keeps for the life of the window, and is made when the view
 /// drawn while that state is empty appears. A scene's content closure runs more than once for a window and hands
@@ -27,6 +27,17 @@ import SwiftUI
 /// app, its placeholder made the window, and the link reached `onOpenURL` some 45 ms later, in each of six launches;
 /// the placeholder, given an `onOpenURL` of its own, received nothing. SwiftUI then opened its first window as well,
 /// on the default route, or the windows it restored.
+///
+/// The width class reaches the root the way a link does, through the window's way in, since it is an event of the
+/// world, and the view decides nothing by it: the root's model carries the layout the root view draws (navigation
+/// state spec, section 4; `docs/style.md`, "Views"). The window is made with the class the placeholder reads when it
+/// appears, so the first frame already has its shape: on 2026-10-24, in the iOS 26.3 simulator, that class was the one
+/// the window settled at in every window the probe made, on an iPhone 17 and in narrow iPad windows, at a fresh launch,
+/// restored and opened with Open in New Window, and no video showed a frame of the split view first. The drawn root
+/// reports the class on its first frame too, so that a class that moved between the window's making and that frame
+/// still reaches the root, which takes the width it already has as nothing. The same day, rotating an iPhone 17 Pro
+/// Max with a task open, with the tree chosen from a reported width, wrote no path and drew no frame of the old tree at
+/// the new width.
 struct WindowView: View {
     private let app: TodoApp
 
@@ -53,6 +64,18 @@ struct WindowView: View {
     /// The window, nil only until the window first appears.
     @State private var window: TodoApp.Window?
 
+    /// The window's horizontal size class, which only the view can know (`docs/style.md`, "Views"), read for the width
+    /// class the window is made with and reports: compact on iPhone and in a narrow iPad window, regular in a wide
+    /// one, and nil on the Mac.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// The window's width class as the root takes it: compact as narrow, and anything else as wide, the regular class
+    /// and the Mac's, which has none. Nothing here is decided by it: it is handed to the root, and the layout comes
+    /// back in the root's model.
+    private var width: AppModule.Width {
+        horizontalSizeClass == .compact ? .narrow : .wide
+    }
+
     init(app: TodoApp, value: Binding<Value?>) {
         self.app = app
         self._value = value
@@ -63,6 +86,9 @@ struct WindowView: View {
             takingLinks(RootView(host: window.host))
                 .onOpenURL(perform: window.open)
                 .onChange(of: window.host.route.path) { _, routeText in keep(routeText) }
+                // On the first frame as well, `initial`, for a class that moved after the window was made; a width the
+                // window has already moves nothing in the root.
+                .onChange(of: width, initial: true) { _, width in window.widthChanged(width) }
         } else {
             // A view that fills the window, because a view with nothing in it never appears: on 2026-10-18 an
             // `onAppear` on a `Group` holding nothing never ran in a window of the group, and the window stayed
@@ -74,7 +100,7 @@ struct WindowView: View {
 
     private func makeWindow() {
         do {
-            let window = try app.makeWindow(path: value?.path ?? storedPath)
+            let window = try app.makeWindow(path: value?.path ?? storedPath, width: width)
             answerTheRoot(of: window.host)
             self.window = window
             keep(window.host.route.path)

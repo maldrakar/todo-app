@@ -18,22 +18,30 @@ import TodoCore
 /// open one of the kinds it holds (navigation state spec, section 2). Quick entry sits in a seat (spec section 4),
 /// the window's own modal, which the root alone holds.
 ///
+/// It decides the layout of the window's navigation (navigation state spec, section 4). The window's view reports
+/// the window's width class, narrow or wide, as an event of the world, and decides nothing by it; the model carries
+/// the shape for that class ready to draw, every screen over the sidebar in one path when the window is narrow, and
+/// when it is wide the first of them as the detail column's root and the rest as its path. The screens stand in the
+/// stack whichever the shape, so a window that narrows or widens keeps them, with their state.
+///
 /// It is a routable module (spec section 4), and its route is the route of the window: what a link carries, what
 /// a window is restored from and what the web's address bar shows, each through the route's one text form, `path`
 /// (spec section 2).
 public final class AppModule: Routable {
-    /// What the root view draws: each module's model as the module computes it, carried whole, the path of the
+    /// What the root view draws: each module's model as the module computes it, carried whole, the layout of the
     /// screens standing over the sidebar, and the root's own sentence.
     public struct Model: Equatable, Sendable {
         /// The sidebar's own model, with its highlight and the sentence it says.
         public let taskViewList: TaskViewList.Model
 
-        /// The ids of the screens standing over the sidebar, bottom up, which the root view binds as the path of
-        /// the window's stack and hands back whole as `.wentBack(to:)` (navigation state spec, sections 3 and 6).
-        public let path: [StackElementID]
+        /// The shape of the window's navigation for its width, with the ids of the screens standing over the sidebar
+        /// in it, which the root view switches over once and whose path it binds and hands back whole as
+        /// `.wentBack(to:)` (navigation state spec, sections 3, 4 and 6).
+        public let layout: Layout
 
         /// The model of each screen standing over the sidebar, by the id of its element, so that the root view finds
-        /// an element's model without a search. It holds a model for every id of `path` and none beside.
+        /// an element's model without a search. It holds a model for every id of `layout`, the column's included, and
+        /// none beside.
         public let screens: [StackElementID: ScreenModel]
 
         /// Quick entry's own model while it is up, and nil when it is not; it is drawn as a sheet on every Apple
@@ -45,6 +53,29 @@ public final class AppModule: Routable {
         /// owner, 2026-10-16, answering the spec's open question). What a module says about itself is in its own
         /// model.
         public let problem: String?
+    }
+
+    /// The shape of the window's navigation for its width class, which the root decides and the root view draws:
+    /// the view switches over it once, binds the path it carries and chooses no tree of its own (navigation state
+    /// spec, sections 4 and 6; `docs/style.md`, "Views"). Both shapes hold the ids of the same screens, bottom up, so
+    /// a window that narrows or widens has the same screens in the other shape.
+    public enum Layout: Equatable, Sendable {
+        /// One stack, with the sidebar at its root and every screen over the sidebar in its path: iPhone's window and
+        /// a narrow iPad window.
+        case narrow(path: [StackElementID])
+        /// The sidebar in a column of its own, beside a stack whose root is the first screen over the sidebar, nil
+        /// when none stands, which the view draws as its placeholder, and whose path is the rest: the Mac's window
+        /// and a wide iPad window. The column is not in the path, so no write of the path can pop it, and "in a wide
+        /// window the highlight cannot be removed" holds by construction.
+        case wide(column: StackElementID?, path: [StackElementID])
+    }
+
+    /// The width class of a window, which only its view can know and which it reports without deciding anything by
+    /// it (`docs/style.md`, "Views"; navigation state spec, section 4): narrow, iPhone's and a narrow iPad window,
+    /// and wide, the Mac's and a wide iPad window.
+    public enum Width: Equatable, Sendable {
+        case narrow
+        case wide
     }
 
     /// What the root view may send: what the views of the window's modules send, each wrapped in the case of the
@@ -59,10 +90,14 @@ public final class AppModule: Routable {
         /// nothing.
         case screen(StackElementID, ScreenAction)
         /// The way back, by the back button, the swipe from the edge or the long-press menu that goes back several
-        /// screens at once, which SwiftUI reports only as the shorter path it wrote and the root view hands on whole
-        /// (navigation state spec, section 3). Named for the gesture: what it closes is the stack's to work out, and
-        /// a path that is not a shorter prefix of the one it holds, the write SwiftUI makes after a pop the model
-        /// drove among them, moves nothing.
+        /// screens at once, which SwiftUI reports only as the shorter path it wrote into the path of the layout and the
+        /// root view hands on whole (navigation state spec, section 3). The root reads it against the layout it has
+        /// when the write arrives, which is the one the view bound unless the width moved in between: narrow, as the
+        /// whole of what stands over the sidebar, and wide, as what stands over the column, so the column is never
+        /// popped (section 4). A write the view bound in the other layout, one that lands after the width moved, is
+        /// read in the layout the root has: on 2026-10-24, in the iOS 26.3 simulator, no write crossed a change of
+        /// tree. Named for the gesture: what it closes is the stack's to work out, and a path that is not a shorter
+        /// prefix of the one it holds, the write SwiftUI makes after a pop the model drove among them, moves nothing.
         case wentBack(to: [StackElementID])
         /// An action of quick entry, handed to it as it came; with no quick entry up it moves nothing.
         case quickEntry(QuickEntry.UserAction)
@@ -72,7 +107,7 @@ public final class AppModule: Routable {
 
     /// Everything that reaches the root: an action a view sent, a change the store committed, which the root
     /// hands to every module of the window, the two events of a routable module, `.created` and `.route` (spec
-    /// section 3), and a link that could not be read.
+    /// section 3), a link that could not be read, and the window's width class.
     public enum Event: RoutedEvent {
         /// What a view sent, lifted by the host.
         case action(UserAction)
@@ -96,6 +131,14 @@ public final class AppModule: Routable {
         /// does not read is made on the default route and says nothing, which is restoration's rule, so this comes
         /// from a link alone.
         case unreadableLink
+        /// The window's width class as its view reports it, delivered by the composition root through the entrance a
+        /// link takes (navigation state spec, section 4). It is an event of the world and not a `UserAction`: nobody
+        /// pressed anything, and a view's closure spells user actions alone (the owner, 2026-10-20, on the window's
+        /// way in).
+        ///
+        /// It moves the layout and nothing else: no screen is made or dropped, no sentence moves and the route stays,
+        /// so the width the window already has moves nothing.
+        case widthChanged(Width)
     }
 
     /// What the root asks of the platform, since there is no module above it.
@@ -129,10 +172,16 @@ public final class AppModule: Routable {
     /// The route defaults to the default window, so that a caller with no route to hand on spells none (owner's
     /// review of #103, as quick entry's `init` has it since #102).
     ///
+    /// The width is the class the window opens with, so that its first frame already has the shape of its layout
+    /// (navigation state spec, section 4). It has no default: a window made wide and told otherwise on its first
+    /// frame is the spec's fallback for a host that does not know the class when the window is made, and a default
+    /// here would make that fallback a rule of the core (`docs/style.md`, "A lower layer holds no policy of its
+    /// client").
+    ///
     /// Throws what the sidebar's `init` throws and nothing else, as M2's root did: a window is not made around a
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A screen of the stack that
     /// cannot be made is its opener's to say, and quick entry cannot fail to be made.
-    public init(store: Store, route: Route = .default) throws(StoreError) {
+    public init(store: Store, route: Route = .default, width: Width) throws(StoreError) {
         let taskViewList = try TaskViewList(store: store, route: route.sidebar)
         // The stack and the seat are built once, here, each with the way to make what it holds: a closure over the
         // `init` of the kind the route names that captures the store and never this root. The root holds both in its
@@ -146,7 +195,7 @@ public final class AppModule: Routable {
             }
         }
         let quickEntry = Seat<QuickEntry, Never> { route in QuickEntry(store: store, route: route) }
-        self.state = State(stack: stack, quickEntry: quickEntry)
+        self.state = State(stack: stack, quickEntry: quickEntry, width: width)
         // The sidebar answers being created with nothing, and the one output it could give, a window to open,
         // needs a person to ask for it, so nothing is dropped here.
         _ = react(to: state.stack.send(.created))
@@ -162,11 +211,13 @@ public final class AppModule: Routable {
             // holds moves nothing. The root's sentence stays, since a gesture on a screen is that screen's.
             return react(to: state.stack.send(.action(action), to: id))
         case .action(.wentBack(let path)):
-            // The stack drops what was over the screen now on top and tells that screen, which empties its
-            // destination (navigation state spec, section 3). A path it does not hold as a shorter prefix moves
-            // nothing, which is where SwiftUI's write after a pop the model drove lands. The root's sentence stays,
-            // since the way back is a gesture on the screens.
-            return react(to: state.stack.wentBack(to: path))
+            // Read against the layout the root has as the write arrives, the one the view bound unless the width moved
+            // in between, which no write crossed in the probes of 2026-10-24, so that in a wide window the column goes
+            // before it and no write can pop the column (navigation state spec, section 4). The stack drops what was
+            // over the screen now on top and tells that screen, which empties its destination (section 3). A path it
+            // does not hold as a shorter prefix moves nothing, which is where SwiftUI's write after a pop the model
+            // drove lands, in either layout. The root's sentence stays, since the way back is a gesture on the screens.
+            return react(to: state.stack.wentBack(to: state.stackPath(wentBackTo: path)))
         case .action(.quickEntry(let action)):
             // Cancel included, which closes quick entry by its own answer. With no quick entry up the empty seat
             // answers nothing, which is where the sheet's binding lands when it writes false after a close the model
@@ -217,6 +268,11 @@ public final class AppModule: Routable {
             // A second link that does not read says it again, over a sentence still on screen or one taken away.
             state.problem = Problem.unreadableLink.sentence
             return nil
+        case .widthChanged(let width):
+            // The layout is computed from the width and the stack on every read, so this moves the layout alone; the
+            // stack is not walked, since no destination was written, and the same width again moves nothing.
+            state.width = width
+            return nil
         }
     }
 
@@ -247,9 +303,9 @@ public final class AppModule: Routable {
         }
     }
 
-    /// Everything the root holds between two events: the window's stack, the seat of quick entry and the root's
-    /// sentence. One value, moved by the cases of `send`, from which the model and the route are computed on every
-    /// read (owner's reviews of #77 and #101).
+    /// Everything the root holds between two events: the window's stack, the seat of quick entry, the root's
+    /// sentence and the window's width class. One value, moved by the cases of `send`, from which the model, its
+    /// layout included, and the route are computed on every read (owner's reviews of #77 and #101).
     ///
     /// The sidebar is the stack's base and not an element or a seat. A window always has it and nothing replaces it,
     /// so the root makes it and hands it to the stack, which keeps it to itself: the root reads its model through
@@ -260,14 +316,39 @@ public final class AppModule: Routable {
         var stack: ScreenStack<Screen>
         var quickEntry: Seat<QuickEntry, Never>
         var problem: String?
+        /// The class the window's view reported last, or the one the window was made with, which the layout is cut
+        /// by and nothing else reads.
+        var width: Width
 
-        /// The model the root view draws: the sidebar's and each screen's, as each computes it, the path of the
+        /// The model the root view draws: the sidebar's and each screen's, as each computes it, the layout of the
         /// screens over the sidebar, quick entry's, and the root's sentence.
         var model: Model {
             Model(
-                taskViewList: stack.baseModel, path: stack.path, screens: stack.models,
+                taskViewList: stack.baseModel, layout: layout, screens: stack.models,
                 quickEntry: quickEntry.model, problem: problem
             )
+        }
+
+        /// The stack's path in the shape of the window's width (navigation state spec, section 4): narrow, the whole
+        /// of it as the one path; wide, its first id as the column, or none when nothing stands, and the rest as
+        /// the path.
+        var layout: Layout {
+            switch width {
+            case .narrow: .narrow(path: stack.path)
+            case .wide: .wide(column: stack.path.first, path: Array(stack.path.dropFirst()))
+            }
+        }
+
+        /// The stack's path that a way back to `written` stands for, read against the layout as it is now, which is
+        /// the one the view bound `written` from unless the width moved in between: narrow, the whole of the stack's
+        /// path; wide, the path over the column, so the column's id goes before it and the column is never popped
+        /// (navigation state spec, section 4). With nothing in the column nothing stands, and whatever was written
+        /// moves nothing.
+        func stackPath(wentBackTo written: [StackElementID]) -> [StackElementID] {
+            switch layout {
+            case .wide(let column?, _): [column] + written
+            case .narrow, .wide(nil, _): written
+            }
         }
     }
 

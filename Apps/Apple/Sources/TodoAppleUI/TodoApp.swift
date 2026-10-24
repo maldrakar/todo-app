@@ -9,7 +9,7 @@ import TodoCore
 /// host still alive (`docs/specs/navigation.md`, section 5), where the feature-module spec's "one host and one root
 /// per process" becomes "one host per window, one store per process". A link the system opens in a window reaches that
 /// window's host through the same entrance as the change sets, by a way in handed to the window when it is made
-/// (section 7).
+/// (section 7), and so does the width class the window's view reports (navigation state spec, section 4).
 @MainActor
 final class TodoApp {
     /// The composition root of this process, put together the first time anything reads it. A `static let` is
@@ -87,7 +87,7 @@ final class TodoApp {
     }
 
     /// A window: a host around a root made from the path, or from the default route when there is none or it does not
-    /// read, and the window's way in for a link.
+    /// read, and with the width class the window opens with, and the window's ways in for a link and for its width.
     ///
     /// A path is the window's route in its one text form, kept by the window to be restored from
     /// (`docs/specs/navigation.md`, section 7). One that does not read, written by another version of the app or by
@@ -98,14 +98,19 @@ final class TodoApp {
     /// it, with a path or without: the window's view hands over the text of the value its window was opened with and
     /// never knows of a launch route, so whether a window is the first is decided here (the owner, 2026-10-20).
     ///
-    /// The host's world entrance is kept for the fan-out and handed to the window inside `open`, and the host itself is
-    /// not kept: its caller, the window's view, holds the window for as long as the window lives (`WindowView`), and
-    /// once the caller lets go the host is released and the next fan-out passes it by. It throws what the root's
-    /// `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the throw.
-    func makeWindow(path: String?) throws -> Window {
+    /// The width is the class the window's view reads when the window first appears, so the window's first frame
+    /// already has the shape of its layout (navigation state spec, section 4). It has no default, as the root's has
+    /// none: the one caller in the product, the window's view, always has one, and a test spells the width it means.
+    ///
+    /// The host's world entrance is kept for the fan-out and handed to the window inside `open` and `widthChanged`, and
+    /// the host itself is not kept: its caller, the window's view, holds the window for as long as the window lives
+    /// (`WindowView`), and once the caller lets go the host is released and the next fan-out passes it by. It throws
+    /// what the root's `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the
+    /// throw.
+    func makeWindow(path: String?, width: AppModule.Width) throws -> Window {
         let unspentLaunchRoute = hostsMade == 0 ? launchRoute : nil
         let route = path.map { (try? AppModule.Route(path: $0)) ?? .default } ?? unspentLaunchRoute ?? .default
-        let root = try AppModule(store: store, route: route)
+        let root = try AppModule(store: store, route: route, width: width)
         // Replaced before `init` returns, since `init` hands the host's entrance over as its last step, so the
         // placeholder is never what is kept.
         var entrance: @MainActor (AppModule.Event) -> Void = { _ in }
@@ -113,10 +118,12 @@ final class TodoApp {
         let deliver = entrance
         entrances.append(Entrance(host: host, deliver: deliver))
         hostsMade += 1
-        // Over the entrance alone, which holds the host weakly, and never over the host or the composition root.
-        return Window(host: host) { url in
-            deliver(TodoApp.route(from: url).map(AppModule.Event.route) ?? .unreadableLink)
-        }
+        // Both over the entrance alone, which holds the host weakly, and never over the host or the composition root.
+        return Window(
+            host: host,
+            open: { url in deliver(TodoApp.route(from: url).map(AppModule.Event.route) ?? .unreadableLink) },
+            widthChanged: { width in deliver(.widthChanged(width)) }
+        )
     }
 
     /// The route a link carries, the URL's path and query read with the route's codec as they are written, still
@@ -144,8 +151,9 @@ final class TodoApp {
         return try? AppModule.Route(path: url.path(percentEncoded: true) + query)
     }
 
-    /// What a window's view is handed once, when its window first appears: the window's host, and the window's way
-    /// in for a link (the owner, 2026-10-20). The view holds it for as long as the window lives, and nothing else does.
+    /// What a window's view is handed once, when its window first appears: the window's host, and the window's ways
+    /// in for a link (the owner, 2026-10-20) and for its width class (navigation state spec, section 4). The view
+    /// holds it for as long as the window lives, and nothing else does.
     struct Window {
         /// The window's host, which the window's view draws and sends its actions to.
         let host: ModuleHost<AppModule>
@@ -159,6 +167,14 @@ final class TodoApp {
         /// (section 5; the owner, 2026-10-20). It holds the host weakly, as the entrance does, so a window's view that
         /// lets go of its window lets go of the host.
         let open: @MainActor (URL) -> Void
+
+        /// Takes the width class the window's view reads, narrow or wide, to this window's host, through the same
+        /// entrance, as the root's `.widthChanged`, which moves the window's layout and nothing else (navigation state
+        /// spec, section 4). It is an event of the world, since nobody pressed anything, so it reaches the host by the
+        /// composition root's way in, as a link does, and never by the view's closure over user actions; the view
+        /// reports the width through this and decides nothing by it (`docs/style.md`, "Views"; the owner, 2026-10-20,
+        /// on the window's way in). It holds the host weakly, as `open` does.
+        let widthChanged: @MainActor (AppModule.Width) -> Void
     }
 
     /// Hands what a commit touched to every host still alive, in the order they were made, and forgets the
