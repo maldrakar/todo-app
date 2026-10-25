@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-25
+
 ### Added
 
 - Spec `docs/specs/navigation.md`, approved by the owner on 2026-10-14 at revision 4: every screen is a child of the screen that opened it and the root holds only the first screens; every addressed module has a route with a head and a tail, and applying a route is the one entrance to navigation, reconciled by head so session state survives; the route of a window has one text form, written and read by one codec in the core, which is the deep link, the state a window is restored from and the web route; a window is a tree of modules with a host of its own and a process is one store that fans its changes to every window; quick entry is the root's child and a sheet on every Apple platform; one tree of views serves macOS, iPhone and iPad, with the containers the epic's choice and not the product's; the epic brings three skeletal screens, a second Mac window, deep links and restoration, and the first iPhone build. The Xcode shell is one committed `project.xcproj`, Xcode 27's JSON project file, kept canonical by Apple's `xcprojformatter` and decoded by `xcode-project-format` in a test, so nothing is generated; the pinned toolchain moves to the Swift 6.4 that Xcode 27 ships, as an `infra` task at the start of the plan, after a probe with Swift 6.4.1 that built the core, passed every host test and found on wasm32 only the wall-clock sentinel firing as designed, because the WasmKit of 6.4 tells the time. The review settled three threads: an argument a screen opens with sits in a route's tail and is read once, never written back; the SwiftUI containers reach no ADR; and the official project format replaces XcodeGen.

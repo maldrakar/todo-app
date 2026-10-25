@@ -8,18 +8,19 @@ A reminders app in the spirit of Things 3, with one shared core and native UI pe
 
 ## Status
 
-Milestones `M0 Process`, `M1 Core architecture` and `M2 Feature-module architecture` are complete, the last two
-released as `v0.1.0` and `v0.2.0`. The core stores tasks, tags and views, resolves the tree their parent links
-describe, filters, sorts and groups them into pages, searches titles and notes, and exchanges a journal with
-another copy of itself; it builds and passes its suite on the host and on wasm32, and `todo` drives all of it
-from a command line. M2 built the module contract in the shared core, the list of views and the root module
-over it, which pass their suites on the host and on wasm32 as the core does, and the macOS app in `Apps/Apple`
-that hosts them. `M3 Navigation`, not yet released, has built the screens below the sidebar, the list of a view's
-tasks and a task's own screen, and quick entry, each held by the module that opens it (ADR-0009); a route for every
-screen, and one text form for a window's route, which is the link and what the window is restored from; and a host
-per window over one store per process. Its modules pass their suites on the host and on wasm32 as M2's do, the
-macOS app opens more than one window, and the iPhone and iPad app, built from the Xcode project in `Apps/Apple` over
-the same views, takes links and restores its windows. Product functionality, `M4`, is next.
+Milestones `M0 Process`, `M1 Core architecture`, `M2 Feature-module architecture` and `M3 Navigation` are complete,
+the last three released as `v0.1.0`, `v0.2.0` and `v0.3.0`. The core stores tasks, tags and views, resolves the tree
+their parent links describe, filters, sorts and groups them into pages, searches titles and notes, and exchanges a
+journal with another copy of itself; it builds and passes its suite on the host and on wasm32, and `todo` drives all
+of it from a command line. M2 built the module contract in the shared core, the list of views and the root module
+over it, which pass their suites on the host and on wasm32 as the core does, and the macOS app in `Apps/Apple` that
+hosts them. M3 built the screens below the sidebar, the list of a view's tasks and a task's own screen, each
+declared by the screen that opens it and standing in the window's one stack, and quick entry, which the root holds
+(ADR-0009); a route for every screen, and one text form for a window's route, which is the link and what the window
+is restored from; a layout, one stack or a split view, that the root module decides from the width its window
+reports; and a host per window over one store per process. Its modules pass their suites on the host and on wasm32
+as M2's do, the macOS app opens more than one window, and the iPhone and iPad app, built from the Xcode project in
+`Apps/Apple` over the same views, takes links and restores its windows. Product functionality, `M4`, is next.
 
 ## Documents
 
