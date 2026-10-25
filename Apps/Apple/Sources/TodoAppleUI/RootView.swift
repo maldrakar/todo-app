@@ -21,7 +21,8 @@ struct RootView: View {
 
     /// Which of the split view's columns are shown, which only the view can know (`docs/style.md`, "Views"): handed
     /// to the split view, which writes it as it lays its columns out, and read for whether the sidebar is beside the
-    /// pane.
+    /// pane, in the body of `HiddenSidebarStrip` and never in this view's, whose stack it would leave drawing the list
+    /// through a pushed task on the Mac (#133).
     @State private var columnVisibility = NavigationSplitViewVisibility.automatic
 
     init(host: ModuleHost<AppModule>) {
@@ -77,7 +78,8 @@ struct RootView: View {
     /// rows alone, and it moved between the rows and the pane as the button hid and showed the sidebar. On each screen
     /// and not on the stack, whose inset reached its root screen alone: on 2026-10-24 it stood mid-pane right under the
     /// placeholder on the iPad (the iOS 26.3 simulator) and on macOS 26.7.1, and a task pushed on the iPad had none
-    /// (#110).
+    /// (#110). Whether the column is hidden is read by a view of its own on each screen, `HiddenSidebarStrip`, so that
+    /// a press of the sidebar's button redraws the strip and not this tree (#133).
     private func splitView(column: StackElementID?, path: [StackElementID]) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
@@ -94,10 +96,14 @@ struct RootView: View {
                             .toolbar { quickEntryButton }
                     }
                 }
-                .safeAreaInset(edge: .bottom) { sidebarSentence(shown: columnVisibility == .detailOnly) }
+                .safeAreaInset(edge: .bottom) {
+                    HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
+                }
                 .navigationDestination(for: StackElementID.self) { id in
                     screen(id)
-                        .safeAreaInset(edge: .bottom) { sidebarSentence(shown: columnVisibility == .detailOnly) }
+                        .safeAreaInset(edge: .bottom) {
+                            HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
+                        }
                 }
             }
         }
@@ -118,16 +124,16 @@ struct RootView: View {
                     screen(id)
                         // The sidebar's sentence on every screen pushed over the sidebar's rows, which draw it when
                         // they are on top, so it shows once on whichever screen is on top, a task's included (#110).
-                        .safeAreaInset(edge: .bottom) { sidebarSentence(shown: true) }
+                        .safeAreaInset(edge: .bottom) { sidebarSentence }
                 }
         }
     }
 
-    /// The strip with the sidebar's sentence for a screen of the window's stack, when `shown`, the one strip both trees
-    /// inset at the bottom of their screens: the sidebar's rows put the sentence under them as text of their own, and
-    /// a screen of the stack carries this strip where the rows are out of sight, hidden beside it or covered by it.
-    @ViewBuilder private func sidebarSentence(shown: Bool) -> some View {
-        if shown, let problem = host.model.taskViewList.problem {
+    /// The strip with the sidebar's sentence for a screen of the window's stack, the one strip both trees inset at the
+    /// bottom of their screens: the sidebar's rows put the sentence under them as text of their own, and a screen of
+    /// the stack carries this strip where the rows are out of sight, hidden beside it or covered by it.
+    @ViewBuilder private var sidebarSentence: some View {
+        if let problem = host.model.taskViewList.problem {
             sentenceStrip(problem)
         }
     }
@@ -211,5 +217,26 @@ struct RootView: View {
     /// the iOS 26.3 simulator).
     private var quickEntryButton: some View {
         Button("Quick Entry", systemImage: "plus") { host.send(.quickEntryButtonTapped) }
+    }
+}
+
+/// The sidebar's strip on a screen of the wide window's stack, drawn while the split view reports the sidebar's column
+/// hidden, a view of its own so that the column's visibility is read in its body and not in the root's (#133). A root
+/// whose body read it was drawn again in the update that hid or showed the sidebar, and handed the stack a new path
+/// binding there, and from then on the task pushed over the list lost its background and its bar and the list showed
+/// through it: on macOS 26.7.1 on 2026-10-25, in both directions, on each commit tried since the first split view,
+/// and in a throwaway app only with both, the read and a binding made anew on each pass, while either alone, or the
+/// read with a binding the stack kept, drew the task clean. The iPad, in the iOS 26.3 simulator, drew it clean either
+/// way.
+private struct HiddenSidebarStrip<Strip: View>: View {
+    /// The split view's columns, handed as the binding and not as its value, since reading the value where this view is
+    /// made would be the root's read.
+    let columnVisibility: Binding<NavigationSplitViewVisibility>
+    let strip: Strip
+
+    var body: some View {
+        if columnVisibility.wrappedValue == .detailOnly {
+            strip
+        }
     }
 }
