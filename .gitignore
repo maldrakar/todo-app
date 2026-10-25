@@ -6,3 +6,4 @@
 *.sqlite-shm
 xcuserdata/
 Apps/Apple/Signing.xcconfig
+tools/spec-review/snap

@@ -246,7 +246,9 @@ the two are separated.
 
 The markdown in the repository is the source of truth. The Artifact is a
 rendered view for review and is regenerated from the markdown; HTML is
-never committed as a spec.
+never committed as a spec. The page is rendered and checked in both
+themes with the scripts in `tools/spec-review`, whose README holds the
+steps.
 
 **Plan** (`docs/plans/<topic>.md`, copy `TEMPLATE.md`) is written for
 the engineer and is derived from the approved spec. It fixes what the
