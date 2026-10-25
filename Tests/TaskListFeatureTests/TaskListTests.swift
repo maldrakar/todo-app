@@ -32,6 +32,15 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     #expect(list.route == .init(head: inbox))
 }
 
+/// The list is titled by its view, as the sidebar names it, which its view draws as the screen's title, so the back
+/// button's menu over a task names the list (#126).
+@Test func aListIsTitledByItsView() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
+    #expect(try TaskList(store: store, route: .init(head: inbox)).model.title == "Inbox")
+    #expect(try TaskList(store: store, route: .init(head: work)).model.title == "Work")
+}
+
 /// A list on a view that is gone is not made, and its `init` says which view it looked for: the stack keeps what
 /// was open, and the list's opener says so (spec section 2).
 @Test func aListOnAGoneViewIsNotMade() throws {
@@ -236,6 +245,34 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     #expect(list.model == before, "the task is missing, which is how a read that never ran shows")
 }
 
+/// A rename of the view, in the sidebar or by a peer, is a change naming the view, and the read that tells the list
+/// whether its view is still there gives it the new title.
+@Test func aRenameOfTheViewRetitlesTheList() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
+    try store.createTask(NewTask(title: "Buy milk"))
+    let list = try TaskList(store: store, route: .init(head: work))
+    let renamed = try changeSet(of: store) { try store.update(view: work, [.title("Office")]) }
+    #expect(list.send(.changed(renamed)) == nil)
+    #expect(list.model.title == "Office")
+    #expect(list.model == (try listOn(work, in: store)))
+}
+
+/// A peer renames the view and gives it a filter this app cannot read, and both arrive in one change: the view's
+/// read answers the new title, which the list takes, and the read of its tasks fails, so the rows stay and the list
+/// says they may be out of date.
+@Test func aRenameTakesWhenTheRereadOfTheTasksFails() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
+    try store.createTask(NewTask(title: "Buy milk"))
+    let list = try TaskList(store: store, route: .init(head: work))
+    let before = list.model
+    #expect(list.send(.changed(try unreadableFilter(on: work, in: store, renamedTo: "Office"))) == nil)
+    #expect(list.model.title == "Office")
+    #expect(list.model.rows == before.rows)
+    #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.")
+}
+
 /// A deleted tag selects nothing any more, so a view filtered by it loses its tasks, while the change names the
 /// tag alone: which tasks a view holds is the query's to say, and the list rereads on a tag too.
 @Test func aDeletedTagRereadsTheRowsOfAViewFilteredByIt() throws {
@@ -379,14 +416,20 @@ private func read(_ segments: [String]) throws(RouteError) -> TaskList.Route {
 }
 
 /// A newer app on a peer gives the view a filter this one cannot read, and the change of that write comes back:
-/// the view is still there, so the list stays, and `tasks(in:today:)` refuses it with `.viewNeedsNewerApp`.
-private func unreadableFilter(on view: ViewID, in store: Store) throws -> ChangeSet {
-    try changeSet(of: store) {
-        _ = try store.apply([
-            JournalOperation(
-                entity: .view, entityID: view.rawValue, field: "filter", value: .text("{\"kind\":\"reminder_soon\"}"),
-                clock: HLC(millis: 1_800_000_000_000, counter: 0), device: Store.newDeviceID()
-            ),
-        ])
+/// the view is still there, so the list stays, and `tasks(in:today:)` refuses it with `.viewNeedsNewerApp`. Given a
+/// title, the same peer renames the view in the same change.
+private func unreadableFilter(on view: ViewID, in store: Store, renamedTo title: String? = nil) throws -> ChangeSet {
+    let peer = Store.newDeviceID()
+    let millis: Int64 = 1_800_000_000_000
+    let filter = JournalOperation(
+        entity: .view, entityID: view.rawValue, field: "filter", value: .text("{\"kind\":\"reminder_soon\"}"),
+        clock: HLC(millis: millis, counter: 0), device: peer
+    )
+    let rename = title.map {
+        JournalOperation(
+            entity: .view, entityID: view.rawValue, field: "title", value: .text($0),
+            clock: HLC(millis: millis, counter: 1), device: peer
+        )
     }
+    return try changeSet(of: store) { _ = try store.apply([filter] + (rename.map { [$0] } ?? [])) }
 }

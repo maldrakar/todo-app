@@ -143,7 +143,10 @@ struct RootView: View {
     /// compiling (`docs/style.md`, "Views"; navigation state spec, section 6). An id the model no longer holds, one
     /// SwiftUI still draws while a pop plays out, draws nothing and fills the screen, so the sidebar's sentence on
     /// that screen stays at its bottom: over an empty view it jumped to the middle of the screen sliding away, on
-    /// iPhone and on the iPad (the iOS 26.3 simulator, 2026-10-24, #110).
+    /// iPhone and on the iPad (the iOS 26.3 simulator, 2026-10-24, #110). It has no title either, so a task popped
+    /// by Back takes its title out of the bar as the pop starts, as it takes its text off the screen: with slow
+    /// animations on an iPhone 17, the first frame of the pop showed the back button alone over a blank screen
+    /// sliding away (the iOS 26.3 simulator, 2026-10-25, #126).
     ///
     /// The list carries the Quick Entry button on its toolbar, and the task pushed over it carries none (the owner,
     /// 2026-10-20).

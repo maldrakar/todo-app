@@ -6,7 +6,8 @@ import TodoCore
 /// The list of views, drawn as the module assembled it, every gesture sent as the one action its control is
 /// named for (spec section 2). A deselect is no gesture here: the List cannot remove the highlight (`selection`). It
 /// knows nothing about renaming beyond what a row says: a row with a `draft` draws a field, and every other row
-/// its title.
+/// its title. It has no title of its own, so its row in the back button's menu over a screen pushed on it is empty,
+/// where the screens over it are named by theirs (the owner, 2026-10-25, #126).
 struct TaskViewListView: View {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void

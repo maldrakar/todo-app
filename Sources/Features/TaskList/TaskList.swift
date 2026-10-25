@@ -24,6 +24,10 @@ public final class TaskList: Routable {
             public let title: String
         }
 
+        /// The title of the view the list is on, as the last read of that view answered, drawn as the screen's
+        /// title: the back button's menu names the list by it (#126).
+        public let title: String
+
         /// The view's tasks, in the order the view's query gives them.
         public let rows: [Row]
 
@@ -146,20 +150,24 @@ public final class TaskList: Routable {
 
     private var state: State
 
-    /// Made from its route, the one way a list is made (spec section 3): the rows of the view the head names, and
-    /// the task the tail names declared over them, which the stack makes in the walk after the list is made.
+    /// Made from its route, the one way a list is made (spec section 3): the title and the rows of the view the head
+    /// names, and the task the tail names declared over them, which the stack makes in the walk after the list is
+    /// made. The view is read for its title and then once more by the query of its tasks, which reads it and hands
+    /// back only the tasks, and each read of a view reads the table of views whole (`Store.view(_:)`): a list made
+    /// reads that table twice, tens of rows in this epic.
     ///
-    /// Throws when the view's tasks cannot be read, a view that is gone among them, which the query refuses
-    /// with `.notFound` and the view's id: a list that came up empty would look like a view with nothing in it,
+    /// Throws when the view or its tasks cannot be read, a view that is gone among them, which is refused with
+    /// `.notFound` and the view's id: a list that came up empty would look like a view with nothing in it,
     /// and the stack keeps what was open while the list's opener says so (navigation state spec, section 2). A task
     /// that cannot be made does not stop the list: a link to a task that is gone opens the view it names, and the
     /// stack tells the list, which says why with no task open, which is what still exists (spec section 3, the
     /// fourth flow).
     public init(store: Store, route: Route) throws(StoreError) {
+        guard let view = try store.view(route.head) else { throw .notFound(route.head) }
         let rows = try TaskList.rows(of: store, in: route.head)
         self.head = route.head
         self.store = store
-        self.state = State(rows: rows, destination: Destination(), problem: nil)
+        self.state = State(title: view.title, rows: rows, destination: Destination(), problem: nil)
         setDestination(route.task)
     }
 
@@ -208,20 +216,22 @@ public final class TaskList: Routable {
             return nil
         case .changed(let changes):
             do {
-                // Only a change naming this view can have deleted it, and the view's read tells. A view that is gone
-                // is answered at once: the opener closes this list, and the stack drops it with the task screen over
-                // it (spec section 3), so rows read here would be work for nothing. A read that fails is a reread
-                // that failed, and the catch below says so.
+                // Only a change naming this view can have deleted it or renamed it, and the view's read tells. A view
+                // that is gone is answered at once: the opener closes this list, and the stack drops it with the task
+                // screen over it (spec section 3), so rows read here would be work for nothing. A view that is there
+                // gives the list its title, which stands even when the read of the tasks below fails, since the read
+                // that answered it succeeded. A read that fails is a reread that failed, and the catch below says so.
                 if changes.views.contains(head) {
-                    guard try store.view(head) != nil else { return .closeRequested }
+                    guard let view = try store.view(head) else { return .closeRequested }
+                    state.title = view.title
                 }
                 if TaskList.rereads(on: changes, of: head) { state.rows = try TaskList.rows(of: store, in: head) }
             } catch {
-                // The rows on screen are kept, since they are assigned only after a read that succeeded, and a
-                // list emptied by a failed read would take with it the only thing left to act on. The sentence
-                // is written only when none is on screen, as in the sidebar: a change answers for nobody, so it
-                // neither clears a sentence nor replaces one, and "may be out of date" would take the place of
-                // what the person was told about something they did or a link asked for.
+                // Neither the rows on screen nor the title is cleared, since each is assigned only after its own read
+                // succeeded, and a list emptied by a failed read would take with it the only thing left to act on.
+                // The sentence is written only when none is on screen, as in the sidebar: a change answers for
+                // nobody, so it neither clears a sentence nor replaces one, and "may be out of date" would take the
+                // place of what the person was told about something they did or a link asked for.
                 if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
             // The destination stays: the task screen over the list reads the change itself, handed it by the window,
@@ -275,19 +285,20 @@ public final class TaskList: Routable {
         }
     }
 
-    /// Everything the list holds between two events: the rows as the last read produced them, what it declared over
-    /// them, and the sentence a person was last told. One value, moved field by field, and the one place any of it
+    /// Everything the list holds between two events: the view's title and the rows as the last reads produced them,
+    /// what it declared over them, and the sentence a person was last told. One value, moved field by field, and the one place any of it
     /// is kept: the model is computed from it on every read (owner's reviews of #77 and #101).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
     private struct State {
+        var title: String
         var rows: [Model.Row]
         var destination: Destination<TaskScreen.Route>
         var problem: String?
 
-        /// The model a view draws: the rows and the sentence, if any.
-        var model: Model { Model(rows: rows, problem: problem) }
+        /// The model a view draws: the title, the rows and the sentence, if any.
+        var model: Model { Model(title: title, rows: rows, problem: problem) }
     }
 
     /// What can go wrong in this module, with the sentence each one reads as. The store's own error stays here:
