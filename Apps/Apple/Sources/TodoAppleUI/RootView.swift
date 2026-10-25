@@ -226,8 +226,8 @@ struct RootView: View {
 /// binding there, and from then on the task pushed over the list lost its background and its bar and the list showed
 /// through it: on macOS 26.7.1 on 2026-10-25, in both directions, on each commit tried since the first split view,
 /// and in a throwaway app only with both, the read and a binding made anew on each pass, while either alone, or the
-/// read with a binding the stack kept, drew the task clean. The iPad, in the iOS 26.3 simulator, drew it clean either
-/// way.
+/// read with a binding the stack kept, drew the task clean. The iPad, in the iOS 26.3 simulator, drew the task clean
+/// with the read in the root and with it here.
 private struct HiddenSidebarStrip<Strip: View>: View {
     /// The split view's columns, handed as the binding and not as its value, since reading the value where this view is
     /// made would be the root's read.
