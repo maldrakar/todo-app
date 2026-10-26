@@ -69,12 +69,12 @@ extension DesignSystem {
         }
 
         /// The tile is the base at 15 % opacity in the light and 24 % in the dark.
-        static func tile(_ base: RGB, dark: Bool) -> RGB {
+        private static func tile(_ base: RGB, dark: Bool) -> RGB {
             RGB(red: base.red, green: base.green, blue: base.blue, opacity: dark ? 0.24 : 0.15)
         }
 
         /// The glyph is the base mixed 20 % toward the ink in the light and 30 % toward white in the dark.
-        static func glyph(_ base: RGB, dark: Bool) -> RGB {
+        private static func glyph(_ base: RGB, dark: Bool) -> RGB {
             dark ? base.mixed(toward: white, by: 0.3) : base.mixed(toward: lightInk, by: 0.2)
         }
 
