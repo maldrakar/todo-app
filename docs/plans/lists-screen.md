@@ -81,7 +81,7 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | #142 | The design foundations in `TodoAppleUI` | `feature`, `ui-apple` | |
+| 1 | #142 | The design foundations in `TodoAppleUI` | `feature`, `ui-apple` | 2 |
 | 2 | #143 | A view's kind, colour and icon, and the device's own state | `feature`, `core` | |
 | 3 | #144 | Counts and the tree delete | `feature`, `core` | 2 |
 | 4 | #145 | Spike: the drag with a change of depth on iPhone and iPad | `spike`, `ui-apple` | |
@@ -93,7 +93,8 @@ from.
 The owner reviews this table and the interface of every task below.
 
 The split leaves `main` working after every merge. Tasks 1 to 4 touch no
-screen and can run beside each other. Tasks 5 and 6 change the module's
+screen, and all but Task 1, which keys its colours by Task 2's
+`TaskViewColor`, can run beside each other. Tasks 5 and 6 change the module's
 model and actions, so each adapts `TaskViewListView` in the same pull
 request just far enough that the app compiles and works, with today's
 look; the look arrives in Task 7 for the phone and in Task 8 for the Mac
@@ -314,7 +315,7 @@ extension TaskViewList {
 - The walk (`TaskViewList+Rows.swift`) is one pass over `views()`: each read row keeps the id, the title, the kind, the colour, the icon, the parent, the tree depth, whether it has children, and the drawn depth, one less than the tree depth under an area. A row under a collapsed ancestor is left out: the walk carries the depth below which rows are hidden, and clears it when a row at or above that depth arrives. The store reads a nested area as a list, so the walk never meets one.
 - `countText` is the count's decimal for a count above zero and `""` otherwise; an area's line has none. The counts come from `taskCounts(today:)` beside every read of the rows, with `today` the UTC day of `Store.systemNow()`, as the task list reads it; one `reread` reads both and throws as today's does.
 - `.changed`: a change naming a view rereads rows and counts; one naming only tasks or tags rereads the counts alone; a draft and the sentence stay, since a change answers nobody (spec section 4).
-- The folds are the device's (ADR-0010): `init` reads `deviceState("taskViewList.collapsed")`, the ids joined by `,`, dropping anything that does not read as an id or that no row holds; `disclosureTapped` on a row with children toggles it and writes the set back the same way, nil when empty; on a leaf or an area's line it moves nothing. A write of the device state that fails leaves the fold on screen and says nothing, the engineer's call (Self-review).
+- The folds are the device's (ADR-0010, amendment of 2026-10-26): `init` reads `deviceState("taskViewList.collapsed", as: [String].self)`, the folded ids' raw values, dropping anything that does not read as an id or that no row holds; `disclosureTapped` on a row with children toggles it and writes the set back the same way, an empty list when nothing is folded; on a leaf or an area's line it moves nothing. A write of the device state that fails leaves the fold on screen and says nothing, the engineer's call (Self-review).
 - `newListMenuItemChosen(in:)` creates `NewTaskView(title: "New list", parent:, kind: .list, color:, icon: "list")` at `.end`: under the list named, with that list's colour; under the area named, with none; with nil, in the last area of the root, or at the root's end when there is no area, with none (spec section 3). Then the parent is unfolded and written, the rows reread, and the field opens on the new row with its title as the draft, on a row the reread holds, as `createFolder` does today. The new list is not declared over the sidebar: the highlight stays where it was (Self-review).
 - `newAreaMenuItemChosen` creates `NewTaskView(title: "", kind: .area)` at the root's `.end` and opens the field on its line with the empty draft; `commit` accepts the empty title for an area and refuses it for a list with today's sentence (spec section 3).
 - `newTaskMenuItemChosen` answers `.newTaskRequested` and moves nothing.
