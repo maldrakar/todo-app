@@ -64,13 +64,13 @@ from.
 | `Sources/TodoCore/Query/Store+Counts.swift` | 3 | `taskCounts(today:)` and its statement |
 | `Tests/TodoCoreTests/ViewTests.swift`, `StoreOpenTests.swift`, `FieldMapTests.swift` | 2, 3 | the fields, the migration, the tree delete |
 | `Tests/TodoCoreTests/DeviceStateTests.swift`, `CountTests.swift` | 2, 3 | new |
-| `Package.swift` | 5 | `TaskViewListFeature` depends on `DesignSystem` and `DesignSystemComponents` |
+| `Package.swift` | 5 | `TaskViewListFeature` depends on `DesignSystem` and `DesignSystemComponents`, and so do `TaskViewListFeatureTests`, which spell `TileModel(…)` and compare `DesignSystem.Font`, and `AppFeatureTests`, which compare the sidebar's tiles; the feature targets' comment says when a feature imports the two |
 | `Sources/Features/TaskViewList/TaskViewList.swift` | 5, 6 | the module's events |
 | `Sources/Features/TaskViewList/TaskViewList+Model.swift` | 5, 6 | `Model` and its nested types |
 | `Sources/Features/TaskViewList/TaskViewList+Rows.swift` | 5, 6 | the walk from the store's tree to the drawn rows, and each list row's tile and title font (5); the root rule and the drop's reading (6) |
 | `Sources/Features/App/AppModule.swift` | 5 | reacts to `newTaskRequested`; hands the sidebar the window's width class |
 | `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, `TaskViewListRowsTests.swift`, `TaskViewListEditsTests.swift` | 5, 6 | adapted; the rows; the edits |
-| `Tests/AppFeatureTests/AppModuleTests.swift` | 5, 6 | quick entry from the sidebar; the open list deleted |
+| `Tests/AppFeatureTests/AppModuleTests.swift` | 5, 6 | quick entry from the sidebar and the sidebar's tiles following the width; the open list deleted |
 | `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh` | 5, 6 | the probe drives the new actions; the budget re-measured |
 | `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift` | 5, 6, 8 | adapted to the model (5, 6); deleted (8) |
 | `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsScreen.swift`, `ListRowView.swift`, `AreaLine.swift`, `ListsBottomBar.swift`, `MovePickerSheet.swift`, `ListsDragGesture.swift` | 7 | the phone's screen, rows, lines, bar, picker and drag |
@@ -275,7 +275,7 @@ extension Store {
 
 **Goal.** `TaskViewList` draws rows of two kinds with tiles, counts and folds remembered per device, areas with optional names, makes lists and areas where the spec says, and asks the root for quick entry; the Apple view adapts to the model so that the app keeps working, with the look left to Task 7 (spec sections 1, 3, 4, 5 and 6).
 
-**Files.** `Package.swift`; `Sources/Features/TaskViewList/TaskViewList.swift`, new `TaskViewList+Model.swift`, `TaskViewList+Rows.swift`; `Sources/Features/App/AppModule.swift`; `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, new `TaskViewListRowsTests.swift`; `Tests/AppFeatureTests/AppModuleTests.swift`; `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `CHANGELOG.md`.
+**Files.** `Package.swift`; `Sources/Features/TaskViewList/TaskViewList.swift`, new `TaskViewList+Model.swift`, `TaskViewList+Rows.swift`; `Sources/Features/App/AppModule.swift`; `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, new `TaskViewListRowsTests.swift`; `Tests/AppFeatureTests/AppModuleTests.swift`; `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `CHANGELOG.md`; ADR-0007 if the width's type goes into `FeatureModule` (Interface).
 
 **Interface.** Consumes Task 2's fields and Task 3's `taskCounts(today:)`. Produces:
 
@@ -295,7 +295,7 @@ extension TaskViewList {
         public struct ListRow: Equatable, Sendable {
             public let title: String
             public let tile: TileModel                // built for the window's width class (Rules)
-            public let titleFont: DesignSystem.Font   // chosen by the drawn depth and the children
+            public let titleFont: DesignSystem.Font   // chosen by the width, the drawn depth and the children
             public let countText: String              // "" for zero and for a view with no count
             public let hasChildren: Bool
             public let isCollapsed: Bool
@@ -308,7 +308,8 @@ extension TaskViewList {
     // init(store:route:) gains width:, the window's width class, with no default, as the root's own init has it;
     // Event gains widthChanged(_:), an event of the world. The width's type is one both the root and this module can
     // name, since a child never imports the root (ADR-0007): a type in FeatureModule that AppModule.Width becomes,
-    // or this module's own, onto which the root maps its own. The pull request picks one and says why.
+    // which then joins ADR-0007's list of that target's contents and the target's comment in Package.swift, or this
+    // module's own, onto which the root maps its own. The pull request picks one and says why.
     // UserAction gains disclosureTapped(ViewID), newListMenuItemChosen(in: ViewID?), newAreaMenuItemChosen,
     // newTaskMenuItemChosen, and loses createFolderButtonTapped. Output gains newTaskRequested.
 }
@@ -320,7 +321,7 @@ extension TaskViewList {
 **Rules.**
 
 - The walk (`TaskViewList+Rows.swift`) is one pass over `views()`: each read row keeps the id, the title, the kind, the colour, the icon, the parent, the tree depth, whether it has children, and the drawn depth, one less than the tree depth under an area. A row under a collapsed ancestor is left out: the walk carries the depth below which rows are hidden, and clears it when a row at or above that depth arrives. The store reads a nested area as a list, so the walk never meets one.
-- A list row's tile and title font are the Lists screen's layout, built in `TaskViewList+Rows.swift` from the read row and the width the module holds whenever the model is computed (ADR-0007, amendment of 2026-10-26). The colour is `DesignSystem.ListColor(rawValue:)` of the `TaskViewColor`'s raw value and the icon `DesignSystem.Icon(rawValue:)` of its text, a name either does not know reading as no colour, drawn as stone's, or no icon. The sizes are constants cited to the canvas: narrow, side 30, radius 8 and glyph 19 at drawn depth 0 and 26, 7 and 16 deeper (`Phone.dc.html`, `tileSize`); wide, 20, 6 and 13 for every row (`Mac.dc.html`, the 30 pt row). The title is `.rowTitle` at drawn depth 0 and `.nestedRowTitle` deeper, each `Emphasized` when the row has children. `widthChanged` moves the width alone, so the tiles follow it with no read of the store.
+- A list row's tile and title font are the Lists screen's layout, built in `TaskViewList+Rows.swift` from the read row and the width the module holds whenever the model is computed (ADR-0007, amendment of 2026-10-26). The colour is `DesignSystem.ListColor(rawValue:)` of the `TaskViewColor`'s raw value and the icon `DesignSystem.Icon(rawValue:)` of its text, a name either does not know reading as no colour, drawn as stone's, or no icon. The sizes are constants cited to the canvas: narrow, side 30, radius 8 and glyph 19 at drawn depth 0 and 26, 7 and 16 deeper (`Phone.dc.html`, `tileSize`); wide, 20, 6 and 13 for every row (`Mac.dc.html`, the 30 pt row). The title, narrow, is `.rowTitle` at drawn depth 0 and `.nestedRowTitle` deeper, and wide `.rowTitle` at every depth, the body being the system's sidebar size, 13 pt on the Mac and 17 on the iPad; each is `Emphasized` when the row has children. `widthChanged` moves the width alone, so the tiles follow it with no read of the store.
 - `countText` is the count's decimal for a count above zero and `""` otherwise; an area's line has none. The counts come from `taskCounts(today:)` beside every read of the rows, with `today` the UTC day of `Store.systemNow()`, as the task list reads it; one `reread` reads both and throws as today's does.
 - `.changed`: a change naming a view rereads rows and counts; one naming only tasks or tags rereads the counts alone; a draft and the sentence stay, since a change answers nobody (spec section 4).
 - The folds are the device's (ADR-0010, amendment of 2026-10-26): `init` reads `deviceState("taskViewList.collapsed", as: [String].self)`, the folded ids' raw values, dropping anything that does not read as an id or that no row holds; `disclosureTapped` on a row with children toggles it and writes the set back the same way, an empty list when nothing is folded; on a leaf or an area's line it moves nothing. A write of the device state that fails leaves the fold on screen and says nothing, the engineer's call (Self-review).
@@ -334,7 +335,7 @@ extension TaskViewList {
 
 - `theRowsCarryTheirKindTileAndCount`: in a narrow window the built-ins' tiles, the Inbox's `TileModel(color: .blue, icon: .tray, side: 30, cornerRadius: 8, glyphSize: 19)`, Inbox counting two open tasks and Logbook `""`; a list made with an icon this app does not know has a tile with no icon.
 - `aWideWindowsRowsCarryTheSidebarsTiles`: made wide, every row's tile is 20, 6 and 13 at any depth; `widthChanged(.narrow)` gives the narrow sizes by drawn depth, and a view written with no change sent stays out of the rows; `AppModuleTests.theSidebarsTilesFollowTheWindowsWidth`, a root made narrow and told wide.
-- `aRowsTitleFontFollowsItsDepthAndChildren`: a root list with children and a root leaf, a nested parent and a nested leaf take the four fonts; an area's list at drawn depth 0 takes the root's.
+- `aRowsTitleFontFollowsItsDepthAndChildren`: narrow, a root list with children and a root leaf, a nested parent and a nested leaf take the four fonts, and an area's list at drawn depth 0 the root's; wide, the nested rows take the root's two.
 - `anAreaIsALineAndItsListsStandAtTheRootsDepth`: an area with two lists, one nested, at depths 0, 0, 1; a named line's label; an unnamed line's nil.
 - `aFoldHidesTheBranchAndIsReadBackByAModuleMadeAnew`; `aFoldOnALeafOrALineMovesNothing`; `aFoldOnAnIdNoRowHoldsIsDropped`, from a stale device state.
 - `newListFromPlusGoesIntoTheLastAreaOrToTheEndOfTheRoot`; `newListFromAListsMenuGoesInsideItWithItsColourAndUnfoldsIt`; `newListInAnAreaHasNoColour`; `aNewListOpensItsFieldAndDeclaresNoList`.
@@ -453,7 +454,7 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
 
 **Rules.**
 
-- The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile through `ListTile(row.tile)`, which the module built at the canvas's 20, 6 and 13, the title at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
+- The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile through `ListTile(row.tile)`, which the module built at the canvas's 20, 6 and 13, the title in `Font(row.titleFont)`, which the module chose for the wide window and which renders at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
 - At the bottom: the search field, 30 pt, in the fill colour, inert; a 30 pt round "+" in the accent, a `Menu` with New task, `⌘N`, New list, `⇧⌘N`, and New area, the shortcuts through `keyboardShortcut`. The toolbar's New Folder is gone; the list's Quick Entry button stays.
 - The drag at any time, with the line-and-circle indicator for a drop between rows and into a parent, sending the same `rowDropped`.
 - The one platform condition, `#if os(macOS)`: the Mac's right click opens the menus, Rename, New list, Open in New Window, Move to…, Delete on a list and Rename, New list, Delete area on a line, and the Mac has no edit mode, no "…" and no edit items; on the iPad the long press opens the menus, "…" holds Edit, and the bar of Task 7 stands at the bottom of the column with edit mode as on the phone (spec section 8). Open in New Window where `supportsMultipleWindows`.
@@ -471,7 +472,7 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
 ## Self-review against the spec
 
 - Problem and goals: Tasks 5 to 8 replace the scaffold; the non-goals have no task, the badge included.
-- Section 1: Task 5 draws the rows and lines, Task 7 the screen, Task 8 the sidebar; Logbook and Trash stand where the seed ranks them, nothing names them. Section 2: Task 2. Section 3: Task 5's placements and the area's name, Task 6's root rule and the area's deletion. Section 4: Task 3's counts and Task 5's reread; the badge is out of the epic. Section 5: Task 5's model and Task 6's dialogs and drop; the route unchanged; the folds in Task 2's table through Task 5. Section 6: Tasks 5 and 6. Section 7: Task 4's spike, Task 6's edit mode and area drop, Task 7's screen. Section 8: Task 8. Section 9: Task 1. Section 10: every row has a task. Testing: each task's tests and hand checks. Risks: the drag is Task 4; the wide tree is Task 7's sideways scroll; the counts' cost is Task 3's measurement; midnight is accepted; the area's two writes are Task 6; the marked text is the field's as today; a deleted Inbox leaves quick entry to say so, as today; the wasm budget is Tasks 5 and 6.
+- Section 1: Task 5 draws the rows and lines, Task 7 the screen, Task 8 the sidebar; Logbook and Trash stand where the seed ranks them, nothing names them. Section 2: Task 2. Section 3: Task 5's placements and the area's name, Task 6's root rule and the area's deletion. Section 4: Task 3's counts and Task 5's reread; the badge is out of the epic. Section 5: Task 5's model and Task 6's dialogs and drop; the route unchanged; the folds in Task 2's table through Task 5. Section 6: Tasks 5 and 6. Section 7: Task 4's spike, Task 6's edit mode and area drop, Task 7's screen. Section 8: Task 8. Section 9: Task 1, and Task 5's tiles and title fonts. Section 10: every row has a task. Testing: each task's tests and hand checks. Risks: the drag is Task 4; the wide tree is Task 7's sideways scroll; the counts' cost is Task 3's measurement; midnight is accepted; the area's two writes are Task 6; the marked text is the field's as today; a deleted Inbox leaves quick entry to say so, as today; the wasm budget is Tasks 5 and 6.
 - Deviations, each the engineer's call, for the owner's review:
   - A new list is not declared over the sidebar when it is made: today's folder declares its list, and on a narrow window that would push the list over the sidebar while the name field is open. The field opens; the highlight stays.
   - `taskCounts(today:)` where the spec says `counts(today:)`, since the number is a count of tasks; `countStatement` beside `viewStatement` so that the plan test explains the statement itself.
@@ -479,5 +480,5 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
   - The drop's depth is clamped to what the rows allow, since the view's slot offers only those and the module trusts nothing a view sends.
   - A fold whose device-state write fails stays folded and says nothing: the fold is on screen, the next fold writes the set again, and the module's sentences stay for the data a person edits.
   - A list with no colour draws stone's shades; the canvas gives a new list blue, the spec gives it none, and the spec wins for the behaviour while the look of "none" is the foundations'.
-  - The foundations come before their caller, as the spec orders the epic; the pull request names Tasks 7 and 8.
+  - The foundations come before their callers, as the spec orders the epic; the pull request names Task 5, which builds the tiles and chooses the fonts, and Tasks 7 and 8, which draw them.
   - `TaskViewListView` is adapted twice before the look arrives, as the navigation plan adapted the root view, so that every merge works.
