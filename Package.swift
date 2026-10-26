@@ -9,6 +9,8 @@ let package = Package(
         // only through a product, and a target in none stays this package's own.
         .library(name: "TodoCore", targets: ["TodoCore"]),
         .library(name: "DeviceFile", targets: ["DeviceFile"]),
+        .library(name: "DesignSystem", targets: ["DesignSystem"]),
+        .library(name: "DesignSystemComponents", targets: ["DesignSystemComponents"]),
         .library(name: "FeatureModule", targets: ["FeatureModule"]),
         .library(name: "TaskViewListFeature", targets: ["TaskViewListFeature"]),
         .library(name: "TaskListFeature", targets: ["TaskListFeature"]),
@@ -41,6 +43,17 @@ let package = Package(
         // Where an identity is kept beside its database, in a target of its own because two consumers keep
         // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
         .target(name: "DeviceFile"),
+        // The look's design decisions in numbers, which every platform turns into its own pixels: the colours, the
+        // type as text styles, the motion and the icons, the tile's colours and the icons named as the store names
+        // them. It depends on nothing, the core included, because the look must not know the domain, and the wasm
+        // probe links it once a module the probe drives builds a component's model (ADR-0007, amendment of
+        // 2026-10-26).
+        .target(name: "DesignSystem"),
+        // The models and the logic of the components every platform draws from the design system's decisions, a
+        // list's tile first, whose model holds every visual parameter a platform needs to draw it. It depends on the
+        // design system alone and, like it, not on the core: the feature module that builds a component's model reads
+        // the store's names of a list's colour and icon as the design system's (ADR-0007, amendment of 2026-10-26).
+        .target(name: "DesignSystemComponents", dependencies: ["DesignSystem"]),
         // The contract, and beside it what every parent and every flow needs and nothing of any one screen: the
         // routable module and its seat, the error a route's text form is refused with, the destination a screen
         // declares what is open over it in, the stack a flow holds the screens over its base in, the id of an
@@ -84,6 +97,10 @@ let package = Package(
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
+        // The core and its helpers only for the tests that hold the design system's names of a tile's colour and of
+        // an icon to the store's, with which they agree by raw value.
+        .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "TodoCore", "TestSupport"]),
+        .testTarget(name: "DesignSystemComponentsTests", dependencies: ["DesignSystemComponents", "DesignSystem"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",

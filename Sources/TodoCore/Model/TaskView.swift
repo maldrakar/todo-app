@@ -13,8 +13,9 @@
 /// `kind`, `color` and `icon` are read by the rules of the Lists screen spec, section 2. An `area` stored on a
 /// view with an effective parent or a filter reads as a list, since an area stands only at the root and selects
 /// nothing; a colour this app has no name for reads as none; an icon is the name of a glyph in the app's own
-/// set as text, which the platform maps and draws its default glyph for when it does not know the name. A
-/// view written before the three existed reads as a plain list with no tile.
+/// set as text, and a name this app does not know is read by the feature module that builds the tile, which
+/// gives it the default glyph (ADR-0007, amendment of 2026-10-26). A view written before the three existed
+/// reads as a plain list with no tile.
 public struct TaskView: Equatable, Sendable {
     public let id: ViewID
     public let title: String
@@ -38,9 +39,9 @@ public enum TaskViewKind: String, Equatable, Sendable {
     case list, area
 }
 
-/// The colour of a list's tile, by name: the eleven the canvas's tiles use. The names are the core's and the
-/// shade a name means in each appearance is the platform's, which is what `CaseIterable` is for: the
-/// platform's table of shades is held complete by walking every case.
+/// The colour of a list's tile, by name: the eleven the canvas's tiles use. The names are the core's, and what a
+/// name looks like is the design system's, which names the same eleven without depending on the core; that is
+/// what `CaseIterable` is for: a test walks every case to hold the two lists together.
 public enum TaskViewColor: String, Equatable, Sendable, CaseIterable {
     case blue, amber, rose, green, stone, indigo, teal, pink, orange, violet, sky
 }

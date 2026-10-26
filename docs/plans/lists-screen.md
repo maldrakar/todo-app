@@ -30,7 +30,7 @@ The rules every task obeys, each with the spec section or ADR it comes
 from.
 
 - Toolchain: Swift 6.4.0 as `.swift-version` pins it, through swiftly (`export PATH="$HOME/.swiftly/bin:$PATH"`), with the wasm SDK `swift-6.4.0-RELEASE_wasm`; Xcode 27.1's toolchain is the same version (ADR-0008). A directory without the pin gets swiftly's default, which cannot import the 6.4 wasm SDK's modules: every command runs from the repository or a package inside it.
-- The core is full Swift on the standard library and FoundationEssentials, built and tested with SwiftPM for the host and wasm32; no SwiftUI, Observation or Foundation proper in the root package, which the wasm32 build in CI enforces (ADR-0001). A feature target imports `TodoCore`, `FeatureModule` and the features whose routes its destination holds, never a sibling or the root (ADR-0007).
+- The core is full Swift on the standard library and FoundationEssentials, built and tested with SwiftPM for the host and wasm32; no SwiftUI, Observation or Foundation proper in the root package, which the wasm32 build in CI enforces (ADR-0001). A feature target imports `TodoCore`, `FeatureModule` and the features whose routes its destination holds, and the design system's two targets when it builds a component's model, never a sibling or the root (ADR-0007, and its amendment of 2026-10-26).
 - The core has three entities and no containers: an area is a view of kind `area`, never nested, never holding tasks (ADR-0004, amendment of 2026-10-25). A view's kind, colour and icon are nullable text columns and known journal fields, written at creation; a value this app does not know reads as absent, an area with a parent or a rule reads as a list, and the built-ins are ordinary views that nothing pins (spec section 2).
 - A device's own UI state lives in the store's `device_state` table, outside the journal, read and written through the store and never synced; the folded branches are its first key, and a write of it reports no change set (ADR-0010).
 - A module is a `final class` conforming to `FeatureModule`, its model computed from its state, `send` synchronous and never throwing, what the store refuses written into the model as a sentence (ADR-0006, `docs/style.md`). `TaskViewList` stays `Routable` with no head; its route, its destination, the window's route and its text form do not change (spec section 5).
@@ -39,7 +39,7 @@ from.
 - A user action names the control and the gesture, never what the module does about it (`docs/style.md`); events of the world are named for what happened.
 - Everything from the store is data from outside: no trap, no recursion over data-shaped depth (`docs/style.md`). Every walk over the rows is one pass carrying the depths it has passed, as `TaskViewList.rows(of:)` walks today; an id or a depth a view sends is clamped or ignored, never trusted.
 - The names the tasks add were probed on 2026-10-25 (Verified facts of Tasks 1 and 2); a name a task adds beyond these gets the same probe before it is fixed.
-- The look is the canvas's; where the canvas and the spec differ, the canvas is right about the look and the spec about the behaviour (spec, introduction). The sizes in Tasks 1, 7 and 8 are the canvas's.
+- The look is the canvas's; where the canvas and the spec differ, the canvas is right about the look and the spec about the behaviour (spec, introduction). The sizes in Tasks 1, 5, 7 and 8 are the canvas's; the type is text styles, whose sizes at the iPhone's default text size are the canvas's but for the large title, 34 pt against 32, and the meta, 12 against 12.5, the owner's choice on #151.
 - Every merge leaves `main` working on every platform: a task that changes a module's model or actions adapts `Apps/Apple` in the same pull request, minimally where the look is a later task's (Tasks 5 and 6), and starts the macOS job from the Actions tab on its branch before asking for the merge (`docs/process.md`, section 10).
 - Tests are swift-testing. A module test opens `makeStore` with the test clock, sends events and compares the model whole. The root package's suite runs green on the host with `swift test` and on wasm32 with `swift test --swift-sdk swift-6.4.0-RELEASE_wasm --disable-xctest`, and `scripts/wasm-size.sh` passes, before every PR; the budget is re-measured where the probe's code moves (Tasks 5 and 6).
 - `Apps/Apple` is built and tested from its directory with the pinned toolchain, and each screen is checked by hand in the iOS 26.3 simulator on an iPhone 17, an iPhone 17 Pro Max turned sideways and an iPad Pro 11-inch (M5), and on the Mac, in both appearances, with screenshots in the pull request (spec, "Testing").
@@ -49,12 +49,13 @@ from.
 
 | File | Task | Holds |
 | ---- | ---- | ----- |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/Palette.swift` | 1 | the named colours with a shade per appearance, the accent, the dynamic-colour helper |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/ListColorShades.swift` | 1 | the eleven list colours' tile and glyph shades, and the shades of no colour |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/ListTile.swift` | 1 | the tile view |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/IconSet.swift` | 1 | icon names to SF Symbols, with the default |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/Typography.swift`, `Motion.swift` | 1 | the fonts; the durations and springs |
-| `Apps/Apple/Tests/TodoAppleUITests/FoundationsTests.swift` | 1 | the tables are complete and the defaults hold |
+| `Package.swift`, `Sources/DesignSystem/DesignSystem.swift` | 1 | the `DesignSystem` and `DesignSystemComponents` targets, their products and their tests; the enum every type of the design system is nested in |
+| `Sources/DesignSystem/Color.swift`, `Color+Components.swift` | 1 | `RGB`, and `Color` with the named colours as its static members, a shade per appearance; `Color.Components.Tile`, the tile's eleven colours by the store's names, each a background and a glyph colour drawn from a base nothing outside sees by the canvas's rule |
+| `Sources/DesignSystem/Font.swift`, `Animation.swift`, `Icon.swift` | 1 | the fonts as text styles; the animations, each a curve, a duration and a delay; the icons by the names the store keeps, the default glyph `bullets` among them |
+| `Sources/DesignSystemComponents/TileModel.swift` | 1 | a list's tile as plain data: the tile colour, the icon and the sizes its caller gives, and its glyph's medium weight |
+| `Tests/DesignSystemTests/ColorTests.swift`, `TileColorTests.swift`, `ChannelGap.swift`, `FontTests.swift`, `AnimationTests.swift`, `IconTests.swift`, `Tests/DesignSystemComponentsTests/TileModelTests.swift` | 1 | the mix and the accent soft, the tile colours against the canvas and their names against the store's, a derived colour compared with the canvas's, the four row titles, the delay, the store's icon names and unknown ones; what the tile carries |
+| `Apps/Apple/Package.swift`, `Apps/Apple/Sources/TodoAppleUI/DesignSystem/Color+DesignSystem.swift`, `Font+DesignSystem.swift`, `Animation+DesignSystem.swift`, `Image+DesignSystem.swift`, `ListTile.swift` | 1 | the dependencies on `DesignSystem` and `DesignSystemComponents`; the renderers, a `Color` that follows the appearance, a text-style `Font`, an `Animation` with its delay and every icon's SF Symbol; the tile view, drawn from a `TileModel` |
+| `Apps/Apple/Tests/TodoAppleUITests/DesignSystemRenderersTests.swift` | 1 | each renderer, and that every icon's symbol exists on the system |
 | `Sources/TodoCore/Model/TaskView.swift` | 2 | `TaskViewKind`, `TaskViewColor`, the three fields, `NewTaskView`'s three parameters, the seed's tiles |
 | `Sources/TodoCore/Storage/Schema.swift`, `Migrations.swift` | 2 | `version5` |
 | `Sources/TodoCore/Storage/JournalOperation.swift` | 2 | the three fields in `FieldMap` |
@@ -63,12 +64,13 @@ from.
 | `Sources/TodoCore/Query/Store+Counts.swift` | 3 | `taskCounts(today:)` and its statement |
 | `Tests/TodoCoreTests/ViewTests.swift`, `StoreOpenTests.swift`, `FieldMapTests.swift` | 2, 3 | the fields, the migration, the tree delete |
 | `Tests/TodoCoreTests/DeviceStateTests.swift`, `CountTests.swift` | 2, 3 | new |
+| `Package.swift` | 5 | `TaskViewListFeature` depends on `DesignSystem` and `DesignSystemComponents`, and so do `TaskViewListFeatureTests`, which spell `TileModel(…)` and compare `DesignSystem.Font`, and `AppFeatureTests`, which compare the sidebar's tiles; the feature targets' comment says when a feature imports the two |
 | `Sources/Features/TaskViewList/TaskViewList.swift` | 5, 6 | the module's events |
 | `Sources/Features/TaskViewList/TaskViewList+Model.swift` | 5, 6 | `Model` and its nested types |
-| `Sources/Features/TaskViewList/TaskViewList+Rows.swift` | 5, 6 | the walk from the store's tree to the drawn rows (5); the root rule and the drop's reading (6) |
-| `Sources/Features/App/AppModule.swift` | 5 | reacts to `newTaskRequested` |
+| `Sources/Features/TaskViewList/TaskViewList+Rows.swift` | 5, 6 | the walk from the store's tree to the drawn rows, and each list row's tile and title font (5); the root rule and the drop's reading (6) |
+| `Sources/Features/App/AppModule.swift` | 5 | reacts to `newTaskRequested`; hands the sidebar the window's width class |
 | `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, `TaskViewListRowsTests.swift`, `TaskViewListEditsTests.swift` | 5, 6 | adapted; the rows; the edits |
-| `Tests/AppFeatureTests/AppModuleTests.swift` | 5, 6 | quick entry from the sidebar; the open list deleted |
+| `Tests/AppFeatureTests/AppModuleTests.swift` | 5, 6 | quick entry from the sidebar and the sidebar's tiles following the width; the open list deleted |
 | `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh` | 5, 6 | the probe drives the new actions; the budget re-measured |
 | `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift` | 5, 6, 8 | adapted to the model (5, 6); deleted (8) |
 | `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsScreen.swift`, `ListRowView.swift`, `AreaLine.swift`, `ListsBottomBar.swift`, `MovePickerSheet.swift`, `ListsDragGesture.swift` | 7 | the phone's screen, rows, lines, bar, picker and drag |
@@ -93,7 +95,7 @@ from.
 The owner reviews this table and the interface of every task below.
 
 The split leaves `main` working after every merge. Tasks 1 to 4 touch no
-screen, and all but Task 1, which keys its colours by Task 2's
+screen, and all but Task 1, whose test holds its tile colours to Task 2's
 `TaskViewColor`, can run beside each other. Tasks 5 and 6 change the module's
 model and actions, so each adapts `TaskViewListView` in the same pull
 request just far enough that the app compiles and works, with today's
@@ -273,7 +275,7 @@ extension Store {
 
 **Goal.** `TaskViewList` draws rows of two kinds with tiles, counts and folds remembered per device, areas with optional names, makes lists and areas where the spec says, and asks the root for quick entry; the Apple view adapts to the model so that the app keeps working, with the look left to Task 7 (spec sections 1, 3, 4, 5 and 6).
 
-**Files.** `Sources/Features/TaskViewList/TaskViewList.swift`, new `TaskViewList+Model.swift`, `TaskViewList+Rows.swift`; `Sources/Features/App/AppModule.swift`; `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, new `TaskViewListRowsTests.swift`; `Tests/AppFeatureTests/AppModuleTests.swift`; `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `CHANGELOG.md`.
+**Files.** `Package.swift`; `Sources/Features/TaskViewList/TaskViewList.swift`, new `TaskViewList+Model.swift`, `TaskViewList+Rows.swift`; `Sources/Features/App/AppModule.swift`; `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, new `TaskViewListRowsTests.swift`; `Tests/AppFeatureTests/AppModuleTests.swift`; `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh`; `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift`; `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`; `CHANGELOG.md`; ADR-0007 if the width's type goes into `FeatureModule` (Interface).
 
 **Interface.** Consumes Task 2's fields and Task 3's `taskCounts(today:)`. Produces:
 
@@ -292,9 +294,9 @@ extension TaskViewList {
         }
         public struct ListRow: Equatable, Sendable {
             public let title: String
-            public let color: TaskViewColor?
-            public let icon: String?
-            public let countText: String   // "" for zero and for a view with no count
+            public let tile: TileModel                // built for the window's width class (Rules)
+            public let titleFont: DesignSystem.Font   // chosen by the width, the drawn depth and the children
+            public let countText: String              // "" for zero and for a view with no count
             public let hasChildren: Bool
             public let isCollapsed: Bool
             public let isSelected: Bool
@@ -303,16 +305,23 @@ extension TaskViewList {
         public let selection: ViewID?
         public let problem: String?
     }
+    // init(store:route:) gains width:, the window's width class, with no default, as the root's own init has it;
+    // Event gains widthChanged(_:), an event of the world. The width's type is one both the root and this module can
+    // name, since a child never imports the root (ADR-0007): a type in FeatureModule that AppModule.Width becomes,
+    // which then joins ADR-0007's list of that target's contents and the target's comment in Package.swift, or this
+    // module's own, onto which the root maps its own. The pull request picks one and says why.
     // UserAction gains disclosureTapped(ViewID), newListMenuItemChosen(in: ViewID?), newAreaMenuItemChosen,
     // newTaskMenuItemChosen, and loses createFolderButtonTapped. Output gains newTaskRequested.
 }
-// AppModule: react(to: TaskViewList.Output) gains the arm for .newTaskRequested, which opens quick entry as
-// quickEntryButtonTapped does and leaves the root's sentence, since the gesture is the sidebar's.
+// AppModule: init hands the sidebar the width the window is made with, and .widthChanged hands it the new width
+// besides moving the layout. react(to: TaskViewList.Output) gains the arm for .newTaskRequested, which opens quick
+// entry as quickEntryButtonTapped does and leaves the root's sentence, since the gesture is the sidebar's.
 ```
 
 **Rules.**
 
 - The walk (`TaskViewList+Rows.swift`) is one pass over `views()`: each read row keeps the id, the title, the kind, the colour, the icon, the parent, the tree depth, whether it has children, and the drawn depth, one less than the tree depth under an area. A row under a collapsed ancestor is left out: the walk carries the depth below which rows are hidden, and clears it when a row at or above that depth arrives. The store reads a nested area as a list, so the walk never meets one.
+- A list row's tile and title font are the Lists screen's layout, built in `TaskViewList+Rows.swift` from the read row and the width the module holds whenever the model is computed (ADR-0007, amendment of 2026-10-26). The colour is `DesignSystem.Color.Components.Tile(rawValue:)` of the `TaskViewColor`'s raw value, `.stone` for none or a name it does not know, and the icon `DesignSystem.Icon(rawValue:)` of its text, `.bullets` for none or a name it does not know. The sizes are constants cited to the canvas: narrow, side 30, radius 8 and glyph 19 at drawn depth 0 and 26, 7 and 16 deeper (`Phone.dc.html`, `tileSize`); wide, 20, 6 and 13 for every row (`Mac.dc.html`, the 30 pt row). The title, narrow, is `.rowTitle` at drawn depth 0 and `.nestedRowTitle` deeper, and wide `.rowTitle` at every depth, the body being the system's sidebar size, 13 pt on the Mac and 17 on the iPad; each is `Emphasized` when the row has children. `widthChanged` moves the width alone, so the tiles follow it with no read of the store.
 - `countText` is the count's decimal for a count above zero and `""` otherwise; an area's line has none. The counts come from `taskCounts(today:)` beside every read of the rows, with `today` the UTC day of `Store.systemNow()`, as the task list reads it; one `reread` reads both and throws as today's does.
 - `.changed`: a change naming a view rereads rows and counts; one naming only tasks or tags rereads the counts alone; a draft and the sentence stay, since a change answers nobody (spec section 4).
 - The folds are the device's (ADR-0010, amendment of 2026-10-26): `init` reads `deviceState("taskViewList.collapsed", as: [String].self)`, the folded ids' raw values, dropping anything that does not read as an id or that no row holds; `disclosureTapped` on a row with children toggles it and writes the set back the same way, an empty list when nothing is folded; on a leaf or an area's line it moves nothing. A write of the device state that fails leaves the fold on screen and says nothing, the engineer's call (Self-review).
@@ -320,11 +329,13 @@ extension TaskViewList {
 - `newAreaMenuItemChosen` creates `NewTaskView(title: "", kind: .area)` at the root's `.end` and opens the field on its line with the empty draft; `commit` accepts the empty title for an area and refuses it for a list with today's sentence (spec section 3).
 - `newTaskMenuItemChosen` answers `.newTaskRequested` and moves nothing.
 - `rowSelected` and `openInNewWindowMenuItemChosen` on an area's line move nothing, since an area never opens; `renameMenuItemChosen` on it opens the field with its name. `Kind.area(label:)` is the title when it is not empty and nil otherwise.
-- `TaskViewListView` adapts and no more: one switch over `kind`, a line as a `Divider` with its label beside it, a list as today's row; the toolbar's New Folder becomes New List sending `newListMenuItemChosen(in: nil)`; the wasm probe drives the four new actions and the budget is re-measured.
+- `TaskViewListView` adapts and no more: one switch over `kind`, a line as a `Divider` with its label beside it, a list as today's row; the toolbar's New Folder becomes New List sending `newListMenuItemChosen(in: nil)`; the wasm probe drives the four new actions, its width change now reaches the sidebar, and the budget is re-measured with the two design targets the sidebar links.
 
 **Tests.**
 
-- `theRowsCarryTheirKindTileAndCount`: the built-ins with their colours and icons, Inbox counting two open tasks and Logbook `""`.
+- `theRowsCarryTheirKindTileAndCount`: in a narrow window the built-ins' tiles, the Inbox's `TileModel(color: .blue, icon: .tray, side: 30, cornerRadius: 8, glyphSize: 19)`, Inbox counting two open tasks and Logbook `""`; a list made with an icon this app does not know has a tile with the bullets icon, and one with no colour a stone tile.
+- `aWideWindowsRowsCarryTheSidebarsTiles`: made wide, every row's tile is 20, 6 and 13 at any depth; `widthChanged(.narrow)` gives the narrow sizes by drawn depth, and a view written with no change sent stays out of the rows; `AppModuleTests.theSidebarsTilesFollowTheWindowsWidth`, a root made narrow and told wide.
+- `aRowsTitleFontFollowsItsDepthAndChildren`: narrow, a root list with children and a root leaf, a nested parent and a nested leaf take the four fonts, and an area's list at drawn depth 0 the root's; wide, the nested rows take the root's two.
 - `anAreaIsALineAndItsListsStandAtTheRootsDepth`: an area with two lists, one nested, at depths 0, 0, 1; a named line's label; an unnamed line's nil.
 - `aFoldHidesTheBranchAndIsReadBackByAModuleMadeAnew`; `aFoldOnALeafOrALineMovesNothing`; `aFoldOnAnIdNoRowHoldsIsDropped`, from a stale device state.
 - `newListFromPlusGoesIntoTheLastAreaOrToTheEndOfTheRoot`; `newListFromAListsMenuGoesInsideItWithItsColourAndUnfoldsIt`; `newListInAnAreaHasNoColour`; `aNewListOpensItsFieldAndDeclaresNoList`.
@@ -340,6 +351,7 @@ extension TaskViewList {
 - `Day(millisSinceEpoch:)` is `package`, callable from the feature; `TaskList.rows(of:in:)` reads today the same way.
 - Trap: a `TextField` writes the text it holds back through its binding twice per keystroke (`TaskViewList`); the area's field goes through the same `titleFieldChanged` rule, a text equal to the draft moving nothing.
 - Trap: the model's `Row` loses `title` and `isSelected`; `TodoAppTests` and the probe read them through `kind`.
+- The root reaches the sidebar only through `state.stack.send(_:)`, which walks the stack after every event (`ScreenStack`, 2026-10-26): `widthChanged` leaves the destination alone, so the walk after it moves nothing. The probe sends `.widthChanged(.narrow)` to the root already (`main.swift`).
 
 ### Task 6: The module's edits: edit mode, delete, Move to… and the drop
 
@@ -377,7 +389,7 @@ extension TaskViewList.Model {
 - Edit mode: `editMenuItemChosen` sets it, `doneButtonTapped` commits an open field as Return does and leaves it, and a refused name keeps the field and the mode. While editing, every `countText` is `""`, an unnamed area's label is `"Area"`, and `rowSelected` on any row opens its field instead of declaring a list (spec section 7).
 - Delete asks first (spec section 6). `deleteMenuItemChosen(id)` on a list puts up `Confirmation(title: "Delete “X”?", message:)` with `"No task is deleted."`, `"One list inside it goes with it. No task is deleted."` or `"N lists inside it go with it. No task is deleted."`; on an area, `"Delete the “X” area?"`, or `"Delete the area?"` unnamed, with `"Its lists stay."`; on an id no row holds, nothing. `deleteConfirmed` deletes a list with `delete(viewTree:)`, and an area by moving each of its lists in rank order, `move(view:to:at: .end)` under the area above or by the root rule when there is none, then `delete(view:)`; the confirmation closes either way, a refusal says `couldNotSave`, and the rows are reread. `deleteCancelled` closes it; with none up both move nothing, which is where the alert's write after a close the model drove lands.
 - The root rule, in `TaskViewList+Rows.swift`: a list put at the root goes `.after` the last list of the root that stands before the first area, or `.start` when none does; it serves Top level, the lists of a deleted first area, and nothing else (spec section 3).
-- Move to…: `moveToMenuItemChosen(id)` on a list opens `MovePicker` over the whole tree in tree order with folds ignored, the lines and the drawn depths as the screen's, the list and its descendants disabled and its parent current, `isTopLevelCurrent` when it stands at the root; on an area or an id no row holds, nothing. `movePickerRowTapped(nil)` moves by the root rule; a line or a list moves the list `.end` under it; a disabled row moves nothing. After a move the destination is unfolded, the rows reread and the picker closed; a refusal says `couldNotSave`. `movePickerCancelled` closes it; with none up both move nothing.
+- Move to…: `moveToMenuItemChosen(id)` on a list opens `MovePicker` over the whole tree in tree order with folds ignored, the lines, the drawn depths and each list row's tile and title font as the screen's, built by Task 5's rule for the width the module holds, the list and its descendants disabled and its parent current, `isTopLevelCurrent` when it stands at the root; on an area or an id no row holds, nothing. `movePickerRowTapped(nil)` moves by the root rule; a line or a list moves the list `.end` under it; a disabled row moves nothing. After a move the destination is unfolded, the rows reread and the picker closed; a refusal says `couldNotSave`. `movePickerCancelled` closes it; with none up both move nothing.
 - The drop, `rowDropped(id, after:, depth:)`: an id or an `after` no row holds moves nothing. For a list, the depth is clamped between the drawn depth of the row that follows `after` once the moved list and its descendants are skipped, or 0 when none follows, and the depth of `after` plus one, or 0 when `after` is nil or an area's line. Then `after` nil is the root at `.start`; an area's line is that area at `.start`; `after`'s depth plus one is `after` at `.start`; `after`'s depth is `after`'s parent `.after(after)`; a shallower depth is the ancestor of `after` at that drawn depth, found by walking parents while the drawn depth is greater, placed `.after` it under its parent (spec section 5). For an area, `after` nil is the root at `.start`, and otherwise the root `.after` the root item of `after`'s block, its topmost ancestor (spec section 7). The store's refusals say `couldNotSave`; after a write the new parent is unfolded and the rows reread.
 - `TaskViewListView` adapts and no more: `.alert` over `confirmation` with Delete and Cancel sending `deleteConfirmed` and `deleteCancelled`, `.sheet` over `movePicker` with a plain `List` of the rows sending `movePickerRowTapped` and a Cancel sending `movePickerCancelled`, both dismissals sending the Cancel; the context menu gains New list, Move to… and Delete; Edit and Done on the toolbar. The probe drives the picker and a drop; the budget is re-measured.
 
@@ -410,8 +422,8 @@ struct ListsScreen: View { init(model: TaskViewList.Model, send: @escaping (Task
 
 **Rules.**
 
-- The rows (`Phone.dc.html`): 46 pt high; the tile's leading edge at 20 + 22 × depth pt; the tile 30, radius 8, glyph 19 at the root and 26, 7, 16 nested, through `ListTile`; the title in `Typography.rowTitle`, ink, one line, at least 140 pt wide; the count in `Typography.count`, ink2, at the right edge, with the chevron beside it, both pinned while the tree scrolls sideways past the depth at which 20 + 22 × depth + the tile + 12 + 140 + 72 exceeds the width; guides of 1.5 pt in the line colour down each ancestor level under its tile's centre; the chevron rotates on fold with `Motion.popover`.
-- An area's line (`AreaLine`): a 1 pt line in the line colour across the tree, 17 pt tall alone, and 36 pt with the label in ink2 at 13 pt medium sitting on the line, which while renaming becomes the field; a grip at the right in edit mode.
+- The rows (`Phone.dc.html`): 46 pt high; the tile's leading edge at 20 + 22 × depth pt; the tile through `ListTile(row.tile)`, which the module built at the canvas's 30, 8 and 19 at the root and 26, 7 and 16 nested, with no `TileModel` built and no `init(rawValue:)` in the view; the title in `Font(row.titleFont)`, ink, one line, at least 140 pt wide; the count in `Font(.count)`, ink2, at the right edge, with the chevron beside it, both pinned while the tree scrolls sideways past the depth at which 20 + 22 × depth + the tile + 12 + 140 + 72 exceeds the width; guides of 1.5 pt in the line colour down each ancestor level under its tile's centre; the chevron rotates on fold with `Animation(.popover)`.
+- An area's line (`AreaLine`): a 1 pt line in the line colour across the tree, 17 pt tall alone, and 36 pt with the label in ink2 in `Font(.areaLabel)` sitting on the line, which while renaming becomes the field; a grip at the right in edit mode.
 - The bar (`ListsBottomBar`), on `.regularMaterial`: a 48 pt round "…" at the left, a `Menu` holding Edit, and +List, +Area and a Done check in edit mode; the capsule in the middle, 48 pt high, radius 24, the magnifier and "Search" in ink2, a view that sends nothing; a 48 pt round "+" in the accent at the right, a `Menu` holding New task, New list and New area. No title, as the canvas has none.
 - The long press is `.contextMenu` behind `#if !os(watchOS)` as today: Rename, New list, Move to…, Delete on a list; Rename, New list, Delete area on a line; Open in New Window on a list where `supportsMultipleWindows`. Not shown in edit mode, which `isEditing` says.
 - Edit mode: grips at the right, a tap on a row sends `rowSelected`, and the drag, `ListsDragGesture`, built as Task 4 answered: the lifted row scaled 1.03 and tilted −1.5°, the slot 52 pt dashed at the chosen depth, the depth bounded as Task 4 bounds it, one `rowDropped` on release.
@@ -442,7 +454,7 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
 
 **Rules.**
 
-- The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile 20, 6, 13, the title at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
+- The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile through `ListTile(row.tile)`, which the module built at the canvas's 20, 6 and 13, the title in `Font(row.titleFont)`, which the module chose for the wide window and which renders at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
 - At the bottom: the search field, 30 pt, in the fill colour, inert; a 30 pt round "+" in the accent, a `Menu` with New task, `⌘N`, New list, `⇧⌘N`, and New area, the shortcuts through `keyboardShortcut`. The toolbar's New Folder is gone; the list's Quick Entry button stays.
 - The drag at any time, with the line-and-circle indicator for a drop between rows and into a parent, sending the same `rowDropped`.
 - The one platform condition, `#if os(macOS)`: the Mac's right click opens the menus, Rename, New list, Open in New Window, Move to…, Delete on a list and Rename, New list, Delete area on a line, and the Mac has no edit mode, no "…" and no edit items; on the iPad the long press opens the menus, "…" holds Edit, and the bar of Task 7 stands at the bottom of the column with edit mode as on the phone (spec section 8). Open in New Window where `supportsMultipleWindows`.
@@ -460,13 +472,13 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
 ## Self-review against the spec
 
 - Problem and goals: Tasks 5 to 8 replace the scaffold; the non-goals have no task, the badge included.
-- Section 1: Task 5 draws the rows and lines, Task 7 the screen, Task 8 the sidebar; Logbook and Trash stand where the seed ranks them, nothing names them. Section 2: Task 2. Section 3: Task 5's placements and the area's name, Task 6's root rule and the area's deletion. Section 4: Task 3's counts and Task 5's reread; the badge is out of the epic. Section 5: Task 5's model and Task 6's dialogs and drop; the route unchanged; the folds in Task 2's table through Task 5. Section 6: Tasks 5 and 6. Section 7: Task 4's spike, Task 6's edit mode and area drop, Task 7's screen. Section 8: Task 8. Section 9: Task 1. Section 10: every row has a task. Testing: each task's tests and hand checks. Risks: the drag is Task 4; the wide tree is Task 7's sideways scroll; the counts' cost is Task 3's measurement; midnight is accepted; the area's two writes are Task 6; the marked text is the field's as today; a deleted Inbox leaves quick entry to say so, as today; the wasm budget is Tasks 5 and 6.
+- Section 1: Task 5 draws the rows and lines, Task 7 the screen, Task 8 the sidebar; Logbook and Trash stand where the seed ranks them, nothing names them. Section 2: Task 2. Section 3: Task 5's placements and the area's name, Task 6's root rule and the area's deletion. Section 4: Task 3's counts and Task 5's reread; the badge is out of the epic. Section 5: Task 5's model and Task 6's dialogs and drop; the route unchanged; the folds in Task 2's table through Task 5. Section 6: Tasks 5 and 6. Section 7: Task 4's spike, Task 6's edit mode and area drop, Task 7's screen. Section 8: Task 8. Section 9: Task 1, and Task 5's tiles and title fonts. Section 10: every row has a task. Testing: each task's tests and hand checks. Risks: the drag is Task 4; the wide tree is Task 7's sideways scroll; the counts' cost is Task 3's measurement; midnight is accepted; the area's two writes are Task 6; the marked text is the field's as today; a deleted Inbox leaves quick entry to say so, as today; the wasm budget is Tasks 5 and 6.
 - Deviations, each the engineer's call, for the owner's review:
   - A new list is not declared over the sidebar when it is made: today's folder declares its list, and on a narrow window that would push the list over the sidebar while the name field is open. The field opens; the highlight stays.
   - `taskCounts(today:)` where the spec says `counts(today:)`, since the number is a count of tasks; `countStatement` beside `viewStatement` so that the plan test explains the statement itself.
   - `PickerRow` carries the row and two flags where the spec says "rows of the same shape", so that the picker's view switches over the same `Kind` and reads two Bools.
   - The drop's depth is clamped to what the rows allow, since the view's slot offers only those and the module trusts nothing a view sends.
   - A fold whose device-state write fails stays folded and says nothing: the fold is on screen, the next fold writes the set again, and the module's sentences stay for the data a person edits.
-  - A list with no colour draws stone's shades; the canvas gives a new list blue, the spec gives it none, and the spec wins for the behaviour while the look of "none" is the foundations'.
-  - The foundations come before their caller, as the spec orders the epic; the pull request names Tasks 7 and 8.
+  - A list with no colour draws stone's tile colour; the canvas gives a new list blue, the spec gives it none, and the spec wins for the behaviour while the look of "none" is stone's, which the module picks as it picks the bullets glyph for no icon (Task 5).
+  - The foundations come before their callers, as the spec orders the epic; the pull request names Task 5, which builds the tiles and chooses the fonts, and Tasks 7 and 8, which draw them.
   - `TaskViewListView` is adapted twice before the look arrives, as the navigation plan adapted the root view, so that every merge works.
