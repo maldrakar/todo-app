@@ -1,6 +1,6 @@
 # Plan: The Lists screen
 
-- Status: Draft
+- Status: Approved 2026-10-26, with the owner's word that a decision may move during implementation and be recorded in the task's pull request
 - Spec: `docs/specs/lists-screen.md`, approved 2026-10-25
 - Epic: #138
 
