@@ -108,13 +108,14 @@ value a peer wrote is as arbitrary as one a person typed.
   layout its model gives it: it chooses no tree of containers by the
   width, assembles no path, and reads no route to decide what to
   draw. (Owner, 2026-10-22, #117; ADR-0006, amendment of 2026-10-22)
-- **A view may switch over two enums of its model, and no others.**
-  The shape of its layout, and the screens of a stack, the latter in
-  one place per stack, to pick a view per case. It is dispatch and
-  not a condition over data: every case is drawn, with no `default`,
-  so a screen added to a stack and not drawn stops the view
-  compiling. (Navigation state spec, sections 4 and 6, #117; ADR-0006,
-  amendment of 2026-10-22)
+- **A view may switch over three enums of its model, and no others.**
+  The shape of its layout; the screens of a stack, in one place per
+  stack, to pick a view per case; and the kind of a row, to pick the
+  row to draw. It is dispatch and not a condition over data: every
+  case is drawn, with no `default`, so a screen added to a stack and
+  not drawn stops the view compiling. (Navigation state spec, sections
+  4 and 6, #117; ADR-0006, amendments of 2026-10-22 and 2026-10-25;
+  the row's kind is the owner's call on the Lists screen spec, #138)
 
 ## In a review thread
 
