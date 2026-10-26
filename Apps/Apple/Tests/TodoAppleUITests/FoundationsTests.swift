@@ -74,6 +74,8 @@ import TodoCore
     #expect(Typography.rowTitle(depth: 3, hasChildren: true) == .system(size: 16, weight: .semibold))
 }
 
+/// On the main actor because `Color.resolve(in:)` reaches AppKit's dynamic provider, which answers on the main actor
+/// only: a nonisolated version of this test hung `swift test` with no output (2026-10-26).
 @Test @MainActor func aDynamicColourResolvesToEachAppearancesShade() {
     let light = RGB(hex: 0xE7EAF9)
     let dark = RGB(hex: 0x1A1917)
