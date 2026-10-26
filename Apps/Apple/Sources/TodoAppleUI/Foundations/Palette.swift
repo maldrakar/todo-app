@@ -27,7 +27,7 @@ struct RGB: Equatable {
     }
 
     /// A literal with no appearance of its own: only `Palette.dynamic` follows the theme.
-    var color: Color { Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity) }
+    fileprivate var color: Color { Color(.sRGB, red: red, green: green, blue: blue, opacity: opacity) }
 }
 
 extension RGB {
@@ -49,10 +49,13 @@ enum Palette {
     static let sidebar = dynamic(light: RGB(hex: 0xF2EDE5), dark: RGB(hex: 0x1F1E1B))
     static let fill = dynamic(light: RGB(hex: 0xF0EBE3), dark: RGB(hex: 0x2E2B27))
     static let line = dynamic(light: RGB(hex: 0xE8E2D8), dark: RGB(hex: 0x35322D))
-    static let ink = dynamic(light: RGB(hex: 0x1F1D1A), dark: RGB(hex: 0xEEEAE3))
+    static let ink = dynamic(light: lightInk, dark: RGB(hex: 0xEEEAE3))
     static let ink2 = dynamic(light: RGB(hex: 0x625C53), dark: RGB(hex: 0xABA498))
     static let ink3 = dynamic(light: RGB(hex: 0xA39C90), dark: RGB(hex: 0x6F6A62))
     static let red = dynamic(light: RGB(hex: 0xC2362B), dark: RGB(hex: 0xF07468))
+
+    /// The ink in the light appearance as a number, which the glyph rule of `ListColorShades` mixes toward.
+    static let lightInk = RGB(hex: 0x1F1D1A)
 
     /// The same blue in both appearances.
     static let accent = accentRGB.color

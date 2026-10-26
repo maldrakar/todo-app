@@ -29,6 +29,5 @@ struct ListTile: View {
                     .font(.system(size: glyph, weight: .medium))
                     .foregroundStyle(shades.glyph)
             }
-            .accessibilityHidden(true)
     }
 }

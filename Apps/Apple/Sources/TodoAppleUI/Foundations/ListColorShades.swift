@@ -9,14 +9,15 @@ struct ListColorShades: Equatable {
 
     /// One entry for every colour a list can have.
     static let byName: [TaskViewColor: ListColorShades] =
-        Dictionary(uniqueKeysWithValues: TaskViewColor.allCases.map { ($0, $0 == .stone ? none : shades(of: base($0))) })
+        Dictionary(uniqueKeysWithValues: TaskViewColor.allCases.map { ($0, $0 == .stone ? noColor : painted(base($0))) })
 
-    /// A list with no colour draws stone's shades, the very ones `byName` holds for stone: a dynamic `Color` is
-    /// equal only to itself, so a second copy of them would not compare equal.
-    static let none = shades(of: base(.stone))
+    /// What a list with no colour draws: stone's shades, the very ones `byName` holds for stone, since a dynamic
+    /// `Color` is equal only to itself and a second copy would not compare equal. Private, because a name `none` would
+    /// read as `Optional.none` next to `byName`'s optionals.
+    private static let noColor = painted(base(.stone))
 
     static func shades(of color: TaskViewColor?) -> ListColorShades {
-        color.flatMap { byName[$0] } ?? none
+        color.flatMap { byName[$0] } ?? noColor
     }
 
     /// The tile is the base at 15 % opacity in the light and 24 % in the dark, the canvas's `paint` rule
@@ -27,10 +28,10 @@ struct ListColorShades: Equatable {
 
     /// The glyph is the base mixed 20 % toward the ink in the light and 30 % toward white in the dark, the same rule.
     static func glyph(_ base: RGB, dark: Bool) -> RGB {
-        dark ? base.mixed(toward: RGB(hex: 0xFFFFFF), by: 0.3) : base.mixed(toward: RGB(hex: 0x1F1D1A), by: 0.2)
+        dark ? base.mixed(toward: RGB(hex: 0xFFFFFF), by: 0.3) : base.mixed(toward: Palette.lightInk, by: 0.2)
     }
 
-    private static func shades(of base: RGB) -> ListColorShades {
+    private static func painted(_ base: RGB) -> ListColorShades {
         ListColorShades(
             tile: Palette.dynamic(light: tile(base, dark: false), dark: tile(base, dark: true)),
             glyph: Palette.dynamic(light: glyph(base, dark: false), dark: glyph(base, dark: true)))

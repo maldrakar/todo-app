@@ -1,7 +1,7 @@
 // Apps/Apple/Sources/TodoAppleUI/Foundations/Typography.swift
 import SwiftUI
 
-/// The canvas's type (`Main.dc.html`). Titles are the rounded face and the rest the system face.
+/// The canvas's type (`Main.dc.html`). The large and section titles are the rounded face; the rest is the system face.
 enum Typography {
     static let largeTitle = Font.system(size: 32, weight: .heavy, design: .rounded)
     static let sectionTitle = Font.system(size: 17, weight: .heavy, design: .rounded)

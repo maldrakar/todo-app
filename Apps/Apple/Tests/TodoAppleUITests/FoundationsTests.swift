@@ -12,7 +12,6 @@ import TodoCore
 
 @Test func aListWithNoColourDrawsStonesShades() throws {
     let stone = try #require(ListColorShades.byName[.stone])
-    #expect(ListColorShades.none == stone)
     #expect(ListColorShades.shades(of: nil) == stone)
     #expect(ListColorShades.shades(of: .blue) == ListColorShades.byName[.blue])
 }
@@ -28,9 +27,13 @@ import TodoCore
     #expect(glyph.opacity == 1)
 }
 
-@Test func theDarkGlyphIsTheBaseMixedThirtyPercentTowardWhite() {
-    let base = RGB(hex: 0x3E6EC5)
-    #expect(ListColorShades.glyph(base, dark: true) == base.mixed(toward: RGB(hex: 0xFFFFFF), by: 0.3))
+/// 0.7 x #3E6EC5 + 0.3 x white comes to #789AD6.
+@Test func theDarkGlyphOfBlueIsLiftedTowardWhite() {
+    let glyph = ListColorShades.glyph(RGB(hex: 0x3E6EC5), dark: true)
+    let expected = RGB(hex: 0x789AD6)
+    for (got, want) in [(glyph.red, expected.red), (glyph.green, expected.green), (glyph.blue, expected.blue)] {
+        #expect(abs(got - want) * 255 <= 1)
+    }
 }
 
 @Test func theDarkTileIsTheBaseAtTwentyFourPercent() {
@@ -69,4 +72,18 @@ import TodoCore
     #expect(Typography.rowTitle(depth: 0, hasChildren: false) == .system(size: 17, weight: .regular))
     #expect(Typography.rowTitle(depth: 1, hasChildren: false) == .system(size: 16, weight: .regular))
     #expect(Typography.rowTitle(depth: 3, hasChildren: true) == .system(size: 16, weight: .semibold))
+}
+
+@Test @MainActor func aDynamicColourResolvesToEachAppearancesShade() {
+    let light = RGB(hex: 0xE7EAF9)
+    let dark = RGB(hex: 0x1A1917)
+    let color = Palette.dynamic(light: light, dark: dark)
+    for (scheme, want) in [(ColorScheme.light, light), (ColorScheme.dark, dark)] {
+        var environment = EnvironmentValues()
+        environment.colorScheme = scheme
+        let got = color.resolve(in: environment)
+        #expect(abs(Double(got.red) - want.red) < 0.01, "\(scheme)")
+        #expect(abs(Double(got.green) - want.green) < 0.01, "\(scheme)")
+        #expect(abs(Double(got.blue) - want.blue) < 0.01, "\(scheme)")
+    }
 }
