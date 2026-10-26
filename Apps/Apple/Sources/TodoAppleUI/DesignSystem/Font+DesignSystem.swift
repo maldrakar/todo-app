@@ -4,14 +4,17 @@ import SwiftUI
 
 extension Font {
     /// A font of the look as the system font of its text style, which grows with the size a person sets (Dynamic
-    /// Type). Each `switch` below names every case with no `default`, so a style or a weight added to the look stops
-    /// this compiling until it is drawn.
+    /// Type).
     init(_ font: DesignSystem.Font) {
-        self = .system(Self.style(font.style), design: font.rounded ? .rounded : .default, weight: Self.weight(font.weight))
+        self = .system(TextStyle(font.style), design: font.rounded ? .rounded : .default, weight: Weight(font.weight))
     }
+}
 
-    private static func style(_ style: DesignSystem.Font.TextStyle) -> TextStyle {
-        switch style {
+extension Font.TextStyle {
+    /// A text style of the look as SwiftUI's. The `switch` names every case with no `default`, so a style added to the
+    /// look stops this compiling until it is drawn.
+    fileprivate init(_ style: DesignSystem.Font.TextStyle) {
+        self = switch style {
         case .largeTitle: .largeTitle
         case .headline: .headline
         case .body: .body
@@ -20,9 +23,13 @@ extension Font {
         case .caption: .caption
         }
     }
+}
 
-    private static func weight(_ weight: DesignSystem.Font.Weight) -> Weight {
-        switch weight {
+extension Font.Weight {
+    /// A weight of the look as SwiftUI's. The `switch` names every case with no `default`, so a weight added to the
+    /// look stops this compiling until it is drawn.
+    fileprivate init(_ weight: DesignSystem.Font.Weight) {
+        self = switch weight {
         case .regular: .regular
         case .medium: .medium
         case .semibold: .semibold
