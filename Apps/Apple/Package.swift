@@ -26,6 +26,7 @@ let package = Package(
         .target(name: "TodoAppleUI", dependencies: [
             .product(name: "AppFeature", package: "todo-core"),
             .product(name: "DesignSystem", package: "todo-core"),
+            .product(name: "DesignSystemComponents", package: "todo-core"),
             .product(name: "DeviceFile", package: "todo-core"),
             .product(name: "FeatureModule", package: "todo-core"),
             .product(name: "QuickEntryFeature", package: "todo-core"),
