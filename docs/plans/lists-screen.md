@@ -81,14 +81,14 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | | The design foundations in `TodoAppleUI` | `feature`, `ui-apple` | |
-| 2 | | A view's kind, colour and icon, and the device's own state | `feature`, `core` | |
-| 3 | | Counts and the tree delete | `feature`, `core` | 2 |
-| 4 | | Spike: the drag with a change of depth on iPhone and iPad | `spike`, `ui-apple` | |
-| 5 | | The module's rows: kinds, tiles, counts, folds, areas, new list and area | `feature`, `core`, `ui-apple` | 2, 3 |
-| 6 | | The module's edits: edit mode, delete, Move to… and the drop | `feature`, `core`, `ui-apple` | 5 |
-| 7 | | The Lists screen on iPhone | `feature`, `ui-apple` | 1, 4, 6 |
-| 8 | | The sidebar on the Mac and the iPad | `feature`, `ui-apple` | 7 |
+| 1 | #142 | The design foundations in `TodoAppleUI` | `feature`, `ui-apple` | |
+| 2 | #143 | A view's kind, colour and icon, and the device's own state | `feature`, `core` | |
+| 3 | #144 | Counts and the tree delete | `feature`, `core` | 2 |
+| 4 | #145 | Spike: the drag with a change of depth on iPhone and iPad | `spike`, `ui-apple` | |
+| 5 | #146 | The module's rows: kinds, tiles, counts, folds, areas, new list and area | `feature`, `core`, `ui-apple` | 2, 3 |
+| 6 | #147 | The module's edits: edit mode, delete, Move to… and the drop | `feature`, `core`, `ui-apple` | 5 |
+| 7 | #148 | The Lists screen on iPhone | `feature`, `ui-apple` | 1, 4, 6 |
+| 8 | #149 | The sidebar on the Mac and the iPad | `feature`, `ui-apple` | 7 |
 
 The owner reviews this table and the interface of every task below.
 
