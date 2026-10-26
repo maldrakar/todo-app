@@ -49,11 +49,12 @@ from.
 
 | File | Task | Holds |
 | ---- | ---- | ----- |
-| `Package.swift`, `Sources/DesignSystem/DesignSystem.swift` | 1 | the `DesignSystem` target, its product and its tests; the one entry point, `DesignSystem.color`, `.font` and `.motion` |
-| `Sources/DesignSystem/Palette.swift` | 1 | `RGB`, `Color`, `TileColors`; the named colours with a shade per appearance, the accent, and the eleven list colours' bases with the rule that derives a list's tile and glyph, stone's for no colour |
-| `Sources/DesignSystem/Typography.swift`, `Motion.swift`, `IconSet.swift` | 1 | the fonts as text styles; the animations and the delay; the icons by the names the store keeps |
-| `Tests/DesignSystemTests/PaletteTests.swift`, `TypographyTests.swift`, `IconSetTests.swift` | 1 | the shade rule against the canvas, no colour as stone, the row title, the store's icon names and unknown ones |
-| `Apps/Apple/Package.swift`, `Apps/Apple/Sources/TodoAppleUI/DesignSystem/Color+DesignSystem.swift`, `Font+DesignSystem.swift`, `Animation+DesignSystem.swift`, `Image+DesignSystem.swift`, `ListTile.swift` | 1 | the dependency on `DesignSystem`; the renderers, a `Color` that follows the appearance, a text-style `Font`, an `Animation` and an icon's SF Symbol with the default; the tile view |
+| `Package.swift`, `Sources/DesignSystem/DesignSystem.swift` | 1 | the `DesignSystem` and `DesignSystemComponents` targets, their products and their tests; the enum every type of the design system is nested in |
+| `Sources/DesignSystem/Color.swift`, `ListColor.swift` | 1 | `RGB`, and `Color` with the named colours as its static members, a shade per appearance; the eleven list colours by the store's names, each with its base |
+| `Sources/DesignSystem/Font.swift`, `Animation.swift`, `Icon.swift` | 1 | the fonts as text styles; the animations, each a curve, a duration and a delay; the icons by the names the store keeps |
+| `Sources/DesignSystemComponents/TileModel.swift` | 1 | a list's tile: its sizes for where it sits, its tile and glyph by the shade rule, stone's for no colour, and its glyph's icon and weight |
+| `Tests/DesignSystemTests/ColorTests.swift`, `ListColorTests.swift`, `FontTests.swift`, `AnimationTests.swift`, `IconTests.swift`, `Tests/DesignSystemComponentsTests/TileModelTests.swift` | 1 | the mix and the accent soft, the list colours against the store's, the row title, the delay, the store's icon names and unknown ones; the tile against the canvas |
+| `Apps/Apple/Package.swift`, `Apps/Apple/Sources/TodoAppleUI/DesignSystem/Color+DesignSystem.swift`, `Font+DesignSystem.swift`, `Animation+DesignSystem.swift`, `Image+DesignSystem.swift`, `ListTile.swift` | 1 | the dependencies on `DesignSystem` and `DesignSystemComponents`; the renderers, a `Color` that follows the appearance, a text-style `Font`, an `Animation` with its delay and an icon's SF Symbol with the default; the tile view, drawn from a `TileModel` |
 | `Apps/Apple/Tests/TodoAppleUITests/DesignSystemRenderersTests.swift` | 1 | each renderer, and that every icon's symbol exists on the system |
 | `Sources/TodoCore/Model/TaskView.swift` | 2 | `TaskViewKind`, `TaskViewColor`, the three fields, `NewTaskView`'s three parameters, the seed's tiles |
 | `Sources/TodoCore/Storage/Schema.swift`, `Migrations.swift` | 2 | `version5` |
@@ -93,7 +94,7 @@ from.
 The owner reviews this table and the interface of every task below.
 
 The split leaves `main` working after every merge. Tasks 1 to 4 touch no
-screen, and all but Task 1, which keys its colours by Task 2's
+screen, and all but Task 1, whose test holds its list colours to Task 2's
 `TaskViewColor`, can run beside each other. Tasks 5 and 6 change the module's
 model and actions, so each adapts `TaskViewListView` in the same pull
 request just far enough that the app compiles and works, with today's
@@ -410,8 +411,8 @@ struct ListsScreen: View { init(model: TaskViewList.Model, send: @escaping (Task
 
 **Rules.**
 
-- The rows (`Phone.dc.html`): 46 pt high; the tile's leading edge at 20 + 22 × depth pt; the tile 30, radius 8, glyph 19 at the root and 26, 7, 16 nested, through `ListTile`; the title in `DesignSystem.font.rowTitle(depth:hasChildren:)` through `Font(_:)`, ink, one line, at least 140 pt wide; the count in `DesignSystem.font.count` through `Font(_:)`, ink2, at the right edge, with the chevron beside it, both pinned while the tree scrolls sideways past the depth at which 20 + 22 × depth + the tile + 12 + 140 + 72 exceeds the width; guides of 1.5 pt in the line colour down each ancestor level under its tile's centre; the chevron rotates on fold with `DesignSystem.motion.popover` through `Animation(_:)`.
-- An area's line (`AreaLine`): a 1 pt line in the line colour across the tree, 17 pt tall alone, and 36 pt with the label in ink2 in `DesignSystem.font.areaLabel` through `Font(_:)` sitting on the line, which while renaming becomes the field; a grip at the right in edit mode.
+- The rows (`Phone.dc.html`): 46 pt high; the tile's leading edge at 20 + 22 × depth pt; the tile through `ListTile(TileModel(color:icon:placement: .row(depth:)))`, the model built from the row's colour and icon names by `init(rawValue:)`, which gives it the canvas's 30, 8 and 19 at the root and 26, 7 and 16 nested; the title in `Font(.rowTitle(depth:hasChildren:))`, ink, one line, at least 140 pt wide; the count in `Font(.count)`, ink2, at the right edge, with the chevron beside it, both pinned while the tree scrolls sideways past the depth at which 20 + 22 × depth + the tile + 12 + 140 + 72 exceeds the width; guides of 1.5 pt in the line colour down each ancestor level under its tile's centre; the chevron rotates on fold with `Animation(.popover)`.
+- An area's line (`AreaLine`): a 1 pt line in the line colour across the tree, 17 pt tall alone, and 36 pt with the label in ink2 in `Font(.areaLabel)` sitting on the line, which while renaming becomes the field; a grip at the right in edit mode.
 - The bar (`ListsBottomBar`), on `.regularMaterial`: a 48 pt round "…" at the left, a `Menu` holding Edit, and +List, +Area and a Done check in edit mode; the capsule in the middle, 48 pt high, radius 24, the magnifier and "Search" in ink2, a view that sends nothing; a 48 pt round "+" in the accent at the right, a `Menu` holding New task, New list and New area. No title, as the canvas has none.
 - The long press is `.contextMenu` behind `#if !os(watchOS)` as today: Rename, New list, Move to…, Delete on a list; Rename, New list, Delete area on a line; Open in New Window on a list where `supportsMultipleWindows`. Not shown in edit mode, which `isEditing` says.
 - Edit mode: grips at the right, a tap on a row sends `rowSelected`, and the drag, `ListsDragGesture`, built as Task 4 answered: the lifted row scaled 1.03 and tilted −1.5°, the slot 52 pt dashed at the chosen depth, the depth bounded as Task 4 bounds it, one `rowDropped` on release.
@@ -442,7 +443,7 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
 
 **Rules.**
 
-- The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile 20, 6, 13, the title at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
+- The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile through `ListTile(TileModel(color:icon:placement: .sidebar))`, which gives it the canvas's 20, 6 and 13, the title at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
 - At the bottom: the search field, 30 pt, in the fill colour, inert; a 30 pt round "+" in the accent, a `Menu` with New task, `⌘N`, New list, `⇧⌘N`, and New area, the shortcuts through `keyboardShortcut`. The toolbar's New Folder is gone; the list's Quick Entry button stays.
 - The drag at any time, with the line-and-circle indicator for a drop between rows and into a parent, sending the same `rowDropped`.
 - The one platform condition, `#if os(macOS)`: the Mac's right click opens the menus, Rename, New list, Open in New Window, Move to…, Delete on a list and Rename, New list, Delete area on a line, and the Mac has no edit mode, no "…" and no edit items; on the iPad the long press opens the menus, "…" holds Edit, and the bar of Task 7 stands at the bottom of the column with edit mode as on the phone (spec section 8). Open in New Window where `supportsMultipleWindows`.
