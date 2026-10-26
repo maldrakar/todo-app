@@ -1,6 +1,6 @@
 import Testing
-import TodoCore
 @testable import DesignSystem
+import TodoCore
 
 private typealias RGB = DesignSystem.RGB
 
