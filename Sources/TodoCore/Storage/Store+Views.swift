@@ -175,7 +175,7 @@ extension Store {
             let definition = ViewDefinition(filter: row[4], sort: row[5], groupBy: row[6])
             return TaskView(
                 id: ViewID(id), title: row[1].string ?? "", parent: parent, rank: row[3].string ?? Rank.initial,
-                kind: Store.kind(stored: row[10], parent: parent, filter: row[4]),
+                kind: Store.viewKind(stored: row[10], parent: parent, filter: row[4]),
                 color: row[11].string.flatMap(TaskViewColor.init(rawValue:)), icon: row[12].string,
                 filter: definition.filter, sort: definition.sort, groupBy: definition.groupBy,
                 needsNewerApp: definition.needsNewerApp, createdAt: row[7].int64 ?? 0, updatedAt: row[8].int64 ?? 0
@@ -236,13 +236,13 @@ extension Store {
     /// list anywhere else: a folder, or a list with a rule, which is what an app older than the field made of
     /// it when it nested it or gave it a rule (spec section 2). That is a reading rule and not a repair, as
     /// `TreeRules` reads a broken parent link as no link.
-    private static func kind(stored: Value, parent: ViewID?, filter: Value) -> TaskViewKind {
-        storedKind(stored) == .area && parent == nil && filter.isNull ? .area : .list
+    private static func viewKind(stored: Value, parent: ViewID?, filter: Value) -> TaskViewKind {
+        storedViewKind(stored) == .area && parent == nil && filter.isNull ? .area : .list
     }
 
     /// The kind the column names, before the reading rule above: anything but `area` is a list, an unknown
     /// name, a null from a view written before the column and a value that is not text among them.
-    private static func storedKind(_ value: Value) -> TaskViewKind {
+    private static func storedViewKind(_ value: Value) -> TaskViewKind {
         value.string.flatMap(TaskViewKind.init(rawValue:)) ?? .list
     }
 
@@ -254,7 +254,7 @@ extension Store {
     private func requireView(_ id: ViewID) throws(StoreError) -> TaskViewKind {
         let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT kind FROM views WHERE id = ? AND deleted = 0", [.text(id.rawValue)]) }
         guard let row = rows.first else { throw .notFound(id) }
-        return Store.storedKind(row[0])
+        return Store.storedViewKind(row[0])
     }
 
     /// The second statement every grouped read runs, and the one a placement ranks among. It is a constant
