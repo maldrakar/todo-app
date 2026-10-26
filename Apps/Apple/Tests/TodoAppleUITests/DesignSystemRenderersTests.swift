@@ -45,16 +45,11 @@ import Testing
     #expect(Animation(.quickEntry) == .spring(duration: 0.42).delay(0))
 }
 
-/// A symbol that does not exist draws nothing and says nothing, so the system is asked for the symbol of every icon
-/// and of none.
+/// A symbol that does not exist draws nothing and says nothing, so the system is asked for the symbol of every icon,
+/// the default glyph's among them.
 @Test func everyIconNamesASymbolThisSystemHas() {
-    let icons: [DesignSystem.Icon?] = DesignSystem.Icon.allCases + [nil]
-    for icon in icons {
+    for icon in DesignSystem.Icon.allCases {
         let name = Image.systemName(for: icon)
         #expect(NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil, "\(name)")
     }
-}
-
-@Test func noIconDrawsTheBulletedList() {
-    #expect(Image.systemName(for: nil) == "list.bullet")
 }
