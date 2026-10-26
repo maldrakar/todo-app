@@ -3,8 +3,9 @@ import DesignSystemComponents
 import SwiftUI
 
 /// A list's tile as its model describes it: a rounded square of the tile's colour with the glyph on it, every size,
-/// colour and weight the model's (`TileModel`), so the view adds no visual choice of its own. The caller builds the
-/// model from the row's colour and icon names and where the tile sits (`docs/specs/lists-screen.md`, section 9).
+/// colour and weight the model's (`TileModel`), so the view adds no visual choice of its own. The model arrives built
+/// by the feature module of the screen the tile stands in, at the sizes that screen calls for
+/// (`docs/specs/lists-screen.md`, section 9; ADR-0007, amendment of 2026-10-26).
 struct ListTile: View {
     private let model: TileModel
 

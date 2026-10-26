@@ -46,12 +46,12 @@ let package = Package(
         // The look's design decisions in numbers, which every platform turns into its own pixels: the colours, the
         // list colours' bases and the icons by the names the store keeps, the type as text styles and the motion.
         // It depends on nothing, the core included, because the look must not know the domain, and the wasm probe
-        // leaves it out until a web host draws with it (ADR-0007, amendment of 2026-10-26).
+        // links it once a module the probe drives builds a component's model (ADR-0007, amendment of 2026-10-26).
         .target(name: "DesignSystem"),
         // The models and the logic of the components every platform draws from the design system's decisions, a
         // list's tile first, whose model holds every visual parameter a platform needs to draw it. It depends on the
-        // design system alone and, like it, not on the core: a platform host reads the store's names of a list's
-        // colour and icon as the design system's at the call site (ADR-0007, amendment of 2026-10-26).
+        // design system alone and, like it, not on the core: the feature module that builds a component's model reads
+        // the store's names of a list's colour and icon as the design system's (ADR-0007, amendment of 2026-10-26).
         .target(name: "DesignSystemComponents", dependencies: ["DesignSystem"]),
         // The contract, and beside it what every parent and every flow needs and nothing of any one screen: the
         // routable module and its seat, the error a route's text form is refused with, the destination a screen
@@ -101,7 +101,7 @@ let package = Package(
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
         // The core and its helpers only for the tests that hold the design system's names of a list's colour and
-        // icon to the store's, the one place the two meet.
+        // icon to the store's, with which they agree by raw value.
         .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "DesignSystemTestSupport", "TodoCore", "TestSupport"]),
         .testTarget(name: "DesignSystemComponentsTests", dependencies: ["DesignSystemComponents", "DesignSystem", "DesignSystemTestSupport"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),

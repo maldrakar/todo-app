@@ -23,11 +23,17 @@ extension DesignSystem {
         /// An area's name on its line, the canvas's 13 pt medium at the iPhone's default text size.
         public static let areaLabel = Font(style: .footnote, weight: .medium, rounded: false)
 
-        /// A row's title: the body at the root and the callout nested, 17 and 16 pt at the iPhone's default text size,
-        /// semibold when the row has children and regular otherwise. A depth at or below zero reads as the root's: a
-        /// depth a view sends is never trusted.
-        public static func rowTitle(depth: Int, hasChildren: Bool) -> Font {
-            Font(style: depth > 0 ? .callout : .body, weight: hasChildren ? .semibold : .regular, rounded: false)
-        }
+        /// A row's title, 17 pt at the iPhone's default text size. Which of the four row titles a row takes is the
+        /// choice of the feature module that builds its screen's model.
+        public static let rowTitle = Font(style: .body, weight: .regular, rounded: false)
+
+        /// A row's title in semibold, 17 pt at the iPhone's default text size.
+        public static let rowTitleEmphasized = Font(style: .body, weight: .semibold, rounded: false)
+
+        /// A nested row's title, 16 pt at the iPhone's default text size.
+        public static let nestedRowTitle = Font(style: .callout, weight: .regular, rounded: false)
+
+        /// A nested row's title in semibold, 16 pt at the iPhone's default text size.
+        public static let nestedRowTitleEmphasized = Font(style: .callout, weight: .semibold, rounded: false)
     }
 }

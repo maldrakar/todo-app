@@ -25,8 +25,10 @@ import Testing
 @Test func aFontRendersItsTextStyleWeightAndFace() {
     #expect(Font(.largeTitle) == .system(.largeTitle, design: .rounded, weight: .heavy))
     #expect(Font(.sectionTitle) == .system(.headline, design: .rounded, weight: .heavy))
-    #expect(Font(.rowTitle(depth: 0, hasChildren: true)) == .system(.body, design: .default, weight: .semibold))
-    #expect(Font(.rowTitle(depth: 1, hasChildren: false)) == .system(.callout, design: .default, weight: .regular))
+    #expect(Font(.rowTitle) == .system(.body, design: .default, weight: .regular))
+    #expect(Font(.rowTitleEmphasized) == .system(.body, design: .default, weight: .semibold))
+    #expect(Font(.nestedRowTitle) == .system(.callout, design: .default, weight: .regular))
+    #expect(Font(.nestedRowTitleEmphasized) == .system(.callout, design: .default, weight: .semibold))
     #expect(Font(.count) == .system(.subheadline, design: .default, weight: .regular))
     #expect(Font(.meta) == .system(.caption, design: .default, weight: .medium))
     #expect(Font(.areaLabel) == .system(.footnote, design: .default, weight: .medium))

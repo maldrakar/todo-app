@@ -2,9 +2,9 @@
 
 extension DesignSystem {
     /// The colours a list's tile can have, by the names the store keeps for them, each with its base, from which a
-    /// tile derives its shades. The design system names them itself, so that the look knows nothing of the domain: a
-    /// platform host reads a view's colour as one of these by its name with `init(rawValue:)`, and a root test holds
-    /// the two lists of names together (ADR-0007, amendment of 2026-10-26).
+    /// tile derives its shades. The design system names them itself, so that the look knows nothing of the domain: the
+    /// feature module that builds a tile reads a view's colour as one of these by its name with `init(rawValue:)`, and
+    /// a root test holds the two lists of names together (ADR-0007, amendment of 2026-10-26).
     public enum ListColor: String, Sendable, CaseIterable {
         case blue, amber, rose, green, stone, indigo, teal, pink, orange, violet, sky
 
