@@ -73,18 +73,23 @@ public enum GroupBy: String, Sendable, Codable, CaseIterable {
 
 // MARK: - JSON
 
-/// How deep a document may nest before this file refuses it, on the way in and on the way out alike. Every
+/// How deep a document may nest before the core refuses it, on the way in and on the way out alike. Every
 /// walk over a filter recurses \u2014 Foundation's scanner and decoder, the encoder, and `FilterCompiler` \u2014 and on
 /// wasm32, where the stack is 64 KiB, they give out between 60 and 100 levels, the compiler first. Neither
 /// trap can be caught, and a view is read on every open (#34), so the depth is counted here, without
 /// recursion, before the decoder sees the bytes and before a filter is written to a row. A filter a person
 /// builds is a handful of levels deep, and a group costs two: the object and its list.
-private let maximumDepth = 32
+///
+/// A device's own state is JSON in a row as well, read through the same decoder at every open of the module
+/// that keeps it, so `Store.deviceState(_:as:)` and `setDeviceState(_:_:)` hold its value to the same bound.
+let maximumDepth = 32
 
-private func makeEncoder() -> JSONEncoder {
+/// The one encoder of the core's JSON: a filter and a sort here, and a device state's value in the store.
+func makeEncoder() -> JSONEncoder {
     let encoder = JSONEncoder()
     // Sorted keys because this is the on-disk and on-the-wire format: two devices that save the same filter
-    // have to produce the same bytes, or last-write-wins compares strings that differ only in key order.
+    // have to produce the same bytes, or last-write-wins compares strings that differ only in key order. A
+    // device state never leaves the device, and the same bytes for the same value cost it nothing.
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     return encoder
 }
@@ -117,7 +122,7 @@ private func decodeJSON<T: Decodable>(_ type: T.Type, from json: String) throws(
 
 /// The deepest nesting of objects and arrays in a document, counted in one pass. A brace inside a string is
 /// text — a tag id or a title can hold one — so the scan has to know when it is inside one.
-private func nestingDepth(of json: String) -> Int {
+func nestingDepth(of json: String) -> Int {
     var depth = 0, deepest = 0
     var inString = false, escaped = false
     for byte in json.utf8 {
