@@ -87,6 +87,10 @@ let package = Package(
         // The test helpers as an ordinary target: a test target cannot be depended on, and every feature's
         // tests open a store the same way. It is in no product, so nothing ships it.
         .target(name: "TestSupport", dependencies: ["TodoCore"], path: "Tests/Support"),
+        // The design system's test helpers, an ordinary target for the same reason: its tests and its components'
+        // compare a colour the look derives with the canvas's the same way. It depends on the design system alone,
+        // so the components' tests stay off the core, and it is in no product either.
+        .target(name: "DesignSystemTestSupport", dependencies: ["DesignSystem"], path: "Tests/DesignSystemSupport"),
         .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
         .executableTarget(
             name: "WasmSizeProbe",
@@ -98,8 +102,8 @@ let package = Package(
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
         // The core and its helpers only for the tests that hold the design system's names of a list's colour and
         // icon to the store's, the one place the two meet.
-        .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "TodoCore", "TestSupport"]),
-        .testTarget(name: "DesignSystemComponentsTests", dependencies: ["DesignSystemComponents", "DesignSystem"]),
+        .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "DesignSystemTestSupport", "TodoCore", "TestSupport"]),
+        .testTarget(name: "DesignSystemComponentsTests", dependencies: ["DesignSystemComponents", "DesignSystem", "DesignSystemTestSupport"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",

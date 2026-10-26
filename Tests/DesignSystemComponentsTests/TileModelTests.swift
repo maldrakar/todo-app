@@ -1,28 +1,22 @@
 import Testing
+import DesignSystemTestSupport
 import DesignSystemComponents
 @testable import DesignSystem
 
 private typealias RGB = DesignSystem.RGB
 
-/// Each channel of `got` within one unit in 255 of `want`'s, the precision the canvas writes a hex to.
-private func expectClose(_ got: RGB, _ want: RGB, sourceLocation: SourceLocation = #_sourceLocation) {
-    for (channel, wanted) in [(got.red, want.red), (got.green, want.green), (got.blue, want.blue)] {
-        #expect(abs(channel - wanted) * 255 <= 1, sourceLocation: sourceLocation)
-    }
-}
-
 /// `Main.dc.html` draws the Inbox's glyph as #385EA3, which is blue's base mixed a fifth toward the ink, so the rule
 /// here is the canvas's and not a guess at it.
 @Test func theLightGlyphOfBlueIsTheCanvassBlue() {
     let glyph = TileModel(color: .blue, icon: .tray, placement: .row(depth: 0)).glyph.color.light
-    expectClose(glyph, RGB(hex: 0x385EA3))
+    #expect(channelGap(glyph, RGB(hex: 0x385EA3)) <= 1)
     #expect(glyph.opacity == 1)
 }
 
 /// 0.7 x #3E6EC5 + 0.3 x white comes to #789AD6.
 @Test func theDarkGlyphOfBlueIsLiftedTowardWhite() {
     let glyph = TileModel(color: .blue, icon: .tray, placement: .row(depth: 0)).glyph.color.dark
-    expectClose(glyph, RGB(hex: 0x789AD6))
+    #expect(channelGap(glyph, RGB(hex: 0x789AD6)) <= 1)
     #expect(glyph.opacity == 1)
 }
 
