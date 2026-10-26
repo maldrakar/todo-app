@@ -3,45 +3,35 @@
 extension DesignSystem {
     /// A colour as the canvas writes it, in sRGB with channels from 0 to 1: numbers and not a platform's colour, so
     /// that the rules that mix and fade colours are tested on numbers, on the host and on wasm32. Only this module
-    /// spells a colour; a component derives its own from the look's by mixing and fading them.
+    /// spells a colour or derives one, so a platform reads the channels and makes none.
     public struct RGB: Equatable, Sendable {
         public let red: Double
         public let green: Double
         public let blue: Double
         public let opacity: Double
 
-        /// White, the surface's light shade.
-        public static let white = RGB(hex: 0xFFFFFF)
+        /// White, the surface's light shade and what a tile's glyph is lifted toward in the dark.
+        static let white = RGB(hex: 0xFFFFFF)
 
         /// This colour moved `amount` of the way toward `other`, channel by channel, keeping its own opacity.
-        public func mixed(toward other: RGB, by amount: Double) -> RGB {
+        func mixed(toward other: RGB, by amount: Double) -> RGB {
             RGB(
                 red: red + (other.red - red) * amount,
                 green: green + (other.green - green) * amount,
                 blue: blue + (other.blue - blue) * amount,
                 opacity: opacity)
         }
-
-        /// This colour at `opacity`, its channels kept.
-        public func withOpacity(_ opacity: Double) -> RGB {
-            RGB(red: red, green: green, blue: blue, opacity: opacity)
-        }
     }
 
     /// One colour of the look: its shade in the light appearance and its shade in the dark, between which a platform
     /// switches as the appearance changes.
     ///
-    /// The look's colours are its static members, the canvas's (`Phone.dc.html`, `Main.dc.html`). A view takes a
-    /// colour from here and never spells one, so it holds no condition on the appearance; a component builds its own
-    /// from shades it derives, as a list's tile does from its colour's base.
+    /// The look's colours are its static members, the canvas's (`Phone.dc.html`, `Main.dc.html`), and the colours of
+    /// its components are members of `Components`, each component's under its own name, as a list's tile's are. A view
+    /// takes a colour from here and never spells one, so it holds no condition on the appearance.
     public struct Color: Equatable, Sendable {
         public let light: RGB
         public let dark: RGB
-
-        public init(light: RGB, dark: RGB) {
-            self.light = light
-            self.dark = dark
-        }
 
         public static let paper = Color(light: RGB(hex: 0xFAF7F2), dark: RGB(hex: 0x1A1917))
         public static let surface = Color(light: .white, dark: RGB(hex: 0x24221F))

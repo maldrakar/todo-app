@@ -1,5 +1,4 @@
 import Testing
-import DesignSystemTestSupport
 @testable import DesignSystem
 
 private typealias RGB = DesignSystem.RGB

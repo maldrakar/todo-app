@@ -43,10 +43,11 @@ let package = Package(
         // Where an identity is kept beside its database, in a target of its own because two consumers keep
         // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
         .target(name: "DeviceFile"),
-        // The look's design decisions in numbers, which every platform turns into its own pixels: the colours, the
-        // list colours' bases and the icons by the names the store keeps, the type as text styles and the motion.
-        // It depends on nothing, the core included, because the look must not know the domain, and the wasm probe
-        // links it once a module the probe drives builds a component's model (ADR-0007, amendment of 2026-10-26).
+        // The look's design decisions in numbers, which every platform turns into its own pixels: the colours, a
+        // list's tile's among them, the type as text styles, the motion and the icons, the tile's colours and the icons
+        // by the names the store keeps. It depends on nothing, the core included, because the look must not know the
+        // domain, and the wasm probe links it once a module the probe drives builds a component's model (ADR-0007,
+        // amendment of 2026-10-26).
         .target(name: "DesignSystem"),
         // The models and the logic of the components every platform draws from the design system's decisions, a
         // list's tile first, whose model holds every visual parameter a platform needs to draw it. It depends on the
@@ -87,10 +88,6 @@ let package = Package(
         // The test helpers as an ordinary target: a test target cannot be depended on, and every feature's
         // tests open a store the same way. It is in no product, so nothing ships it.
         .target(name: "TestSupport", dependencies: ["TodoCore"], path: "Tests/Support"),
-        // The design system's test helpers, an ordinary target for the same reason: its tests and its components'
-        // compare a colour the look derives with the canvas's the same way. It depends on the design system alone,
-        // so the components' tests stay off the core, and it is in no product either.
-        .target(name: "DesignSystemTestSupport", dependencies: ["DesignSystem"], path: "Tests/DesignSystemSupport"),
         .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
         .executableTarget(
             name: "WasmSizeProbe",
@@ -100,10 +97,10 @@ let package = Package(
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
-        // The core and its helpers only for the tests that hold the design system's names of a list's colour and
-        // icon to the store's, with which they agree by raw value.
-        .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "DesignSystemTestSupport", "TodoCore", "TestSupport"]),
-        .testTarget(name: "DesignSystemComponentsTests", dependencies: ["DesignSystemComponents", "DesignSystem", "DesignSystemTestSupport"]),
+        // The core and its helpers only for the tests that hold the design system's names of a tile's colour and of
+        // an icon to the store's, with which they agree by raw value.
+        .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "TodoCore", "TestSupport"]),
+        .testTarget(name: "DesignSystemComponentsTests", dependencies: ["DesignSystemComponents", "DesignSystem"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",
