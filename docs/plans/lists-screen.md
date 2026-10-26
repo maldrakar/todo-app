@@ -49,12 +49,12 @@ from.
 
 | File | Task | Holds |
 | ---- | ---- | ----- |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/Palette.swift` | 1 | the named colours with a shade per appearance, the accent, the dynamic-colour helper |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/ListColorShades.swift` | 1 | the eleven list colours' tile and glyph shades, and the shades of no colour |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/ListTile.swift` | 1 | the tile view |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/IconSet.swift` | 1 | icon names to SF Symbols, with the default |
-| `Apps/Apple/Sources/TodoAppleUI/Foundations/Typography.swift`, `Motion.swift` | 1 | the fonts; the durations and springs |
-| `Apps/Apple/Tests/TodoAppleUITests/FoundationsTests.swift` | 1 | the tables are complete and the defaults hold |
+| `Package.swift`, `Sources/DesignSystem/DesignSystem.swift` | 1 | the `DesignSystem` target, its product and its tests; the one entry point, `DesignSystem.color`, `.font` and `.motion` |
+| `Sources/DesignSystem/Palette.swift` | 1 | `RGB`, `Color`, `TileColors`; the named colours with a shade per appearance, the accent, and the eleven list colours' bases with the rule that derives a list's tile and glyph, stone's for no colour |
+| `Sources/DesignSystem/Typography.swift`, `Motion.swift`, `IconSet.swift` | 1 | the fonts as text styles; the animations and the delay; the icons by the names the store keeps |
+| `Tests/DesignSystemTests/PaletteTests.swift`, `TypographyTests.swift`, `IconSetTests.swift` | 1 | the shade rule against the canvas, no colour as stone, the row title, the store's icon names and unknown ones |
+| `Apps/Apple/Package.swift`, `Apps/Apple/Sources/TodoAppleUI/DesignSystem/Color+DesignSystem.swift`, `Font+DesignSystem.swift`, `Animation+DesignSystem.swift`, `Image+DesignSystem.swift`, `ListTile.swift` | 1 | the dependency on `DesignSystem`; the renderers, a `Color` that follows the appearance, a text-style `Font`, an `Animation` and an icon's SF Symbol with the default; the tile view |
+| `Apps/Apple/Tests/TodoAppleUITests/DesignSystemRenderersTests.swift` | 1 | each renderer, and that every icon's symbol exists on the system |
 | `Sources/TodoCore/Model/TaskView.swift` | 2 | `TaskViewKind`, `TaskViewColor`, the three fields, `NewTaskView`'s three parameters, the seed's tiles |
 | `Sources/TodoCore/Storage/Schema.swift`, `Migrations.swift` | 2 | `version5` |
 | `Sources/TodoCore/Storage/JournalOperation.swift` | 2 | the three fields in `FieldMap` |
@@ -410,7 +410,7 @@ struct ListsScreen: View { init(model: TaskViewList.Model, send: @escaping (Task
 
 **Rules.**
 
-- The rows (`Phone.dc.html`): 46 pt high; the tile's leading edge at 20 + 22 × depth pt; the tile 30, radius 8, glyph 19 at the root and 26, 7, 16 nested, through `ListTile`; the title in `Typography.rowTitle`, ink, one line, at least 140 pt wide; the count in `Typography.count`, ink2, at the right edge, with the chevron beside it, both pinned while the tree scrolls sideways past the depth at which 20 + 22 × depth + the tile + 12 + 140 + 72 exceeds the width; guides of 1.5 pt in the line colour down each ancestor level under its tile's centre; the chevron rotates on fold with `Motion.popover`.
+- The rows (`Phone.dc.html`): 46 pt high; the tile's leading edge at 20 + 22 × depth pt; the tile 30, radius 8, glyph 19 at the root and 26, 7, 16 nested, through `ListTile`; the title in `DesignSystem.font.rowTitle(depth:hasChildren:)` through `Font(_:)`, ink, one line, at least 140 pt wide; the count in `DesignSystem.font.count` through `Font(_:)`, ink2, at the right edge, with the chevron beside it, both pinned while the tree scrolls sideways past the depth at which 20 + 22 × depth + the tile + 12 + 140 + 72 exceeds the width; guides of 1.5 pt in the line colour down each ancestor level under its tile's centre; the chevron rotates on fold with `DesignSystem.motion.popover` through `Animation(_:)`.
 - An area's line (`AreaLine`): a 1 pt line in the line colour across the tree, 17 pt tall alone, and 36 pt with the label in ink2 at 13 pt medium sitting on the line, which while renaming becomes the field; a grip at the right in edit mode.
 - The bar (`ListsBottomBar`), on `.regularMaterial`: a 48 pt round "…" at the left, a `Menu` holding Edit, and +List, +Area and a Done check in edit mode; the capsule in the middle, 48 pt high, radius 24, the magnifier and "Search" in ink2, a view that sends nothing; a 48 pt round "+" in the accent at the right, a `Menu` holding New task, New list and New area. No title, as the canvas has none.
 - The long press is `.contextMenu` behind `#if !os(watchOS)` as today: Rename, New list, Move to…, Delete on a list; Rename, New list, Delete area on a line; Open in New Window on a list where `supportsMultipleWindows`. Not shown in edit mode, which `isEditing` says.
