@@ -289,4 +289,26 @@ enum Schema {
     INSERT INTO own_devices (id) SELECT value FROM meta WHERE key = 'device_id' AND typeof(value) = 'text';
     DELETE FROM meta WHERE key = 'device_id';
     """
+
+    /// A view's kind, colour and icon, and the device's own state (spec sections 2 and 5; ADR-0004, amendment
+    /// of 2026-10-25; ADR-0010).
+    ///
+    /// The three columns are nullable text with no default, because every row already in the table was
+    /// written before them and has to read as a plain list with no tile, which is what an empty column says;
+    /// a default would put a value on those rows that no operation in the journal carries. They are known
+    /// journal fields from this version on, so an operation a newer device sent for one of them, journaled
+    /// and left unapplied by the version before, reaches the state at this open through the replay.
+    ///
+    /// `device_state` is outside the journal: no operation names it and nothing in it leaves the device. A
+    /// value is NOT NULL because a key with no value is a row deleted, which is what writing none does.
+    static let version5 = """
+    ALTER TABLE views ADD COLUMN kind TEXT;
+    ALTER TABLE views ADD COLUMN color TEXT;
+    ALTER TABLE views ADD COLUMN icon TEXT;
+
+    CREATE TABLE device_state (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    ) WITHOUT ROWID;
+    """
 }

@@ -69,7 +69,7 @@ enum FieldMap {
     static let known: [EntityKind: Set<String>] = [
         .task: ["title", "notes", "status", "when_day", "deadline_day", "parent", "rank", "trashed", "deleted", "created_at", "completed_at"],
         .tag: ["title", "parent", "rank", "deleted", "created_at"],
-        .view: ["title", "parent", "rank", "filter", "sort", "group_by", "deleted", "created_at"],
+        .view: ["title", "parent", "rank", "kind", "color", "icon", "filter", "sort", "group_by", "deleted", "created_at"],
         .taskTag: ["present"],
         .viewItem: ["present", "rank"],
     ]
@@ -80,7 +80,7 @@ enum FieldMap {
     static let nullable: [EntityKind: Set<String>] = [
         .task: ["when_day", "deadline_day", "parent", "completed_at"],
         .tag: ["parent"],
-        .view: ["parent", "filter", "group_by"],
+        .view: ["parent", "kind", "color", "icon", "filter", "group_by"],
         .taskTag: [],
         .viewItem: [],
     ]
