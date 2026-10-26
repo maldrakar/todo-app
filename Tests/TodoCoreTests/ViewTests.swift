@@ -172,6 +172,55 @@ import TestSupport
     #expect(try store.view(reviews)?.parent == nil)
 }
 
+/// A list deleted with everything under it goes in one write: every view of its subtree is tombstoned by
+/// operations under one stamp, which one `apply` commits as one transaction, so nothing under it surfaces at
+/// the root the way a child of `delete(view:)` does, and the views after it in the tree stay as they were
+/// (spec section 6). A view that is gone is not there to delete.
+@Test func deletingATreeTombstonesEveryViewUnderItInOneTransaction() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work"))
+    let reviews = try store.createView(NewTaskView(title: "Reviews", parent: work, filter: .status([.open])))
+    let projects = try store.createView(NewTaskView(title: "Projects", parent: work))
+    let alpha = try store.createView(NewTaskView(title: "Alpha", parent: projects, filter: .when(.empty)))
+    let home = try store.createView(NewTaskView(title: "Home"))
+    try store.createView(NewTaskView(title: "Garden", parent: home))
+    let before = try store.views()
+
+    var commits: [ChangeSet] = []
+    store.onChange = { commits.append($0) }
+    try store.delete(viewTree: work)
+    store.onChange = nil
+
+    let tree: Set<ViewID> = [work, reviews, projects, alpha]
+    #expect(try store.views() == before.filter { !tree.contains($0.id) }, "the tree is gone, and nothing of it surfaced at the root")
+    #expect(commits.map(\.views) == [tree], "one transaction, which addressed the tree")
+    let tombstones = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT entity_id, clock FROM ops WHERE entity = 'view' AND field = 'deleted' AND value = 1")
+    }
+    #expect(Set(tombstones.map { ViewID($0[0].string ?? "") }) == tree)
+    #expect(Set(tombstones.map { $0[1].int64 }).count == 1, "under one stamp")
+    #expect(throws: StoreError.notFound(work)) { try store.delete(viewTree: work) }
+}
+
+/// A list selects its tasks by its rule and holds none of them, so deleting the tree takes the rules away and
+/// leaves every task as it was, the one its manual list pinned among them; the pins go unread with the list
+/// they belong to, as they do after `delete(view:)` (spec section 6).
+@Test func deletingATreeLeavesTheTasks() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let pinned = try store.createTask(NewTask(title: "pinned", tags: [work]))
+    try store.createTask(NewTask(title: "loose"))
+    let folder = try store.createView(NewTaskView(title: "Folder"))
+    let tagged = try store.createView(NewTaskView(title: "Work", parent: folder, filter: .hasTag(work)))
+    try store.pin(task: pinned, in: tagged)
+    let before = try store.allTasks()
+
+    try store.delete(viewTree: folder)
+
+    #expect(try store.allTasks() == before)
+    #expect(throws: StoreError.notFound(tagged)) { try store.tasks(in: tagged, today: Day(year: 2026, month: 10, day: 26)) }
+}
+
 /// Views move the way tasks and tags do, and a move into the view's own subtree is refused rather than left
 /// to the reading rule, which would answer the cycle by putting every view on it at the root — a person who
 /// drags a folder onto one of its own children would watch the sidebar scatter.
