@@ -9,8 +9,9 @@ extension Store {
     /// Every view with a count costs one statement, a folder too: a list with no rule counts the union of its
     /// children, each task once, so its statement asks for any of their conditions, and no ids travel from one
     /// statement to the next. The conditions are built from the leaves up in one pass over the tree order
-    /// reversed, where every child comes before its parent, and each is text made of its children's text, so a
-    /// tree thousands deep is that deep in the expression SQLite parses and never in a walk of the tree here.
+    /// reversed, where every child comes before its parent, and each is text made of its children's text: the
+    /// walk here never recurses, while the expression is as deep as the tree, and SQLite's code generation
+    /// recurses over it (#152).
     public func taskCounts(today: Day) throws(StoreError) -> [ViewID: Int] {
         var counts: [ViewID: Int] = [:]
         var childFragments: [ViewID: [SQLFragment]] = [:]

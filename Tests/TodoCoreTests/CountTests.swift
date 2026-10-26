@@ -131,17 +131,36 @@ private func applyView(_ store: Store, _ id: String, parent: ViewID?, filter: St
 }
 
 /// A folder with nothing to count has no number, which is not a count of zero: a folder holding only an empty
-/// folder has none either.
+/// folder has none either, and a folder whose lists select no open task counts 0 like any list that does.
 @Test func anEmptyFolderHasNoCount() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "loose"))
     let empty = try store.createView(NewTaskView(title: "Empty"))
     let holder = try store.createView(NewTaskView(title: "Holder"))
     let inner = try store.createView(NewTaskView(title: "Inner", parent: holder))
+    let quiet = try store.createView(NewTaskView(title: "Quiet"))
+    let finished = try store.createView(NewTaskView(title: "Finished", parent: quiet, filter: .status([.done])))
 
     let counts = try store.taskCounts(today: today)
     #expect(counts[empty] == nil && counts[holder] == nil && counts[inner] == nil)
+    #expect(counts[finished] == 0 && counts[quiet] == 0, "a folder's zero is a count")
     #expect(counts[BuiltInTaskViews.inbox] == 1, "the store counts all the same")
+}
+
+/// A list with a rule counts what its rule selects, and the lists under it, which its page draws as sections
+/// of their own, add nothing to its number: only a list with no rule counts the union of its children.
+@Test func aListWithARuleCountsItsOwnRuleAndNotItsLists() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    try store.createTask(NewTask(title: "both", when: today, tags: [work]))
+    try store.createTask(NewTask(title: "tagged", tags: [work]))
+    try store.createTask(NewTask(title: "due", when: today))
+    let due = try store.createView(NewTaskView(title: "Due", filter: .when(.on(0))))
+    let tagged = try store.createView(NewTaskView(title: "Work", parent: due, filter: .hasTag(work)))
+
+    let counts = try store.taskCounts(today: today)
+    #expect(counts[tagged] == 2)
+    #expect(counts[due] == 2, "the tagged task only its list selects is not the parent's")
 }
 
 /// The guard `builtInViewsUseIndexes` keeps over a view's read, kept over its count: the count of a built-in
