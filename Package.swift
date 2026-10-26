@@ -9,6 +9,7 @@ let package = Package(
         // only through a product, and a target in none stays this package's own.
         .library(name: "TodoCore", targets: ["TodoCore"]),
         .library(name: "DeviceFile", targets: ["DeviceFile"]),
+        .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "FeatureModule", targets: ["FeatureModule"]),
         .library(name: "TaskViewListFeature", targets: ["TaskViewListFeature"]),
         .library(name: "TaskListFeature", targets: ["TaskListFeature"]),
@@ -41,6 +42,11 @@ let package = Package(
         // Where an identity is kept beside its database, in a target of its own because two consumers keep
         // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
         .target(name: "DeviceFile"),
+        // The look in numbers, which every platform turns into its own pixels: the palette with the list colours
+        // and their shade rule, the type as text styles, the motion and the icon set by the names the store keeps.
+        // It depends on the core for `TaskViewColor` alone, so the shades are keyed by the core's own names, and
+        // the wasm probe leaves it out until a web host draws with it (ADR-0007, amendment of 2026-10-26).
+        .target(name: "DesignSystem", dependencies: ["TodoCore"]),
         // The contract, and beside it what every parent and every flow needs and nothing of any one screen: the
         // routable module and its seat, the error a route's text form is refused with, the destination a screen
         // declares what is open over it in, the stack a flow holds the screens over its base in, the id of an
@@ -84,6 +90,7 @@ let package = Package(
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),
         .testTarget(name: "TodoCLITests", dependencies: ["TodoCLI"]),
         .testTarget(name: "DeviceFileTests", dependencies: ["DeviceFile", "TodoCore"]),
+        .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "TodoCore", "TestSupport"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",
