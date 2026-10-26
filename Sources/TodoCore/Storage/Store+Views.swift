@@ -60,17 +60,20 @@ private struct ViewDefinition {
 extension Store {
     // MARK: - Writes
 
+    /// Writes every field of the new view under one stamp in one transaction. An area is made at the root with
+    /// no filter, and a request for one anywhere else is refused here, where it is a message about the view
+    /// the caller built, rather than written and then read back as a list (ADR-0004, amendment of 2026-10-25).
     @discardableResult
     public func createView(_ new: NewTaskView, at placement: Placement = .end) throws(StoreError) -> ViewID {
+        if new.kind == .area {
+            guard new.parent == nil else { throw Store.nestedAreaRefusal }
+            guard new.filter == nil else { throw .invalid("an area has no rule") }
+        }
         if let parent = new.parent { try requireView(parent) }
         let id = ViewID()
         let rank = try siblingRank(in: .view, parent: new.parent, placement: placement, excluding: nil)
         let stamp = clock.next()
-        let fields: [(String, Value)] = [
-            ("title", .text(new.title)), ("parent", Value(new.parent?.rawValue)), ("rank", .text(rank)),
-            ("filter", try filterValue(new.filter)), ("sort", try sortValue(new.sort)),
-            ("group_by", Value(new.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(stamp.millis)),
-        ]
+        let fields = try creationFields(of: new, rank: rank, createdAt: stamp.millis)
         try apply(fields.map { op(.view, id.rawValue, $0.0, $0.1, stamp) })
         return id
     }
@@ -104,10 +107,13 @@ extension Store {
 
     /// Re-parents the view and ranks it among its new siblings, the way `move(tag:to:at:)` does for a tag:
     /// two operations under one stamp, and a move into the view's own subtree refused here rather than left
-    /// to the reading rule, which would answer the cycle by putting every view on it at the root.
+    /// to the reading rule, which would answer the cycle by putting every view on it at the root. An area
+    /// moves along the root and nowhere else, and is told by the kind its row stores, so a move of one under
+    /// any view is refused as `createView` refuses a nested one.
     public func move(view id: ViewID, to parent: ViewID?, at placement: Placement) throws(StoreError) {
-        try requireView(id)
+        let kind = try requireView(id)
         if let parent {
+            guard kind != .area else { throw Store.nestedAreaRefusal }
             guard parent != id else { throw .invalid("a view cannot be its own parent") }
             try requireView(parent)
             if try isUnder(parent, ancestor: id, in: .view) { throw .invalid("a view cannot be moved under its own descendant") }
@@ -153,21 +159,26 @@ extension Store {
     ///
     /// This loads the whole table. Views number in the tens, and the tree order needs every row anyway, so
     /// the query that would ask for one branch would still have to read the rest to know where it hangs.
+    ///
+    /// The kind, the colour and the icon are read by the rules written on `TaskView`: whatever another device
+    /// wrote into the three columns reads as something, and a name this app does not know reads as none.
     public func views() throws(StoreError) -> [TaskView] {
         let rows = try sql { () throws(SQLiteError) in
-            try db.rows("SELECT id, title, parent, rank, filter, sort, group_by, created_at, updated_at, deleted FROM views")
+            try db.rows("SELECT id, title, parent, rank, filter, sort, group_by, created_at, updated_at, deleted, kind, color, icon FROM views")
         }
         let nodes = rows.map { TreeRules.Node(id: $0[0].string ?? "", parent: $0[2].string, deleted: $0[9].bool) }
         let parents = TreeRules.effectiveParents(nodes)
         let views = rows.compactMap { row -> TaskView? in
             guard !row[9].bool else { return nil }
             let id = row[0].string ?? ""
+            let parent = (parents[id] ?? nil).map(ViewID.init(_:))
             let definition = ViewDefinition(filter: row[4], sort: row[5], groupBy: row[6])
             return TaskView(
-                id: ViewID(id), title: row[1].string ?? "", parent: (parents[id] ?? nil).map(ViewID.init(_:)),
-                rank: row[3].string ?? Rank.initial, filter: definition.filter, sort: definition.sort,
-                groupBy: definition.groupBy, needsNewerApp: definition.needsNewerApp,
-                createdAt: row[7].int64 ?? 0, updatedAt: row[8].int64 ?? 0
+                id: ViewID(id), title: row[1].string ?? "", parent: parent, rank: row[3].string ?? Rank.initial,
+                kind: Store.kind(stored: row[10], parent: parent, filter: row[4]),
+                color: row[11].string.flatMap(TaskViewColor.init(rawValue:)), icon: row[12].string,
+                filter: definition.filter, sort: definition.sort, groupBy: definition.groupBy,
+                needsNewerApp: definition.needsNewerApp, createdAt: row[7].int64 ?? 0, updatedAt: row[8].int64 ?? 0
             )
         }
         return TreeRules.inTreeOrder(views)
@@ -192,25 +203,58 @@ extension Store {
     /// The device id is `Store.seedDevice` and not this device's, so that two devices produce byte-identical
     /// journal rows for the same five views and sync merges them instead of racing to create two Inboxes. It
     /// is outside `own_devices`, which is what keeps these rows out of every push.
+    ///
+    /// A store an earlier version seeded already holds the fields it knew, and the ones it did not, the kind,
+    /// the colour and the icon, are new rows that apply at the first open by this version: no clock holds those
+    /// fields yet, so the built-ins show their tiles at once.
     func seedBuiltInViews() throws(StoreError) {
         let zero = HLC(millis: 0, counter: 0)
         var ops: [JournalOperation] = []
         for definition in BuiltInTaskViews.definitions {
-            let fields: [(String, Value)] = [
-                ("title", .text(definition.title)), ("parent", .null), ("rank", .text(definition.rank)),
-                ("filter", try filterValue(definition.filter)), ("sort", try sortValue(definition.sort)),
-                ("group_by", Value(definition.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(0)),
-            ]
+            let fields = try creationFields(of: definition.view, rank: definition.rank, createdAt: 0)
             ops += fields.map { JournalOperation(entity: .view, entityID: definition.id.rawValue, field: $0.0, value: $0.1, clock: zero, device: Store.seedDevice) }
         }
         try apply(ops)
     }
 
+    /// Every field a view is created with, for `createView` and the seed alike, so that a built-in is written
+    /// exactly as a view a person makes. A colour or an icon the view has none of is a null like any other.
+    private func creationFields(of new: NewTaskView, rank: String, createdAt: Int64) throws(StoreError) -> [(String, Value)] {
+        [
+            ("title", .text(new.title)), ("parent", Value(new.parent?.rawValue)), ("rank", .text(rank)),
+            ("kind", .text(new.kind.rawValue)), ("color", Value(new.color?.rawValue)), ("icon", Value(new.icon)),
+            ("filter", try filterValue(new.filter)), ("sort", try sortValue(new.sort)),
+            ("group_by", Value(new.groupBy?.rawValue)), ("deleted", Value(false)), ("created_at", .integer(createdAt)),
+        ]
+    }
+
+    /// The refusal of an area anywhere but the root, which a create and a move both answer with.
+    private static let nestedAreaRefusal = StoreError.invalid("an area cannot be nested")
+
+    /// The kind a view reads as. An area stands only at the root and selects nothing, so the column's `area`
+    /// reads as one only where the view is that, with no effective parent and an empty filter column, and as a
+    /// list anywhere else: a folder, or a list with a rule, which is what an app older than the field made of
+    /// it when it nested it or gave it a rule (spec section 2). That is a reading rule and not a repair, as
+    /// `TreeRules` reads a broken parent link as no link.
+    private static func kind(stored: Value, parent: ViewID?, filter: Value) -> TaskViewKind {
+        storedKind(stored) == .area && parent == nil && filter.isNull ? .area : .list
+    }
+
+    /// The kind the column names, before the reading rule above: anything but `area` is a list, an unknown
+    /// name, a null from a view written before the column and a value that is not text among them.
+    private static func storedKind(_ value: Value) -> TaskViewKind {
+        value.string.flatMap(TaskViewKind.init(rawValue:)) ?? .list
+    }
+
     /// A write names the view it edits, and a caller that names one that is gone gets an error rather than an
-    /// operation that creates a row out of nothing, the way `requireTask` guards a task.
-    private func requireView(_ id: ViewID) throws(StoreError) {
-        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT 1 FROM views WHERE id = ? AND deleted = 0", [.text(id.rawValue)]) }
-        if rows.isEmpty { throw .notFound(id) }
+    /// operation that creates a row out of nothing, the way `requireTask` guards a task. It answers the kind
+    /// the row stores, read in the same statement, which is what `move` tells an area by; the other callers
+    /// only need the row to be there.
+    @discardableResult
+    private func requireView(_ id: ViewID) throws(StoreError) -> TaskViewKind {
+        let rows = try sql { () throws(SQLiteError) in try db.rows("SELECT kind FROM views WHERE id = ? AND deleted = 0", [.text(id.rawValue)]) }
+        guard let row = rows.first else { throw .notFound(id) }
+        return Store.storedKind(row[0])
     }
 
     /// The second statement every grouped read runs, and the one a placement ranks among. It is a constant
