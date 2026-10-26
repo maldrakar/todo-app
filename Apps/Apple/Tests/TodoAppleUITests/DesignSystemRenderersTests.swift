@@ -30,6 +30,12 @@ import Testing
     #expect(Font(font.rowTitle(depth: 1, hasChildren: false)) == .system(.callout, design: .default, weight: .regular))
     #expect(Font(font.count) == .system(.subheadline, design: .default, weight: .regular))
     #expect(Font(font.meta) == .system(.caption, design: .default, weight: .medium))
+    #expect(Font(font.areaLabel) == .system(.footnote, design: .default, weight: .medium))
+}
+
+/// A list tile's glyph takes its size from the tile and only its weight from the look.
+@Test func theTileGlyphsWeightRendersAsTheLooks() {
+    #expect(Font.Weight(DesignSystem.font.tileGlyphWeight) == .medium)
 }
 
 /// Each kind of motion renders as SwiftUI's animation of the same curve and duration.

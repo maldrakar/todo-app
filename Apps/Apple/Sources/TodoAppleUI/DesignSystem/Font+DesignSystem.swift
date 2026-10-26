@@ -20,6 +20,7 @@ extension Font.TextStyle {
         case .body: .body
         case .callout: .callout
         case .subheadline: .subheadline
+        case .footnote: .footnote
         case .caption: .caption
         }
     }
@@ -28,7 +29,7 @@ extension Font.TextStyle {
 extension Font.Weight {
     /// A weight of the look as SwiftUI's. The `switch` names every case with no `default`, so a weight added to the
     /// look stops this compiling until it is drawn.
-    fileprivate init(_ weight: DesignSystem.Font.Weight) {
+    init(_ weight: DesignSystem.Font.Weight) {
         self = switch weight {
         case .regular: .regular
         case .medium: .medium

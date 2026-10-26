@@ -28,7 +28,7 @@ struct ListTile: View {
             .frame(width: size, height: size)
             .overlay {
                 Image(icon)
-                    .font(.system(size: glyph, weight: .medium))
+                    .font(.system(size: glyph, weight: Font.Weight(DesignSystem.font.tileGlyphWeight)))
                     .foregroundStyle(Color(colors.glyph))
             }
     }
