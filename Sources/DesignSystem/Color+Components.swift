@@ -8,9 +8,9 @@ extension DesignSystem.Color {
 
 extension DesignSystem.Color.Components {
     /// The colours a list's tile can take, by the names the store keeps for them, each the tile's background and the
-    /// glyph on it. The design system names them itself, so that the look knows nothing of the domain: the feature
-    /// module that builds a tile reads a view's colour as one of these by its name with `init(rawValue:)`, and a root
-    /// test holds the two lists of names together (ADR-0007, amendment of 2026-10-26).
+    /// colour of the glyph on it. The design system names them itself, so that the look knows nothing of the domain:
+    /// the feature module that builds a tile reads a view's colour as one of these by its name with `init(rawValue:)`,
+    /// and a root test holds the two lists of names together (ADR-0007, amendment of 2026-10-26).
     public enum Tile: String, Sendable, CaseIterable {
         case blue, amber, rose, green, stone, indigo, teal, pink, orange, violet, sky
 

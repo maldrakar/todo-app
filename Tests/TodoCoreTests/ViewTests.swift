@@ -117,8 +117,9 @@ import TestSupport
 
 /// The kind and the colour are names this app owns, and a name it does not know, from a newer app or a wrong
 /// one, reads as absent: a plain list with no colour, and never a view that stops reading (`docs/style.md`).
-/// The icon is a name the platform maps and draws a default glyph for, so any text reads as itself; a value
-/// that is not text is none of the three.
+/// The icon reads as its text, whatever it is: a name this app does not know is read by the feature module
+/// that builds the tile, which gives it the default glyph (ADR-0007, amendment of 2026-10-26). A value that
+/// is not text is none of the three.
 @Test func anUnknownKindOrColourReadsAsAbsent() throws {
     let store = try makeStore()
     let stamp = HLC(millis: 5, counter: 0)

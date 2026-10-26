@@ -43,11 +43,11 @@ let package = Package(
         // Where an identity is kept beside its database, in a target of its own because two consumers keep
         // it, the demo and the Apple app, and they agree on where it lives only by sharing the code (ADR-0005).
         .target(name: "DeviceFile"),
-        // The look's design decisions in numbers, which every platform turns into its own pixels: the colours, a
-        // list's tile's among them, the type as text styles, the motion and the icons, the tile's colours and the icons
-        // by the names the store keeps. It depends on nothing, the core included, because the look must not know the
-        // domain, and the wasm probe links it once a module the probe drives builds a component's model (ADR-0007,
-        // amendment of 2026-10-26).
+        // The look's design decisions in numbers, which every platform turns into its own pixels: the colours, the
+        // type as text styles, the motion and the icons, the tile's colours and the icons named as the store names
+        // them. It depends on nothing, the core included, because the look must not know the domain, and the wasm
+        // probe links it once a module the probe drives builds a component's model (ADR-0007, amendment of
+        // 2026-10-26).
         .target(name: "DesignSystem"),
         // The models and the logic of the components every platform draws from the design system's decisions, a
         // list's tile first, whose model holds every visual parameter a platform needs to draw it. It depends on the

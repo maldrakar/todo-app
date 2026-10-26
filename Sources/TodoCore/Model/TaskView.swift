@@ -13,8 +13,9 @@
 /// `kind`, `color` and `icon` are read by the rules of the Lists screen spec, section 2. An `area` stored on a
 /// view with an effective parent or a filter reads as a list, since an area stands only at the root and selects
 /// nothing; a colour this app has no name for reads as none; an icon is the name of a glyph in the app's own
-/// set as text, which the platform maps and draws its default glyph for when it does not know the name. A
-/// view written before the three existed reads as a plain list with no tile.
+/// set as text, and a name this app does not know is read by the feature module that builds the tile, which
+/// gives it the default glyph (ADR-0007, amendment of 2026-10-26). A view written before the three existed
+/// reads as a plain list with no tile.
 public struct TaskView: Equatable, Sendable {
     public let id: ViewID
     public let title: String
