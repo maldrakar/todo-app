@@ -105,6 +105,25 @@ extension Store {
         try setFlag(.view, id, "deleted", true)
     }
 
+    /// Tombstones the view and every view under it, where `delete(view:)` tombstones one and lets its children
+    /// surface at the root (spec section 6). The subtree is the one `views()` reads, in its one pass: parents
+    /// come before children there, so a view is under the deleted one exactly when its parent has been taken
+    /// before it, and nothing walks down the tree by recursion. One operation per view under one stamp, in one
+    /// `apply`, which is one transaction, so the tree goes whole or not at all. The tasks are untouched, since
+    /// a rule selects them and a rule gone selects nothing, and the manual lists of the deleted views stop
+    /// being read, as after `delete(view:)`.
+    public func delete(viewTree id: ViewID) throws(StoreError) {
+        try requireView(id)
+        let stamp = clock.next()
+        var taken: Set<ViewID> = []
+        var ops: [JournalOperation] = []
+        for view in try views() where view.id == id || view.parent.map({ taken.contains($0) }) == true {
+            taken.insert(view.id)
+            ops.append(op(.view, view.id.rawValue, "deleted", Value(true), stamp))
+        }
+        try apply(ops)
+    }
+
     /// Re-parents the view and ranks it among its new siblings, the way `move(tag:to:at:)` does for a tag:
     /// two operations under one stamp, and a move into the view's own subtree refused here rather than left
     /// to the reading rule, which would answer the cycle by putting every view on it at the root. An area
