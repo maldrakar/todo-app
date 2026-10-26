@@ -10,7 +10,7 @@ extension DesignSystem {
         public let blue: Double
         public let opacity: Double
 
-        /// The surface's light shade, and what a list tile's glyph is lifted toward in the dark.
+        /// White, the surface's light shade.
         public static let white = RGB(hex: 0xFFFFFF)
 
         /// This colour moved `amount` of the way toward `other`, channel by channel, keeping its own opacity.

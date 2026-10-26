@@ -32,8 +32,8 @@ public struct TileModel: Equatable, Sendable {
     /// list with no colour draws stone's.
     public init(color: DesignSystem.ListColor?, icon: DesignSystem.Icon?, placement: Placement) {
         // The canvas's sizes: the root of the phone's tree and a nested row (`Phone.dc.html`, `tileSize`), and the
-        // sidebar's 30 pt row (`Mac.dc.html`). A depth at or below zero reads as the root's, one comparison and no
-        // trap, since a depth a view sends is never trusted.
+        // sidebar's 30 pt row (`Mac.dc.html`). A depth at or below zero reads as the root's: a depth a view sends is
+        // never trusted.
         let glyphSize: Double
         (side, cornerRadius, glyphSize) = switch placement {
         case .row(let depth) where depth > 0: (26, 7, 16)

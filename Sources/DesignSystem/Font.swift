@@ -24,8 +24,8 @@ extension DesignSystem {
         public static let areaLabel = Font(style: .footnote, weight: .medium, rounded: false)
 
         /// A row's title: the body at the root and the callout nested, 17 and 16 pt at the iPhone's default text size,
-        /// semibold when the row has children and regular otherwise. A depth at or below zero reads as the root's, one
-        /// comparison and no trap, since a depth a view sends is never trusted.
+        /// semibold when the row has children and regular otherwise. A depth at or below zero reads as the root's: a
+        /// depth a view sends is never trusted.
         public static func rowTitle(depth: Int, hasChildren: Bool) -> Font {
             Font(style: depth > 0 ? .callout : .body, weight: hasChildren ? .semibold : .regular, rounded: false)
         }
