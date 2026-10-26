@@ -81,7 +81,7 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | #142 | The design foundations in `TodoAppleUI` | `feature`, `ui-apple` | |
+| 1 | #142 | The design foundations in `TodoAppleUI` | `feature`, `ui-apple` | 2 |
 | 2 | #143 | A view's kind, colour and icon, and the device's own state | `feature`, `core` | |
 | 3 | #144 | Counts and the tree delete | `feature`, `core` | 2 |
 | 4 | #145 | Spike: the drag with a change of depth on iPhone and iPad | `spike`, `ui-apple` | |
@@ -93,7 +93,8 @@ from.
 The owner reviews this table and the interface of every task below.
 
 The split leaves `main` working after every merge. Tasks 1 to 4 touch no
-screen and can run beside each other. Tasks 5 and 6 change the module's
+screen, and all but Task 1, which keys its colours by Task 2's
+`TaskViewColor`, can run beside each other. Tasks 5 and 6 change the module's
 model and actions, so each adapts `TaskViewListView` in the same pull
 request just far enough that the app compiles and works, with today's
 look; the look arrives in Task 7 for the phone and in Task 8 for the Mac
