@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "TodoCore", targets: ["TodoCore"]),
         .library(name: "DeviceFile", targets: ["DeviceFile"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
+        .library(name: "DesignSystemComponents", targets: ["DesignSystemComponents"]),
         .library(name: "FeatureModule", targets: ["FeatureModule"]),
         .library(name: "TaskViewListFeature", targets: ["TaskViewListFeature"]),
         .library(name: "TaskListFeature", targets: ["TaskListFeature"]),
@@ -47,6 +48,11 @@ let package = Package(
         // It depends on nothing, the core included, because the look must not know the domain, and the wasm probe
         // leaves it out until a web host draws with it (ADR-0007, amendment of 2026-10-26).
         .target(name: "DesignSystem"),
+        // The models and the logic of the components every platform draws from the design system's decisions, a
+        // list's tile first, whose model holds every visual parameter a platform needs to draw it. It depends on the
+        // design system alone and, like it, not on the core: a platform host reads the store's names of a list's
+        // colour and icon as the design system's at the call site (ADR-0007, amendment of 2026-10-26).
+        .target(name: "DesignSystemComponents", dependencies: ["DesignSystem"]),
         // The contract, and beside it what every parent and every flow needs and nothing of any one screen: the
         // routable module and its seat, the error a route's text form is refused with, the destination a screen
         // declares what is open over it in, the stack a flow holds the screens over its base in, the id of an
@@ -93,6 +99,7 @@ let package = Package(
         // The core and its helpers only for the tests that hold the design system's names of a list's colour and
         // icon to the store's, the one place the two meet.
         .testTarget(name: "DesignSystemTests", dependencies: ["DesignSystem", "TodoCore", "TestSupport"]),
+        .testTarget(name: "DesignSystemComponentsTests", dependencies: ["DesignSystemComponents", "DesignSystem"]),
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",
