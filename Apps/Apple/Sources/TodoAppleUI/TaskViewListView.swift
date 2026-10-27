@@ -104,10 +104,20 @@ struct TaskViewListView: View {
         // ideal, because the column opens at the width AppKit saved for it (`NSSplitView Subview Frames` in the
         // app's defaults): with a saved width, an ideal of 220 opened at 180, the minimum it had then.
         .navigationSplitViewColumnWidth(min: 220, ideal: 220)
+        #if !os(watchOS)
+        // The sidebar's "+", a menu with an item for each thing it makes, each sending the action its item is named for:
+        // where a list or an area goes, and that New Task is quick entry, is the module's to decide (Lists screen spec,
+        // section 8). The look is the plan's Tasks 7 and 8. Not on the watch, where `Menu` is unavailable (a file
+        // typechecked against the watchOS 10 SDK with Xcode 27.1 on 2026-10-27), and whose build is a compile check in
+        // this epic, as it is for the row's menu above.
         .toolbar {
-            // New list at the end of the tree, in the last area when there is one, which is the module's to decide.
-            Button("New List", systemImage: "text.badge.plus") { send(.newListMenuItemChosen(in: nil)) }
+            Menu("Add", systemImage: "plus") {
+                Button("New Task") { send(.newTaskMenuItemChosen) }
+                Button("New List") { send(.newListMenuItemChosen(in: nil)) }
+                Button("New Area") { send(.newAreaMenuItemChosen) }
+            }
         }
+        #endif
     }
 
     /// The highlight, read from the model and moved only by an action, the shape a text field's binding has

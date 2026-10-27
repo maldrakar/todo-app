@@ -92,9 +92,10 @@ TODO_ROUTE=/view/00000000-0000-4000-8000-000000000002/task/<task id> swift run t
 
 It opens a window: the list of views in a sidebar, and beside it the tasks of the view chosen there. Rename,
 in a row's context menu, opens a field on the row: Return or a click away keeps the new title, a blank one is
-refused with a sentence under the list, and Esc keeps the old title. New List, on the toolbar, adds a list at the
-end of the tree, in the last area when there is one, with its field open, and leaves the highlight where it was;
-an area is a line with its name beside it. A click on a task pushes its screen, which shows its title,
+refused with a sentence under the list, and Esc keeps the old title. The + on the sidebar's toolbar holds New
+Task, which opens quick entry, New List, which adds a list at the end of the tree, in the last area when there is
+one, with its field open and the highlight where it was, and New Area, which adds an unnamed area at the end, a line
+with its name field open. A click on a task pushes its screen, which shows its title,
 over the list, and the back button returns to the list. Quick Entry, the + on the list's toolbar, opens a sheet with
 a title field: Return or Add puts the task in the Inbox and closes the sheet, a blank title is refused with a
 sentence in the sheet, and Cancel or Esc closes it and writes nothing.
