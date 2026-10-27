@@ -372,7 +372,7 @@ private struct FirstScreenIsNoList: Error {}
 @Test func theSameWidthAgainMovesNothing() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    for width in [AppModule.Width.narrow, .wide] {
+    for width in [WindowWidth.narrow, .wide] {
         let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: width)
         let model = app.model
         let route = app.route

@@ -70,14 +70,6 @@ public final class AppModule: Routable {
         case wide(column: StackElementID?, path: [StackElementID])
     }
 
-    /// The width class of a window, which only its view can know and which it reports without deciding anything by
-    /// it (`docs/style.md`, "Views"; navigation state spec, section 4): narrow, iPhone's and a narrow iPad window,
-    /// and wide, the Mac's and a wide iPad window.
-    public enum Width: Equatable, Sendable {
-        case narrow
-        case wide
-    }
-
     /// What the root view may send: what the views of the window's modules send, each wrapped in the case of the
     /// module it is for, so that the root view hands each module's view a closure over that module's actions alone,
     /// the way back its stack's path reports, and the root's own toolbar button. Named for the control and the
@@ -138,7 +130,7 @@ public final class AppModule: Routable {
         ///
         /// It moves the layout and nothing else: no screen is made or dropped, no sentence moves and the route stays,
         /// so the width the window already has moves nothing.
-        case widthChanged(Width)
+        case widthChanged(WindowWidth)
     }
 
     /// What the root asks of the platform, since there is no module above it.
@@ -181,7 +173,7 @@ public final class AppModule: Routable {
     /// Throws what the sidebar's `init` throws and nothing else, as M2's root did: a window is not made around a
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A screen of the stack that
     /// cannot be made is its opener's to say, and quick entry cannot fail to be made.
-    public init(store: Store, route: Route = .default, width: Width) throws(StoreError) {
+    public init(store: Store, route: Route = .default, width: WindowWidth) throws(StoreError) {
         let taskViewList = try TaskViewList(store: store, route: route.sidebar)
         // The stack and the seat are built once, here, each with the way to make what it holds: a closure over the
         // `init` of the kind the route names that captures the store and never this root. The root holds both in its
@@ -318,7 +310,7 @@ public final class AppModule: Routable {
         var problem: String?
         /// The class the window's view reported last, or the one the window was made with, which the layout is cut
         /// by and nothing else reads.
-        var width: Width
+        var width: WindowWidth
 
         /// The model the root view draws: the sidebar's and each screen's, as each computes it, the layout of the
         /// screens over the sidebar, quick entry's, and the root's sentence.

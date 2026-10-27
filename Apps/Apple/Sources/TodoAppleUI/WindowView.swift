@@ -1,5 +1,6 @@
 // Apps/Apple/Sources/TodoAppleUI/WindowView.swift
 import AppFeature
+import FeatureModule
 import SwiftUI
 
 /// The view of one window: it makes the window from the window's path and its width class once, when the window first
@@ -72,7 +73,7 @@ struct WindowView: View {
     /// The window's width class as the root takes it: compact as narrow, and anything else as wide, the regular class
     /// and the Mac's, which has none. Nothing here is decided by it: it is handed to the root, and the layout comes
     /// back in the root's model.
-    private var width: AppModule.Width {
+    private var width: WindowWidth {
         horizontalSizeClass == .compact ? .narrow : .wide
     }
 

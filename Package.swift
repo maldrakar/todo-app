@@ -58,9 +58,11 @@ let package = Package(
         // routable module and its seat, the error a route's text form is refused with, the destination a screen
         // declares what is open over it in, the stack a flow holds the screens over its base in, the id of an
         // element of it, the protocol of a flow's enum of screens and the notice the stack sends (ADR-0007,
-        // amendment of 2026-10-22). It still depends on nothing: a seat and a stack are handed the way to make
-        // what they hold by their owner, so the contract names no dependency, and a screen that needs none, or
-        // others than the store, needs nothing from it (ADR-0007, amendment of 2026-10-15).
+        // amendment of 2026-10-22), and the width class of a window, which the root lays its window out by and the
+        // sidebar builds its rows for, here since a child never imports the root (ADR-0007, amendment of
+        // 2026-10-27). It still depends on nothing: a seat and a stack are handed the way to make what they hold by
+        // their owner, so the contract names no dependency, and a screen that needs none, or others than the
+        // store, needs nothing from it (ADR-0007, amendment of 2026-10-15).
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
