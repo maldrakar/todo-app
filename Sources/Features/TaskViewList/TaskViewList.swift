@@ -166,8 +166,8 @@ public final class TaskViewList: Routable {
     /// names is declared whether or not a row holds its view; one the stack cannot make, its view gone or not yet
     /// synced, comes back as `.notOpened`, which takes the declaration back and says so in `problem`.
     ///
-    /// The folds are the device's own, read from its state as the module last wrote them (ADR-0010, amendment of
-    /// 2026-10-26).
+    /// The folds are the device's own, read from its state as this module or another window of the device last wrote
+    /// them, here and at every read of the rows after (ADR-0010, amendment of 2026-10-26).
     ///
     /// The width is the class of the window the module is drawn in, which the root hands it from its own: it has no
     /// default, as the root's has none, so that the class a window is made with is always its host's to say
@@ -175,7 +175,7 @@ public final class TaskViewList: Routable {
     ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
     /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own reads
-    /// throw, the rows and their counts.
+    /// throw, the rows, their counts and the folds.
     public init(store: Store, route: Route, width: WindowWidth) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
@@ -401,12 +401,10 @@ public final class TaskViewList: Routable {
     }
 
     /// Folds and unfolds the branches to the set, written to the device's state first and kept after (ADR-0010).
-    ///
-    /// A write that fails leaves the fold on screen and says nothing, the engineer's call (Lists screen plan,
-    /// "Self-review"): the fold the person made is drawn, the next fold writes the whole set again, and this module's
-    /// sentences stay for the data a person edits, which a fold is not.
     private func setCollapsed(_ collapsed: Set<ViewID>) {
-        // Sorted, so that the same folds are the same text in the file, whatever order a set hands them out in.
+        // A write that fails is not said: the fold stays on screen until the next read of the rows takes the folds
+        // back from the store, and this module's sentences stay for the data a person edits, which a fold is not
+        // (Lists screen plan, "Self-review"). Sorted, so that the same folds are the same text in the file.
         try? store.setDeviceState(TaskViewList.collapsedKey, collapsed.map(\.rawValue).sorted())
         state.collapsed = collapsed
     }
@@ -414,8 +412,9 @@ public final class TaskViewList: Routable {
     /// The folded lists as the device's state holds them, of the lists the rows hold: what was written is the device's
     /// and may be stale or wrong (`docs/style.md`, "Data from outside"), so a text that does not read as an id, an id
     /// no row holds, a view deleted since, and an area's, whose line never folds, are dropped, and the next fold writes
-    /// the set back without them. A value that does not decode as a list of texts reads as nothing folded, which the
-    /// store decides.
+    /// the set back without them. A list with no lists inside keeps its fold, which it does not draw
+    /// (`ReadRow.drawnKind`), so lists that come back inside it come back folded. A value that does not decode as a
+    /// list of texts reads as nothing folded, which the store decides.
     private static func collapsed(in store: Store, among rows: [ReadRow]) throws(StoreError) -> Set<ViewID> {
         let held = Set(rows.filter { $0.kind == .list }.map(\.id))
         let kept = try store.deviceState(collapsedKey, as: [String].self) ?? []
@@ -425,7 +424,8 @@ public final class TaskViewList: Routable {
     /// The key the folds are kept under in the device's own state: the module's name and what it keeps, the folded
     /// lists' ids as their raw values. Its rule is that a write of it reports no change set, which the store's
     /// writes of a device's state never do: a fold is one screen's own, and another window of the same device that
-    /// draws the same rows reads it at its next read of them (ADR-0010).
+    /// draws the same rows reads it at its next read of them, `reread`, and writes it back with its own next fold
+    /// (Lists screen spec, section 5; ADR-0010).
     private static let collapsedKey = "taskViewList.collapsed"
 
     /// Declares the list of a view over this module, or nothing: a click, a route, the way back and the stack's notices
@@ -436,7 +436,9 @@ public final class TaskViewList: Routable {
         state.destination.declare(list.map { .pushed($0) })
     }
 
-    /// Reads the tree and its counts again and keeps of this person's session whatever the new rows still hold.
+    /// Reads the tree, its counts and the device's folds again and keeps of this person's session whatever the new rows
+    /// still hold. The folds are read with the rows, so that a fold another window of this device made since is drawn
+    /// here at the next read of the rows (Lists screen spec, section 5).
     ///
     /// A rename goes when its row does, with a sentence, because a person typing a name was interrupted, and the
     /// sentence is the one a refused write gives for the same fact, since a peer's delete is that fact arriving by
@@ -445,9 +447,9 @@ public final class TaskViewList: Routable {
     /// whose highlight moved was not interrupted, and the list on a view that is gone asks to be closed on its own
     /// `.changed`, which this module answers by declaring nothing.
     ///
-    /// The rows on screen are never cleared by a read that failed, because they are assigned last and a
-    /// throw leaves them where they were: `send` cannot throw (ADR-0006), and a list emptied by a failed
-    /// read would take with it the only thing left to act on.
+    /// The rows on screen are never cleared by a read that failed, because they are assigned last, with their counts
+    /// and the folds, and a throw leaves all of them where they were: `send` cannot throw (ADR-0006), and a list
+    /// emptied by a failed read would take with it the only thing left to act on.
     ///
     /// What a failed read means is the caller's to say, which is why this throws instead of writing a
     /// sentence of its own. It means three different things: after a `.changed` nothing else is in flight,
@@ -458,17 +460,19 @@ public final class TaskViewList: Routable {
     private func reread() throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
+        let collapsed = try TaskViewList.collapsed(in: store, among: rows)
         if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
             // The name comes off the rows as they still are: the ones being read in no longer hold the
             // view, and after the assignment below there is nothing left to call it. A row already gone
             // from those too cannot be named at all, and an invented name is worse than silence.
-            if let title = state.rows.first(where: { $0.id == rename.id })?.title {
-                state.problem = Problem.viewIsGone(title: title).sentence
+            if let problem = TaskViewList.gone(state.rows.first { $0.id == rename.id }) {
+                state.problem = problem.sentence
             }
             state.rename = nil
         }
         state.rows = rows
         state.counts = counts
+        state.collapsed = collapsed
     }
 
     /// Writes the draft and closes the field, or refuses it and leaves the field where it is.
@@ -489,9 +493,8 @@ public final class TaskViewList: Routable {
             state.problem = Problem.emptyTitle.sentence
             return
         }
-        // The name a refusal would use, read before the write: the reread below drops the row, and by then
+        // The row a refusal names is the one read before the write: the reread below drops it, and by then
         // there is nothing left to call the view.
-        let viewName = row?.title
         var problem: String?
         do {
             // One change and no other: two changes to one field in one call keep only the last (#40), and a
@@ -499,7 +502,7 @@ public final class TaskViewList: Routable {
             // field shows them, and what a view is called is what the store keeps — padding is neither.
             try store.update(view: rename.id, [.title(title)])
         } catch {
-            problem = TaskViewList.problem(error, renaming: viewName).sentence
+            problem = TaskViewList.problem(error, renaming: row).sentence
         }
         // The field closes either way. On the refusal the view it was open on is gone or unwritable, and a
         // field left open over it would invite the same person to type the same name again.
@@ -524,13 +527,23 @@ public final class TaskViewList: Routable {
     /// `.notFound` is the one refusal this list can put in a person's words: the view the field was open on
     /// is gone, which is what a peer deleting it mid-rename looks like from here. Everything else is SQLite
     /// saying something about a file, and calling that "the view is gone" would put a sentence on screen
-    /// that is not true. A `.notFound` with no title to give is the general sentence for the same reason:
-    /// the specific one would have to invent the name it names.
-    private static func problem(_ error: StoreError, renaming title: String?) -> Problem {
-        switch (error, title) {
-        case (.notFound, .some(let title)): .viewIsGone(title: title)
+    /// that is not true. A `.notFound` with no row to name it by is the general sentence for the same
+    /// reason: the specific one would have to invent the name it names.
+    private static func problem(_ error: StoreError, renaming row: ReadRow?) -> Problem {
+        switch error {
+        case .notFound: gone(row) ?? .couldNotSave
         default: .couldNotSave
         }
+    }
+
+    /// What a field whose view went is told, by the row it was open on: the view's name, and for an unnamed
+    /// area, which has none to give, a sentence of its own that names none. An empty title is no name, so a
+    /// list that has one, written so by another device, and a row that is not there have nothing to say: an
+    /// invented name is worse than silence.
+    private static func gone(_ row: ReadRow?) -> Problem? {
+        guard let row else { return nil }
+        if !row.title.isEmpty { return .viewIsGone(title: row.title) }
+        return row.kind == .area ? .areaIsGone : nil
     }
 
     /// Makes a list or an area at the end of its new siblings with its field open on the title it is made with, so
@@ -613,8 +626,8 @@ public final class TaskViewList: Routable {
             let drawn = TaskViewList.unfolded(rows, collapsed: collapsed).map {
                 Model.Row(
                     id: $0.id, depth: $0.depth,
-                    kind: $0.kind(
-                        in: width, count: counts[$0.id], isCollapsed: collapsed.contains($0.id),
+                    kind: $0.drawnKind(
+                        in: width, count: counts[$0.id], isFolded: collapsed.contains($0.id),
                         isSelected: $0.id == declared
                     ),
                     draft: rename?.text(on: $0.id)
@@ -647,6 +660,7 @@ public final class TaskViewList: Routable {
         case couldNotRead
         case emptyTitle
         case viewIsGone(title: String)
+        case areaIsGone
         case couldNotSave
         case couldNotOpenList
 
@@ -655,6 +669,7 @@ public final class TaskViewList: Routable {
             case .couldNotRead: "The views could not be read, so this list may be out of date."
             case .emptyTitle: "A title cannot be empty."
             case .viewIsGone(let title): "“\(title)” is no longer there, so the new name was not saved."
+            case .areaIsGone: "The area is no longer there, so the new name was not saved."
             case .couldNotSave: "The change could not be saved, so nothing was written."
             case .couldNotOpenList: "The list could not be opened."
             }

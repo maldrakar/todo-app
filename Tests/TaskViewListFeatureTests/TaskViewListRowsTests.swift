@@ -171,11 +171,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 }
 
 /// A fold on a list with lists inside it hides the branch, the lists under it however deep, and the rows after the
-/// branch stay, the next one at its depth or above and those under that. The fold is the device's own (ADR-0010, amendment of 2026-10-26), written on every fold as the
-/// folded ids, so a module made anew, as at the next launch, reads it back, a fold inside a folded branch included.
-/// Unfolded, the branch is back as it was, the fold inside it kept, and with nothing folded the set written is empty.
-/// A fold is no answer to anything a person was told, so a field open on a refused name keeps its draft and its
-/// sentence throughout.
+/// branch stay, the next one at its depth or above and those under that. The fold is the device's own (ADR-0010,
+/// amendment of 2026-10-26), written on every fold as the folded ids, so a module made anew, as at the next launch,
+/// reads it back, a fold inside a folded branch included. Unfolded, the branch is back as it was, the fold inside it
+/// kept, and with nothing folded the set written is empty. A fold is no answer to anything a person was told, so a
+/// field open on a refused name keeps its draft and its sentence throughout.
 @Test func aFoldHidesTheBranchAndIsReadBackByAModuleMadeAnew() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
@@ -223,9 +223,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 }
 
 /// The folds read back are the device's state, written by a version of the app that may be older, newer or wrong
-/// (`docs/style.md`, "Data from outside"), so a stale set reads as what it can: a view deleted since, an id no view ever
-/// had, a text that is no id at all and an area, whose line never folds, are dropped, and the fold a list's row holds
-/// stands. The next fold writes back what the module holds, without them.
+/// (`docs/style.md`, "Data from outside"), so a stale set reads as what it can: a view deleted since, an id no view
+/// ever had, a text that is no id at all and an area, whose line never folds, are dropped, and the fold a list's row
+/// holds stands. The next fold writes back what the module holds, without them.
 @Test func aFoldOnAnIdNoRowHoldsIsDropped() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
@@ -294,6 +294,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, home, garden, made.id])
     #expect(made.depth == 0)
     #expect(try stored(made.id, in: store) == ["New list", home.rawValue, "list", nil, "list"])
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = reference.send(.action(.renameMenuItemChosen(made.id)))
+    #expect(list.model == reference.model)
 }
 
 /// New list from a list's menu makes it inside that list, last among the lists already there, with that list's colour
@@ -315,6 +318,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(made.depth == 1)
     #expect(listRow(made)?.tile == TileModel(color: .teal, icon: .list, side: 26, cornerRadius: 7, glyphSize: 16))
     #expect(try stored(made.id, in: store) == ["New list", projects.rawValue, "list", "teal", "list"])
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = reference.send(.action(.renameMenuItemChosen(made.id)))
+    #expect(list.model == reference.model, "a module made anew reads the branch unfolded")
 }
 
 /// New list from an area's menu makes it last under the area's line with no colour, even where the area holds a
@@ -331,6 +337,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(made.depth == 0)
     #expect(listRow(made)?.tile == TileModel(color: .stone, icon: .list, side: 30, cornerRadius: 8, glyphSize: 19))
     #expect(try stored(made.id, in: store) == ["New list", work.rawValue, "list", nil, "list"])
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = reference.send(.action(.renameMenuItemChosen(made.id)))
+    #expect(list.model == reference.model)
 }
 
 /// The new list opens its name field with its title as the draft, so the first keystroke replaces it, and declares
@@ -435,4 +444,90 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.send(.action(.newTaskMenuItemChosen)) == .newTaskRequested)
     #expect(list.model == before)
     #expect(list.destination.pushed == .init(head: inbox))
+}
+
+
+/// The folds are the device's, so two windows of one device share them: a fold made in one is read by the other at its
+/// next read of the rows, which a change naming a view brings, and not at a change naming only tasks, which reads the
+/// counts alone; a fold the other makes then writes the set with the first window's fold in it (Lists screen spec,
+/// section 5; ADR-0010).
+@Test func aFoldMadeInAnotherWindowIsReadAtTheNextReread() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    try store.createView(NewTaskView(title: "Home", parent: projects))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    try store.createView(NewTaskView(title: "Chores", parent: errands))
+    let first = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let second = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(first.send(.action(.disclosureTapped(projects))) == nil)
+    let filed = try changeSet(of: store) { try store.createTask(NewTask(title: "Buy milk")) }
+    #expect(second.send(.changed(filed)) == nil)
+    #expect(listRow(projects, in: second.model)?.isCollapsed == false, "a change to a task reads the counts alone")
+    let created = try changeSet(of: store) { try store.createView(NewTaskView(title: "Docs")) }
+    #expect(second.send(.changed(created)) == nil)
+    #expect(second.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow)).model)
+    #expect(listRow(projects, in: second.model)?.isCollapsed == true)
+    #expect(second.send(.action(.disclosureTapped(errands))) == nil)
+    #expect(try store.deviceState(collapsedKey, as: [String].self).map(Set.init) == [projects.rawValue, errands.rawValue])
+}
+
+/// An unnamed area has no name to say, so a field open on one that a peer deleted says that the area is gone without
+/// a name, by either way the news arrives: as a change, which drops the field, or as the refusal of Return. One fact,
+/// one sentence, so the two end in the same model, the area's line gone and no field open.
+@Test func anUnnamedAreaGoneMidRenameIsSaidWithoutAName() throws {
+    let store = try makeStore()
+    let area = try store.createView(NewTaskView(title: "", kind: .area))
+    let viaChange = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let viaReturn = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    for list in [viaChange, viaReturn] {
+        _ = list.send(.action(.renameMenuItemChosen(area)))
+        _ = list.send(.action(.titleFieldChanged("Home")))
+    }
+    let deleted = try changeSet(of: store) { try store.delete(view: area) }
+    #expect(viaChange.send(.changed(deleted)) == nil)
+    #expect(viaReturn.send(.action(.titleFieldSubmitted)) == nil)
+    #expect(viaChange.model.problem == "The area is no longer there, so the new name was not saved.")
+    #expect(viaChange.model == viaReturn.model)
+    #expect(viaChange.model.rows == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow)).model.rows)
+}
+
+/// A fold is drawn only on a list with lists inside it, where a chevron can take it back: a leaf whose id the device's
+/// state holds shows none, nor does a folded list whose lists are gone. The fold is kept for the list all the same,
+/// so a list that comes back inside it comes back folded, under a chevron that unfolds it.
+@Test func aFoldIsDrawnOnlyOnAListWithListsInside() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    try store.setDeviceState(collapsedKey, [projects.rawValue, errands.rawValue])
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(listRow(projects, in: list.model)?.isCollapsed == true)
+    #expect(listRow(errands, in: list.model)?.isCollapsed == false, "a leaf the device's state names")
+    let deleted = try changeSet(of: store) { try store.delete(view: home) }
+    #expect(list.send(.changed(deleted)) == nil)
+    #expect(listRow(projects, in: list.model)?.isCollapsed == false, "its lists are gone")
+    let garden = try changeSet(of: store) { try store.createView(NewTaskView(title: "Garden", parent: projects)) }
+    #expect(list.send(.changed(garden)) == nil)
+    #expect(listRow(projects, in: list.model)?.isCollapsed == true)
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "the list that came back inside it is folded")
+    #expect(list.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow)).model)
+}
+
+/// A change naming only tags can move a count too, as a deleted tag takes its tasks out of every rule that names it,
+/// so it reads the counts again, and not the rows: a view written since with no change sent stays out of them (Lists
+/// screen spec, section 4).
+@Test func aChangeToATagRereadsTheCountsAndNotTheRows() throws {
+    let store = try makeStore()
+    let errands = try store.createTag(title: "errands")
+    try store.createTask(NewTask(title: "Buy milk", tags: [errands]))
+    let shopping = try store.createView(NewTaskView(title: "Shopping", filter: .hasTag(errands)))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(listRow(shopping, in: list.model)?.countText == "1", "the tag's task is counted; this is the setup")
+    let deleted = try changeSet(of: store) { try store.delete(tag: errands) }
+    #expect(deleted.tasks.isEmpty && deleted.views.isEmpty, "a change naming the tag alone; this is the setup")
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    try store.createView(NewTaskView(title: "Docs"))
+    #expect(list.send(.changed(deleted)) == nil)
+    #expect(listRow(shopping, in: list.model)?.countText == "")
+    #expect(list.model == reference.model, "the count moved, and Docs is missing")
 }

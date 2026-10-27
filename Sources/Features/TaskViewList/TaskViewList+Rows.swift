@@ -78,12 +78,13 @@ extension TaskViewList {
 }
 
 extension TaskViewList.ReadRow {
-    /// What the row draws in a window of the width class, with the count the store answered for it and whether it is
-    /// the highlighted one: an area's line, which carries its name and nothing else, or a list's row with everything
-    /// finished. The tile and the title's font are the Lists screen's layout, built here from the row and the width
-    /// whenever the model is computed, so that a window that narrows or widens moves them with no read of the store
-    /// (ADR-0007, amendment of 2026-10-26).
-    func kind(in width: WindowWidth, count: Int?, isCollapsed: Bool, isSelected: Bool) -> TaskViewList.Model.Kind {
+    /// What the row draws in a window of the width class, with the count the store answered for it, whether the device
+    /// holds it folded and whether it is the highlighted one: an area's line, which carries its name and nothing else,
+    /// or a list's row with everything finished. A fold is drawn only on a list with lists inside it, where a chevron
+    /// can take it back. The tile and the title's font are the Lists screen's layout, built here from the row and the
+    /// width whenever the model is computed, so that a window that narrows or widens moves them with no read of the
+    /// store (ADR-0007, amendment of 2026-10-26).
+    func drawnKind(in width: WindowWidth, count: Int?, isFolded: Bool, isSelected: Bool) -> TaskViewList.Model.Kind {
         switch kind {
         case .area:
             return .area(label: title.isEmpty ? nil : title)
@@ -92,7 +93,7 @@ extension TaskViewList.ReadRow {
             return .list(TaskViewList.Model.ListRow(
                 title: title, tile: size.tile(tileColor, tileIcon), titleFont: size.titleFont(emphasized: hasChildren),
                 countText: count.flatMap { $0 > 0 ? String($0) : nil } ?? "", hasChildren: hasChildren,
-                isCollapsed: isCollapsed, isSelected: isSelected
+                isCollapsed: hasChildren && isFolded, isSelected: isSelected
             ))
         }
     }
