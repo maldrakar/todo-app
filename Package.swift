@@ -25,7 +25,7 @@ let package = Package(
             name: "CSQLite",
             cSettings: [
                 .define("SQLITE_ENABLE_FTS5"),
-                .define("SQLITE_THREADSAFE", to: "0"),
+                .define("SQLITE_THREADSAFE", to: "2"),
                 .define("SQLITE_OMIT_LOAD_EXTENSION"),
                 .define("SQLITE_OMIT_DEPRECATED"),
                 .define("SQLITE_OMIT_SHARED_CACHE"),

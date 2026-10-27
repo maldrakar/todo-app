@@ -1,15 +1,25 @@
 import CSQLite
 
-/// SQLite is compiled without mutexes (`SQLITE_THREADSAFE=0`, ADR-0002), so the mutex that serializes the
-/// library's own one-time initialization is compiled out with them: a thread that calls `sqlite3_open_v2`
-/// while another is still inside `sqlite3_initialize` skips initialization, gets `SQLITE_OK` and then finds
-/// no VFS registered. Swift initializes a global `let` exactly once and blocks every other thread until it
-/// is done, which restores the ordering the C mutex used to provide. Every `open` reads it first.
+/// Some of SQLite's state belongs to the process and not to a connection: the random-number generator FTS5
+/// draws from at every open, the status counters, the unix VFS's list of open files. SQLite is compiled in
+/// multi-thread mode (`SQLITE_THREADSAFE=2`, ADR-0002), whose mutexes guard that state, so connections may be
+/// open and in use on several threads at once, as the parallel test runner has them. What the mutexes do not
+/// guard is a connection and what was prepared on it, so neither `Connection` nor `Statement` is `Sendable`:
+/// the compiler lets each be used from one isolation domain at a time.
 ///
-/// This closes the initialization race only. A threads-off SQLite is not safe across threads afterwards
-/// either, and neither `Connection` nor `Statement` is `Sendable`: the core stays single-threaded, and the
-/// test suite is only safe in parallel because each test keeps its connections to itself.
-private let libraryInitialization: Int32 = sqlite3_initialize()
+/// Upstream leaves two first checks outside every mutex, harmless by its account and races to ThreadSanitizer
+/// all the same (#98). `sqlite3_initialize` reads whether the library is initialized before it takes a mutex,
+/// so it runs here, once. And at every file open `unixOpen` reads the process id the unix VFS keeps to notice a
+/// fork, and while it differs from the current one rewrites it and resets the generator; seeding the generator
+/// sets it, so the generator is seeded here too, and every later access is a read. Swift initializes a global
+/// `let` exactly once and blocks every other thread until it is done, and every `open` reads it first.
+private let libraryInitialization: Int32 = {
+    let rc = sqlite3_initialize()
+    guard rc == SQLITE_OK else { return rc }
+    var byte: UInt8 = 0
+    sqlite3_randomness(1, &byte)
+    return SQLITE_OK
+}()
 
 /// One open SQLite database, closed when the last reference goes away.
 public final class Connection {

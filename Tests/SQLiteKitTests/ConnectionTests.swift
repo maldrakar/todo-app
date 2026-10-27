@@ -110,6 +110,13 @@ let SQLITE_OK_CODE: Int32 = 0
     #expect(caught != nil)
 }
 
+@Test func sqliteIsCompiledInMultiThreadMode() throws {
+    // The random-number generator and the status counters belong to the process, not to a connection, and the
+    // parallel test runner opens connections on several threads at once (#98).
+    let db = try Connection.openInMemory()
+    #expect(try db.rows("SELECT sqlite_compileoption_used('THREADSAFE=2')") == [[.integer(1)]])
+}
+
 @Test func bindingAgainMidScanRestartsTheStatement() throws {
     let db = try Connection.openInMemory()
     try db.execute("CREATE TABLE t (x INTEGER); INSERT INTO t VALUES (1), (2), (3);")
