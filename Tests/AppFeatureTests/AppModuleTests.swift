@@ -563,6 +563,22 @@ private struct FirstScreenIsNoList: Error {}
     #expect(try firstList(in: app).rows.map(\.title) == ["Buy milk"])
 }
 
+/// The sidebar's New task asks the root for quick entry, and the root opens it as its own toolbar button does, over
+/// the window as it stands (Lists screen spec, section 5). The root's sentence stays, since the gesture is the
+/// sidebar's and a gesture in a child leaves the root's sentence (the owner, 2026-10-20).
+@Test func theSidebarsNewTaskRequestOpensQuickEntry() throws {
+    let store = try makeStore()
+    let app = try AppModule(store: store, width: .wide)
+    #expect(app.send(.unreadableLink) == nil)
+    #expect(app.send(.action(.taskViewList(.newTaskMenuItemChosen))) == nil)
+    #expect(app.model.quickEntry?.draft == "")
+    #expect(app.model.problem == "The link could not be opened.")
+    let reference = try AppModule(store: store, route: try Route(path: "/view/\(inbox)?quick-entry"), width: .wide)
+    #expect(reference.send(.unreadableLink) == nil)
+    #expect(app.model == reference.model)
+    #expect(app.route == reference.route)
+}
+
 /// The button pressed a second time keeps the quick entry that is up, with its draft, since it has no head to
 /// differ by (spec section 3).
 @Test func theQuickEntryButtonKeepsTheOneThatIsUp() throws {

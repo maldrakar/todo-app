@@ -219,10 +219,9 @@ public final class AppModule: Routable {
             return nil
         case .action(.quickEntryButtonTapped):
             // The root's own gesture, so the root's sentence goes with it, as each module's sentence goes with its own
-            // gestures; a gesture in a child is the child's, and leaves it (the owner, 2026-10-20). A quick entry
-            // already up has the head of every quick entry, so its seat keeps it, draft and all.
+            // gestures; a gesture in a child is the child's, and leaves it (the owner, 2026-10-20).
             state.problem = nil
-            react(to: state.quickEntry.apply(QuickEntry.Route()))
+            openQuickEntry()
             return nil
         case .changed(let changes):
             // Every module of the window gets the change and decides for itself whether it reads it: the sidebar
@@ -282,9 +281,20 @@ public final class AppModule: Routable {
             // A window is the platform's to open, so the request leaves the root under its own name, with the
             // sidebar's own route for the new window and no quick entry (spec section 4, the rule of bubbling).
             return .openWindow(Route(sidebar: sidebar, quickEntry: nil))
+        case .newTaskRequested?:
+            // Quick entry over the window, as the root's own button opens it. The root's sentence stays, since the
+            // gesture is the sidebar's, and a gesture in a child is the child's (the owner, 2026-10-20).
+            openQuickEntry()
+            return nil
         case nil:
             return nil
         }
+    }
+
+    /// Puts quick entry up over the window, the root's modal (spec section 4). A quick entry already up has the head
+    /// of every quick entry, so its seat keeps it, draft and all.
+    private func openQuickEntry() {
+        react(to: state.quickEntry.apply(QuickEntry.Route()))
     }
 
     /// What quick entry asked for: to be closed, and the root drops it. With its task created, that is the modal's

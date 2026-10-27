@@ -4,10 +4,29 @@ import DesignSystem
 import DesignSystemComponents
 import FeatureModule
 import SQLiteKit
+import TaskListFeature
+import TaskScreenFeature
 import TaskViewListFeature
 import TodoCore
 
 private let inbox = BuiltInTaskViews.inbox
+
+/// The five views every store starts with, in the order the seed ranks them.
+private let builtIns = [
+    inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash,
+]
+
+/// What the store keeps of a view the module made, which is what says where it went and what it looks like: its title,
+/// its parent, its kind, its colour and its icon.
+private func stored(_ id: ViewID, in store: Store) throws -> [String?] {
+    let view = try #require(try store.view(id))
+    return [view.title, view.parent?.rawValue, view.kind.rawValue, view.color?.rawValue, view.icon]
+}
+
+/// The row a field is open on, which is how a test finds the row a New list or a New area just made.
+private func rowBeingNamed(in model: TaskViewList.Model) throws -> TaskViewList.Model.Row {
+    try #require(model.rows.first { $0.draft != nil })
+}
 
 /// The key the sidebar keeps its folds under in the device's own state, as the module names it (ADR-0010).
 private let collapsedKey = "taskViewList.collapsed"
@@ -54,10 +73,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     func tile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
         TileModel(color: color, icon: icon, side: 30, cornerRadius: 8, glyphSize: 19)
     }
-    #expect(model.rows.map(\.id) == [
-        inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash,
-        garden, reading,
-    ])
+    #expect(model.rows.map(\.id) == builtIns + [garden, reading])
     #expect(listRow(inbox, in: model)?.tile == TileModel(color: .blue, icon: .tray, side: 30, cornerRadius: 8, glyphSize: 19))
     #expect(model.rows.map { listRow($0)?.tile } == [
         tile(.blue, .tray), tile(.amber, .sun), tile(.rose, .calendar), tile(.green, .logbook), tile(.stone, .trash),
@@ -253,4 +269,170 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.send(.changed(moved)) == nil)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work, clients, acme])
     #expect(list.model.rows.first { $0.id == work }?.kind == .area(label: "Work"))
+}
+
+/// "+ → New list" puts the list where the line says it belongs (Lists screen spec, section 3): with no area, at the
+/// root's end, and with areas, last in the last of them, so that it stands under the last line. Either way it is
+/// titled "New list", has no colour, since nothing is above it to take one from, and has the list icon.
+@Test func newListFromPlusGoesIntoTheLastAreaOrToTheEndOfTheRoot() throws {
+    let bare = try makeStore()
+    let atTheRoot = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow)
+    #expect(atTheRoot.send(.action(.newListMenuItemChosen(in: nil))) == nil)
+    let last = try rowBeingNamed(in: atTheRoot.model)
+    #expect(atTheRoot.model.rows.map(\.id) == builtIns + [last.id])
+    #expect(last.depth == 0)
+    #expect(try stored(last.id, in: bare) == ["New list", nil, "list", nil, "list"])
+
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    let home = try store.createView(NewTaskView(title: "Home", kind: .area))
+    let garden = try store.createView(NewTaskView(title: "Garden", parent: home, color: .green))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(list.send(.action(.newListMenuItemChosen(in: nil))) == nil)
+    let made = try rowBeingNamed(in: list.model)
+    #expect(list.model.rows.map(\.id) == builtIns + [work, clients, home, garden, made.id])
+    #expect(made.depth == 0)
+    #expect(try stored(made.id, in: store) == ["New list", home.rawValue, "list", nil, "list"])
+}
+
+/// New list from a list's menu makes it inside that list, last among the lists already there, with that list's colour
+/// and the list icon, and the branch it was made in unfolds, written to the device's state as every fold is, so that
+/// the field the new list opens is on screen (Lists screen spec, section 6).
+@Test func newListFromAListsMenuGoesInsideItWithItsColourAndUnfoldsIt() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects", color: .teal, icon: "folder"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(listRow(projects, in: list.model)?.isCollapsed == true, "the branch is folded; this is the setup")
+    #expect(list.send(.action(.newListMenuItemChosen(in: projects))) == nil)
+    let made = try rowBeingNamed(in: list.model)
+    #expect(list.model.rows.map(\.id) == builtIns + [projects, home, made.id, errands])
+    #expect(listRow(projects, in: list.model)?.isCollapsed == false)
+    #expect(try store.deviceState(collapsedKey, as: [String].self) == [])
+    #expect(made.depth == 1)
+    #expect(listRow(made)?.tile == TileModel(color: .teal, icon: .list, side: 26, cornerRadius: 7, glyphSize: 16))
+    #expect(try stored(made.id, in: store) == ["New list", projects.rawValue, "list", "teal", "list"])
+}
+
+/// New list from an area's menu makes it last under the area's line with no colour, even where the area holds a
+/// colour of its own from another device, since an area has no tile to give one (Lists screen spec, section 6); it
+/// stands at the root's drawn depth like the area's other lists, and its tile is stone's.
+@Test func newListInAnAreaHasNoColour() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area, color: .rose))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work, color: .violet))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(list.send(.action(.newListMenuItemChosen(in: work))) == nil)
+    let made = try rowBeingNamed(in: list.model)
+    #expect(list.model.rows.map(\.id) == builtIns + [work, clients, made.id])
+    #expect(made.depth == 0)
+    #expect(listRow(made)?.tile == TileModel(color: .stone, icon: .list, side: 30, cornerRadius: 8, glyphSize: 19))
+    #expect(try stored(made.id, in: store) == ["New list", work.rawValue, "list", nil, "list"])
+}
+
+/// The new list opens its name field with its title as the draft, so the first keystroke replaces it, and declares
+/// nothing: the list open beside the sidebar, with the task in it, and the highlight stay where they were, since on a
+/// narrow window a list declared now would be pushed over the sidebar while the field is open (Lists screen plan,
+/// "Self-review"). A New list on a row that is not there makes nothing.
+@Test func aNewListOpensItsFieldAndDeclaresNoList() throws {
+    let store = try makeStore()
+    let task = try store.createTask(NewTask(title: "Buy milk"))
+    let route = TaskViewList.Route(list: .init(head: inbox, task: TaskScreen.Route(head: task)))
+    let list = try TaskViewList(store: store, route: route, width: .narrow)
+    let before = list.model
+    let written = try store.journal(after: 0).count
+    #expect(list.send(.action(.newListMenuItemChosen(in: ViewID()))) == nil)
+    #expect(list.model == before)
+    #expect(try store.journal(after: 0).count == written, "nothing was made")
+    #expect(list.send(.action(.newListMenuItemChosen(in: nil))) == nil)
+    let made = try rowBeingNamed(in: list.model)
+    #expect(made.draft == "New list")
+    #expect(list.destination.pushed == route.list)
+    #expect(list.route == route)
+    let reference = try TaskViewList(store: store, route: route, width: .narrow)
+    _ = reference.send(.action(.renameMenuItemChosen(made.id)))
+    #expect(list.model == reference.model, "the field on the new row, the highlight on the Inbox, and nothing said")
+}
+
+/// "+ → New area" adds the line at the root's end, after every list and area there, with its name field open and
+/// empty, and declares nothing (Lists screen spec, section 3).
+@Test func aNewAreaGoesToTheEndOfTheRootWithItsNameFieldOpen() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(list.send(.action(.newAreaMenuItemChosen)) == nil)
+    let made = try rowBeingNamed(in: list.model)
+    #expect(list.model.rows.map(\.id) == builtIns + [work, clients, made.id])
+    #expect(made.kind == .area(label: nil))
+    #expect(made.depth == 0)
+    #expect(made.draft == "")
+    #expect(try stored(made.id, in: store) == ["", nil, "area", nil, nil])
+    #expect(list.destination.pushed == .init(head: inbox))
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = reference.send(.action(.renameMenuItemChosen(made.id)))
+    #expect(list.model == reference.model)
+}
+
+/// An area may go unnamed and a list may not (Lists screen spec, sections 3 and 6): Return on the new area's empty
+/// field keeps it unnamed, a name given later is its label, and a name cleared, spaces and all, leaves it unnamed
+/// again, each without a sentence; the empty name on a list is refused with the sentence it is refused with today, and
+/// its field stays open.
+@Test func anAreaAcceptsTheEmptyNameAndAListRefusesIt() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.newAreaMenuItemChosen))
+    let area = try rowBeingNamed(in: list.model).id
+    #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    #expect(list.model.problem == nil)
+    #expect(list.model.rows.allSatisfy { $0.draft == nil })
+    #expect(list.model.rows.last?.kind == .area(label: nil))
+    _ = list.send(.action(.renameMenuItemChosen(area)))
+    _ = list.send(.action(.titleFieldChanged("Home")))
+    #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    #expect(list.model.rows.last?.kind == .area(label: "Home"))
+    _ = list.send(.action(.renameMenuItemChosen(area)))
+    #expect(try rowBeingNamed(in: list.model).draft == "Home", "the field opens on the area's name")
+    _ = list.send(.action(.titleFieldChanged("  ")))
+    #expect(list.send(.action(.titleFieldLostFocus)) == nil)
+    #expect(list.model.problem == nil)
+    #expect(list.model.rows.last?.kind == .area(label: nil))
+    #expect(try stored(area, in: store) == ["", nil, "area", nil, nil])
+
+    _ = list.send(.action(.newListMenuItemChosen(in: nil)))
+    let made = try rowBeingNamed(in: list.model).id
+    _ = list.send(.action(.titleFieldChanged("")))
+    #expect(list.send(.action(.titleFieldSubmitted)) == nil)
+    #expect(list.model.problem == "A title cannot be empty.")
+    #expect(try rowBeingNamed(in: list.model).id == made, "the field stays open on the list")
+    #expect(try stored(made, in: store) == ["New list", area.rawValue, "list", nil, "list"])
+}
+
+/// An area never opens (Lists screen spec, section 2), so a tap on its line and Open in New Window on it move nothing:
+/// no list is declared, the one open stays, and an open field and its sentence stay where they are.
+@Test func aTapOrOpenInNewWindowOnAnAreasLineMovesNothing() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let list = try TaskViewList(store: store, route: .init(list: .init(head: BuiltInTaskViews.upcoming)), width: .narrow)
+    refusingAName(list)
+    let before = list.model
+    #expect(list.send(.action(.rowSelected(work))) == nil)
+    #expect(list.model == before)
+    #expect(list.destination.pushed == .init(head: BuiltInTaskViews.upcoming))
+    #expect(list.send(.action(.openInNewWindowMenuItemChosen(work))) == nil)
+    #expect(list.model == before)
+}
+
+/// New task is quick entry, which is the root's to open over the window (Lists screen spec, section 5), so the module
+/// asks for it and moves nothing of its own, an open field and its sentence included.
+@Test func newTaskAsksTheRootForQuickEntry() throws {
+    let list = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow)
+    refusingAName(list)
+    let before = list.model
+    #expect(list.send(.action(.newTaskMenuItemChosen)) == .newTaskRequested)
+    #expect(list.model == before)
+    #expect(list.destination.pushed == .init(head: inbox))
 }

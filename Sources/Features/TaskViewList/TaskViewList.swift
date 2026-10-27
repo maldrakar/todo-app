@@ -72,12 +72,17 @@ public final class TaskViewList: Routable {
         case titleFieldCancelled
         /// The field lost focus, because the person went somewhere else on screen.
         case titleFieldLostFocus
-        /// The toolbar button.
-        case createFolderButtonTapped
         /// The row's Open in New Window menu item, on the Mac and the iPad.
         case openInNewWindowMenuItemChosen(ViewID)
         /// A list's chevron, which folds and unfolds the lists inside it.
         case disclosureTapped(ViewID)
+        /// New list, from a list's menu, an area's menu, "+" and the edit bar, on the row its menu is on, and nil
+        /// from "+" and the bar.
+        case newListMenuItemChosen(in: ViewID?)
+        /// New area, from "+" and the edit bar.
+        case newAreaMenuItemChosen
+        /// New task, from "+".
+        case newTaskMenuItemChosen
     }
 
     public enum Event: RoutedEvent {
@@ -85,9 +90,10 @@ public final class TaskViewList: Routable {
         case changed(ChangeSet)
 
         /// The parent has just created this module: sent once, by the module that holds it, through the window's
-        /// stack, right after `init`. It is not the creation of a folder, which is `createFolderButtonTapped` and a
-        /// write; it is this module's own creation, and it writes nothing. It is an event of the world and not a
-        /// `UserAction`, because nobody did anything and a view has no way to send it (spec section 2).
+        /// stack, right after `init`. It is not the creation of a list or an area, which `newListMenuItemChosen` and
+        /// `newAreaMenuItemChosen` write; it is this module's own creation, and it writes nothing. It is an event of
+        /// the world and not a `UserAction`, because nobody did anything and a view has no way to send it (spec
+        /// section 2).
         ///
         /// It is answered with nothing and moves nothing, the sentence included: the module was made from a
         /// route its parent chose and already knows, and it declared the list of the view it starts on in its
@@ -126,6 +132,9 @@ public final class TaskViewList: Routable {
         /// asks with its own route on that view, and its parent passes the request on under its own name (spec
         /// section 4, the rule of bubbling), so the root never spells the route of the list below it.
         case openInWindow(Route)
+        /// Quick entry, which the root opens over the window, as it does for its own toolbar button (Lists screen spec,
+        /// section 5).
+        case newTaskRequested
     }
 
     /// What a view draws, computed from the state on every read and never kept beside it, so that what the
@@ -152,8 +161,8 @@ public final class TaskViewList: Routable {
     ///
     /// The Inbox this module falls back on is declared only when a row holds it, so a person who deleted it is told
     /// nothing, having asked for nothing, and no highlight waits for the row: one would light up the moment a peer's
-    /// change brought the row in, beside a list that was never opened on it. It is the invariant `createFolder` holds
-    /// for the same reason: what this module puts on a row of its own accord goes onto a row the list holds. A list
+    /// change brought the row in, beside a list that was never opened on it. It is the invariant `create` holds for the
+    /// same reason: what this module puts on a row of its own accord goes onto a row the list holds. A list
     /// the route names is declared whether or not a row holds its view; one the stack cannot make, its view gone or
     /// not yet synced, comes back as `.notOpened`, which takes the declaration back and says so in `problem`.
     ///
@@ -208,6 +217,10 @@ public final class TaskViewList: Routable {
             // It does so with a field open too, over the field's own sentence, which the rule above keeps from being
             // cleared and not from being answered: the new sentence answers the gesture just made, the field stays
             // open on its draft, and Return brings the field's refusal back.
+            //
+            // An area never opens (Lists screen spec, section 2), so a tap on its line moves nothing, the sentence
+            // included. Any other id is declared without asking the rows, as before.
+            guard !state.rows.contains(where: { $0.id == id && $0.kind == .area }) else { return nil }
             if state.rename == nil { state.problem = nil }
             setDestination(TaskList.Route(head: id))
             return nil
@@ -251,18 +264,46 @@ public final class TaskViewList: Routable {
             state.rename = nil
             state.problem = nil
             return nil
-        case .action(.createFolderButtonTapped):
-            createFolder()
-            return nil
         case .action(.openInNewWindowMenuItemChosen(let id)):
             // Asked of the parent, because a window is the platform's to open and what it opens is the root's
             // to decide (spec section 4, the rule of bubbling). It asks with this module's own route on the view,
             // the list on it, so that the root passes it on without spelling the list's route. Nothing here
             // moves, the highlight, an open field and its sentence included: the person did nothing to this
             // module, and the window that opens beside it answers nothing they were told. A row that is not
-            // there asks for nothing, the way the Rename menu item on one opens no field.
-            guard state.rows.contains(where: { $0.id == id }) else { return nil }
+            // there asks for nothing, the way the Rename menu item on one opens no field, and neither does an area's
+            // line, since an area never opens (Lists screen spec, section 2).
+            guard state.rows.contains(where: { $0.id == id && $0.kind == .list }) else { return nil }
             return .openInWindow(Route(list: TaskList.Route(head: id)))
+        case .action(.newListMenuItemChosen(let id)):
+            // Where the list goes is the module's to decide (Lists screen spec, section 3): inside the list or the
+            // area whose menu it came from, and from "+" or the bar in the last area of the root, so that it stands
+            // under the last line, or at the root's end when there is no area. A menu on a row that is not there
+            // makes nothing, the way the Rename menu item on one opens no field.
+            let parent: ReadRow?
+            if let id {
+                guard let row = state.rows.first(where: { $0.id == id }) else { return nil }
+                parent = row
+            } else {
+                parent = state.rows.last { $0.kind == .area }
+            }
+            // The colour of the list it is made inside, and none in an area or at the root, where nothing gives
+            // one: an area has no tile, whatever colour another device left on it (Lists screen spec, section 6). The
+            // icon is the design system's list glyph, by the name the store keeps for it.
+            let color = parent?.kind == .list ? parent?.color : nil
+            create(NewTaskView(
+                title: TaskViewList.newListTitle, parent: parent?.id, kind: .list, color: color, icon: "list"
+            ))
+            return nil
+        case .action(.newAreaMenuItemChosen):
+            // A line at the root's end, after every list and area there, and unnamed until a name is typed into the
+            // field it opens with (Lists screen spec, section 3).
+            create(NewTaskView(title: "", kind: .area))
+            return nil
+        case .action(.newTaskMenuItemChosen):
+            // Quick entry is the root's modal over the window, so the module asks for it, and moves nothing of its own,
+            // the highlight, an open field and its sentence included, as Open in New Window moves nothing (Lists
+            // screen spec, section 5).
+            return .newTaskRequested
         case .action(.disclosureTapped(let id)):
             // Only a list with lists inside it has a chevron. A leaf has nothing to fold, and an area's line defines
             // its area and never folds, so a tap on either, or on a row that is not there, moves nothing. The fold is
@@ -387,8 +428,8 @@ public final class TaskViewList: Routable {
     /// draws the same rows reads it at its next read of them (ADR-0010).
     private static let collapsedKey = "taskViewList.collapsed"
 
-    /// Declares the list of a view over this module, or nothing: a click, a route, a new folder, the way back and
-    /// the stack's notices each arrive here, so what a click opens and what a link opens cannot drift apart (spec
+    /// Declares the list of a view over this module, or nothing: a click, a route, the way back and the stack's
+    /// notices each arrive here, so what a click opens and what a link opens cannot drift apart (spec
     /// section 3). Every call is a new write, which the window's stack follows at the walk after the event, and the
     /// highlight is what it declares.
     private func setDestination(_ list: TaskList.Route?) {
@@ -410,8 +451,8 @@ public final class TaskViewList: Routable {
     ///
     /// What a failed read means is the caller's to say, which is why this throws instead of writing a
     /// sentence of its own. It means three different things: after a `.changed` nothing else is in flight,
-    /// after a refused write there is already something more specific to say, and after a folder was
-    /// written it means the folder cannot be shown yet — and a reread that swallowed the error had to pick
+    /// after a refused write there is already something more specific to say, and after a list or an area
+    /// was made it means the new row cannot be shown yet — and a reread that swallowed the error had to pick
     /// one of the three for all of them, which is what left the corner this closes (owner's review of #77,
     /// 2026-09-24).
     private func reread() throws(StoreError) {
@@ -434,21 +475,23 @@ public final class TaskViewList: Routable {
     ///
     /// The empty title is refused here and not by the store: what a person's word for a view has to be is
     /// this list's rule, and a core that had an opinion about it would hold the policy of its client
-    /// (`docs/style.md`). The field stays open on the refusal, because the person is mid-word and the text
-    /// they typed is the only place the name exists.
+    /// (`docs/style.md`). A list's title cannot be empty, and an area's can, since an unnamed area is a line
+    /// alone (Lists screen spec, section 3). The field stays open on the refusal, because the person is
+    /// mid-word and the text they typed is the only place the name exists.
     private func commit(_ rename: State.Rename) {
         // Trimmed once, and the one value both the refusal and the write work off: a draft that is nothing
         // but whitespace trims to nothing, which is what empty means here, and no second rule has to agree
         // with this one. Nothing else in the state moves, which is what leaves the field open on the raw
         // text a person is still looking at.
         let title = rename.draft.trimmed()
-        guard !title.isEmpty else {
+        let row = state.rows.first { $0.id == rename.id }
+        guard !title.isEmpty || row?.kind == .area else {
             state.problem = Problem.emptyTitle.sentence
             return
         }
         // The name a refusal would use, read before the write: the reread below drops the row, and by then
         // there is nothing left to call the view.
-        let viewName = state.rows.first { $0.id == rename.id }?.title
+        let viewName = row?.title
         var problem: String?
         do {
             // One change and no other: two changes to one field in one call keep only the last (#40), and a
@@ -490,28 +533,37 @@ public final class TaskViewList: Routable {
         }
     }
 
-    /// A folder at the end of the root level, chosen and with its field open, so that a person names it
-    /// straight away instead of hunting for the row the button just made (spec, "The sidebar in M2").
+    /// Makes a list or an area at the end of its new siblings with its field open on the title it is made with, so
+    /// that a person names it straight away instead of hunting for the row the menu just made (Lists screen spec,
+    /// section 6). The branch it is made in unfolds, written to the device's state as every fold is, so that the row
+    /// and its field are on screen.
+    ///
+    /// It declares nothing, so the highlight and the list open beside the sidebar stay where they were: on a narrow
+    /// window a list declared here would be pushed over the sidebar while the field is open (Lists screen plan,
+    /// "Self-review").
     ///
     /// The write goes first and the rows come back out of the store: the id, the rank and the place in the
     /// tree are the store's to decide, and a row put together here would be this module's guess at them.
-    private func createFolder() {
+    private func create(_ new: NewTaskView) {
         let id: ViewID
         do {
-            id = try store.createView(NewTaskView(title: TaskViewList.newFolderTitle))
+            id = try store.createView(new, at: .end)
         } catch {
             // The rows stand: nothing was written, so there is nothing to reread and nothing has moved.
             state.problem = Problem.couldNotSave.sentence
             return
         }
         state.problem = nil
+        if let parent = new.parent, state.collapsed.contains(parent) {
+            setCollapsed(state.collapsed.subtracting([parent]))
+        }
         do {
             try reread()
         } catch {
-            // The folder is written and cannot be shown yet, so neither the highlight nor the field moves
-            // onto it: the rows here are the ones from before the button, and a rename left on a row this
-            // list does not hold would be waiting there when the next unrelated `.changed` brought the row
-            // in, opening a text field on a folder made minutes ago.
+            // The view is written and cannot be shown yet, so the field does not move onto it: the rows here
+            // are the ones from before the menu, and a rename left on a row this list does not hold would be
+            // waiting there when the next unrelated `.changed` brought the row in, opening a text field on a list
+            // made minutes ago.
             state.problem = Problem.couldNotRead.sentence
             return
         }
@@ -521,21 +573,17 @@ public final class TaskViewList: Routable {
         // list holds the row. It does not cover `.rowSelected` and `.route`, which declare the list of the id
         // they name without asking the rows, and which the stack hands back when the list cannot be made.
         //
-        // A peer can have deleted the folder between the write and this read, and a highlight on a row
-        // that came back deleted is a highlight on nothing.
+        // A peer can have deleted the view between the write and this read, and a field on a row that came
+        // back deleted is a field on nothing.
         guard state.rows.contains(where: { $0.id == id }) else { return }
-        state.rename = State.Rename(id: id, draft: TaskViewList.newFolderTitle)
-        // The highlight moves without anybody choosing a row, because the folder's list is declared as a click
-        // would have declared it: the highlight is the declaration, so a list on a folder the module is not
-        // highlighting cannot happen.
-        setDestination(TaskList.Route(head: id))
+        state.rename = State.Rename(id: id, draft: new.title)
     }
 
-    /// The name a new folder is born with. A constant because the row a person reads and the draft in the
+    /// The name a new list is born with. A constant because the row a person reads and the draft in the
     /// field are one word and two copies of it would drift apart. It is English here: a string a person
-    /// reads is the formatting service's to localise, and that service is M3's; until it arrives, a string
-    /// this module writes is English.
-    private static let newFolderTitle = "New folder"
+    /// reads is the formatting service's to localise, and until it arrives a string this module writes is
+    /// English (Lists screen spec, "Goals and non-goals").
+    private static let newListTitle = "New list"
 
     /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
     /// lists folded on this device, the width class of the window, the rename a person has open, the list declared over

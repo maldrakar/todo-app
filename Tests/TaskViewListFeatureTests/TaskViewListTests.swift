@@ -330,25 +330,6 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     }
 }
 
-@Test func createFolderAddsARowAtTheEndSelectsItAndOpensItsRename() throws {
-    let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
-    #expect(list.send(.action(.createFolderButtonTapped)) == nil)
-    #expect(list.model.rows.map(title(of:)) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash", "New folder"])
-    let folder = try #require(list.model.rows.last)
-    #expect(folder.depth == 0, "a folder from the toolbar belongs at the root and not under whatever was chosen")
-    #expect(list.model.rows.filter(isHighlighted).map(\.id) == [folder.id])
-    #expect(folder.draft == "New folder", "the field opens on the default name, so the first keystroke replaces it")
-    // The highlight moved without anybody choosing a row, because the folder's list is declared as a click would
-    // have declared it: the highlight is the declaration, so the list beside it cannot stay on the view before.
-    #expect(list.destination.pushed == on(folder.id).list)
-    #expect(list.route == on(folder.id))
-    let stored = try store.view(folder.id)
-    #expect(stored?.title == "New folder")
-    #expect(stored?.filter == nil, "a folder is a view without a filter, which is what makes it hold others")
-    #expect(list.model.problem == nil)
-}
-
 @Test func aStoreRefusalLandsInTheProblemAndTheNextActionClearsIt() throws {
     let store = try makeStore()
     let folder = try store.createView(NewTaskView(title: "Work"))
