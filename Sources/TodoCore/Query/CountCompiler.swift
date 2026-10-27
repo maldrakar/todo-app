@@ -250,8 +250,11 @@ struct CountCompiler {
     }
 
     /// Whether the tags hold fewer tasks, added up, than `share` of the open ones. Summed and compared as `Double`, so
-    /// that counts a store could hold never overflow on the way; a tag whose size was not read is no driver.
+    /// that counts a store could hold never overflow on the way; a tag whose size was not read is no driver. No tags
+    /// hold no tasks under any share, whatever the open count: a disjunction of projects, pins and days walks none,
+    /// and in a store where no rule names a tag the open tasks are never counted at all.
     private func holdFewerTasks(than share: Double, _ tags: [TagID]) -> Bool {
+        guard !tags.isEmpty else { return true }
         var held = 0.0
         for tag in tags {
             guard let size = tagSizes[tag] else { return false }

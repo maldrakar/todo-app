@@ -401,6 +401,40 @@ private func plan(_ store: Store, _ statement: (sql: String, params: [Value])) t
     #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
 }
 
+/// A disjunction with no tag among its drivers drives whatever the store's tags hold (#153): a folder of project
+/// lists, and a rule asking for a project or a day, in a store where no rule names a tag, so that no size is read
+/// at all, drive as they do beside an unrelated tag list.
+@Test func aDisjunctionWithNoTagDrivesInAStoreWhereNoRuleNamesATag() throws {
+    let store = try makeStore()
+    let projects = [try store.createTask(NewTask(title: "p0")), try store.createTask(NewTask(title: "p1"))]
+    for i in 0..<10 { try store.createTask(NewTask(title: "open \(i)", when: i < 3 ? today : nil, parent: projects[i % 2])) }
+    let folder = try store.createView(NewTaskView(title: "Projects"))
+    let lists = try projects.map { try store.createView(NewTaskView(title: "Project", parent: folder, filter: .parent($0))) }
+    let either = try store.createView(NewTaskView(title: "Project or today", filter: .or([.parent(projects[0]), .when(.on(0))])))
+    let driven = try drivenViews(store)
+    #expect(driven.isSuperset(of: lists + [folder, either]), "\(driven)")
+    #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
+}
+
+/// Lists that share a tag are grouped under it before a day beside it in one of them is weighed (#153): the group
+/// walks the tag once where the lists apart would walk it twice, and whether the regrouped disjunction drives is
+/// decided on the whole. A folder shaped like Clients, `a AND deadline <= 30`, `a AND root`, `b`, drives with `a`
+/// and `b` adding up to under half of the open tasks, where `a` counted twice would not.
+@Test func listsThatShareATagAreGroupedBeforeADayIsWeighed() throws {
+    let store = try makeStore()
+    let a = try store.createTag(title: "a")
+    let b = try store.createTag(title: "b")
+    for i in 0..<100 {
+        try store.createTask(NewTask(title: "open \(i)", deadline: i % 4 == 0 ? today : nil, tags: i < 20 ? [a] : i < 30 ? [b] : []))
+    }
+    let folder = try store.createView(NewTaskView(title: "Clients"))
+    for rule in [Filter.and([.hasTag(a), .deadline(.onOrBefore(30))]), .and([.hasTag(a), .parent(nil)]), .hasTag(b)] {
+        try store.createView(NewTaskView(title: "Client", parent: folder, filter: rule))
+    }
+    #expect(try drivenViews(store).contains(folder))
+    #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
+}
+
 // MARK: - The counts every rewritten shape gives
 
 /// The open tasks out of the trash that a list's read selects, the read #153 does not touch.
