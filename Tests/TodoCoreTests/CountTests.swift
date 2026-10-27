@@ -163,18 +163,39 @@ private func applyView(_ store: Store, _ id: String, parent: ViewID?, filter: St
     #expect(counts[due] == 2, "the tagged task only its list selects is not the parent's")
 }
 
+/// The statements `taskCounts` runs, by view, out of the function that assembles them for it: a guard that
+/// explained a copy would pass while the count itself degraded.
+private func countStatements(of store: Store) throws -> [ViewID: (sql: String, params: [Value])] {
+    var statements: [ViewID: (sql: String, params: [Value])] = [:]
+    for count in try store.countStatements(today: today) { statements[count.view] = (count.sql, count.params) }
+    return statements
+}
+
+/// The rows of a statement's query plan, outer loop first.
+private func plan(_ store: Store, _ statement: (sql: String, params: [Value])) throws -> [String] {
+    try store.sql { () throws(SQLiteError) in
+        try store.db.rows("EXPLAIN QUERY PLAN " + statement.sql, statement.params).map { $0[3].string ?? "" }
+    }
+}
+
 /// The guard `builtInViewsUseIndexes` keeps over a view's read, kept over its count: the count of a built-in
 /// that degrades into a full scan of a table with one row per task fails here, and so does one driven from
 /// the wrong side of the join. The statement explained is the one `taskCounts` runs, out of the function it
-/// assembles it with, over the condition it compiles.
+/// assembles it with.
 @Test func theCountStatementUsesTheIndexes() throws {
     let store = try makeStore()
+    let statements = try countStatements(of: store)
     for id in [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash] {
         let view = try #require(try store.view(id))
+        let statement = try #require(statements[id])
+        // No built-in's rule has a condition of its own that drives a count (#153): an empty day, the root, a day
+        // range open at one end, a status and the trash each select too much of a store to be worth an index. So
+        // each is the statement #144 wrote, byte for byte: the rule compiled bare under the count's own conditions,
+        // with the count's own status condition on its index.
         let fragment = FilterCompiler.compile(try #require(view.filter), today: today)
-        let plan = try store.sql { () throws(SQLiteError) in
-            try store.db.rows("EXPLAIN QUERY PLAN " + Store.countStatement(where: fragment.sql), fragment.params).map { $0[3].string ?? "" }
-        }
+        #expect(statement.sql == "SELECT count(*) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND t.status = 0 AND tt.trashed = 0 AND (\(fragment.sql))")
+        #expect(statement.params == fragment.params)
+        let plan = try plan(store, statement)
         #expect(plan.contains { $0.contains(" t ") || $0.hasSuffix(" t") }, "\(view.title) has no plan row for the tasks table: \(plan)")
         let scans = plan.filter { $0.hasPrefix("SCAN t ") || $0 == "SCAN t" || $0.hasPrefix("SCAN tt ") || $0 == "SCAN tt" }
         #expect(scans.isEmpty, "\(view.title) counts by scanning a table that grows with the list: \(plan)")
@@ -189,6 +210,283 @@ private func applyView(_ store: Store, _ id: String, parent: ViewID?, filter: St
             #expect(driver.contains("task_tree_trashed"), "the Trash's count is driven by \(driver)")
         } else {
             #expect(driver == "SEARCH t USING INDEX tasks_status (status=?)", "\(view.title)'s count is driven by \(driver)")
+        }
+    }
+}
+
+/// The guard of #153 beside the built-ins': a count is driven by its rule's own index where the rule has one, and
+/// only then is the count's own `t.status = 0` kept off the status index, so that the planner has one index to
+/// take and the choice never rests on a tie in SQLite's estimates, which are its defaults because the store never
+/// runs `ANALYZE`. A project list is driven by the tree's parent index; a tag list and a manual list by the list of
+/// the tasks the tag or the pins hold, which SQLite looks the tasks up from by id; a short day range by its day's
+/// index; a folder of a project and a tag by both, one `OR` branch each. A tag that holds too many tasks to beat
+/// the walk of the open ones, a range a month wide and a rule that asks for a status other than open are not
+/// driven by their own index, and the status index drives them as it drove every count before.
+@Test func aCountIsDrivenByItsRulesOwnIndex() throws {
+    let store = try makeStore()
+    let small = try store.createTag(title: "small")
+    let big = try store.createTag(title: "big")
+    let project = try store.createTask(NewTask(title: "project"))
+    for i in 0..<10 {
+        try store.createTask(NewTask(title: "task \(i)", parent: i == 0 ? project : nil, tags: i < 5 ? [big] : i == 5 ? [small] : []))
+    }
+    let projectList = try store.createView(NewTaskView(title: "Project", filter: .parent(project)))
+    let tagged = try store.createView(NewTaskView(title: "Small", filter: .hasTag(small)))
+    let manual = try store.createView(NewTaskView(title: "Manual"))
+    try store.update(view: manual, [.filter(.listedIn(manual))])
+    let day = try store.createView(NewTaskView(title: "Today's", filter: .when(.on(0))))
+    let week = try store.createView(NewTaskView(title: "Week", filter: .deadline(.between(0, 7))))
+    let folder = try store.createView(NewTaskView(title: "Folder"))
+    let one = try store.createView(NewTaskView(title: "One", parent: folder, filter: .parent(project)))
+    let two = try store.createView(NewTaskView(title: "Two", parent: folder, filter: .hasTag(small)))
+    // A rule with two conditions an index serves is driven by the better one, and the other is kept off its index:
+    // left on it, the parent's equality is estimated below the pins' list, and the planner would take it.
+    let pinnedInProject = try store.createView(NewTaskView(title: "Pinned in the project", filter: .and([.parent(project), .listedIn(manual)])))
+    let crowded = try store.createView(NewTaskView(title: "Big", filter: .hasTag(big)))
+    let undatedBig = Filter.and([.hasTag(big), .when(.empty)])
+    let crowdedUndated = try store.createView(NewTaskView(title: "Big and undated", filter: undatedBig))
+    let month = try store.createView(NewTaskView(title: "Month", filter: .when(.between(0, 31))))
+    let finished = try store.createView(NewTaskView(title: "Finished", filter: .and([.status([.done]), .hasTag(small)])))
+
+    let statements = try countStatements(of: store)
+    var plans: [ViewID: [String]] = [:]
+    var quiet: Set<ViewID> = []
+    for (id, statement) in statements {
+        plans[id] = try plan(store, statement)
+        if statement.sql.contains("+t.status = 0") { quiet.insert(id) }
+    }
+    let projectPlan = plans[projectList] ?? [], tagPlan = plans[tagged] ?? [], manualPlan = plans[manual] ?? []
+    let dayPlan = plans[day] ?? [], weekPlan = plans[week] ?? [], folderPlan = plans[folder] ?? []
+    let pinnedInProjectPlan = plans[pinnedInProject] ?? []
+
+    #expect(projectPlan.first == "SEARCH tt USING INDEX task_tree_parent (parent=?)", "\(projectPlan)")
+    #expect(tagPlan.prefix(4) == [
+        "SEARCH tt USING PRIMARY KEY (id=?)", "LIST SUBQUERY 1",
+        "SEARCH g USING INDEX sqlite_autoindex_tags_1 (id=?)", "SEARCH x USING COVERING INDEX task_tags_tag (tag_id=?)",
+    ], "\(tagPlan)")
+    #expect(manualPlan.prefix(3) == ["SEARCH tt USING PRIMARY KEY (id=?)", "LIST SUBQUERY 1", "SEARCH v USING PRIMARY KEY (view_id=?)"], "\(manualPlan)")
+    #expect(pinnedInProjectPlan.prefix(3) == ["SEARCH tt USING PRIMARY KEY (id=?)", "LIST SUBQUERY 1", "SEARCH v USING PRIMARY KEY (view_id=?)"], "\(pinnedInProjectPlan)")
+    #expect(dayPlan.first == "SEARCH t USING INDEX tasks_when (when_day=?)", "\(dayPlan)")
+    #expect(weekPlan.first == "SEARCH t USING INDEX tasks_deadline (deadline_day>? AND deadline_day<?)", "\(weekPlan)")
+    #expect(folderPlan.first == "MULTI-INDEX OR", "\(folderPlan)")
+    #expect(folderPlan.contains("SEARCH p USING COVERING INDEX task_tree_parent (parent=?)"), "\(folderPlan)")
+    #expect(folderPlan.contains("SEARCH x USING COVERING INDEX task_tags_tag (tag_id=?)"), "\(folderPlan)")
+    #expect(quiet == [projectList, tagged, manual, day, week, folder, one, two, pinnedInProject], "the count's own status condition stays off its index exactly where the rule drives")
+
+    // Not driven: the walk of the open tasks over the status index, as #144 counted everything. The big tag is
+    // written as the list of its tasks all the same, which SQLite builds once instead of probing once per task.
+    for id in [crowded, crowdedUndated, month, finished] {
+        let plan = plans[id] ?? []
+        #expect(plan.first == "SEARCH t USING INDEX tasks_status (status=?)", "\(plan)")
+    }
+    let crowdedPlan = plans[crowded] ?? []
+    #expect(crowdedPlan.contains("SEARCH x USING COVERING INDEX task_tags_tag (tag_id=?)"), "\(crowdedPlan)")
+    // Beside an empty day, which SQLite tests first, the big tag stays the correlated `EXISTS` of #144, which runs on
+    // the undated tasks alone: the rule is written as #144 wrote it, byte for byte.
+    let undated = FilterCompiler.compile(undatedBig, today: today)
+    #expect(statements[crowdedUndated]?.sql == "SELECT count(*) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND t.status = 0 AND tt.trashed = 0 AND (\(undated.sql))")
+    // The rule of `finished` asks for a status the count's own condition excludes: kept on the status index, the
+    // count's condition is a constant SQLite compares with the rule's before the loop, so the count reads no row,
+    // as the Logbook's does.
+    #expect(statements[finished]?.sql.contains("t.deleted = 0 AND t.status = 0 AND") == true)
+}
+
+/// The sizes the choice of a tag's driver asks for cost no table row: the open tasks are counted on the status index
+/// and a tag's tasks on the tag's partial index, by the statements `taskCounts` runs for them.
+@Test func theSizesOfTheTagsAreReadFromTheIndexesAlone() throws {
+    let store = try makeStore()
+    #expect(try plan(store, (Store.openTaskCountQuery, [])) == ["SEARCH tasks USING COVERING INDEX tasks_status (status=?)"])
+    #expect(try plan(store, (Store.tagSizeQuery, [.text("tag")])) == ["SEARCH task_tags USING COVERING INDEX task_tags_tag (tag_id=?)"])
+}
+
+/// A tag drives a count only while it holds fewer than two fifths as many tasks as the status index holds open
+/// ones (#153). Its driver walks every task the tag holds, done ones too, and the walk of the open tasks it would
+/// replace reads the tag's list once and each open task once, which is cheaper from about that size on.
+@Test func aTagDrivesWhileItHoldsFewerThanTwoFifthsOfTheOpenTasks() throws {
+    let store = try makeStore()
+    let tag = try store.createTag(title: "tag")
+    for i in 0..<10 { try store.createTask(NewTask(title: "open \(i)", tags: i < 2 ? [tag] : [])) }
+    let done = try store.createTask(NewTask(title: "done", tags: [tag]))
+    try store.update(task: done, [.status(.done)])
+    let list = try store.createView(NewTaskView(title: "Tagged", filter: .hasTag(tag)))
+    #expect(try countStatements(of: store)[list]?.sql.contains("+t.status = 0") == true, "three tasks against ten open ones drive")
+
+    let another = try store.createTask(NewTask(title: "done too", tags: [tag]))
+    try store.update(task: another, [.status(.done)])
+    #expect(try countStatements(of: store)[list]?.sql.contains("+t.status = 0") == false, "four, the done ones among them, do not")
+    #expect(try store.taskCounts(today: today)[list] == 2)
+}
+
+// MARK: - The counts every rewritten shape gives
+
+/// The open tasks out of the trash that a list's read selects, the read #153 does not touch.
+private func openTasks(_ store: Store, of list: ViewID) throws -> Set<TaskID> {
+    Set(try store.tasks(in: list, today: today).filter { $0.status == .open && !$0.trashed }.map(\.id))
+}
+
+/// What a view counts by the rule of spec section 4, from the reads of the lists it counts, which #153 does not
+/// touch: the open tasks out of the trash in the union of those reads. A list with a rule counts its rule; a folder
+/// counts the lists under it, through the folders under it; an area and a view this app cannot read count nothing.
+private func countsByReads(_ store: Store) throws -> [ViewID: Int] {
+    let views = try store.views()
+    func counted(_ view: TaskView) -> [ViewID] {
+        guard view.kind == .list, view.needsNewerApp == nil else { return [] }
+        if view.filter != nil { return [view.id] }
+        return views.filter { $0.parent == view.id }.flatMap(counted)
+    }
+    var counts: [ViewID: Int] = [:]
+    for view in views {
+        let lists = counted(view)
+        guard !lists.isEmpty else { continue }
+        var open: Set<TaskID> = []
+        for list in lists { open.formUnion(try openTasks(store, of: list)) }
+        counts[view.id] = open.count
+    }
+    return counts
+}
+
+/// The views whose count is driven by a condition of their rule's own, which keeps the count's status off its index.
+private func drivenViews(_ store: Store) throws -> Set<ViewID> {
+    Set(try store.countStatements(today: today).filter { $0.sql.contains("+t.status = 0") }.map(\.view))
+}
+
+/// The counts whose statement scans a table that grows with the list. A count with every condition but its driver
+/// off its index scans every task when SQLite cannot use the driver's form, which costs more than the walk of the
+/// open tasks it replaced, so none may.
+private func scanningViews(_ store: Store) throws -> Set<ViewID> {
+    var scanning: Set<ViewID> = []
+    for count in try store.countStatements(today: today) {
+        let plan = try plan(store, (count.sql, count.params))
+        if plan.contains(where: { $0 == "SCAN t" || $0.hasPrefix("SCAN t ") || $0 == "SCAN tt" || $0.hasPrefix("SCAN tt ") }) { scanning.insert(count.view) }
+    }
+    return scanning
+}
+
+/// The open tasks out of the trash that one list's read selects and none of `others` selects. A folder test holds
+/// each of its lists to some, since a list that adds nothing to its folder's count would let a regrouping that
+/// drops it pass unseen.
+private func ownTasks(_ store: Store, of list: ViewID, besides others: [ViewID]) throws -> Set<TaskID> {
+    var own = try openTasks(store, of: list)
+    for other in others { own.subtract(try openTasks(store, of: other)) }
+    return own
+}
+
+/// A store in which every condition of the shapes below has tasks on both sides of it: 200 tasks a fixed generator
+/// spreads over the three statuses, days and deadlines around today or none, two projects or the root, four small
+/// tags and one on most tasks, the trash, and a manual list. One task is deleted.
+private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, projects: [TaskID], manual: ViewID) {
+    let store = try makeStore()
+    let small = [try store.createTag(title: "a"), try store.createTag(title: "b"), try store.createTag(title: "c"), try store.createTag(title: "d")]
+    let big = try store.createTag(title: "big")
+    let projects = [try store.createTask(NewTask(title: "p0")), try store.createTask(NewTask(title: "p1"))]
+    let manual = try store.createView(NewTaskView(title: "Pinned"))
+    try store.update(view: manual, [.filter(.listedIn(manual))])
+    var state: UInt64 = 153
+    func roll(_ n: UInt64) -> Int {
+        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+        return Int((state >> 33) % n)
+    }
+    for i in 0..<200 {
+        var tags: Set<TagID> = []
+        for tag in small where roll(100) < 14 { tags.insert(tag) }
+        if roll(100) < 70 { tags.insert(big) }
+        let when = roll(100) < 40 ? nil : today.advanced(by: roll(9) - 4)
+        let deadline = roll(100) < 50 ? nil : today.advanced(by: roll(12) - 3)
+        let parent = [nil, nil, nil, projects[0], projects[1]][roll(5)]
+        let task = try store.createTask(NewTask(title: "task \(i)", when: when, deadline: deadline, parent: parent, tags: tags))
+        switch roll(20) {
+        case 0..<7: try store.update(task: task, [.status(.done)])
+        case 7..<9: try store.update(task: task, [.status(.canceled)])
+        default: break
+        }
+        if roll(20) == 0 { try store.trash(task: task) }
+        if roll(10) == 0 { try store.pin(task: task, in: manual) }
+        if i == 100 { try store.delete(task: task) }
+    }
+    return (store, small, big, projects, manual)
+}
+
+/// Every shape of rule a count rewrites counts what its read selects that is open (#153): a manual list, a project,
+/// a day, a short range and a small tag as the driver; a negation and an empty day beside a driver, which SQL's
+/// unknown would drop if they were written without `COALESCE` or as an equality; the root and a status that
+/// includes open beside one; a disjunction of four different drivers, with a tag no other rule names, and one
+/// beside a deadline; a range inside a tag's rule, which the range drives; and the trash beside a tag. And the
+/// shapes that are not driven count as before: a big tag, a range a month wide, a disjunction with an undriven
+/// branch, a disjunction inside a branch of another, negated tags, and a status the count excludes. No count
+/// scans the tasks.
+@Test func aDrivenListCountsWhatItsReadSelects() throws {
+    let (store, small, big, projects, manual) = try shapesStore()
+    let (a, b, c, d) = (small[0], small[1], small[2], small[3])
+    func list(_ title: String, _ filter: Filter) throws -> ViewID { try store.createView(NewTaskView(title: title, filter: filter)) }
+    let driven: Set<ViewID> = [
+        manual,
+        try list("Project", .parent(projects[0])),
+        try list("On the day", .when(.on(0))),
+        try list("This week", .deadline(.between(0, 7))),
+        try list("Small tag", .hasTag(a)),
+        try list("Not today", .and([.hasTag(a), .not(.when(.on(0)))])),
+        try list("No day", .and([.hasTag(b), .when(.empty)])),
+        try list("At the root", .and([.hasTag(c), .parent(nil)])),
+        try list("Open or done", .and([.status([.open, .done]), .hasTag(c)])),
+        try list("Any of four", .or([.parent(projects[1]), .hasTag(d), .when(.on(1)), .listedIn(manual)])),
+        try list("Either tag, due", .and([.or([.hasTag(a), .hasTag(b)]), .deadline(.onOrBefore(3))])),
+        try list("Range first", .and([.hasTag(a), .when(.between(-1, 2))])),
+        try list("Binned", .and([.hasTag(a), .trashed(true)])),
+    ]
+    let undriven: [(String, Filter)] = [
+        ("Big tag", .hasTag(big)),
+        ("Month", .when(.between(-3, 40))),
+        ("Tag or due", .or([.hasTag(a), .deadline(.onOrBefore(0))])),
+        ("Nested", .or([.and([.or([.hasTag(a), .hasTag(b)]), .when(.empty)]), .parent(projects[0])])),
+        ("Untagged", .and([.not(.hasTag(a)), .not(.hasTag(b))])),
+        ("Closed", .and([.status([.done]), .hasTag(a)])),
+    ]
+    for (title, rule) in undriven { _ = try list(title, rule) }
+
+    #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
+    #expect(try drivenViews(store) == driven, "the shapes above are the ones driven, and no other")
+    #expect(try scanningViews(store).isEmpty)
+}
+
+/// A folder counts the union of its lists once however its count is regrouped (#153): conditions every list shares
+/// are taken out in front, a list that asks for no more than the conditions another one shares with it absorbs
+/// that one, and lists driven by the same condition are grouped under it, all of which hold in SQL's logic of
+/// three values; a folder of folders counts its lists through them; a folder with an undriven list, with a big
+/// tag's, or with a disjunction inside a list's conjunction, which its own disjunction would nest, counts as before.
+/// Every list but the absorbed ones selects open tasks no other list of its folder selects, so that no regrouping
+/// can lose one unseen, and no count scans the tasks.
+@Test func aFolderCountsTheUnionOfItsListsHoweverItIsRegrouped() throws {
+    let (store, small, big, projects, _) = try shapesStore()
+    let (a, b, c) = (small[0], small[1], small[2])
+    func folder(_ title: String, in parent: ViewID? = nil, _ rules: [Filter]) throws -> (folder: ViewID, lists: [ViewID]) {
+        let folder = try store.createView(NewTaskView(title: title, parent: parent))
+        var lists: [ViewID] = []
+        for (i, rule) in rules.enumerated() { lists.append(try store.createView(NewTaskView(title: "\(title) \(i)", parent: folder, filter: rule))) }
+        return (folder, lists)
+    }
+    let factored = try folder("Factored", [.and([.when(.empty), .hasTag(a)]), .and([.when(.empty), .hasTag(b)])])
+    let absorbed = try folder("Absorbed", [.hasTag(a), .and([.hasTag(a), .when(.on(0))])])
+    let grouped = try folder("Grouped", [
+        .and([.hasTag(a), .deadline(.onOrBefore(3))]), .and([.hasTag(a), .deadline(.onOrAfter(4))]),
+        .and([.hasTag(b), .when(.empty)]), .hasTag(b),
+    ])
+    let shared = try folder("Shared project", [.and([.parent(projects[0]), .hasTag(a)]), .and([.parent(projects[0]), .when(.empty)])])
+    let outer = try folder("Outer", [.when(.on(0))])
+    let inner = try folder("Inner", in: outer.folder, [.parent(projects[0]), .hasTag(c)])
+    let mixed = try folder("Mixed", [.hasTag(a), .deadline(.onOrBefore(0))])
+    let crowded = try folder("Crowded", [.hasTag(big), .parent(projects[0])])
+    let nested = try folder("Nested", [.or([.hasTag(a), .parent(projects[1])]), .and([.or([.hasTag(b), .hasTag(c)]), .deadline(.onOrBefore(3))])])
+
+    #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
+    let driven = try drivenViews(store)
+    for id in [factored, absorbed, grouped, shared, outer, inner].map(\.folder) { #expect(driven.contains(id)) }
+    for id in [mixed, crowded, nested].map(\.folder) { #expect(!driven.contains(id)) }
+    #expect(try scanningViews(store).isEmpty)
+
+    let absorbedLists: Set<ViewID> = [absorbed.lists[1], grouped.lists[2]]
+    for lists in [factored.lists, absorbed.lists, grouped.lists, shared.lists, outer.lists + inner.lists, mixed.lists, crowded.lists, nested.lists] {
+        for list in lists where !absorbedLists.contains(list) {
+            #expect(!(try ownTasks(store, of: list, besides: lists.filter { $0 != list })).isEmpty, "a list that adds nothing to its folder")
         }
     }
 }

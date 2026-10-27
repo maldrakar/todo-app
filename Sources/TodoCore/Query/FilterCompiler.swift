@@ -7,6 +7,25 @@ struct SQLFragment: Equatable {
 
 /// Turns a filter tree into one WHERE fragment over `tasks t JOIN task_tree tt`.
 enum FilterCompiler {
+    /// How `compile` writes a condition that SQLite could drive a statement from. A view's read writes every one
+    /// plainly and leaves the choice of an index to the planner; a count chooses the one condition it is driven
+    /// by itself (`CountCompiler`, #153) and writes the others so that the planner cannot take them.
+    enum Form {
+        /// As a view's read writes them: a column compared as it is, and a tag and a pin as a correlated `EXISTS`,
+        /// which SQLite answers once per row it reaches.
+        case plain
+        /// As `plain`, but a tag and a pin as the list of the tasks it holds, `t.id IN (SELECT …)`: SQLite builds
+        /// the list once per statement, and can look the tasks up by id from it.
+        case lists
+        /// Off every index: a column behind a unary `+`, which SQLite compares as it is but cannot search an index
+        /// by, and a tag and a pin as the correlated `EXISTS`, which it answers for each row it reaches. The trash is
+        /// left as it is. Where a rule asks for the trash among the conditions it asks for all of, the count's own
+        /// `tt.trashed = 0` beside it makes the two a comparison of constants, which SQLite makes once before the
+        /// loop, so the count reads no row whichever index the planner opened, as the Trash's count does
+        /// (`EXPLAIN`, SQLite 3.53.4); anywhere else in a rule no index serves it.
+        case unindexed
+    }
+
     /// The fragment a view uses: the filter, plus `tt.trashed = 0` unless the filter mentions trash itself.
     static func whereClause(_ filter: Filter, today: Day) -> SQLFragment {
         let fragment = compile(filter, today: today)
@@ -14,28 +33,37 @@ enum FilterCompiler {
         return SQLFragment(sql: "(\(fragment.sql)) AND tt.trashed = 0", params: fragment.params)
     }
 
-    static func compile(_ filter: Filter, today: Day) -> SQLFragment {
+    static func compile(_ filter: Filter, today: Day, form: Form = .plain) -> SQLFragment {
         switch filter {
         case .status(let statuses):
             // No status matches nothing. An empty `IN ()` is not SQL, and a filter that names no status is
             // one a person emptied rather than one that means "any".
             guard !statuses.isEmpty else { return SQLFragment(sql: "0", params: []) }
             let marks = Array(repeating: "?", count: statuses.count).joined(separator: ", ")
-            return SQLFragment(sql: "t.status IN (\(marks))", params: statuses.map { .integer($0.rawValue) })
+            return SQLFragment(sql: "\(column("t.status", form)) IN (\(marks))", params: statuses.map { .integer($0.rawValue) })
         case .when(let condition):
-            return day("t.when_day", condition, today)
+            return day(column("t.when_day", form), condition, today)
         case .deadline(let condition):
-            return day("t.deadline_day", condition, today)
+            return day(column("t.deadline_day", form), condition, today)
         case .hasTag(let tag):
+            guard form == .lists else {
+                return SQLFragment(
+                    sql: "EXISTS (SELECT 1 FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.task_id = t.id AND x.tag_id = ? AND x.present = 1)",
+                    params: [.text(tag.rawValue)]
+                )
+            }
             return SQLFragment(
-                sql: "EXISTS (SELECT 1 FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.task_id = t.id AND x.tag_id = ? AND x.present = 1)",
+                sql: "t.id IN (SELECT x.task_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.tag_id = ? AND x.present = 1)",
                 params: [.text(tag.rawValue)]
             )
         case .parent(let parent):
-            guard let parent else { return SQLFragment(sql: "tt.parent IS NULL", params: []) }
-            return SQLFragment(sql: "tt.parent = ?", params: [.text(parent.rawValue)])
+            guard let parent else { return SQLFragment(sql: "\(column("tt.parent", form)) IS NULL", params: []) }
+            return SQLFragment(sql: "\(column("tt.parent", form)) = ?", params: [.text(parent.rawValue)])
         case .listedIn(let view):
-            return SQLFragment(sql: "EXISTS (SELECT 1 FROM view_items v WHERE v.view_id = ? AND v.task_id = t.id AND v.present = 1)", params: [.text(view.rawValue)])
+            guard form == .lists else {
+                return SQLFragment(sql: "EXISTS (SELECT 1 FROM view_items v WHERE v.view_id = ? AND v.task_id = t.id AND v.present = 1)", params: [.text(view.rawValue)])
+            }
+            return SQLFragment(sql: "t.id IN (SELECT v.task_id FROM view_items v WHERE v.view_id = ? AND v.present = 1)", params: [.text(view.rawValue)])
         case .trashed(let flag):
             // The flag is written into the SQL instead of bound, the way `whereClause` writes the implicit
             // exclusion one screen above. It is a `Bool`, so there is nothing to inject, and it is what lets
@@ -49,17 +77,22 @@ enum FilterCompiler {
         // require matches everything, nothing to choose from matches nothing. Unlike the empty status list
         // above, neither is a list a person emptied \u2014 a view with no filter is `nil` and not `and([])`.
         case .and(let parts):
-            return combine(parts, separator: " AND ", empty: "1", today: today)
+            return combine(parts, separator: " AND ", empty: "1", today: today, form: form)
         case .or(let parts):
-            return combine(parts, separator: " OR ", empty: "0", today: today)
+            return combine(parts, separator: " OR ", empty: "0", today: today, form: form)
         case .not(let inner):
             // `when_day`, `deadline_day` and `tt.parent` are nullable, and in SQL `NOT (NULL = ?)` is NULL,
             // which drops the row: a negation would lose exactly the tasks with no day and no parent, which
             // are the ones it is there to return. Reading an unknown as false first makes it a complement,
             // and it changes nothing for the conditions that cannot be NULL.
-            let fragment = compile(inner, today: today)
+            let fragment = compile(inner, today: today, form: form)
             return SQLFragment(sql: "NOT COALESCE((\(fragment.sql)), 0)", params: fragment.params)
         }
+    }
+
+    /// A column as `form` compares it: behind a unary `+`, which leaves the value as it is and the index unused.
+    private static func column(_ name: String, _ form: Form) -> String {
+        form == .unindexed ? "+" + name : name
     }
 
     static func mentionsTrashed(_ filter: Filter) -> Bool {
@@ -116,9 +149,13 @@ enum FilterCompiler {
         }
     }
 
-    private static func combine(_ parts: [Filter], separator: String, empty: String, today: Day) -> SQLFragment {
+    private static func combine(_ parts: [Filter], separator: String, empty: String, today: Day, form: Form) -> SQLFragment {
+        joined(parts.map { compile($0, today: today, form: form) }, separator: separator, empty: empty)
+    }
+
+    /// Fragments joined by an operator, in parentheses of their own; none is the operator's identity, `empty`.
+    static func joined(_ parts: [SQLFragment], separator: String, empty: String) -> SQLFragment {
         guard !parts.isEmpty else { return SQLFragment(sql: empty, params: []) }
-        let compiled = parts.map { compile($0, today: today) }
-        return SQLFragment(sql: "(" + compiled.map(\.sql).joined(separator: separator) + ")", params: compiled.flatMap(\.params))
+        return SQLFragment(sql: "(" + parts.map(\.sql).joined(separator: separator) + ")", params: parts.flatMap(\.params))
     }
 }
