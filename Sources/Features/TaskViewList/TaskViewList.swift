@@ -548,8 +548,8 @@ public final class TaskViewList: Routable {
 
     /// Makes a list or an area at the end of its new siblings with its field open on the title it is made with, so
     /// that a person names it straight away instead of hunting for the row the menu just made (Lists screen spec,
-    /// section 6). The branch it is made in unfolds, written to the device's state as every fold is, so that the row
-    /// and its field are on screen.
+    /// section 6). The branch it is made in unfolds once the rows are read, written to the device's state as every
+    /// fold is, so that the row and its field are on screen.
     ///
     /// It declares nothing, so the highlight and the list open beside the sidebar stay where they were: on a narrow
     /// window a list declared here would be pushed over the sidebar while the field is open (Lists screen plan,
@@ -567,9 +567,6 @@ public final class TaskViewList: Routable {
             return
         }
         state.problem = nil
-        if let parent = new.parent, state.collapsed.contains(parent) {
-            setCollapsed(state.collapsed.subtracting([parent]))
-        }
         do {
             try reread()
         } catch {
@@ -579,6 +576,12 @@ public final class TaskViewList: Routable {
             // made minutes ago.
             state.problem = Problem.couldNotRead.sentence
             return
+        }
+        // The unfold comes after the read, which takes the folds back from the store: before it, a write of the
+        // unfold that failed would be read back as the branch folded, and the field would open on a row the model
+        // does not draw. After it, the branch is unfolded on screen whether or not the write held, as every fold is.
+        if let parent = new.parent, state.collapsed.contains(parent) {
+            setCollapsed(state.collapsed.subtracting([parent]))
         }
         // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
         // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` for

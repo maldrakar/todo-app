@@ -446,7 +446,6 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.destination.pushed == .init(head: inbox))
 }
 
-
 /// The folds are the device's, so two windows of one device share them: a fold made in one is read by the other at its
 /// next read of the rows, which a change naming a view brings, and not at a change naming only tasks, which reads the
 /// counts alone; a fold the other makes then writes the set with the first window's fold in it (Lists screen spec,
