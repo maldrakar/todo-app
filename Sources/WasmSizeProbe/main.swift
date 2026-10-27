@@ -142,9 +142,10 @@ private enum WasmSizeProbe {
         perform(.action(.taskViewList(.titleFieldSubmitted)))
         // Read between the two writes: after the folder the highlight is on the folder, and the title the rename
         // put on the row would not reach a `print` at all.
-        let renamed = app.model.taskViewList.rows.first(where: \.isSelected)?.title ?? "none"
+        let renamed = highlightedTitle(in: app.model) ?? "none"
         perform(.action(.taskViewList(.createFolderButtonTapped)))
-        let newFolder = app.model.taskViewList.rows.first(where: \.isSelected)
+        let newFolder = highlightedTitle(in: app.model)
+        let newFolderDraft = app.model.taskViewList.rows.first { $0.draft != nil }?.draft
         // A link, read from its path and followed through the window's stack, with quick entry up over the Inbox;
         // quick entry files a task, whose change reaches the list; a tap on the list's element, in the column,
         // pushes the task, and the way back, the detail's path one shorter, which is empty, pops it and leaves the
@@ -187,7 +188,7 @@ private enum WasmSizeProbe {
         print("journal \(exported.count) operations, first \(exported.first.map { "\($0.entity.rawValue).\($0.field) at \($0.clock.raw)" } ?? "none"), pair \(JournalOperation.pairID(view, review))")
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
-        print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
+        print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder ?? "none") \(newFolderDraft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
@@ -234,6 +235,18 @@ private enum WasmSizeProbe {
         case .wide(let column?, let path): [column] + path
         case .wide(nil, let path): path
         }
+    }
+
+    /// The title of the sidebar's highlighted row, and nil when none is: one switch over a row's kinds, as the sidebar's
+    /// view has, an area's line never highlighted.
+    private static func highlightedTitle(in model: AppModule.Model) -> String? {
+        for row in model.taskViewList.rows {
+            switch row.kind {
+            case .list(let list) where list.isSelected: return list.title
+            case .list, .area: continue
+            }
+        }
+        return nil
     }
 
     /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.

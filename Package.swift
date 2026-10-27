@@ -68,8 +68,14 @@ let package = Package(
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
         // features whose routes its destination holds, the screens it declares open over it (ADR-0009,
         // amendment of 2026-10-22), and never on a sibling or on the root module (ADR-0007). The sidebar
-        // declares the task list, and the task list declares the task screen.
-        .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskListFeature"], path: "Sources/Features/TaskViewList"),
+        // declares the task list, and the task list declares the task screen. A feature that builds the models
+        // of its screen's components depends on the design system's two targets too, as the sidebar builds
+        // each row's tile and chooses its title's font (ADR-0007, amendment of 2026-10-26).
+        .target(
+            name: "TaskViewListFeature",
+            dependencies: ["TodoCore", "FeatureModule", "TaskListFeature", "DesignSystem", "DesignSystemComponents"],
+            path: "Sources/Features/TaskViewList"
+        ),
         .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
         .target(name: "QuickEntryFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/QuickEntry"),
@@ -106,7 +112,10 @@ let package = Package(
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",
-            dependencies: ["TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]
+            dependencies: [
+                "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit",
+                "TestSupport", "DesignSystem", "DesignSystemComponents",
+            ]
         ),
         .testTarget(
             name: "TaskListFeatureTests",
@@ -116,7 +125,10 @@ let package = Package(
         .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(
             name: "AppFeatureTests",
-            dependencies: ["AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport"]
+            dependencies: [
+                "AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature",
+                "QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport", "DesignSystemComponents",
+            ]
         ),
     ],
     swiftLanguageModes: [.v6]

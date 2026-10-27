@@ -128,8 +128,9 @@ public final class AppModule: Routable {
         /// pressed anything, and a view's closure spells user actions alone (the owner, 2026-10-20, on the window's
         /// way in).
         ///
-        /// It moves the layout and nothing else: no screen is made or dropped, no sentence moves and the route stays,
-        /// so the width the window already has moves nothing.
+        /// It moves the layout, and the sidebar's tiles and title fonts, which the sidebar builds for the width it is
+        /// handed (Lists screen spec, sections 8 and 9), and nothing else: no screen is made or dropped, no sentence
+        /// moves and the route stays, so the width the window already has moves nothing.
         case widthChanged(WindowWidth)
     }
 
@@ -164,8 +165,8 @@ public final class AppModule: Routable {
     /// The route defaults to the default window, so that a caller with no route to hand on spells none (owner's
     /// review of #103, as quick entry's `init` has it since #102).
     ///
-    /// The width is the class the window opens with, so that its first frame already has the shape of its layout
-    /// (navigation state spec, section 4). It has no default: a window made wide and told otherwise on its first
+    /// The width is the class the window opens with, so that its first frame already has the shape of its layout and
+    /// the sidebar its tiles (navigation state spec, section 4), and the sidebar is made with it. It has no default: a window made wide and told otherwise on its first
     /// frame is the spec's fallback for a host that does not know the class when the window is made, and a default
     /// here would make that fallback a rule of the core (`docs/style.md`, "A lower layer holds no policy of its
     /// client").
@@ -174,7 +175,7 @@ public final class AppModule: Routable {
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A screen of the stack that
     /// cannot be made is its opener's to say, and quick entry cannot fail to be made.
     public init(store: Store, route: Route = .default, width: WindowWidth) throws(StoreError) {
-        let taskViewList = try TaskViewList(store: store, route: route.sidebar)
+        let taskViewList = try TaskViewList(store: store, route: route.sidebar, width: width)
         // The stack and the seat are built once, here, each with the way to make what it holds: a closure over the
         // `init` of the kind the route names that captures the store and never this root. The root holds both in its
         // state, so a closure holding the root would close a cycle, root to state to stack or seat to closure to
@@ -261,10 +262,12 @@ public final class AppModule: Routable {
             state.problem = Problem.unreadableLink.sentence
             return nil
         case .widthChanged(let width):
-            // The layout is computed from the width and the stack on every read, so this moves the layout alone; the
-            // stack is not walked, since no destination was written, and the same width again moves nothing.
+            // The layout is computed from the width and the stack on every read, so the root's own part is the width
+            // alone. The sidebar is handed it too, since its rows take the tiles of the width they are drawn at, and
+            // it answers nothing; it is reached through the stack, whose walk after the event finds no destination
+            // written and moves nothing. The same width again moves nothing in either.
             state.width = width
-            return nil
+            return react(to: state.stack.send(.widthChanged(width)))
         }
     }
 
@@ -309,7 +312,7 @@ public final class AppModule: Routable {
         var quickEntry: Seat<QuickEntry, Never>
         var problem: String?
         /// The class the window's view reported last, or the one the window was made with, which the layout is cut
-        /// by and nothing else reads.
+        /// by and nothing else reads: the sidebar is handed the same class and keeps its own.
         var width: WindowWidth
 
         /// The model the root view draws: the sidebar's and each screen's, as each computes it, the layout of the

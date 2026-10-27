@@ -1,0 +1,92 @@
+// Sources/Features/TaskViewList/TaskViewList+Model.swift
+import DesignSystem
+import DesignSystemComponents
+import TodoCore
+
+extension TaskViewList {
+    /// What a view draws: the rows of the tree, the highlighted one named once more for a list bound to one value, and
+    /// the sentence.
+    public struct Model: Equatable, Sendable {
+        /// One row of the tree, an area's line or a list's row (spec section 5).
+        public struct Row: Equatable, Sendable, Identifiable {
+            public let id: ViewID
+
+            /// The depth the row is drawn at, which a view indents by and decides nothing with: a list of the root at
+            /// 0 and its lists at 1, and an area's line at 0 with the lists under it at 0 too and theirs at 1, since
+            /// the line, and not an indent, says which area a list belongs to (spec section 3).
+            public let depth: Int
+
+            /// What the row is, which a view switches over once to pick the row it draws, every case drawn and no
+            /// `default` (`docs/style.md`, "Views").
+            public let kind: Kind
+
+            /// The text of the rename in progress on this row, and nil on every other row and whenever no
+            /// field is open at all: a view puts a text field where this is not nil, draws the title or the
+            /// label everywhere else, and that is the whole of what it knows about renaming. It is what the
+            /// person typed, down to the spaces at its ends; what the store keeps is that text trimmed
+            /// (`commit`), since a caret is no place for the module to be moving text about.
+            ///
+            /// The draft is the module's, put on the row when the model is assembled and never kept in one.
+            /// A read replaces every row, so a draft that lived in a row would be emptied by a peer's edit
+            /// arriving while a person was typing. What ends it is its row going, which `reread` decides.
+            public let draft: String?
+        }
+
+        /// A row's kind, an enum so that a row is one of the two explicitly and never both or neither (the owner,
+        /// 2026-10-25, on the spec's first revision).
+        public enum Kind: Equatable, Sendable {
+            /// An area's line, with its name as its label, and nil for an area that has none: the line alone is the
+            /// whole of how an unnamed area looks (spec section 3).
+            case area(label: String?)
+            /// A list's row, with everything it draws.
+            case list(ListRow)
+        }
+
+        /// What a list's row draws, every value finished, so that a view formats nothing and chooses nothing
+        /// (`docs/style.md`, "Views").
+        public struct ListRow: Equatable, Sendable {
+            public let title: String
+
+            /// The list's tile, in its colour and with its icon, at the sizes the Lists screen gives a row of its
+            /// drawn depth in a window of the module's width class (`TaskViewList+Rows.swift`).
+            public let tile: TileModel
+
+            /// The title's font, one of the design system's four row titles, chosen by the same width class, the
+            /// drawn depth and whether the row has lists inside it.
+            public let titleFont: DesignSystem.Font
+
+            /// The number of the list's open tasks as text, and the empty string for a count of zero and for a list
+            /// that has no count: a view draws it as it is, and a zero is drawn as nothing on every list (spec
+            /// section 4).
+            public let countText: String
+
+            /// Whether the list has lists inside it, which a chevron folds.
+            public let hasChildren: Bool
+
+            /// Whether this row is the highlighted one, which `selection` names too.
+            public let isSelected: Bool
+        }
+
+        public let rows: [Row]
+
+        /// The id of the highlighted row, and nil when no row is highlighted: what a list that keeps its
+        /// selection as one value is bound to, as the Mac's `List(selection:)` is, so that the binding reads a
+        /// field the way a text field's reads `draft`, instead of searching the rows for one (spec section 4).
+        ///
+        /// It is the highlight `ListRow.isSelected` carries, held a second way because it is read a second way: a
+        /// list bound to one value reads this, and a client that draws row by row reads the row. Both come
+        /// off the same drawn rows when the model is assembled, so they name the same row or none.
+        ///
+        /// The highlight is the view of the list this module declared, where a list's row holds it (navigation state
+        /// spec, "Open questions"): nil when it declared nothing, and when the view it declared has no such row, a
+        /// view that is gone or not yet synced, so a highlight goes with its row by computation and a row that
+        /// arrives later lights up only if its list is still declared.
+        public let selection: ViewID?
+
+        /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
+        /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one
+        /// would be a view holding logic (spec section 2). A list that could not be opened is said here, where
+        /// the list that stays open is drawn beside it; what the list says about itself is in its own model.
+        public let problem: String?
+    }
+}

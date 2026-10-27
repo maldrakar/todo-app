@@ -13,6 +13,11 @@ import TodoCore
 /// number and decides nothing, and the walk that builds them never recurses over a chain that arrived from
 /// sync (`docs/style.md`).
 ///
+/// A row is an area's line or a list's row, and a list's row arrives with everything it draws finished: its tile and
+/// its title's font, built for the width class of the window, which the root hands the module as it hands it to its
+/// own layout, and the count of its open tasks as text (Lists screen spec, sections 1, 4 and 5; ADR-0007, amendment
+/// of 2026-10-26). The module reads the counts beside the rows, and the width moves the tiles with no read at all.
+///
 /// It is the base of its window's stack, and the task list's opener. A choice here declares the list of that view's
 /// tasks in this module's destination, and the window's stack makes, keeps and drops the list (ADR-0009, amendment of
 /// 2026-10-22): the module holds no screen, and hears what the list asks for as `.destinationAnswered`. The list is
@@ -24,48 +29,6 @@ import TodoCore
 /// has one list of views, and its tail is the route of the list it declared, so that a link to a view declares its
 /// list here, highlighted, and the route a window writes down names the view and the task declared in its list.
 public final class TaskViewList: Routable {
-    public struct Model: Equatable, Sendable {
-        public struct Row: Equatable, Sendable {
-            public let id: ViewID
-            public let title: String
-            public let depth: Int
-            public let isSelected: Bool
-
-            /// The text of the rename in progress on this row, and nil on every other row and whenever no
-            /// field is open at all: a view puts a text field where this is not nil, draws the title
-            /// everywhere else, and that is the whole of what it knows about renaming. It is what the
-            /// person typed, down to the spaces at its ends; what the store keeps is that text trimmed
-            /// (`commit`), since a caret is no place for the module to be moving text about.
-            ///
-            /// The draft is the module's, put on the row when the model is assembled and never kept in one.
-            /// A read replaces every row, so a draft that lived in a row would be emptied by a peer's edit
-            /// arriving while a person was typing. What ends it is its row going, which `reread` decides.
-            public let draft: String?
-        }
-
-        public let rows: [Row]
-
-        /// The id of the highlighted row, and nil when no row is highlighted: what a list that keeps its
-        /// selection as one value is bound to, as the Mac's `List(selection:)` is, so that the binding reads a
-        /// field the way a text field's reads `draft`, instead of searching the rows for one (spec section 4).
-        ///
-        /// It is the highlight `Row.isSelected` carries, held a second way because it is read a second way: a
-        /// list bound to one value reads this, and a client that draws row by row reads the row. Both come
-        /// off the same drawn rows when the model is assembled, so they name the same row or none.
-        ///
-        /// The highlight is the view of the list this module declared, where a row holds it (navigation state spec,
-        /// "Open questions"): nil when it declared nothing, and when the view it declared has no row, a view that is
-        /// gone or not yet synced, so a highlight goes with its row by computation and a row that arrives later
-        /// lights up only if its list is still declared.
-        public let selection: ViewID?
-
-        /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
-        /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one
-        /// would be a view holding logic (spec section 2). A list that could not be opened is said here, where
-        /// the list that stays open is drawn beside it; what the list says about itself is in its own model.
-        public let problem: String?
-    }
-
     /// The address of the module in its window: no head, and the route of the list declared over it as the tail
     /// (spec section 4).
     public struct Route: RouteValue {
@@ -147,6 +110,13 @@ public final class TaskViewList: Routable {
         /// the module, nil when none does, which the module takes back as its destination (navigation state spec,
         /// section 2, and "Open questions").
         case notOpened(StoreError, stillOpen: TaskList.Route?)
+
+        /// The width class of the window, which the root hands the module when its window's view reports it: an
+        /// event of the world and not a `UserAction`, since nobody pressed anything, as it is for the root (navigation
+        /// state spec, section 4). It moves the width alone, which the tiles and the title fonts are computed from, so
+        /// they follow it with no read of the store; the sentence and an open field stay, and the width the module
+        /// already has moves nothing.
+        case widthChanged(WindowWidth)
     }
 
     public enum Output: Equatable, Sendable {
@@ -185,14 +155,19 @@ public final class TaskViewList: Routable {
     /// the route names is declared whether or not a row holds its view; one the stack cannot make, its view gone or
     /// not yet synced, comes back as `.notOpened`, which takes the declaration back and says so in `problem`.
     ///
+    /// The width is the class of the window the module is drawn in, which the root hands it from its own: it has no
+    /// default, as the root's has none, so that the class a window is made with is always its host's to say
+    /// (`docs/style.md`, "A lower layer holds no policy of its client").
+    ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
-    /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own read
-    /// throws.
-    public init(store: Store, route: Route) throws(StoreError) {
+    /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own reads
+    /// throw, the rows and their counts.
+    public init(store: Store, route: Route, width: WindowWidth) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
+        let counts = try TaskViewList.counts(of: store)
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
-        self.state = State(rows: rows, destination: Destination())
+        self.state = State(rows: rows, counts: counts, width: width, destination: Destination())
         setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
 
@@ -335,26 +310,37 @@ public final class TaskViewList: Routable {
             return nil
         case .changed(let changes):
             // Every edit to a task is a commit that touched no view, and the rows are the same afterwards, so
-            // the condition is what keeps a person typing in a list out of the views table. A commit that did
-            // touch a view rereads the whole tree rather than the branch it names, because views number in
-            // the tens and the tree order needs every row anyway (spec, "The sidebar in M2").
-            if !changes.views.isEmpty {
-                // The sentence stands unless the reread replaces it. It answered what a person did, and what
-                // another device did is no answer to it: a sentence cleared by a peer's edit would go between
-                // the person being told and reading it.
-                do {
+            // the condition is what keeps a person typing in a list out of the views table: such a commit reads
+            // the counts alone, since a change to any task or tag can move any count (Lists screen spec, section
+            // 4). A commit that did touch a view rereads the whole tree rather than the branch it names, because
+            // views number in the tens and the tree order needs every row anyway (spec, "The sidebar in M2"), and
+            // the counts with it, as every read of the rows does.
+            //
+            // The sentence stands unless a read replaces it. It answered what a person did, and what another device
+            // did is no answer to it: a sentence cleared by a peer's edit would go between the person being told and
+            // reading it. A draft stays for the same reason.
+            do {
+                if !changes.views.isEmpty {
                     try reread()
-                } catch {
-                    // Only when there is nothing on screen already. A `.changed` neither clears a sentence nor
-                    // replaces one, because it answers for nobody: the field can be open with a refusal on it
-                    // when a peer's edit arrives, and "the list may be out of date" would take the place of
-                    // what the person was actually told.
-                    if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
+                } else if !changes.tasks.isEmpty || !changes.tags.isEmpty {
+                    // Assigned after the read, so a read that failed leaves the counts on screen where they were.
+                    state.counts = try TaskViewList.counts(of: store)
                 }
+            } catch {
+                // Only when there is nothing on screen already. A `.changed` neither clears a sentence nor
+                // replaces one, because it answers for nobody: the field can be open with a refusal on it
+                // when a peer's edit arrives, and "the list may be out of date" would take the place of
+                // what the person was actually told.
+                if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
             }
             // The destination stays: the list over this module reads the change itself, handed it by the window
             // after this module, and a list whose view is gone asks to be closed. The highlight on a row that went
             // goes by computation. Nothing is written in answer (spec section 5).
+            return nil
+        case .widthChanged(let width):
+            // The tiles and the title fonts are computed from the width on every read of the model, so this moves
+            // them alone, and the same width again moves nothing.
+            state.width = width
             return nil
         }
     }
@@ -367,7 +353,7 @@ public final class TaskViewList: Routable {
         state.destination.declare(list.map { .pushed($0) })
     }
 
-    /// Reads the tree again and keeps of this person's session whatever the new rows still hold.
+    /// Reads the tree and its counts again and keeps of this person's session whatever the new rows still hold.
     ///
     /// A rename goes when its row does, with a sentence, because a person typing a name was interrupted, and the
     /// sentence is the one a refused write gives for the same fact, since a peer's delete is that fact arriving by
@@ -388,6 +374,7 @@ public final class TaskViewList: Routable {
     /// 2026-09-24).
     private func reread() throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
+        let counts = try TaskViewList.counts(of: store)
         if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
             // The name comes off the rows as they still are: the ones being read in no longer hold the
             // view, and after the assignment below there is nothing left to call it. A row already gone
@@ -398,6 +385,7 @@ public final class TaskViewList: Routable {
             state.rename = nil
         }
         state.rows = rows
+        state.counts = counts
     }
 
     /// Writes the draft and closes the field, or refuses it and leaves the field where it is.
@@ -501,28 +489,15 @@ public final class TaskViewList: Routable {
         setDestination(TaskList.Route(head: id))
     }
 
-    /// The tree as one read produced it. `views()` answers parents before children with the effective parent
-    /// already resolved, so a row's depth is its parent's plus one and the depths the walk has passed are all
-    /// it carries: one pass, no stack, and a chain a thousand deep from sync reads like a flat list
-    /// (`docs/style.md`, "No recursion over data-shaped depth"). A parent the walk has not passed reads as
-    /// no parent, the way the core resolves a link it cannot use, rather than as a row left out of the list.
-    private static func rows(of store: Store) throws(StoreError) -> [State.ReadRow] {
-        var depths: [ViewID: Int] = [:]
-        return try store.views().map { view in
-            let depth = view.parent.flatMap { depths[$0] }.map { $0 + 1 } ?? 0
-            depths[view.id] = depth
-            return State.ReadRow(id: view.id, title: view.title, depth: depth)
-        }
-    }
-
     /// The name a new folder is born with. A constant because the row a person reads and the draft in the
     /// field are one word and two copies of it would drift apart. It is English here: a string a person
     /// reads is the formatting service's to localise, and that service is M3's; until it arrives, a string
     /// this module writes is English.
     private static let newFolderTitle = "New folder"
 
-    /// Everything this module holds between two events: the rows as the last read produced them, the rename a
-    /// person has open, the list declared over the module, and the sentence they were last told. One entity, moved
+    /// Everything this module holds between two events: the rows and their counts as the last reads produced them,
+    /// the width class of the window, the rename a person has open, the list declared over the module, and the
+    /// sentence they were last told. One entity, moved
     /// field by field, from which the model is computed on every read, so that nothing on screen is state in its
     /// own right and there is no second copy to keep in step (owner's reviews of #77 and #101): the highlight is
     /// read off the destination, and is not kept beside it.
@@ -533,35 +508,32 @@ public final class TaskViewList: Routable {
     /// over it is the navigation state, which the window's stack follows (ADR-0009, amendment of 2026-10-22).
     private struct State {
         var rows: [ReadRow]
+        var counts: [ViewID: Int]
+        var width: WindowWidth
         var rename: Rename?
         var destination: Destination<TaskList.Route>
         var problem: String?
 
-        /// The model a view draws: the rows with this person's session projected onto them — the highlight
-        /// on the row of the view whose list is declared, the draft on the row they are renaming — the
-        /// highlighted row's id, and the sentence, if any.
+        /// The model a view draws: the rows with the window and this person's session projected onto them — the
+        /// tiles and fonts for the width, the counts, the highlight on the list's row of the view whose list is
+        /// declared, the draft on the row they are renaming — the highlighted row's id, and the sentence, if any.
         var model: Model {
             let declared = destination.pushed?.head
             let drawn = rows.map {
                 Model.Row(
-                    id: $0.id, title: $0.title, depth: $0.depth,
-                    isSelected: $0.id == declared, draft: rename?.text(on: $0.id)
+                    id: $0.id, depth: $0.depth,
+                    kind: $0.kind(in: width, count: counts[$0.id], isSelected: $0.id == declared),
+                    draft: rename?.text(on: $0.id)
                 )
             }
             // Read off the drawn rows and not copied from the destination: `.rowSelected` and `.route` declare the
-            // list of an id without asking the rows, and an id no row carries highlights nothing, so the model names
-            // no row for it either.
-            let selection = drawn.first(where: \.isSelected)?.id
+            // list of an id without asking the rows, and an id no list's row carries highlights nothing, so the
+            // model names no row for it either.
+            let selection = drawn.first { row in
+                guard case .list(let list) = row.kind else { return false }
+                return list.isSelected
+            }?.id
             return Model(rows: drawn, selection: selection, problem: problem)
-        }
-
-        /// One row of the list as a read of the store produced it, before anything about this person's
-        /// session is projected onto it. It is what the store answered and nothing else, which is what lets
-        /// the same read serve a highlight that moves and a field that opens without being read again.
-        struct ReadRow {
-            let id: ViewID
-            let title: String
-            let depth: Int
         }
 
         /// The rename a person has open: the row the field is on, and the text in it.
@@ -595,5 +567,3 @@ public final class TaskViewList: Routable {
         }
     }
 }
-
-extension TaskViewList.Model.Row: Identifiable {}
