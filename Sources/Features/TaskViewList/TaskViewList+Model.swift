@@ -82,9 +82,10 @@ extension TaskViewList {
         /// off the same drawn rows when the model is assembled, so they name the same row or none.
         ///
         /// The highlight is the view of the list this module declared, where a list's row holds it (navigation state
-        /// spec, "Open questions"): nil when it declared nothing, and when the view it declared has no such row, a
-        /// view that is gone or not yet synced, so a highlight goes with its row by computation and a row that
-        /// arrives later lights up only if its list is still declared.
+        /// spec, "Open questions"): nil when it declared nothing, and when the view it declared has no such row among
+        /// the rows drawn, a view that is gone or not yet synced, or a list inside a folded one, so a highlight goes
+        /// with its row by computation and a row that arrives later, or is unfolded, lights up only if its list is
+        /// still declared.
         public let selection: ViewID?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
