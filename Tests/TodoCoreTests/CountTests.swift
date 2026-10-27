@@ -245,6 +245,8 @@ private func plan(_ store: Store, _ statement: (sql: String, params: [Value])) t
     let crowded = try store.createView(NewTaskView(title: "Big", filter: .hasTag(big)))
     let undatedBig = Filter.and([.hasTag(big), .when(.empty)])
     let crowdedUndated = try store.createView(NewTaskView(title: "Big and undated", filter: undatedBig))
+    let dueBig = Filter.and([.hasTag(big), .not(.deadline(.empty))])
+    let crowdedDue = try store.createView(NewTaskView(title: "Big with a deadline", filter: dueBig))
     let month = try store.createView(NewTaskView(title: "Month", filter: .when(.between(0, 31))))
     let finished = try store.createView(NewTaskView(title: "Finished", filter: .and([.status([.done]), .hasTag(small)])))
 
@@ -275,16 +277,19 @@ private func plan(_ store: Store, _ statement: (sql: String, params: [Value])) t
 
     // Not driven: the walk of the open tasks over the status index, as #144 counted everything. The big tag is
     // written as the list of its tasks all the same, which SQLite builds once instead of probing once per task.
-    for id in [crowded, crowdedUndated, month, finished] {
+    for id in [crowded, crowdedUndated, crowdedDue, month, finished] {
         let plan = plans[id] ?? []
         #expect(plan.first == "SEARCH t USING INDEX tasks_status (status=?)", "\(plan)")
     }
     let crowdedPlan = plans[crowded] ?? []
     #expect(crowdedPlan.contains("SEARCH x USING COVERING INDEX task_tags_tag (tag_id=?)"), "\(crowdedPlan)")
-    // Beside an empty day, which SQLite tests first, the big tag stays the correlated `EXISTS` of #144, which runs on
-    // the undated tasks alone: the rule is written as #144 wrote it, byte for byte.
-    let undated = FilterCompiler.compile(undatedBig, today: today)
-    #expect(statements[crowdedUndated]?.sql == "SELECT count(*) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND t.status = 0 AND tt.trashed = 0 AND (\(undated.sql))")
+    // Beside an empty day, or beside having a deadline, both of which SQLite tests first, the big tag stays the
+    // correlated `EXISTS` of #144, which runs on the tasks left alone: the rule is written as #144 wrote it, byte for
+    // byte.
+    for (id, rule) in [(crowdedUndated, undatedBig), (crowdedDue, dueBig)] {
+        let fragment = FilterCompiler.compile(rule, today: today)
+        #expect(statements[id]?.sql == "SELECT count(*) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND t.status = 0 AND tt.trashed = 0 AND (\(fragment.sql))")
+    }
     // The rule of `finished` asks for a status the count's own condition excludes: kept on the status index, the
     // count's condition is a constant SQLite compares with the rule's before the loop, so the count reads no row,
     // as the Logbook's does.
@@ -315,6 +320,85 @@ private func plan(_ store: Store, _ statement: (sql: String, params: [Value])) t
     try store.update(task: another, [.status(.done)])
     #expect(try countStatements(of: store)[list]?.sql.contains("+t.status = 0") == false, "four, the done ones among them, do not")
     #expect(try store.taskCounts(today: today)[list] == 2)
+}
+
+/// Beside a day #144 tests first, a tag drives a count only while it holds fewer than three hundredths of the open
+/// tasks (#153): #144 then rejects most open tasks before it probes the tag, and its count costs little more than
+/// the walk of the open tasks. A range open at one end, a wide range, a day that is not empty and a choice of such days
+/// lower the share; an empty day does not, and the same tag on its own still drives.
+@Test func aTagBesideADayDrivesWhileItHoldsFewerThanThreeHundredthsOfTheOpenTasks() throws {
+    let store = try makeStore()
+    let tag = try store.createTag(title: "tag")
+    for i in 0..<100 { try store.createTask(NewTask(title: "open \(i)", deadline: i < 50 ? today : nil, tags: i < 2 ? [tag] : [])) }
+    let rules: [Filter] = [
+        .and([.hasTag(tag), .deadline(.onOrBefore(30))]), .and([.hasTag(tag), .when(.between(-100, 100))]),
+        .and([.hasTag(tag), .not(.deadline(.empty))]), .and([.hasTag(tag), .or([.deadline(.onOrBefore(30)), .when(.onOrAfter(1))])]),
+    ]
+    let besideDays = try rules.map { try store.createView(NewTaskView(title: "Beside a day", filter: $0)) }
+    let undated = try store.createView(NewTaskView(title: "Undated", filter: .and([.hasTag(tag), .when(.empty)])))
+    let alone = try store.createView(NewTaskView(title: "Alone", filter: .hasTag(tag)))
+    #expect(try drivenViews(store).isSuperset(of: besideDays + [undated, alone]), "two tasks against a hundred open ones drive")
+
+    let third = try store.createTask(NewTask(title: "tagged too", deadline: today, tags: [tag]))
+    try store.update(task: third, [.status(.done)])
+    let driven = try drivenViews(store)
+    #expect(driven.isDisjoint(with: besideDays), "three, the done one among them, do not beside a day")
+    #expect(driven.isSuperset(of: [undated, alone]), "and still do beside an empty day or alone")
+    #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
+}
+
+/// A disjunction of tags drives a count only while the tasks of the tags that drive its branches add up to fewer than
+/// half of the open ones (#153), since its driver walks them all; each tag below its own share is not enough. A
+/// folder of tag lists is judged the same way, as the disjunction of its lists.
+@Test func aDisjunctionOfTagsDrivesWhileTheirTasksAddUpToFewerThanHalfOfTheOpenTasks() throws {
+    let store = try makeStore()
+    let first = try store.createTag(title: "first")
+    let second = try store.createTag(title: "second")
+    for i in 0..<10 { try store.createTask(NewTask(title: "open \(i)", tags: i < 2 ? [first] : i < 4 ? [second] : [])) }
+    let either = try store.createView(NewTaskView(title: "Either", filter: .or([.hasTag(first), .hasTag(second)])))
+    let folder = try store.createView(NewTaskView(title: "Folder"))
+    let lists = [
+        try store.createView(NewTaskView(title: "First", parent: folder, filter: .hasTag(first))),
+        try store.createView(NewTaskView(title: "Second", parent: folder, filter: .hasTag(second))),
+    ]
+    #expect(try drivenViews(store) == Set(lists + [either, folder]), "four tasks against ten open ones drive")
+
+    let done = try store.createTask(NewTask(title: "done", tags: [second]))
+    try store.update(task: done, [.status(.done)])
+    #expect(try drivenViews(store) == Set(lists), "five do not, though each tag alone still drives")
+    #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
+}
+
+/// A disjunction whose every branch #144 can reject by a day before it probes a tag is judged as a tag beside a day
+/// is, its tags' tasks added up against three hundredths of the open ones (#153): SQLite tests the day first in a
+/// branch too, whichever is written first, and by a project as surely as by a day. One branch with a tag and no
+/// such condition makes #144 probe it for every open task, and the disjunction keeps its own share.
+@Test func aDisjunctionADayRejectsInEveryBranchDrivesOnlyAsATagBesideADay() throws {
+    let store = try makeStore()
+    let first = try store.createTag(title: "first")
+    let second = try store.createTag(title: "second")
+    let third = try store.createTag(title: "third")
+    let project = try store.createTask(NewTask(title: "project"))
+    for i in 0..<99 {
+        let tags: Set<TagID> = i < 1 ? [first] : i < 2 ? [second] : i < 7 ? [third] : []
+        try store.createTask(NewTask(title: "open \(i)", when: i % 2 == 0 ? today.advanced(by: 1) : nil, deadline: i % 3 == 0 ? today : nil, parent: i % 5 == 0 ? project : nil, tags: tags))
+    }
+    let dated = Filter.or([.and([.hasTag(first), .deadline(.onOrBefore(30))]), .and([.when(.onOrAfter(1)), .hasTag(second)])])
+    let datedView = try store.createView(NewTaskView(title: "Dated", filter: dated))
+    let partly = try store.createView(NewTaskView(title: "Partly", filter: .or([.and([.hasTag(first), .deadline(.onOrBefore(30))]), .hasTag(second)])))
+    let projected = try store.createView(NewTaskView(title: "Project or dated", filter: .or([.and([.parent(project), .hasTag(first)]), .and([.hasTag(third), .when(.onOrAfter(1))])])))
+    let probed = try store.createView(NewTaskView(title: "Tag or dated", filter: .or([.hasTag(first), .and([.hasTag(third), .when(.onOrAfter(1))])])))
+    let driven = try drivenViews(store)
+    #expect(driven.isSuperset(of: [datedView, partly, probed]), "two tasks against a hundred open ones drive")
+    #expect(!driven.contains(projected), "five, beside a day, in a disjunction a project and a day reject, do not")
+
+    for title in ["first again", "second again"] {
+        try store.createTask(NewTask(title: title, tags: [title == "first again" ? first : second]))
+    }
+    let after = try drivenViews(store)
+    #expect(!after.contains(datedView), "four do not where a day rejects every branch")
+    #expect(after.contains(partly), "and still do where one branch has no day")
+    #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
 }
 
 // MARK: - The counts every rewritten shape gives
@@ -371,9 +455,10 @@ private func ownTasks(_ store: Store, of list: ViewID, besides others: [ViewID])
     return own
 }
 
-/// A store in which every condition of the shapes below has tasks on both sides of it: 200 tasks a fixed generator
+/// A store in which every condition of the shapes below has tasks on both sides of it: 300 tasks a fixed generator
 /// spreads over the three statuses, days and deadlines around today or none, two projects or the root, four small
-/// tags and one on most tasks, the trash, and a manual list. One task is deleted.
+/// tags, each on about a twelfth of the tasks, so that any two drive a disjunction and four do not, a tag on most
+/// tasks, the trash, and a manual list. One task is deleted.
 private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, projects: [TaskID], manual: ViewID) {
     let store = try makeStore()
     let small = [try store.createTag(title: "a"), try store.createTag(title: "b"), try store.createTag(title: "c"), try store.createTag(title: "d")]
@@ -386,9 +471,9 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
         state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
         return Int((state >> 33) % n)
     }
-    for i in 0..<200 {
+    for i in 0..<300 {
         var tags: Set<TagID> = []
-        for tag in small where roll(100) < 14 { tags.insert(tag) }
+        for tag in small where roll(100) < 8 { tags.insert(tag) }
         if roll(100) < 70 { tags.insert(big) }
         let when = roll(100) < 40 ? nil : today.advanced(by: roll(9) - 4)
         let deadline = roll(100) < 50 ? nil : today.advanced(by: roll(12) - 3)
@@ -401,7 +486,7 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
         }
         if roll(20) == 0 { try store.trash(task: task) }
         if roll(10) == 0 { try store.pin(task: task, in: manual) }
-        if i == 100 { try store.delete(task: task) }
+        if i == 150 { try store.delete(task: task) }
     }
     return (store, small, big, projects, manual)
 }
@@ -409,11 +494,13 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
 /// Every shape of rule a count rewrites counts what its read selects that is open (#153): a manual list, a project,
 /// a day, a short range and a small tag as the driver; a negation and an empty day beside a driver, which SQL's
 /// unknown would drop if they were written without `COALESCE` or as an equality; the root and a status that
-/// includes open beside one; a disjunction of four different drivers, with a tag no other rule names, and one
-/// beside a deadline; a range inside a tag's rule, which the range drives; and the trash beside a tag. And the
-/// shapes that are not driven count as before: a big tag, a range a month wide, a disjunction with an undriven
-/// branch, a disjunction inside a branch of another, negated tags, and a status the count excludes. No count
-/// scans the tasks.
+/// includes open beside one; a disjunction of four different drivers, with a tag no other rule names, one of two
+/// tags, and one of a project and a manual list beside a deadline; a range inside a tag's rule, which the range
+/// drives; the trash beside a tag; and the last two days of the calendar. And the shapes that are not driven count
+/// as before: a big tag, a tag or two beside a deadline or beside having one, which #144 tests first, a disjunction
+/// of four tags whose tasks add up past the share, a range a month wide and one over every day there is, a disjunction with
+/// an undriven branch, a disjunction inside a branch of another, negated tags, and a status the count excludes. No
+/// count scans the tasks.
 @Test func aDrivenListCountsWhatItsReadSelects() throws {
     let (store, small, big, projects, manual) = try shapesStore()
     let (a, b, c, d) = (small[0], small[1], small[2], small[3])
@@ -429,13 +516,20 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
         try list("At the root", .and([.hasTag(c), .parent(nil)])),
         try list("Open or done", .and([.status([.open, .done]), .hasTag(c)])),
         try list("Any of four", .or([.parent(projects[1]), .hasTag(d), .when(.on(1)), .listedIn(manual)])),
-        try list("Either tag, due", .and([.or([.hasTag(a), .hasTag(b)]), .deadline(.onOrBefore(3))])),
+        try list("Two tags", .or([.hasTag(a), .hasTag(b)])),
+        try list("Pinned or the project, due", .and([.or([.parent(projects[1]), .listedIn(manual)]), .deadline(.onOrBefore(3))])),
         try list("Range first", .and([.hasTag(a), .when(.between(-1, 2))])),
         try list("Binned", .and([.hasTag(a), .trashed(true)])),
+        try list("The last two days", .deadline(.between(.max - 1, .max))),
     ]
     let undriven: [(String, Filter)] = [
         ("Big tag", .hasTag(big)),
         ("Month", .when(.between(-3, 40))),
+        ("Every day there is", .when(.between(.min, .max))),
+        ("Tag, due soon", .and([.hasTag(a), .deadline(.onOrBefore(3))])),
+        ("Tag with a deadline", .and([.hasTag(a), .not(.deadline(.empty))])),
+        ("Four tags", .or([.hasTag(a), .hasTag(b), .hasTag(c), .hasTag(d)])),
+        ("Two tags, due soon", .and([.or([.hasTag(a), .hasTag(b)]), .deadline(.onOrBefore(3))])),
         ("Tag or due", .or([.hasTag(a), .deadline(.onOrBefore(0))])),
         ("Nested", .or([.and([.or([.hasTag(a), .hasTag(b)]), .when(.empty)]), .parent(projects[0])])),
         ("Untagged", .and([.not(.hasTag(a)), .not(.hasTag(b))])),
@@ -452,12 +546,13 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
 /// are taken out in front, a list that asks for no more than the conditions another one shares with it absorbs
 /// that one, and lists driven by the same condition are grouped under it, all of which hold in SQL's logic of
 /// three values; a folder of folders counts its lists through them; a folder with an undriven list, with a big
-/// tag's, or with a disjunction inside a list's conjunction, which its own disjunction would nest, counts as before.
+/// tag's, with four tags' whose tasks add up past the share, or with a disjunction inside a list's conjunction,
+/// which its own disjunction would nest, counts as before.
 /// Every list but the absorbed ones selects open tasks no other list of its folder selects, so that no regrouping
 /// can lose one unseen, and no count scans the tasks.
 @Test func aFolderCountsTheUnionOfItsListsHoweverItIsRegrouped() throws {
     let (store, small, big, projects, _) = try shapesStore()
-    let (a, b, c) = (small[0], small[1], small[2])
+    let (a, b, c, d) = (small[0], small[1], small[2], small[3])
     func folder(_ title: String, in parent: ViewID? = nil, _ rules: [Filter]) throws -> (folder: ViewID, lists: [ViewID]) {
         let folder = try store.createView(NewTaskView(title: title, parent: parent))
         var lists: [ViewID] = []
@@ -467,7 +562,7 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
     let factored = try folder("Factored", [.and([.when(.empty), .hasTag(a)]), .and([.when(.empty), .hasTag(b)])])
     let absorbed = try folder("Absorbed", [.hasTag(a), .and([.hasTag(a), .when(.on(0))])])
     let grouped = try folder("Grouped", [
-        .and([.hasTag(a), .deadline(.onOrBefore(3))]), .and([.hasTag(a), .deadline(.onOrAfter(4))]),
+        .and([.hasTag(a), .parent(nil)]), .and([.hasTag(a), .not(.parent(nil))]),
         .and([.hasTag(b), .when(.empty)]), .hasTag(b),
     ])
     let shared = try folder("Shared project", [.and([.parent(projects[0]), .hasTag(a)]), .and([.parent(projects[0]), .when(.empty)])])
@@ -476,15 +571,16 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
     let mixed = try folder("Mixed", [.hasTag(a), .deadline(.onOrBefore(0))])
     let crowded = try folder("Crowded", [.hasTag(big), .parent(projects[0])])
     let nested = try folder("Nested", [.or([.hasTag(a), .parent(projects[1])]), .and([.or([.hasTag(b), .hasTag(c)]), .deadline(.onOrBefore(3))])])
+    let tagged = try folder("Four tags", [.hasTag(a), .hasTag(b), .hasTag(c), .hasTag(d)])
 
     #expect(try store.taskCounts(today: today) == (try countsByReads(store)))
     let driven = try drivenViews(store)
     for id in [factored, absorbed, grouped, shared, outer, inner].map(\.folder) { #expect(driven.contains(id)) }
-    for id in [mixed, crowded, nested].map(\.folder) { #expect(!driven.contains(id)) }
+    for id in [mixed, crowded, nested, tagged].map(\.folder) { #expect(!driven.contains(id)) }
     #expect(try scanningViews(store).isEmpty)
 
     let absorbedLists: Set<ViewID> = [absorbed.lists[1], grouped.lists[2]]
-    for lists in [factored.lists, absorbed.lists, grouped.lists, shared.lists, outer.lists + inner.lists, mixed.lists, crowded.lists, nested.lists] {
+    for lists in [factored.lists, absorbed.lists, grouped.lists, shared.lists, outer.lists + inner.lists, mixed.lists, crowded.lists, nested.lists, tagged.lists] {
         for list in lists where !absorbedLists.contains(list) {
             #expect(!(try ownTasks(store, of: list, besides: lists.filter { $0 != list })).isEmpty, "a list that adds nothing to its folder")
         }

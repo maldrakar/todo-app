@@ -43,7 +43,8 @@ extension Store {
             if let filter = view.filter { candidates.formUnion(CountCompiler.candidateTags(of: filter)) }
             if let parent = view.parent { childRules[parent, default: []] += rules }
         }
-        let compiler = CountCompiler(today: today, smallTags: try smallTags(among: candidates))
+        let sizes = try tagSizes(among: candidates)
+        let compiler = CountCompiler(today: today, tagSizes: sizes.tags, openTasks: sizes.open)
         return counted.map { view, rules in
             let count = compiler.compile(rules)
             return (view, Store.countStatement(over: count.condition.sql, driven: count.driven), count.condition.params)
@@ -56,28 +57,20 @@ extension Store {
     /// The tasks a tag holds, done, trashed and deleted ones among them, counted on the tag's partial index alone.
     static let tagSizeQuery = "SELECT count(*) FROM task_tags WHERE tag_id = ? AND present = 1"
 
-    /// How large a tag may be against the open tasks and still drive a count: under two fifths of the open tasks
-    /// the status index holds. A tag's driver walks every task the tag holds, done ones too, where the walk of the
-    /// open tasks reads the tag's list once and each open task once. In #153's sweep at 50,000 tasks the two
-    /// crossed between 0.36 and 0.40 of the open tasks for a tag's list with about a quarter of the store open, and
-    /// past 0.5 for a list that asks for open tasks too, or with every task open; on either side of the share a
-    /// tag's count was 1.7 to 12 times faster than #144's.
-    private static let drivingTagShare = 0.4
-
-    /// The tags among `candidates` small enough to drive a count. Asked only when a rule offers a tag at all,
-    /// each size once, from an index and no table row: at 50,000 tasks a tag of 1,500 tasks in 0.02 ms and one of
-    /// 25,000 in 0.3 ms, the open tasks in 0.13 to 0.58 ms. A size the store could not read leaves its tag out,
-    /// which costs speed and never a count.
-    private func smallTags(among candidates: Set<TagID>) throws(StoreError) -> Set<TagID> {
-        guard !candidates.isEmpty else { return [] }
+    /// The sizes the choice of a tag's driver is made by (`CountCompiler`): the open tasks, and the tasks each of
+    /// `candidates` holds. Read only when a rule offers a tag at all, each once, from an index and no table row: at
+    /// 50,000 tasks a tag of 1,500 tasks in 0.02 ms and one of 25,000 in 0.3 ms, the open tasks in 0.13 to 0.58 ms.
+    /// A read that fails fails the call, as any of its statements would; `count(*)` always answers one row, and a
+    /// tag whose answer had none would be left out, which costs speed and never a count.
+    private func tagSizes(among candidates: Set<TagID>) throws(StoreError) -> (open: Int64, tags: [TagID: Int64]) {
+        guard !candidates.isEmpty else { return (0, [:]) }
         return try sql { () throws(SQLiteError) in
-            guard let open = try db.rows(Store.openTaskCountQuery).first?.first?.int64 else { return [] }
-            var small: Set<TagID> = []
+            let open = try db.rows(Store.openTaskCountQuery).first?.first?.int64 ?? 0
+            var tags: [TagID: Int64] = [:]
             for tag in candidates {
-                guard let size = try db.rows(Store.tagSizeQuery, [.text(tag.rawValue)]).first?.first?.int64 else { continue }
-                if Double(size) < Store.drivingTagShare * Double(open) { small.insert(tag) }
+                tags[tag] = try db.rows(Store.tagSizeQuery, [.text(tag.rawValue)]).first?.first?.int64
             }
-            return small
+            return (open, tags)
         }
     }
 
