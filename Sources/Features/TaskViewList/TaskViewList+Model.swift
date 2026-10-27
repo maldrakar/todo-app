@@ -63,6 +63,10 @@ extension TaskViewList {
             /// Whether the list has lists inside it, which a chevron folds.
             public let hasChildren: Bool
 
+            /// Whether the list's branch is folded on this device, the lists inside it left out of `rows` (Lists
+            /// screen spec, section 5).
+            public let isCollapsed: Bool
+
             /// Whether this row is the highlighted one, which `selection` names too.
             public let isSelected: Bool
         }

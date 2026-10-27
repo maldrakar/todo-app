@@ -49,6 +49,24 @@ extension TaskViewList {
         }
     }
 
+    /// The rows a person sees: every read row but the lists inside a folded one, however deep (Lists screen spec,
+    /// section 5). One pass in tree order, like the read, carrying the depth below which rows are hidden: a folded list
+    /// hides the rows deeper than itself that follow it, and the first row at its depth or above ends the branch and
+    /// clears it. The depth is the drawn one, so an area's line folds nothing even with its id in the set, which no
+    /// chevron on the line could take out: the lists under the line stand at its own depth, and the first of them ends
+    /// the branch. That is what a list folded on this device comes to when a peer's move makes it read as an area
+    /// again, an area that had arrived nested (ADR-0004, amendment of 2026-10-25).
+    static func unfolded(_ rows: [ReadRow], collapsed: Set<ViewID>) -> [ReadRow] {
+        var hiddenBelow: Int?
+        var shown: [ReadRow] = []
+        for row in rows {
+            if let depth = hiddenBelow, row.depth > depth { continue }
+            hiddenBelow = collapsed.contains(row.id) ? row.depth : nil
+            shown.append(row)
+        }
+        return shown
+    }
+
     /// The number of open tasks each view selects, which the store answers for every view in one call and which is
     /// read beside every read of the rows, since a change to any task can move any count (Lists screen spec, section
     /// 4). `today` is the UTC day of the machine's clock, read again at every read, as the task list reads its own
@@ -65,7 +83,7 @@ extension TaskViewList.ReadRow {
     /// finished. The tile and the title's font are the Lists screen's layout, built here from the row and the width
     /// whenever the model is computed, so that a window that narrows or widens moves them with no read of the store
     /// (ADR-0007, amendment of 2026-10-26).
-    func kind(in width: WindowWidth, count: Int?, isSelected: Bool) -> TaskViewList.Model.Kind {
+    func kind(in width: WindowWidth, count: Int?, isCollapsed: Bool, isSelected: Bool) -> TaskViewList.Model.Kind {
         switch kind {
         case .area:
             return .area(label: title.isEmpty ? nil : title)
@@ -74,7 +92,7 @@ extension TaskViewList.ReadRow {
             return .list(TaskViewList.Model.ListRow(
                 title: title, tile: size.tile(tileColor, tileIcon), titleFont: size.titleFont(emphasized: hasChildren),
                 countText: count.flatMap { $0 > 0 ? String($0) : nil } ?? "", hasChildren: hasChildren,
-                isSelected: isSelected
+                isCollapsed: isCollapsed, isSelected: isSelected
             ))
         }
     }

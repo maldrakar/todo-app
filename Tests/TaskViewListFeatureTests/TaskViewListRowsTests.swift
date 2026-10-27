@@ -3,10 +3,22 @@ import TestSupport
 import DesignSystem
 import DesignSystemComponents
 import FeatureModule
+import SQLiteKit
 import TaskViewListFeature
 import TodoCore
 
 private let inbox = BuiltInTaskViews.inbox
+
+/// The key the sidebar keeps its folds under in the device's own state, as the module names it (ADR-0010).
+private let collapsedKey = "taskViewList.collapsed"
+
+/// Opens the field on Today, types a blank name and submits it, so that the list holds a field open on a refused
+/// draft and the sentence that refused it, which an event that moves nothing leaves where they are.
+private func refusingAName(_ list: TaskViewList) {
+    _ = list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
+    _ = list.send(.action(.titleFieldChanged(" ")))
+    _ = list.send(.action(.titleFieldSubmitted))
+}
 
 /// The list row a view's row draws, and nil for an area's line: what a test reads a tile, a font and a count off.
 private func listRow(_ row: TaskViewList.Model.Row) -> TaskViewList.Model.ListRow? {
@@ -130,11 +142,6 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 /// refused name keeps its draft and its sentence, since a change answers nobody (spec section 4).
 @Test func aChangeToATaskRereadsTheCountsAndNotTheRows() throws {
     let store = try makeStore()
-    func refusingAName(_ list: TaskViewList) {
-        _ = list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
-        _ = list.send(.action(.titleFieldChanged(" ")))
-        _ = list.send(.action(.titleFieldSubmitted))
-    }
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
     refusingAName(list)
     #expect(list.model.problem == "A title cannot be empty.", "the refusal is the setup; without it this proves nothing")
@@ -145,4 +152,105 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.send(.changed(created)) == nil)
     #expect(listRow(inbox, in: list.model)?.countText == "1")
     #expect(list.model == reference.model, "the count moved, Docs is missing, and the draft and the sentence stayed")
+}
+
+/// A fold on a list with lists inside it hides the branch, the lists under it however deep, and the rows after the
+/// branch stay, the next one at its depth or above and those under that. The fold is the device's own (ADR-0010, amendment of 2026-10-26), written on every fold as the
+/// folded ids, so a module made anew, as at the next launch, reads it back, a fold inside a folded branch included.
+/// Unfolded, the branch is back as it was, the fold inside it kept, and with nothing folded the set written is empty.
+/// A fold is no answer to anything a person was told, so a field open on a refused name keeps its draft and its
+/// sentence throughout.
+@Test func aFoldHidesTheBranchAndIsReadBackByAModuleMadeAnew() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    try store.createView(NewTaskView(title: "Garden", parent: home))
+    let office = try store.createView(NewTaskView(title: "Office", parent: projects))
+    let desk = try store.createView(NewTaskView(title: "Desk", parent: office))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    refusingAName(list)
+    let open = list.model
+    #expect(list.send(.action(.disclosureTapped(home))) == nil)
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, home, office, desk, errands])
+    #expect(listRow(home, in: list.model)?.isCollapsed == true)
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "the branch goes whole, and the row after it stays")
+    #expect(listRow(projects, in: list.model)?.isCollapsed == true)
+    #expect(try store.deviceState(collapsedKey, as: [String].self).map(Set.init) == [projects.rawValue, home.rawValue])
+    let made = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    refusingAName(made)
+    #expect(list.model == made.model, "a module made anew reads both folds back")
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, home, office, desk, errands], "the fold inside it stays")
+    #expect(list.send(.action(.disclosureTapped(home))) == nil)
+    #expect(list.model == open)
+    #expect(try store.deviceState(collapsedKey, as: [String].self) == [])
+}
+
+/// The chevron is on a list with lists inside it, and a fold anywhere else is no fold: on a leaf, on an area's line,
+/// which defines its area and never folds although lists stand under it, and on an id no row holds, it moves nothing,
+/// the field and its sentence included, and writes nothing.
+@Test func aFoldOnALeafOrALineMovesNothing() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    try store.createView(NewTaskView(title: "Clients", parent: work))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    refusingAName(list)
+    let before = list.model
+    for id in [errands, work, ViewID()] {
+        #expect(list.send(.action(.disclosureTapped(id))) == nil)
+        #expect(list.model == before)
+    }
+    #expect(try store.deviceState(collapsedKey, as: [String].self) == nil, "nothing was written")
+}
+
+/// The folds read back are the device's state, written by a version of the app that may be older, newer or wrong
+/// (`docs/style.md`, "Data from outside"), so a stale set reads as what it can: a view deleted since, an id no view ever
+/// had, a text that is no id at all and an area, whose line never folds, are dropped, and the fold a list's row holds
+/// stands. The next fold writes back what the module holds, without them.
+@Test func aFoldOnAnIdNoRowHoldsIsDropped() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    try store.createView(NewTaskView(title: "Home", parent: projects))
+    let archive = try store.createView(NewTaskView(title: "Archive"))
+    try store.createView(NewTaskView(title: "2025", parent: archive))
+    try store.delete(viewTree: archive)
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    try store.setDeviceState(collapsedKey, [
+        archive.rawValue, projects.rawValue, ViewID().rawValue, "not an id", work.rawValue,
+    ])
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work, clients])
+    #expect(listRow(projects, in: list.model)?.isCollapsed == true)
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(try store.deviceState(collapsedKey, as: [String].self) == [], "the stale ids were dropped when the folds were read")
+}
+
+/// Only a list folds, an area's line never, even one that was folded as a list. An area that arrived nested, moved
+/// by an app older than the kind, reads as a list with no rule (ADR-0004, amendment of 2026-10-25), so its chevron
+/// folds its branch; when a peer moves it back to the root it reads as an area again, and its lists stand under its
+/// line, a list inside one of them too, whatever the module still holds, since no chevron on the line could unfold
+/// them.
+@Test func aFoldedListThatComesToReadAsAnAreaHidesNothing() throws {
+    let peer = Store.newDeviceID()
+    func parent(of id: ViewID, _ value: Value, at millis: Int64) -> JournalOperation {
+        JournalOperation(entity: .view, entityID: id.rawValue, field: "parent", value: value, clock: HLC(millis: millis, counter: 0), device: peer)
+    }
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
+    _ = try store.apply([parent(of: work, .text(projects.rawValue), at: 1_800_000_000_000)])
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    #expect(listRow(work, in: list.model)?.hasChildren == true, "nested, the area reads as a list; this is the setup")
+    #expect(list.send(.action(.disclosureTapped(work))) == nil)
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work], "folded as a list")
+    let moved = try changeSet(of: store) { _ = try store.apply([parent(of: work, .null, at: 1_800_000_000_001)]) }
+    #expect(list.send(.changed(moved)) == nil)
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work, clients, acme])
+    #expect(list.model.rows.first { $0.id == work }?.kind == .area(label: "Work"))
 }

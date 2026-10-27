@@ -166,10 +166,10 @@ public final class AppModule: Routable {
     /// review of #103, as quick entry's `init` has it since #102).
     ///
     /// The width is the class the window opens with, so that its first frame already has the shape of its layout and
-    /// the sidebar its tiles (navigation state spec, section 4), and the sidebar is made with it. It has no default: a window made wide and told otherwise on its first
-    /// frame is the spec's fallback for a host that does not know the class when the window is made, and a default
-    /// here would make that fallback a rule of the core (`docs/style.md`, "A lower layer holds no policy of its
-    /// client").
+    /// the sidebar its tiles (navigation state spec, section 4), and the sidebar is made with it. It has no default: a
+    /// window made wide and told otherwise on its first frame is the spec's fallback for a host that does not know the
+    /// class when the window is made, and a default here would make that fallback a rule of the core (`docs/style.md`,
+    /// "A lower layer holds no policy of its client").
     ///
     /// Throws what the sidebar's `init` throws and nothing else, as M2's root did: a window is not made around a
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A screen of the stack that

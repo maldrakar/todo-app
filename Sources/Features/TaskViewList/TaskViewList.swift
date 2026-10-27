@@ -76,6 +76,8 @@ public final class TaskViewList: Routable {
         case createFolderButtonTapped
         /// The row's Open in New Window menu item, on the Mac and the iPad.
         case openInNewWindowMenuItemChosen(ViewID)
+        /// A list's chevron, which folds and unfolds the lists inside it.
+        case disclosureTapped(ViewID)
     }
 
     public enum Event: RoutedEvent {
@@ -155,6 +157,9 @@ public final class TaskViewList: Routable {
     /// the route names is declared whether or not a row holds its view; one the stack cannot make, its view gone or
     /// not yet synced, comes back as `.notOpened`, which takes the declaration back and says so in `problem`.
     ///
+    /// The folds are the device's own, read from its state as the module last wrote them (ADR-0010, amendment of
+    /// 2026-10-26).
+    ///
     /// The width is the class of the window the module is drawn in, which the root hands it from its own: it has no
     /// default, as the root's has none, so that the class a window is made with is always its host's to say
     /// (`docs/style.md`, "A lower layer holds no policy of its client").
@@ -165,9 +170,10 @@ public final class TaskViewList: Routable {
     public init(store: Store, route: Route, width: WindowWidth) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
+        let collapsed = try TaskViewList.collapsed(in: store, among: rows)
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
-        self.state = State(rows: rows, counts: counts, width: width, destination: Destination())
+        self.state = State(rows: rows, counts: counts, collapsed: collapsed, width: width, destination: Destination())
         setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
 
@@ -257,6 +263,14 @@ public final class TaskViewList: Routable {
             // there asks for nothing, the way the Rename menu item on one opens no field.
             guard state.rows.contains(where: { $0.id == id }) else { return nil }
             return .openInWindow(Route(list: TaskList.Route(head: id)))
+        case .action(.disclosureTapped(let id)):
+            // Only a list with lists inside it has a chevron. A leaf has nothing to fold, and an area's line defines
+            // its area and never folds, so a tap on either, or on a row that is not there, moves nothing. The fold is
+            // the one thing that moves: it is the device's state and no answer to anything a person was told, so an
+            // open field and the sentence stay where they are.
+            guard state.rows.contains(where: { $0.id == id && $0.kind == .list && $0.hasChildren }) else { return nil }
+            setCollapsed(state.collapsed.symmetricDifference([id]))
+            return nil
         case .created:
             // Nothing moves, the sentence included, because being created answers nothing a person was told,
             // and nothing is answered: `init` declared the list already.
@@ -344,6 +358,34 @@ public final class TaskViewList: Routable {
             return nil
         }
     }
+
+    /// Folds and unfolds the branches to the set, written to the device's state first and kept after (ADR-0010).
+    ///
+    /// A write that fails leaves the fold on screen and says nothing, the engineer's call (Lists screen plan,
+    /// "Self-review"): the fold the person made is drawn, the next fold writes the whole set again, and this module's
+    /// sentences stay for the data a person edits, which a fold is not.
+    private func setCollapsed(_ collapsed: Set<ViewID>) {
+        // Sorted, so that the same folds are the same text in the file, whatever order a set hands them out in.
+        try? store.setDeviceState(TaskViewList.collapsedKey, collapsed.map(\.rawValue).sorted())
+        state.collapsed = collapsed
+    }
+
+    /// The folded lists as the device's state holds them, of the lists the rows hold: what was written is the device's
+    /// and may be stale or wrong (`docs/style.md`, "Data from outside"), so a text that does not read as an id, an id
+    /// no row holds, a view deleted since, and an area's, whose line never folds, are dropped, and the next fold writes
+    /// the set back without them. A value that does not decode as a list of texts reads as nothing folded, which the
+    /// store decides.
+    private static func collapsed(in store: Store, among rows: [ReadRow]) throws(StoreError) -> Set<ViewID> {
+        let held = Set(rows.filter { $0.kind == .list }.map(\.id))
+        let kept = try store.deviceState(collapsedKey, as: [String].self) ?? []
+        return Set(kept.compactMap { try? ViewID(uuidString: $0) }.filter(held.contains))
+    }
+
+    /// The key the folds are kept under in the device's own state: the module's name and what it keeps, the folded
+    /// lists' ids as their raw values. Its rule is that a write of it reports no change set, which the store's
+    /// writes of a device's state never do: a fold is one screen's own, and another window of the same device that
+    /// draws the same rows reads it at its next read of them (ADR-0010).
+    private static let collapsedKey = "taskViewList.collapsed"
 
     /// Declares the list of a view over this module, or nothing: a click, a route, a new folder, the way back and
     /// the stack's notices each arrive here, so what a click opens and what a link opens cannot drift apart (spec
@@ -495,12 +537,11 @@ public final class TaskViewList: Routable {
     /// this module writes is English.
     private static let newFolderTitle = "New folder"
 
-    /// Everything this module holds between two events: the rows and their counts as the last reads produced them,
-    /// the width class of the window, the rename a person has open, the list declared over the module, and the
-    /// sentence they were last told. One entity, moved
-    /// field by field, from which the model is computed on every read, so that nothing on screen is state in its
-    /// own right and there is no second copy to keep in step (owner's reviews of #77 and #101): the highlight is
-    /// read off the destination, and is not kept beside it.
+    /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
+    /// lists folded on this device, the width class of the window, the rename a person has open, the list declared over
+    /// the module, and the sentence they were last told. One entity, moved field by field, from which the model is
+    /// computed on every read, so that nothing on screen is state in its own right and there is no second copy to keep
+    /// in step (owner's reviews of #77 and #101): the highlight is read off the destination, and is not kept beside it.
     ///
     /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the
     /// array inside it is copy-on-write, so a class buys nothing here and would put a second reference type
@@ -509,20 +550,25 @@ public final class TaskViewList: Routable {
     private struct State {
         var rows: [ReadRow]
         var counts: [ViewID: Int]
+        var collapsed: Set<ViewID>
         var width: WindowWidth
         var rename: Rename?
         var destination: Destination<TaskList.Route>
         var problem: String?
 
-        /// The model a view draws: the rows with the window and this person's session projected onto them — the
-        /// tiles and fonts for the width, the counts, the highlight on the list's row of the view whose list is
-        /// declared, the draft on the row they are renaming — the highlighted row's id, and the sentence, if any.
+        /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
+        /// this person's session projected onto them — the tiles and fonts for the width, the counts, the folds, the
+        /// highlight on the list's row of the view whose list is declared, the draft on the row they are renaming —
+        /// the highlighted row's id, and the sentence, if any.
         var model: Model {
             let declared = destination.pushed?.head
-            let drawn = rows.map {
+            let drawn = TaskViewList.unfolded(rows, collapsed: collapsed).map {
                 Model.Row(
                     id: $0.id, depth: $0.depth,
-                    kind: $0.kind(in: width, count: counts[$0.id], isSelected: $0.id == declared),
+                    kind: $0.kind(
+                        in: width, count: counts[$0.id], isCollapsed: collapsed.contains($0.id),
+                        isSelected: $0.id == declared
+                    ),
                     draft: rename?.text(on: $0.id)
                 )
             }
