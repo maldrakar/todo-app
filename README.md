@@ -92,8 +92,9 @@ TODO_ROUTE=/view/00000000-0000-4000-8000-000000000002/task/<task id> swift run t
 
 It opens a window: the list of views in a sidebar, and beside it the tasks of the view chosen there. Rename,
 in a row's context menu, opens a field on the row: Return or a click away keeps the new title, a blank one is
-refused with a sentence under the list, and Esc keeps the old title. New Folder, on the toolbar, adds a folder at
-the end of the top level, chosen and with its field open. A click on a task pushes its screen, which shows its title,
+refused with a sentence under the list, and Esc keeps the old title. New List, on the toolbar, adds a list at the
+end of the tree, in the last area when there is one, with its field open, and leaves the highlight where it was;
+an area is a line with its name beside it. A click on a task pushes its screen, which shows its title,
 over the list, and the back button returns to the list. Quick Entry, the + on the list's toolbar, opens a sheet with
 a title field: Return or Add puts the task in the Inbox and closes the sheet, a blank title is refused with a
 sentence in the sheet, and Cancel or Esc closes it and writes nothing.
@@ -184,13 +185,13 @@ What that last step measures is `wasm-size-probe`, an executable that exists to 
 the product. The budget is about what a web client downloads, and the `todo` demo is the wrong stand-in for
 one: it carries an argument parser, a formatter and a usage text no browser will ever load. The probe instead
 does what a web entry point will: it builds the root module over a store in memory and drives it — choose a
-view, rename it, make a folder, follow a link with `?quick-entry`, file a task through quick entry, push the task
-and go back, open quick entry again and cancel it, choose Open in New Window on a view — and beside it calls the
-public API of `TodoCore` directly — write through a store, read a page, search, exchange a journal, take a
-snapshot — because the linker keeps what a client calls, and a number measured on calls that were dead-stripped
-is a number for a binary nobody ships.
+view, rename it, make a list, a list inside it and an area, fold a branch, ask the sidebar for a new task, follow
+a link with `?quick-entry`, file a task through quick entry, push the task and go back, open quick entry again and
+cancel it, choose Open in New Window on a view — and beside it calls the public API of `TodoCore` directly — write
+through a store, read a page, search, exchange a journal, take a snapshot — because the linker keeps what a client
+calls, and a number measured on calls that were dead-stripped is a number for a binary nobody ships.
 
-The budget is 6.3125 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
+The budget is 6.5625 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
 CI runs and the command to run locally. It is the root module and the core as they stand with four percent to
 spare, rounded up to a whole 64 KiB: a guard against growing sideways, not a target to shrink towards. The
 4.5 MiB the spec first named was never measured — it is the floor measured in the toolchain spike, 3,743,306

@@ -162,9 +162,9 @@ public final class TaskViewList: Routable {
     /// The Inbox this module falls back on is declared only when a row holds it, so a person who deleted it is told
     /// nothing, having asked for nothing, and no highlight waits for the row: one would light up the moment a peer's
     /// change brought the row in, beside a list that was never opened on it. It is the invariant `create` holds for the
-    /// same reason: what this module puts on a row of its own accord goes onto a row the list holds. A list
-    /// the route names is declared whether or not a row holds its view; one the stack cannot make, its view gone or
-    /// not yet synced, comes back as `.notOpened`, which takes the declaration back and says so in `problem`.
+    /// same reason: what this module puts on a row of its own accord goes onto a row the list holds. A list the route
+    /// names is declared whether or not a row holds its view; one the stack cannot make, its view gone or not yet
+    /// synced, comes back as `.notOpened`, which takes the declaration back and says so in `problem`.
     ///
     /// The folds are the device's own, read from its state as the module last wrote them (ADR-0010, amendment of
     /// 2026-10-26).
@@ -428,10 +428,10 @@ public final class TaskViewList: Routable {
     /// draws the same rows reads it at its next read of them (ADR-0010).
     private static let collapsedKey = "taskViewList.collapsed"
 
-    /// Declares the list of a view over this module, or nothing: a click, a route, the way back and the stack's
-    /// notices each arrive here, so what a click opens and what a link opens cannot drift apart (spec
-    /// section 3). Every call is a new write, which the window's stack follows at the walk after the event, and the
-    /// highlight is what it declares.
+    /// Declares the list of a view over this module, or nothing: a click, a route, the way back and the stack's notices
+    /// each arrive here, so what a click opens and what a link opens cannot drift apart (spec section 3). Every call is
+    /// a new write, which the window's stack follows at the walk after the event, and the highlight is what it
+    /// declares.
     private func setDestination(_ list: TaskList.Route?) {
         state.destination.declare(list.map { .pushed($0) })
     }

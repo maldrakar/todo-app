@@ -6,20 +6,24 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.3125 MiB. The probe measures 6,362,344 bytes with Swift 6.4.0 as this is written, so the budget is that with
-# four percent to spare, rounded up to a whole 64 KiB. It was 6.25 MiB over the 6,275,518 bytes the probe measured
-# when the pin moved to Swift 6.4.0, and what has moved the reading since is the code: 6,286,422 bytes once the
-# sidebar had its route (#89), and the rest once the window held the task list, opened by the sidebar, with the
-# task screen inside it, and quick entry beside them, and every route came to read and write its part of the
-# window's path, all of which the probe drives (#92). Before the pin moved it was 6.5625 MiB over the 6,595,141
-# bytes the probe measured with Swift 6.3.3, and what moved that is the toolchain, not the code: the pin went to
-# the 6.4 that Xcode 27 ships (#88), whose release build of the same sources is smaller. It is not the 4.5 MiB the
-# spec first named either, and that figure was never measured: it was the floor measured in #3 — 3,743,306 bytes of
-# standard library, FoundationEssentials and SQLite with no core code reachable — plus half a megabyte of slack for
+# 6.5625 MiB. The probe measures 6,562,323 bytes with Swift 6.4.0 as this is written, so the budget is that with four
+# percent to spare, rounded up to a whole 64 KiB. It was 6.3125 MiB over the 6,362,344 bytes the probe measured once
+# the window's route had its text form (#103), and what has moved the reading since is the code: 6,492,550 bytes on
+# the `main` this was measured beside, 34c7fee, and the other 69,773 once the sidebar drew its rows as areas and
+# lists, with the tiles the design system's two targets build, which the probe links through it, the counts and the
+# folds, and the probe drove the sidebar's new actions (#146). Before that it was 6.25 MiB over the 6,275,518 bytes
+# the probe measured when the pin moved to Swift 6.4.0, and what moved the reading from there was the code too:
+# 6,286,422 bytes once the sidebar had its route (#89), and the rest once the window held the task list, opened by the
+# sidebar, with the task screen inside it, and quick entry beside them, and every route came to read and write its
+# part of the window's path, all of which the probe drives (#92). Before the pin moved it was 6.5625 MiB over the
+# 6,595,141 bytes the probe measured with Swift 6.3.3, and what moved that is the toolchain, not the code: the pin
+# went to the 6.4 that Xcode 27 ships (#88), whose release build of the same sources is smaller. It is not the 4.5 MiB
+# the spec first named either, and that figure was never measured: it was the floor measured in #3 — 3,743,306 bytes
+# of standard library, FoundationEssentials and SQLite with no core code reachable — plus half a megabyte of slack for
 # the code the core would add. That code, with the JSON coding it pulls in, costs 2.8 MB instead. SQLite and
-# FoundationEssentials sit inside the floor, on both sides of the comparison, so they are not what the difference
-# is made of. Moving this number is a decision, so it lives here in one place and nowhere else.
-BUDGET_BYTES=6619136
+# FoundationEssentials sit inside the floor, on both sides of the comparison, so they are not what the difference is
+# made of. Moving this number is a decision, so it lives here in one place and nowhere else.
+BUDGET_BYTES=6881280
 SDK=swift-6.4.0-RELEASE_wasm
 PRODUCT=wasm-size-probe
 
