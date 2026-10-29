@@ -82,6 +82,23 @@ extension TaskViewList {
 
         /// What the picker of Move to… draws (spec section 6).
         public struct MovePicker: Equatable, Sendable {
+            /// A row of the picker: the row the screen draws, and what the picker says about it.
+            public struct Row: Equatable, Sendable, Identifiable {
+                public var id: ViewID { row.id }
+
+                /// The row as the screen draws it, of the same kind, at the same depth and with the same tile and
+                /// title font, so that a view draws it with the screen's own row; it carries no draft, no fold and no
+                /// highlight.
+                public let row: Model.Row
+
+                /// Whether the row cannot take the list, being the list itself or a list inside it, which a view
+                /// greys out.
+                public let isDisabled: Bool
+
+                /// Whether the row is the list's present parent, a list or an area's line, which a view marks.
+                public let isCurrent: Bool
+            }
+
             /// The title, which names the list being moved.
             public let title: String
 
@@ -89,22 +106,7 @@ extension TaskViewList {
             public let isTopLevelCurrent: Bool
 
             /// The whole tree in tree order, every level of it and the folds ignored.
-            public let rows: [PickerRow]
-        }
-
-        /// A row of the picker: the row the screen draws, and what the picker says about it.
-        public struct PickerRow: Equatable, Sendable, Identifiable {
-            public var id: ViewID { row.id }
-
-            /// The row as the screen draws it, of the same kind, at the same depth and with the same tile and title
-            /// font, so that a view draws it with the screen's own row; it carries no draft, no fold and no highlight.
-            public let row: Row
-
-            /// Whether the row cannot take the list, being the list itself or a list inside it, which a view greys out.
-            public let isDisabled: Bool
-
-            /// Whether the row is the list's present parent, a list or an area's line, which a view marks.
-            public let isCurrent: Bool
+            public let rows: [Row]
         }
 
         public let rows: [Row]

@@ -111,13 +111,13 @@ extension TaskViewList {
     /// of them can take it (Lists screen spec, section 6).
     static func pickerRows(
         moving list: ReadRow, among rows: [ReadRow], in width: WindowWidth, isEditing: Bool, counts: [ViewID: Int]
-    ) -> [Model.PickerRow] {
+    ) -> [Model.MovePicker.Row] {
         let greyed = subtree(of: list.id, in: rows)
         return rows.map { row in
             let kind = row.drawnKind(
                 in: width, isEditing: isEditing, count: counts[row.id], isFolded: false, isSelected: false
             )
-            return Model.PickerRow(
+            return Model.MovePicker.Row(
                 row: Model.Row(id: row.id, depth: row.depth, kind: kind, draft: nil),
                 isDisabled: greyed.contains(row.id), isCurrent: row.id == list.parent
             )
