@@ -577,7 +577,7 @@ public final class TaskViewList: Routable {
         let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         // A dialog goes with its row, and says nothing, as the highlight goes: the row leaving the tree says what
         // happened, and a dialog left up would ask about a row the module no longer holds.
-        if let dialog = state.dialog, !rows.contains(where: { $0.id == dialog.row }) {
+        if let dialog = state.dialog, !rows.contains(where: { $0.id == dialog.id }) {
             state.dialog = nil
         }
         if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
@@ -663,25 +663,26 @@ public final class TaskViewList: Routable {
     ///
     /// The rows are read back after a refusal too, since what the store refused can be a peer's change the module has
     /// not heard of yet, a list deleted under the confirmation, and an area's deletion refused at one of its lists has
-    /// moved the lists before it (Lists screen spec, "Risks"). A read that fails then has nothing to add: the refusal
-    /// is the larger fact, and stays (`commit`).
+    /// moved the lists before it (Lists screen spec, "Risks"). A read that fails says the list may be out of date only
+    /// when nothing else was said: after a refusal, the refusal is the larger fact, and stays (`commit`).
     @discardableResult
     private func writeAndReread(_ write: () throws(StoreError) -> Void) -> Bool {
+        let written: Bool
         do {
             try write()
+            written = true
+            if state.rename == nil { state.problem = nil }
         } catch {
+            written = false
             state.problem = Problem.couldNotSave.sentence
-            try? reread()
-            return false
         }
-        if state.rename == nil { state.problem = nil }
         do {
             try reread()
         } catch {
             if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
             return false
         }
-        return true
+        return written
     }
 
     /// Moves a list under a parent, nil for the root, to a place among its lists, from the picker or a drop, and
@@ -706,28 +707,13 @@ public final class TaskViewList: Routable {
         setCollapsedViews(state.collapsedViews.subtracting([id]))
     }
 
-    /// Deletes an area and leaves its lists where they stand (Lists screen spec, sections 3 and 6): the line goes, so
-    /// each list moves into the area above, or to the root above every line when the area was the first, and then the
-    /// area is tombstoned with `delete(view:)`, which is unchanged for it. These are several writes, so a refusal
-    /// between them leaves the lists before it moved and the area in place, which the next attempt finishes (spec,
-    /// "Risks").
+    /// Deletes an area and leaves its lists where they stand (Lists screen spec, sections 3 and 6): each list moves
+    /// where `listMoves(deletingArea:in:)` reads it goes, and then the area is tombstoned with `delete(view:)`, which
+    /// is unchanged for it. These are several writes, so a refusal between them leaves the lists before it moved and
+    /// the area in place, which the next attempt finishes (spec, "Risks").
     private func deleteArea(_ id: ViewID) throws(StoreError) {
-        let rows = state.rows
-        let above = rows.prefix { $0.id != id }.last { $0.kind == .area }
-        var previous: ViewID?
-        for list in rows where list.parent == id {
-            // In rank order, each at the end of the area above; with none above, the first where the root rule puts a
-            // list and each next one after the one before it, which is where the rule puts it once that one stands
-            // there, read from rows that are not read again between the moves, so that they keep their order.
-            let placement: Placement = if above != nil {
-                .end
-            } else if let previous {
-                .after(previous)
-            } else {
-                TaskViewList.rootPlacement(of: list.id, in: rows)
-            }
-            try store.move(view: list.id, to: above?.id, at: placement)
-            previous = list.id
+        for move in TaskViewList.listMoves(deletingArea: id, in: state.rows) {
+            try store.move(view: move.list, to: move.parent, at: move.placement)
         }
         try store.delete(view: id)
     }
@@ -884,27 +870,18 @@ public final class TaskViewList: Routable {
             }
         }
 
-        /// The picker up over the rows, nil when none is: the whole tree in tree order with the folds ignored, each row
-        /// drawn by the screen's rule for the width and edit mode with none of this person's session on it, no draft,
-        /// no fold, since nothing in the picker is hidden for a chevron to say so, and no highlight, since the picker
-        /// marks the present parent instead; the list being moved and every list inside it greyed out, since none of
-        /// them can take it (Lists screen spec, section 6).
+        /// The picker up over the rows, nil when none is: its title names the list being moved, "Top level" is marked
+        /// when the list stands at the root, and its rows are the whole tree as `pickerRows` reads it (Lists screen
+        /// spec, section 6).
         private var movePicker: Model.MovePicker? {
             guard case .movePicker(let id)? = dialog, let moving = rows.first(where: { $0.id == id }) else {
                 return nil
             }
-            let greyed = TaskViewList.subtree(of: id, in: rows)
             return Model.MovePicker(
                 title: "Move “\(moving.title)” to…", isTopLevelCurrent: moving.parent == nil,
-                rows: rows.map { row in
-                    let kind = row.drawnKind(
-                        in: width, isEditing: isEditing, count: counts[row.id], isFolded: false, isSelected: false
-                    )
-                    return Model.PickerRow(
-                        row: Model.Row(id: row.id, depth: row.depth, kind: kind, draft: nil),
-                        isDisabled: greyed.contains(row.id), isCurrent: row.id == moving.parent
-                    )
-                }
+                rows: TaskViewList.pickerRows(
+                    moving: moving, among: rows, in: width, isEditing: isEditing, counts: counts
+                )
             )
         }
 
@@ -916,8 +893,8 @@ public final class TaskViewList: Routable {
             case deleteConfirmation(ViewID)
             case movePicker(ViewID)
 
-            /// The row the dialog is up for.
-            var row: ViewID {
+            /// The id of the row the dialog is up for.
+            var id: ViewID {
                 switch self {
                 case .deleteConfirmation(let id), .movePicker(let id): id
                 }

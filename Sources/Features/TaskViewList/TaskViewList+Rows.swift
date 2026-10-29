@@ -104,6 +104,49 @@ extension TaskViewList {
         return (shown, highlighted)
     }
 
+    /// The rows of the picker that moves a list: the whole tree in tree order with the folds ignored, each row drawn by
+    /// the screen's own rule, `drawnKind`, for the width and edit mode, with none of this person's session on it, no
+    /// draft, no fold, since nothing in the picker is hidden for a chevron to say so, and no highlight, since the
+    /// picker marks the present parent instead; the list being moved and every list inside it greyed out, since none
+    /// of them can take it (Lists screen spec, section 6).
+    static func pickerRows(
+        moving list: ReadRow, among rows: [ReadRow], in width: WindowWidth, isEditing: Bool, counts: [ViewID: Int]
+    ) -> [Model.PickerRow] {
+        let greyed = subtree(of: list.id, in: rows)
+        return rows.map { row in
+            let kind = row.drawnKind(
+                in: width, isEditing: isEditing, count: counts[row.id], isFolded: false, isSelected: false
+            )
+            return Model.PickerRow(
+                row: Model.Row(id: row.id, depth: row.depth, kind: kind, draft: nil),
+                isDisabled: greyed.contains(row.id), isCurrent: row.id == list.parent
+            )
+        }
+    }
+
+    /// Where an area's lists go when the area is deleted, in rank order, each with its new parent and its place, so
+    /// that they stand where they stood (Lists screen spec, sections 3 and 6): the line goes, so each goes to the end
+    /// of the area above, or, when the area was the first, to the root above every line, the first where the root rule
+    /// puts a list and each next one after the one before it, which is where the rule puts it once that one stands
+    /// there. It is read from the rows once, before any of the moves is written, so that they keep their order.
+    static func listMoves(
+        deletingArea id: ViewID, in rows: [ReadRow]
+    ) -> [(list: ViewID, parent: ViewID?, placement: Placement)] {
+        let above = rows.prefix { $0.id != id }.last { $0.kind == .area }
+        var moves: [(list: ViewID, parent: ViewID?, placement: Placement)] = []
+        for list in rows where list.parent == id {
+            let placement: Placement = if above != nil {
+                .end
+            } else if let previous = moves.last {
+                .after(previous.list)
+            } else {
+                rootPlacement(of: list.id, in: rows)
+            }
+            moves.append((list.id, above?.id, placement))
+        }
+        return moves
+    }
+
     /// Where a row let go after another at a depth goes: its new parent and its place among that parent's lists (Lists
     /// screen spec, sections 5 and 7). The rows are the drawn ones, the folds applied, since the slot a view draws
     /// stands between drawn rows, and the answer is nil when the drop names a row they do not hold, or would put a row
