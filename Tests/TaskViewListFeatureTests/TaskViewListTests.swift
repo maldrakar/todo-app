@@ -14,8 +14,9 @@ private func on(_ view: ViewID, task: TaskID? = nil) -> TaskViewList.Route {
 }
 
 /// The model of a sidebar made now on a view, which is what the sidebar is compared with after an event: the
-/// rows as a read now answers them, the highlight on the view where a row holds it, and no sentence.
-private func sidebarOn(_ view: ViewID, in store: Store) throws -> TaskViewList.Model {
+/// rows as a read now answers them, the highlight on the view where a row holds it, and no sentence. Not private,
+/// since the rows' tests compare with it too, where a fold has moved the highlight.
+func sidebarOn(_ view: ViewID, in store: Store) throws -> TaskViewList.Model {
     try TaskViewList(store: store, route: on(view), width: .narrow).model
 }
 

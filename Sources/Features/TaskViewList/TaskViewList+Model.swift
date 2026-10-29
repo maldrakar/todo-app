@@ -67,7 +67,8 @@ extension TaskViewList {
             /// screen spec, section 5); never on a list with no lists inside.
             public let isCollapsed: Bool
 
-            /// Whether this row is the highlighted one, which `selection` names too.
+            /// Whether this row is the highlighted one, which `selection` names too: the row of the view whose list is
+            /// declared, or the folded list whose branch hides that row.
             public let isSelected: Bool
         }
 
@@ -82,10 +83,14 @@ extension TaskViewList {
         /// off the same drawn rows when the model is assembled, so they name the same row or none.
         ///
         /// The highlight is the view of the list this module declared, where a list's row holds it (navigation state
-        /// spec, "Open questions"): nil when it declared nothing, and when the view it declared has no such row among
-        /// the rows drawn, a view that is gone or not yet synced, or a list inside a folded one, so a highlight goes
-        /// with its row by computation and a row that arrives later, or is unfolded, lights up only if its list is
-        /// still declared.
+        /// spec, "Open questions"): nil when it declared nothing, and when the view it declared has no such row, a
+        /// view that is gone or not yet synced, so a highlight goes with its row by computation and a row that arrives
+        /// later lights up only if its list is still declared.
+        ///
+        /// A row hidden by a fold passes its highlight to the folded list that hides it, the outermost of the folds
+        /// above it, which is the one drawn, as the Finder lights a folder that closes over the selection (the owner,
+        /// 2026-10-29, #158). Only the light moves: the list declared stays open, a click on the lit row declares that
+        /// row's own list as a click on any row does, and the row lights up again once no fold hides it.
         public let selection: ViewID?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:

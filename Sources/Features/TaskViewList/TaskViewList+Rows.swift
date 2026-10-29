@@ -50,21 +50,31 @@ extension TaskViewList {
     }
 
     /// The rows a person sees: every read row but the lists inside a folded one, however deep (Lists screen spec,
-    /// section 5). One pass in tree order, like the read, carrying the depth below which rows are hidden: a folded list
-    /// hides the rows deeper than itself that follow it, and the first row at its depth or above ends the branch and
-    /// clears it. The depth is the drawn one, so an area's line folds nothing even with its id in the set, which no
-    /// chevron on the line could take out: the lists under the line stand at its own depth, and the first of them ends
-    /// the branch. That is what a list folded on this device comes to when a peer's move makes it read as an area
-    /// again, an area that had arrived nested (ADR-0004, amendment of 2026-10-25).
-    static func unfolded(_ rows: [ReadRow], collapsed: Set<ViewID>) -> [ReadRow] {
-        var hiddenBelow: Int?
+    /// section 5). One pass in tree order, like the read, carrying the folded row whose branch is hidden, with its
+    /// depth: a folded list hides the rows deeper than itself that follow it, and the first row at its depth or above
+    /// ends the branch and clears it. The depth is the drawn one, so an area's line folds nothing even with its id in
+    /// the set, which no chevron on the line could take out: the lists under the line stand at its own depth, and the
+    /// first of them ends the branch. That is what a list folded on this device comes to when a peer's move makes it
+    /// read as an area again, an area that had arrived nested (ADR-0004, amendment of 2026-10-25).
+    ///
+    /// It answers in the same pass the row the highlight is on: the declared view's own row when it is shown, and the
+    /// folded row that hides it when it is not, as the Finder lights a folder that closes over the selection (the
+    /// owner, 2026-10-29, #158). A row inside a hidden branch is skipped before it is asked whether it folds, so of two
+    /// folds above the declared row the one that hides it is the outer, which is the one drawn.
+    static func unfolded(
+        _ rows: [ReadRow], collapsed: Set<ViewID>, declared: ViewID?
+    ) -> (rows: [ReadRow], highlighted: ViewID?) {
+        var fold: (id: ViewID, depth: Int)?
         var shown: [ReadRow] = []
+        var highlighted: ViewID?
         for row in rows {
-            if let depth = hiddenBelow, row.depth > depth { continue }
-            hiddenBelow = collapsed.contains(row.id) ? row.depth : nil
+            let hiddenBy = fold.flatMap { row.depth > $0.depth ? $0.id : nil }
+            if row.id == declared { highlighted = hiddenBy ?? row.id }
+            guard hiddenBy == nil else { continue }
+            fold = collapsed.contains(row.id) ? (row.id, row.depth) : nil
             shown.append(row)
         }
-        return shown
+        return (shown, highlighted)
     }
 
     /// The number of open tasks each view selects, which the store answers for every view in one call and which is

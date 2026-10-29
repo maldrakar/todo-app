@@ -622,23 +622,23 @@ public final class TaskViewList: Routable {
 
         /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
         /// this person's session projected onto them — the tiles and fonts for the width, the counts, the folds, the
-        /// highlight on the list's row of the view whose list is declared, the draft on the row they are renaming —
-        /// the highlighted row's id, and the sentence, if any.
+        /// highlight on the list's row of the view whose list is declared, or on the folded list that hides that row,
+        /// the draft on the row they are renaming — the highlighted row's id, and the sentence, if any.
         var model: Model {
-            let declared = destination.pushed?.head
-            let drawn = TaskViewList.unfolded(rows, collapsed: collapsed).map {
+            let shown = TaskViewList.unfolded(rows, collapsed: collapsed, declared: destination.pushed?.head)
+            let drawn = shown.rows.map {
                 Model.Row(
                     id: $0.id, depth: $0.depth,
                     kind: $0.drawnKind(
                         in: width, count: counts[$0.id], isFolded: collapsed.contains($0.id),
-                        isSelected: $0.id == declared
+                        isSelected: $0.id == shown.highlighted
                     ),
                     draft: rename?.text(on: $0.id)
                 )
             }
-            // Read off the drawn rows and not copied from the destination: `.rowSelected` and `.route` declare the
-            // list of an id without asking the rows, and an id no list's row carries highlights nothing, so the
-            // model names no row for it either.
+            // Read off the drawn rows and not copied from the destination or the walk: `.rowSelected` and `.route`
+            // declare the list of an id without asking the rows, and an id no list's row carries, an area's line's
+            // among them, highlights nothing, so the model names no row for it either.
             let selection = drawn.first { row in
                 guard case .list(let list) = row.kind else { return false }
                 return list.isSelected

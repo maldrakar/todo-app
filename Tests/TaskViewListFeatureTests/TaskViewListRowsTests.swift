@@ -512,6 +512,76 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow)).model)
 }
 
+/// A fold that hides the open list's row lights the row that hides it, the folded list a person can still see, as the
+/// Finder lights a folder that closes over the selection (the owner, 2026-10-29, #158): `selection` names it, and the
+/// model is the one a sidebar declared on that list draws. With two folds above the open list the outer one is lit,
+/// since it is the one drawn. Only the light moves: the list declared, with the task in it, stays open, and the folds
+/// taken back light its own row again.
+@Test func aFoldOverTheOpenListLightsTheFoldedListThatHidesIt() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
+    try store.createView(NewTaskView(title: "Errands"))
+    let task = try store.createTask(NewTask(title: "Buy seeds"))
+    let route = TaskViewList.Route(list: .init(head: garden, task: TaskScreen.Route(head: task)))
+    let list = try TaskViewList(store: store, route: route, width: .narrow)
+    let open = list.model
+    #expect(open.selection == garden, "the open list's row is lit; this is the setup")
+    #expect(list.send(.action(.disclosureTapped(home))) == nil)
+    #expect(list.model.selection == home)
+    #expect(list.model == (try sidebarOn(home, in: store)), "Home lit, as a sidebar declared on it draws it")
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(list.model.selection == projects, "the outer fold, the one drawn")
+    #expect(list.model == (try sidebarOn(projects, in: store)))
+    #expect(list.destination.pushed == route.list, "the light moved and the declaration did not")
+    #expect(list.route == route)
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(list.model == (try sidebarOn(home, in: store)), "Home still hides Garden")
+    #expect(list.send(.action(.disclosureTapped(home))) == nil)
+    #expect(list.model == open)
+}
+
+/// Under an area's line the lists stand at the line's own depth (Lists screen spec, section 3), and a fold among them
+/// lights the same way: the folded list that hides the open one, the outer of two, and not the list after the branch,
+/// which stands at the same drawn depth as the outer one.
+@Test func aFoldOverTheOpenListUnderAnAreaLightsTheFoldedListThatHidesIt() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
+    let contracts = try store.createView(NewTaskView(title: "Contracts", parent: acme))
+    try store.createView(NewTaskView(title: "Billing", parent: work))
+    let list = try TaskViewList(store: store, route: .init(list: .init(head: contracts)), width: .narrow)
+    let open = list.model
+    #expect(open.selection == contracts, "the open list's row is lit; this is the setup")
+    #expect(list.send(.action(.disclosureTapped(acme))) == nil)
+    #expect(list.model == (try sidebarOn(acme, in: store)))
+    #expect(list.send(.action(.disclosureTapped(clients))) == nil)
+    #expect(list.model.selection == clients)
+    #expect(list.model == (try sidebarOn(clients, in: store)))
+    #expect(list.destination.pushed == .init(head: contracts))
+    #expect(list.send(.action(.disclosureTapped(clients))) == nil)
+    #expect(list.send(.action(.disclosureTapped(acme))) == nil)
+    #expect(list.model == open)
+}
+
+/// The lit list is a row like any other, so a click on it declares its own list, which closes the one open under the
+/// fold, as a click on any row declares that row's (`rowSelected`); unfolded, the light stays where the click put it.
+@Test func aClickOnTheLitFoldedListDeclaresItsOwnList() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let list = try TaskViewList(store: store, route: .init(list: .init(head: home)), width: .narrow)
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(list.model.selection == projects, "the fold lit Projects; this is the setup")
+    #expect(list.send(.action(.rowSelected(projects))) == nil)
+    #expect(list.destination.pushed == .init(head: projects))
+    #expect(list.route == .init(list: .init(head: projects)))
+    #expect(list.send(.action(.disclosureTapped(projects))) == nil)
+    #expect(list.model == (try sidebarOn(projects, in: store)), "unfolded, Projects is lit and Home is not")
+}
+
 /// A change naming only tags can move a count too, as a deleted tag takes its tasks out of every rule that names it,
 /// so it reads the counts again, and not the rows: a view written since with no change sent stays out of them (Lists
 /// screen spec, section 4).
