@@ -715,12 +715,13 @@ public final class TaskViewList: Routable {
         let above = rows.prefix { $0.id != id }.last { $0.kind == .area }
         var previous: ViewID?
         for list in rows where list.parent == id {
-            // In rank order, each after the one moved before it, so that they keep their order: the first at the end
-            // of the area above, or where the root rule puts a list when there is none above.
-            let placement: Placement = if let previous {
-                .after(previous)
-            } else if above != nil {
+            // In rank order, each at the end of the area above; with none above, the first where the root rule puts a
+            // list and each next one after the one before it, which is where the rule puts it once that one stands
+            // there, read from rows that are not read again between the moves, so that they keep their order.
+            let placement: Placement = if above != nil {
                 .end
+            } else if let previous {
+                .after(previous)
             } else {
                 TaskViewList.rootPlacement(of: list.id, in: rows)
             }
