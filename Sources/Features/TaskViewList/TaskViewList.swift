@@ -361,7 +361,9 @@ public final class TaskViewList: Routable {
                 // rule gone selects nothing (Lists screen spec, section 6).
                 writeAndReread { () throws(StoreError) in try store.delete(viewTree: id) }
             case .area:
-                writeAndReread { () throws(StoreError) in try deleteArea(id) }
+                // Several writes, so a refusal part-way leaves some lists moved and the area in place, which the
+                // general sentence, that nothing was written, would deny (`deleteArea`).
+                writeAndReread(refusal: .couldNotDeleteArea) { () throws(StoreError) in try deleteArea(id) }
             }
             return nil
         case .action(.deleteCancelled):
@@ -657,16 +659,16 @@ public final class TaskViewList: Routable {
     }
 
     /// Writes a person's edit of the tree, a delete, a move from the picker or a drop, and reads the rows back,
-    /// answering whether both held. A refusal is said with the module's one sentence for a refused write; a write that
-    /// held takes the sentence away, except while a field is open, whose sentence explains it, as a click leaves it
-    /// (`rowSelected`).
+    /// answering whether both held. A refusal is said with the module's one sentence for a refused write, or with the
+    /// `refusal` a caller passes for a write that has a sentence of its own; a write that held takes the sentence away,
+    /// except while a field is open, whose sentence explains it, as a click leaves it (`rowSelected`).
     ///
     /// The rows are read back after a refusal too, since what the store refused can be a peer's change the module has
     /// not heard of yet, a list deleted under the confirmation, and an area's deletion refused at one of its lists has
     /// moved the lists before it (Lists screen spec, "Risks"). A read that fails says the list may be out of date only
     /// when nothing else was said: after a refusal, the refusal is the larger fact, and stays (`commit`).
     @discardableResult
-    private func writeAndReread(_ write: () throws(StoreError) -> Void) -> Bool {
+    private func writeAndReread(refusal: Problem = .couldNotSave, _ write: () throws(StoreError) -> Void) -> Bool {
         let written: Bool
         do {
             try write()
@@ -674,7 +676,7 @@ public final class TaskViewList: Routable {
             if state.rename == nil { state.problem = nil }
         } catch {
             written = false
-            state.problem = Problem.couldNotSave.sentence
+            state.problem = refusal.sentence
         }
         do {
             try reread()
@@ -710,7 +712,8 @@ public final class TaskViewList: Routable {
     /// Deletes an area and leaves its lists where they stand (Lists screen spec, sections 3 and 6): each list moves
     /// where `listMoves(deletingArea:in:)` reads it goes, and then the area is tombstoned with `delete(view:)`, which
     /// is unchanged for it. These are several writes, so a refusal between them leaves the lists before it moved and
-    /// the area in place, which the next attempt finishes (spec, "Risks").
+    /// the area in place, which the next attempt finishes (spec, "Risks"). That is why a refusal of any of them is said
+    /// with `couldNotDeleteArea` and not with the general sentence, which would be untrue.
     private func deleteArea(_ id: ViewID) throws(StoreError) {
         for move in TaskViewList.listMoves(deletingArea: id, in: state.rows) {
             try store.move(view: move.list, to: move.parent, at: move.placement)
@@ -920,6 +923,7 @@ public final class TaskViewList: Routable {
         case viewIsGone(title: String)
         case areaIsGone
         case couldNotSave
+        case couldNotDeleteArea
         case couldNotOpenList
 
         var sentence: String {
@@ -929,6 +933,7 @@ public final class TaskViewList: Routable {
             case .viewIsGone(let title): "“\(title)” is no longer there, so the new name was not saved."
             case .areaIsGone: "The area is no longer there, so the new name was not saved."
             case .couldNotSave: "The change could not be saved, so nothing was written."
+            case .couldNotDeleteArea: "The area could not be deleted, so some of its lists may have moved already."
             case .couldNotOpenList: "The list could not be opened."
             }
         }

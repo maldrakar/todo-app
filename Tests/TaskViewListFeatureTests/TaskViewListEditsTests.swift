@@ -115,6 +115,7 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
 
 /// The sentence a write the store refuses reads as, the module's one sentence for every refusal of a write.
 private let couldNotSave = "The change could not be saved, so nothing was written."
+private let couldNotDeleteArea = "The area could not be deleted, so some of its lists may have moved already."
 
 /// Delete always asks (Lists screen spec, section 6): the menu item puts the confirmation up and writes nothing, and
 /// Cancel takes it down and leaves the module as it was. A row that is not there asks nothing.
@@ -221,10 +222,11 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
     #expect(try store.view(work) == nil)
 }
 
-/// A delete the store refuses says so with the module's one sentence for a refused write, takes the confirmation down
-/// and reads the rows back: a list a peer deleted before the change saying so arrived is gone from them. An area is
-/// refused at the first of its lists a peer deleted, after the lists before it moved, and stays, so that the next
-/// attempt finishes it and says nothing (Lists screen spec, "Risks").
+/// A delete the store refuses says so, a list's with the module's one sentence for a refused write and an area's with
+/// a sentence of its own, since its several writes may have moved lists before one was refused. It takes the
+/// confirmation down and reads the rows back: a list a peer deleted before the change saying so arrived is gone from
+/// them. An area is refused at the first of its lists a peer deleted, after the lists before it moved, and stays, so
+/// that the next attempt finishes it and says nothing (Lists screen spec, "Risks").
 @Test func aDeleteTheStoreRefusesSaysSoAndTheNextAttemptFinishesAnArea() throws {
     let store = try makeStore()
     let errands = try store.createView(NewTaskView(title: "Errands"))
@@ -242,7 +244,7 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
     #expect(list.send(.action(.deleteMenuItemChosen(work))) == nil)
     try store.delete(view: billing)
     #expect(list.send(.action(.deleteConfirmed)) == nil)
-    #expect(list.model.problem == couldNotSave)
+    #expect(list.model.problem == couldNotDeleteArea)
     #expect(list.model.confirmation == nil)
     #expect(list.model.rows.map(\.id) == builtIns + [clients, work], "Clients moved and the area stayed")
     #expect(list.send(.action(.deleteMenuItemChosen(work))) == nil)
