@@ -29,7 +29,7 @@ private func rowBeingNamed(in model: TaskViewList.Model) throws -> TaskViewList.
 }
 
 /// The key the sidebar keeps its folds under in the device's own state, as the module names it (ADR-0010).
-private let collapsedKey = "taskViewList.collapsed"
+private let collapsedViewsKey = "taskViewList.collapsed"
 
 /// Opens the field on Today, types a blank name and submits it, so that the list holds a field open on a refused
 /// draft and the sentence that refused it, which an event that moves nothing leaves where they are.
@@ -193,7 +193,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "the branch goes whole, and the row after it stays")
     #expect(listRow(projects, in: list.model)?.isCollapsed == true)
-    #expect(try store.deviceState(collapsedKey, as: [String].self).map(Set.init) == [projects.rawValue, home.rawValue])
+    #expect(try store.deviceState(collapsedViewsKey, as: [String].self).map(Set.init) == [projects.rawValue, home.rawValue])
     let made = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
     refusingAName(made)
     #expect(list.model == made.model, "a module made anew reads both folds back")
@@ -201,7 +201,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, home, office, desk, errands], "the fold inside it stays")
     #expect(list.send(.action(.disclosureTapped(home))) == nil)
     #expect(list.model == open)
-    #expect(try store.deviceState(collapsedKey, as: [String].self) == [])
+    #expect(try store.deviceState(collapsedViewsKey, as: [String].self) == [])
 }
 
 /// The chevron is on a list with lists inside it, and a fold anywhere else is no fold: on a leaf, on an area's line,
@@ -219,7 +219,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
         #expect(list.send(.action(.disclosureTapped(id))) == nil)
         #expect(list.model == before)
     }
-    #expect(try store.deviceState(collapsedKey, as: [String].self) == nil, "nothing was written")
+    #expect(try store.deviceState(collapsedViewsKey, as: [String].self) == nil, "nothing was written")
 }
 
 /// The folds read back are the device's state, written by a version of the app that may be older, newer or wrong
@@ -235,14 +235,14 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     try store.delete(viewTree: archive)
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
-    try store.setDeviceState(collapsedKey, [
+    try store.setDeviceState(collapsedViewsKey, [
         archive.rawValue, projects.rawValue, ViewID().rawValue, "not an id", work.rawValue,
     ])
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work, clients])
     #expect(listRow(projects, in: list.model)?.isCollapsed == true)
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
-    #expect(try store.deviceState(collapsedKey, as: [String].self) == [], "the stale ids were dropped when the folds were read")
+    #expect(try store.deviceState(collapsedViewsKey, as: [String].self) == [], "the stale ids were dropped when the folds were read")
 }
 
 /// Only a list folds, an area's line never, even one that was folded as a list. An area that arrived nested, moved
@@ -314,7 +314,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let made = try rowBeingNamed(in: list.model)
     #expect(list.model.rows.map(\.id) == builtIns + [projects, home, made.id, errands])
     #expect(listRow(projects, in: list.model)?.isCollapsed == false)
-    #expect(try store.deviceState(collapsedKey, as: [String].self) == [])
+    #expect(try store.deviceState(collapsedViewsKey, as: [String].self) == [])
     #expect(made.depth == 1)
     #expect(listRow(made)?.tile == TileModel(color: .teal, icon: .list, side: 26, cornerRadius: 7, glyphSize: 16))
     #expect(try stored(made.id, in: store) == ["New list", projects.rawValue, "list", "teal", "list"])
@@ -467,7 +467,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(second.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow)).model)
     #expect(listRow(projects, in: second.model)?.isCollapsed == true)
     #expect(second.send(.action(.disclosureTapped(errands))) == nil)
-    #expect(try store.deviceState(collapsedKey, as: [String].self).map(Set.init) == [projects.rawValue, errands.rawValue])
+    #expect(try store.deviceState(collapsedViewsKey, as: [String].self).map(Set.init) == [projects.rawValue, errands.rawValue])
 }
 
 /// An unnamed area has no name to say, so a field open on one that a peer deleted says that the area is gone without
@@ -498,7 +498,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    try store.setDeviceState(collapsedKey, [projects.rawValue, errands.rawValue])
+    try store.setDeviceState(collapsedViewsKey, [projects.rawValue, errands.rawValue])
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
     #expect(listRow(projects, in: list.model)?.isCollapsed == true)
     #expect(listRow(errands, in: list.model)?.isCollapsed == false, "a leaf the device's state names")

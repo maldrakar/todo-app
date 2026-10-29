@@ -62,7 +62,7 @@ extension TaskViewList {
     /// owner, 2026-10-29, #158). A row inside a hidden branch is skipped before it is asked whether it folds, so of two
     /// folds above the declared row the one that hides it is the outer, which is the one drawn.
     static func unfolded(
-        _ rows: [ReadRow], collapsed: Set<ViewID>, declared: ViewID?
+        _ rows: [ReadRow], collapsedViews: Set<ViewID>, declared: ViewID?
     ) -> (rows: [ReadRow], highlighted: ViewID?) {
         var fold: (id: ViewID, depth: Int)?
         var shown: [ReadRow] = []
@@ -71,7 +71,7 @@ extension TaskViewList {
             let hiddenBy = fold.flatMap { row.depth > $0.depth ? $0.id : nil }
             if row.id == declared { highlighted = hiddenBy ?? row.id }
             guard hiddenBy == nil else { continue }
-            fold = collapsed.contains(row.id) ? (row.id, row.depth) : nil
+            fold = collapsedViews.contains(row.id) ? (row.id, row.depth) : nil
             shown.append(row)
         }
         return (shown, highlighted)

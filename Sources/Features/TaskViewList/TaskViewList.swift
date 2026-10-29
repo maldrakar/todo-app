@@ -179,10 +179,12 @@ public final class TaskViewList: Routable {
     public init(store: Store, route: Route, width: WindowWidth) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
-        let collapsed = try TaskViewList.collapsed(in: store, among: rows)
+        let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
-        self.state = State(rows: rows, counts: counts, collapsed: collapsed, width: width, destination: Destination())
+        self.state = State(
+            rows: rows, counts: counts, collapsedViews: collapsedViews, width: width, destination: Destination()
+        )
         setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
 
@@ -310,7 +312,7 @@ public final class TaskViewList: Routable {
             // the one thing that moves: it is the device's state and no answer to anything a person was told, so an
             // open field and the sentence stay where they are.
             guard state.rows.contains(where: { $0.id == id && $0.kind == .list && $0.hasChildren }) else { return nil }
-            setCollapsed(state.collapsed.symmetricDifference([id]))
+            setCollapsedViews(state.collapsedViews.symmetricDifference([id]))
             return nil
         case .created:
             // Nothing moves, the sentence included, because being created answers nothing a person was told,
@@ -401,12 +403,12 @@ public final class TaskViewList: Routable {
     }
 
     /// Folds and unfolds the branches to the set, written to the device's state first and kept after (ADR-0010).
-    private func setCollapsed(_ collapsed: Set<ViewID>) {
+    private func setCollapsedViews(_ collapsedViews: Set<ViewID>) {
         // A write that fails is not said: the fold stays on screen until the next read of the rows takes the folds
         // back from the store, and this module's sentences stay for the data a person edits, which a fold is not
         // (Lists screen plan, "Self-review"). Sorted, so that the same folds are the same text in the file.
-        try? store.setDeviceState(TaskViewList.collapsedKey, collapsed.map(\.rawValue).sorted())
-        state.collapsed = collapsed
+        try? store.setDeviceState(TaskViewList.collapsedViewsKey, collapsedViews.map(\.rawValue).sorted())
+        state.collapsedViews = collapsedViews
     }
 
     /// The folded lists as the device's state holds them, of the lists the rows hold: what was written is the device's
@@ -415,9 +417,9 @@ public final class TaskViewList: Routable {
     /// the set back without them. A list with no lists inside keeps its fold, which it does not draw
     /// (`ReadRow.drawnKind`), so lists that come back inside it come back folded. A value that does not decode as a
     /// list of texts reads as nothing folded, which the store decides.
-    private static func collapsed(in store: Store, among rows: [ReadRow]) throws(StoreError) -> Set<ViewID> {
+    private static func collapsedViews(in store: Store, among rows: [ReadRow]) throws(StoreError) -> Set<ViewID> {
         let held = Set(rows.filter { $0.kind == .list }.map(\.id))
-        let kept = try store.deviceState(collapsedKey, as: [String].self) ?? []
+        let kept = try store.deviceState(collapsedViewsKey, as: [String].self) ?? []
         return Set(kept.compactMap { try? ViewID(uuidString: $0) }.filter(held.contains))
     }
 
@@ -426,7 +428,7 @@ public final class TaskViewList: Routable {
     /// writes of a device's state never do: a fold is one screen's own, and another window of the same device that
     /// draws the same rows reads it at its next read of them, `reread`, and writes it back with its own next fold
     /// (Lists screen spec, section 5; ADR-0010).
-    private static let collapsedKey = "taskViewList.collapsed"
+    private static let collapsedViewsKey = "taskViewList.collapsed"
 
     /// Declares the list of a view over this module, or nothing: a click, a route, the way back and the stack's notices
     /// each arrive here, so what a click opens and what a link opens cannot drift apart (spec section 3). Every call is
@@ -460,19 +462,19 @@ public final class TaskViewList: Routable {
     private func reread() throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
-        let collapsed = try TaskViewList.collapsed(in: store, among: rows)
+        let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
             // The name comes off the rows as they still are: the ones being read in no longer hold the
             // view, and after the assignment below there is nothing left to call it. A row already gone
             // from those too cannot be named at all, and an invented name is worse than silence.
-            if let problem = TaskViewList.gone(state.rows.first { $0.id == rename.id }) {
+            if let problem = TaskViewList.goneViewProblem(state.rows.first { $0.id == rename.id }) {
                 state.problem = problem.sentence
             }
             state.rename = nil
         }
         state.rows = rows
         state.counts = counts
-        state.collapsed = collapsed
+        state.collapsedViews = collapsedViews
     }
 
     /// Writes the draft and closes the field, or refuses it and leaves the field where it is.
@@ -531,16 +533,18 @@ public final class TaskViewList: Routable {
     /// reason: the specific one would have to invent the name it names.
     private static func problem(_ error: StoreError, renaming row: ReadRow?) -> Problem {
         switch error {
-        case .notFound: gone(row) ?? .couldNotSave
+        case .notFound: goneViewProblem(row) ?? .couldNotSave
         default: .couldNotSave
         }
     }
 
-    /// What a field whose view went is told, by the row it was open on: the view's name, and for an unnamed
-    /// area, which has none to give, a sentence of its own that names none. An empty title is no name, so a
-    /// list that has one, written so by another device, and a row that is not there have nothing to say: an
-    /// invented name is worse than silence.
-    private static func gone(_ row: ReadRow?) -> Problem? {
+    /// The problem a gone view gives the rename open on it.
+    ///
+    /// The row the field was open on picks it: the sentence that names the view, and for an unnamed area, which has
+    /// no name to give, a sentence of its own that names none. An empty title is no name, so a list that has one,
+    /// written so by another device, and a row that is not there have nothing to say: an invented name is worse than
+    /// silence.
+    private static func goneViewProblem(_ row: ReadRow?) -> Problem? {
         guard let row else { return nil }
         if !row.title.isEmpty { return .viewIsGone(title: row.title) }
         return row.kind == .area ? .areaIsGone : nil
@@ -580,8 +584,8 @@ public final class TaskViewList: Routable {
         // The unfold comes after the read, which takes the folds back from the store: before it, a write of the
         // unfold that failed would be read back as the branch folded, and the field would open on a row the model
         // does not draw. After it, the branch is unfolded on screen whether or not the write held, as every fold is.
-        if let parent = new.parent, state.collapsed.contains(parent) {
-            setCollapsed(state.collapsed.subtracting([parent]))
+        if let parent = new.parent, state.collapsedViews.contains(parent) {
+            setCollapsedViews(state.collapsedViews.subtracting([parent]))
         }
         // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
         // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` for
@@ -614,7 +618,7 @@ public final class TaskViewList: Routable {
     private struct State {
         var rows: [ReadRow]
         var counts: [ViewID: Int]
-        var collapsed: Set<ViewID>
+        var collapsedViews: Set<ViewID>
         var width: WindowWidth
         var rename: Rename?
         var destination: Destination<TaskList.Route>
@@ -625,12 +629,12 @@ public final class TaskViewList: Routable {
         /// highlight on the list's row of the view whose list is declared, or on the folded list that hides that row,
         /// the draft on the row they are renaming — the highlighted row's id, and the sentence, if any.
         var model: Model {
-            let shown = TaskViewList.unfolded(rows, collapsed: collapsed, declared: destination.pushed?.head)
+            let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
             let drawn = shown.rows.map {
                 Model.Row(
                     id: $0.id, depth: $0.depth,
                     kind: $0.drawnKind(
-                        in: width, count: counts[$0.id], isFolded: collapsed.contains($0.id),
+                        in: width, count: counts[$0.id], isFolded: collapsedViews.contains($0.id),
                         isSelected: $0.id == shown.highlighted
                     ),
                     draft: rename?.text(on: $0.id)
