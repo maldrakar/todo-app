@@ -3,6 +3,7 @@ import SwiftUI
 import TaskViewListFeature
 import TodoCore
 #if os(iOS)
+// The drag's recognizer, below, is UIKit's, and iOS's alone.
 import UIKit
 #endif
 

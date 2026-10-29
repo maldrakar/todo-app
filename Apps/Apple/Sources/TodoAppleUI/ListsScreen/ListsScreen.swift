@@ -130,6 +130,7 @@ struct ListsScreen: View {
             max(0, -proxy.frame(in: .named(Self.viewportSpace)).minX)
         } action: { sidewaysOffset = $0 }
         #if os(iOS)
+        // The drag is UIKit's long press, unavailable on macOS and watchOS, where the screen has none.
         .background {
             ListsDragGesture(isEnabled: model.isEditing) { phase in dragMoved(phase, among: items) }
         }
@@ -250,6 +251,8 @@ struct ListsScreen: View {
     }
 
     #if os(iOS)
+    // The handler of `ListsDragGesture`, which is iOS's alone.
+
     /// A stage of the long press, among the items drawn with no row lifted: the lift, every move, which moves the slot
     /// on the popover's motion when it changes its place or its depth, and the release, which sends the drop once and
     /// puts the row down; a press that is cancelled puts it down and sends nothing.

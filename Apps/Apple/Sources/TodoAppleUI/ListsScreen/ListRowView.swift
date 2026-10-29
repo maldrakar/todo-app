@@ -17,6 +17,20 @@ struct ListRowView: View {
     /// give it (`Phone.dc.html`, a row's `need`).
     static let minimumTitleWidth: CGFloat = 140
 
+    /// The gap between the tile and the title.
+    static let tileToTitle: CGFloat = 12
+
+    /// How much further in each level of the tree stands (`Phone.dc.html`, `tileLeft`), which is also how far a finger
+    /// carries a lifted row sideways to change its depth by one (`ListsDrag`).
+    nonisolated static let indent: CGFloat = 22
+
+    /// Where the tile of a row of the drawn depth starts, 20 pt from the tree's edge and an indent further for each
+    /// level (`Phone.dc.html`, `tileLeft`): the one indent of the screen, which its guides, its slot and its card are
+    /// placed by too.
+    nonisolated static func tileLeading(atDepth depth: Int) -> CGFloat {
+        20 + indent * CGFloat(depth)
+    }
+
     private let list: TaskViewList.Model.ListRow
     private let depth: Int
     private let draft: String?
@@ -55,20 +69,6 @@ struct ListRowView: View {
         .padding(.leading, Self.tileLeading(atDepth: depth))
         .frame(height: Self.height)
     }
-
-    /// The gap between the tile and the title.
-    static let tileToTitle: CGFloat = 12
-
-    /// How much further in each level of the tree stands (`Phone.dc.html`, `tileLeft`), which is also how far a finger
-    /// carries a lifted row sideways to change its depth by one (`ListsDrag`).
-    nonisolated static let indent: CGFloat = 22
-
-    /// Where the tile of a row of the drawn depth starts, 20 pt from the tree's edge and an indent further for each
-    /// level (`Phone.dc.html`, `tileLeft`): the one indent of the screen, which its guides, its slot and its card are
-    /// placed by too.
-    nonisolated static func tileLeading(atDepth depth: Int) -> CGFloat {
-        20 + indent * CGFloat(depth)
-    }
 }
 
 /// What stands at the right of a list's row in the tree (`Phone.dc.html`, the row's sticky end): the count in ink2, a
@@ -93,7 +93,7 @@ struct ListRowAccessories: View {
     private let send: (TaskViewList.UserAction) -> Void
 
     /// Whether a person asked for less motion, which only the view can read: the chevron then turns without its
-    /// animation (Lists screen spec, section 9).
+    /// animation (`DesignSystem.Animation`).
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
@@ -114,7 +114,7 @@ struct ListRowAccessories: View {
                 .foregroundStyle(Color(.ink2))
                 .lineLimit(1)
                 .frame(minWidth: 20, alignment: .trailing)
-            // The chevron's cell stands on every row, so that the counts stand in one column (canvas).
+            // The chevron's cell stands on every row, so that the counts stand in one column (`Phone.dc.html`).
             ZStack {
                 if list.hasChildren {
                     Button { send(.disclosureTapped(id)) } label: {
@@ -152,7 +152,7 @@ struct ListRowAccessories: View {
 }
 
 /// The grip of a row in edit mode, which says that the row drags (Lists screen spec, section 7): the canvas's three
-/// lines, 20 pt, in the colour and the cell its row gives it. The drag itself starts anywhere on the row
+/// lines, about 20 pt wide, in the colour and the cell its row gives it. The drag itself starts anywhere on the row
 /// (`ListsDragGesture`), so the grip says so and takes no gesture of its own.
 struct RowGrip: View {
     var body: some View {

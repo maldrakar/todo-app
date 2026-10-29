@@ -42,6 +42,8 @@ struct ListsBottomBar: View {
     }
 
     #if !os(watchOS)
+    // The two menus, which the watch cannot build (`body`).
+
     /// "…", which holds Edit alone for now (the owner, 2026-10-25).
     private var moreMenu: some View {
         Menu {
