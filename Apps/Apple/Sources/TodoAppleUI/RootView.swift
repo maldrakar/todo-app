@@ -109,8 +109,8 @@ struct RootView: View {
         }
     }
 
-    /// The narrow window's tree: the views at the root of one stack, and every screen of the layout's path pushed
-    /// over them, each drawn by the one destination.
+    /// The narrow window's tree: the Lists screen at the root of one stack, and every screen of the layout's path
+    /// pushed over it, each drawn by the one destination (Lists screen spec, section 1).
     ///
     /// One stack, and not a split view, which collapses in a narrow window into one stack whose screens SwiftUI
     /// pushes and pops from state of its own: in the iOS 26.3 simulator on 2026-10-21, on iPhone, a tap on the view
@@ -119,7 +119,7 @@ struct RootView: View {
     /// to show" in it. A stack of its own has a path, and the path is the model's.
     private func narrowStack(path: [StackElementID]) -> some View {
         NavigationStack(path: stackPath(path)) {
-            sidebar
+            ListsScreen(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
                 .navigationDestination(for: StackElementID.self) { id in
                     screen(id)
                         // The sidebar's sentence on every screen pushed over the sidebar's rows, which draw it when
@@ -138,7 +138,8 @@ struct RootView: View {
         }
     }
 
-    /// The list of views, the same in both trees.
+    /// The list of views beside the pane of the wide tree, in the look it had until the plan's eighth task draws the
+    /// canvas's sidebar there.
     private var sidebar: some View {
         TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
     }
