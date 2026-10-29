@@ -80,6 +80,33 @@ extension TaskViewList {
             public let message: String
         }
 
+        /// What the picker of Move to… draws (spec section 6).
+        public struct MovePicker: Equatable, Sendable {
+            /// The question, which names the list being moved.
+            public let title: String
+
+            /// Whether the list being moved stands at the root, which marks "Top level" as its present parent.
+            public let isTopLevelCurrent: Bool
+
+            /// The whole tree in tree order, every level of it and the folds ignored.
+            public let rows: [PickerRow]
+        }
+
+        /// A row of the picker: the row the screen draws, and what the picker says about it.
+        public struct PickerRow: Equatable, Sendable, Identifiable {
+            public var id: ViewID { row.id }
+
+            /// The row as the screen draws it, of the same kind, at the same depth and with the same tile and title
+            /// font, so that a view draws it with the screen's own row; it carries no draft, no fold and no highlight.
+            public let row: Row
+
+            /// Whether the row cannot take the list, being the list itself or a list inside it, which a view greys out.
+            public let isDisabled: Bool
+
+            /// Whether the row is the list's present parent, a list or an area's line, which a view marks.
+            public let isCurrent: Bool
+        }
+
         public let rows: [Row]
 
         /// The id of the highlighted row, and nil when no row is highlighted: what a list that keeps its
@@ -111,6 +138,12 @@ extension TaskViewList {
         /// `deleteCancelled` (spec section 6). It is the module's state and not a screen, and no relaunch restores it
         /// (ADR-0009, amendment of 2026-10-25).
         public let confirmation: Confirmation?
+
+        /// The picker of Move to… while it is open, and nil when it is closed: a view draws it as a sheet, "Top level"
+        /// first and then its rows, which send `movePickerRowTapped`, with a Cancel of the view's own that sends
+        /// `movePickerCancelled` (spec section 6). It is the module's state and not a screen, and no relaunch restores
+        /// it (ADR-0009, amendment of 2026-10-25).
+        public let movePicker: MovePicker?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one

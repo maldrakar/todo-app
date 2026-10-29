@@ -69,8 +69,8 @@ extension TaskViewList {
     /// Where a list put at the root goes (Lists screen spec, section 3): after the last list of the root that stands
     /// before the first area, so that it stands above every line and never under the last one, or at the start of the
     /// root when no list stands there. The list itself is passed over, since a placement ranks a list among its
-    /// siblings without it. The rule serves the lists of a deleted first area, and nothing else in this module: "+"
-    /// puts a list into the last area, and a drop at the top of the tree puts it at the start of the root.
+    /// siblings without it. The rule serves Move to…'s Top level and the lists of a deleted first area, and nothing
+    /// else: "+" puts a list into the last area, and a drop at the top of the tree puts it at the start of the root.
     static func rootPlacement(of id: ViewID, in rows: [ReadRow]) -> Placement {
         let last = rows.prefix { $0.kind != .area }.last { $0.parent == nil && $0.id != id }
         return last.map { .after($0.id) } ?? .start

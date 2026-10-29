@@ -230,9 +230,10 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
     #expect(list.model.rows.map(\.id) == builtIns + [clients])
 }
 
-/// A dialog goes with the row it is up for when a read no longer holds the row, and says nothing, as the highlight goes
-/// with its row: the row leaving the tree says what happened. It stays gone when a peer brings the row back, since
-/// nobody asked again, and an open field and its sentence stay throughout.
+/// A dialog goes with the row it is up for when a read no longer holds the row, the list a confirmation would delete or
+/// the list a picker would move, and says nothing, as the highlight goes with its row: the row leaving the tree says
+/// what happened. It stays gone when a peer brings the row back, since nobody asked again, and an open field and its
+/// sentence stay throughout.
 @Test func aDialogGoesWithTheRowItIsUpFor() throws {
     let peer = Store.newDeviceID()
     func deleted(_ id: ViewID, _ flag: Bool, at millis: Int64) -> [JournalOperation] {
@@ -252,4 +253,230 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
     let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
     refusingAName(reference)
     #expect(list.model == reference.model)
+
+    #expect(list.send(.action(.moveToMenuItemChosen(errands))) == nil)
+    let goneAgain = try changeSet(of: store) { _ = try store.apply(deleted(errands, true, at: 1_800_000_000_002)) }
+    #expect(list.send(.changed(goneAgain)) == nil)
+    let backAgain = try changeSet(of: store) { _ = try store.apply(deleted(errands, false, at: 1_800_000_000_003)) }
+    #expect(list.send(.changed(backAgain)) == nil)
+    #expect(list.model.movePicker == nil)
+    #expect(list.model == reference.model)
+}
+
+/// Move to… opens the picker over the whole tree in tree order, each row drawn as the screen draws it with nothing
+/// highlighted, the list being moved and every list inside it greyed out, and its present parent marked: a list, an
+/// area's line, or "Top level" for a list of the root (Lists screen spec, section 6). Its rows follow the width and edit
+/// mode as the screen's do. Asking writes nothing, and on an area or a row that is not there it opens nothing.
+@Test func movePickerShowsTheWholeTreeWithTheListAndItsSubtreeDisabledAndItsParentCurrent() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Buy milk"))
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
+    try store.createView(NewTaskView(title: "Office", parent: projects))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let work = try store.createView(NewTaskView(title: "", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let before = list.model
+    let written = try store.journal(after: 0).count
+    #expect(list.send(.action(.moveToMenuItemChosen(home))) == nil)
+    let picker = try #require(list.model.movePicker)
+    #expect(picker.title == "Move “Home” to…")
+    #expect(!picker.isTopLevelCurrent)
+    #expect(picker.rows.map(\.row) == (try sidebarOn(ViewID(), in: store)).rows, "the screen's rows, nothing lit")
+    #expect(picker.rows.filter(\.isDisabled).map(\.id) == [home, garden])
+    #expect(picker.rows.filter(\.isCurrent).map(\.id) == [projects])
+    #expect(list.model.rows == before.rows)
+    #expect(try store.journal(after: 0).count == written)
+    #expect(list.send(.action(.movePickerCancelled)) == nil)
+    #expect(list.model == before)
+
+    _ = list.send(.action(.moveToMenuItemChosen(errands)))
+    #expect(list.model.movePicker?.isTopLevelCurrent == true)
+    #expect(list.model.movePicker?.rows.filter(\.isCurrent).isEmpty == true)
+    #expect(list.model.movePicker?.rows.filter(\.isDisabled).map(\.id) == [errands])
+    _ = list.send(.action(.movePickerCancelled))
+    _ = list.send(.action(.moveToMenuItemChosen(clients)))
+    #expect(list.model.movePicker?.title == "Move “Clients” to…")
+    #expect(list.model.movePicker?.isTopLevelCurrent == false)
+    #expect(list.model.movePicker?.rows.filter(\.isCurrent).map(\.id) == [work], "an area's line is a parent too")
+    _ = list.send(.widthChanged(.wide))
+    _ = list.send(.action(.editMenuItemChosen))
+    let wide = try TaskViewList(store: store, route: .init(list: .init(head: ViewID())), width: .wide)
+    _ = wide.send(.action(.editMenuItemChosen))
+    #expect(list.model.movePicker?.rows.map(\.row) == wide.model.rows, "the sidebar's tiles, no counts and the area's label")
+    _ = list.send(.action(.movePickerCancelled))
+
+    let shown = list.model
+    #expect(list.send(.action(.moveToMenuItemChosen(work))) == nil)
+    #expect(list.model == shown)
+    #expect(list.send(.action(.moveToMenuItemChosen(ViewID()))) == nil)
+    #expect(list.model == shown)
+}
+
+/// The picker ignores the folds: the lists of a folded branch stand in it at every level, and the folded list is drawn
+/// there unfolded, since nothing in the picker is hidden for a chevron to say so (Lists screen spec, section 6).
+@Test func aFoldedBranchIsStillInThePicker() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    try store.createView(NewTaskView(title: "Garden", parent: home))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let unfolded = try sidebarOn(ViewID(), in: store).rows
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.disclosureTapped(home)))
+    _ = list.send(.action(.disclosureTapped(projects)))
+    #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "both folded; this is the setup")
+    #expect(list.send(.action(.moveToMenuItemChosen(errands))) == nil)
+    #expect(list.model.movePicker?.rows.map(\.row) == unfolded)
+}
+
+/// A tap on a list in the picker moves the list being moved under it, last among the lists there, unfolds it so that
+/// the list is on screen where it went, and closes the picker; a tap on an area's line moves it last under the line
+/// (Lists screen spec, section 6). Each time the module ends as one made now on the store draws it, the unfold read back
+/// from the device's state, and says nothing.
+@Test func aTapInThePickerMovesTheListLastUnfoldsTheDestinationAndClosesIt() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let office = try store.createView(NewTaskView(title: "Office", parent: projects))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.disclosureTapped(projects)))
+    _ = list.send(.action(.moveToMenuItemChosen(errands)))
+    #expect(list.send(.action(.movePickerRowTapped(projects))) == nil)
+    #expect(list.model.movePicker == nil)
+    #expect(list.model.rows.map(\.id) == builtIns + [projects, home, office, errands, work, clients])
+    #expect(try store.view(errands)?.parent == projects)
+    #expect(try store.deviceState(collapsedViewsKey, as: [String].self) == [])
+    #expect(list.model == (try sidebarOn(inbox, in: store)))
+
+    _ = list.send(.action(.moveToMenuItemChosen(errands)))
+    #expect(list.send(.action(.movePickerRowTapped(work))) == nil)
+    #expect(list.model.rows.map(\.id) == builtIns + [projects, home, office, work, clients, errands])
+    #expect(try store.view(errands)?.parent == work)
+    #expect(list.model == (try sidebarOn(inbox, in: store)))
+}
+
+/// "Top level" puts the list at the root above every line, after the last list of the root that stands before the
+/// first area, and never at the root's end, under the last line (Lists screen spec, section 3). A list that is already
+/// that last list stays where it is, and with no list of the root above the first area it goes to the start of the
+/// root.
+@Test func topLevelPutsTheListAboveTheFirstArea() throws {
+    let store = try makeStore()
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
+    let home = try store.createView(NewTaskView(title: "Home", kind: .area))
+    let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.moveToMenuItemChosen(acme)))
+    #expect(list.send(.action(.movePickerRowTapped(nil))) == nil)
+    #expect(list.model.rows.map(\.id) == builtIns + [errands, acme, work, clients, home, garden])
+    #expect(try store.view(acme)?.parent == nil)
+    #expect(list.model == (try sidebarOn(inbox, in: store)))
+    _ = list.send(.action(.moveToMenuItemChosen(acme)))
+    #expect(list.model.movePicker?.isTopLevelCurrent == true, "this is the setup")
+    #expect(list.send(.action(.movePickerRowTapped(nil))) == nil)
+    #expect(list.model == (try sidebarOn(inbox, in: store)), "where it was, and nothing said")
+    #expect(list.model.rows.map(\.id) == builtIns + [errands, acme, work, clients, home, garden])
+
+    let bare = try makeStore()
+    for id in builtIns { try bare.delete(view: id) }
+    let area = try bare.createView(NewTaskView(title: "Work", kind: .area))
+    let inside = try bare.createView(NewTaskView(title: "Clients", parent: area))
+    let alone = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow)
+    _ = alone.send(.action(.moveToMenuItemChosen(inside)))
+    #expect(alone.send(.action(.movePickerRowTapped(nil))) == nil)
+    #expect(alone.model.rows.map(\.id) == [inside, area])
+    #expect(alone.model.problem == nil)
+}
+
+/// A greyed-out row, the list being moved or a list inside it, cannot take it, so a tap on one moves nothing, and nor
+/// does a tap on a row that is not there: the picker stays up and nothing is written.
+@Test func aTapOnADisabledRowMovesNothing() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.moveToMenuItemChosen(projects)))
+    let picking = list.model
+    let written = try store.journal(after: 0).count
+    for id in [projects, home, garden, ViewID()] {
+        #expect(list.send(.action(.movePickerRowTapped(id))) == nil)
+        #expect(list.model == picking)
+    }
+    #expect(try store.journal(after: 0).count == written)
+}
+
+/// The built-ins are default views and nothing more (Lists screen spec, sections 1 and 6): the Logbook moves into an
+/// area from the picker, and the Trash is deleted from the confirmation, like any list.
+@Test func aBuiltInMovesAndDeletesLikeAnyList() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.moveToMenuItemChosen(BuiltInTaskViews.logbook)))
+    #expect(list.model.movePicker?.title == "Move “Logbook” to…")
+    #expect(list.send(.action(.movePickerRowTapped(work))) == nil)
+    #expect(list.send(.action(.deleteMenuItemChosen(BuiltInTaskViews.trash))) == nil)
+    #expect(list.model.confirmation?.title == "Delete “Trash”?")
+    #expect(list.model.confirmation?.message == "No task is deleted.")
+    #expect(list.send(.action(.deleteConfirmed)) == nil)
+    #expect(list.model == (try sidebarOn(inbox, in: store)))
+    #expect(list.model.rows.map(\.id) == [inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, work, BuiltInTaskViews.logbook])
+}
+
+/// A dialog's actions with no such dialog up move nothing, the sentence and an open field included: SwiftUI writes a
+/// dismissal into an alert's or a sheet's binding after a close the module drove, which lands here, and so does a tap
+/// that arrives after its dialog went (Lists screen plan, Task 6). With the picker up the confirmation's actions move
+/// nothing, and with the confirmation up the picker's.
+@Test func aDialogActionWithNoDialogUpMovesNothing() throws {
+    let store = try makeStore()
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    refusingAName(list)
+    let written = try store.journal(after: 0).count
+    let confirmations: [TaskViewList.UserAction] = [.deleteConfirmed, .deleteCancelled]
+    let pickers: [TaskViewList.UserAction] = [.movePickerRowTapped(nil), .movePickerRowTapped(inbox), .movePickerCancelled]
+    let before = list.model
+    for action in confirmations + pickers {
+        #expect(list.send(.action(action)) == nil)
+        #expect(list.model == before)
+    }
+    _ = list.send(.action(.moveToMenuItemChosen(errands)))
+    let picking = list.model
+    for action in confirmations {
+        #expect(list.send(.action(action)) == nil)
+        #expect(list.model == picking)
+    }
+    _ = list.send(.action(.movePickerCancelled))
+    _ = list.send(.action(.deleteMenuItemChosen(errands)))
+    let asking = list.model
+    for action in pickers {
+        #expect(list.send(.action(action)) == nil)
+        #expect(list.model == asking)
+    }
+    #expect(try store.journal(after: 0).count == written)
+}
+
+/// A move from the picker the store refuses says so with the module's one sentence for a refused write, closes the
+/// picker and reads the rows back, folds and all: a list a peer deleted before the change saying so arrived is gone
+/// from them.
+@Test func aMoveTheStoreRefusesSaysSo() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let errands = try store.createView(NewTaskView(title: "Errands"))
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.moveToMenuItemChosen(errands)))
+    try store.delete(view: projects)
+    #expect(list.send(.action(.movePickerRowTapped(projects))) == nil)
+    #expect(list.model.problem == couldNotSave)
+    #expect(list.model.movePicker == nil)
+    #expect(list.model.rows == (try sidebarOn(inbox, in: store)).rows, "the rows read back, Projects gone")
+    #expect(try store.view(errands)?.parent == nil)
 }

@@ -93,6 +93,12 @@ public final class TaskViewList: Routable {
         case deleteConfirmed
         /// The confirmation's Cancel.
         case deleteCancelled
+        /// Move to… on a list's menu.
+        case moveToMenuItemChosen(ViewID)
+        /// A row of the move picker, and nil for its "Top level".
+        case movePickerRowTapped(ViewID?)
+        /// The move picker's Cancel.
+        case movePickerCancelled
     }
 
     public enum Event: RoutedEvent {
@@ -353,6 +359,38 @@ public final class TaskViewList: Routable {
             // Cancel takes the confirmation down, and with none up, a second tap or a write that lands after the
             // module took it down, moves nothing.
             guard case .deleteConfirmation? = state.dialog else { return nil }
+            state.dialog = nil
+            return nil
+        case .action(.moveToMenuItemChosen(let id)):
+            // Move to… is a list's, and opens the picker over the whole tree (Lists screen spec, section 6): an area moves
+            // along the root alone, by the drag, and a row that is not there opens nothing. Opening it writes nothing, so
+            // an open field and the sentence stay where they are.
+            guard state.rows.contains(where: { $0.id == id && $0.kind == .list }) else { return nil }
+            state.dialog = .movePicker(id)
+            return nil
+        case .action(.movePickerRowTapped(let destination)):
+            // With no picker up a tap moves nothing. Top level puts the list where the root rule says, and a line or a
+            // list takes it last among its lists; a greyed-out row, the list itself or one inside it, cannot take it,
+            // and a tap on one, or on a row that is not there, moves nothing and leaves the picker up (Lists screen
+            // spec, sections 3 and 6).
+            guard case .movePicker(let id)? = state.dialog else { return nil }
+            let placement: Placement
+            if let destination {
+                guard state.rows.contains(where: { $0.id == destination }),
+                      !TaskViewList.subtree(of: id, in: state.rows).contains(destination)
+                else { return nil }
+                placement = .end
+            } else {
+                placement = TaskViewList.rootPlacement(of: id, in: state.rows)
+            }
+            // The picker closes whatever the store answers, as the confirmation does.
+            state.dialog = nil
+            move(id, to: destination, at: placement)
+            return nil
+        case .action(.movePickerCancelled):
+            // Cancel closes the picker, and with none up, a second tap or a write that lands after the module closed it,
+            // moves nothing.
+            guard case .movePicker? = state.dialog else { return nil }
             state.dialog = nil
             return nil
         case .action(.newTaskMenuItemChosen):
@@ -625,6 +663,28 @@ public final class TaskViewList: Routable {
         return true
     }
 
+    /// Moves a list under a parent, nil for the root, to a place among its lists, from the picker or a drop, and
+    /// unfolds the parent once the rows are read back, so that the list is on screen where it went (Lists screen spec,
+    /// sections 5 and 6).
+    private func move(_ id: ViewID, to parent: ViewID?, at placement: Placement) {
+        guard writeAndReread({ () throws(StoreError) in try store.move(view: id, to: parent, at: placement) }) else {
+            return
+        }
+        unfold(parent)
+    }
+
+    /// Unfolds the list a row was just put into, written to the device's state as every fold is, so that the row is on
+    /// screen where it went; a list that is not folded, an area, whose line never folds, and the root, nil, are left as
+    /// they are.
+    ///
+    /// It comes after the read of the rows, which takes the folds back from the store: before it, a write of the unfold
+    /// that failed would be read back as the branch folded, and the row would be hidden where it went. After it, the
+    /// branch is unfolded on screen whether or not the write held, as every fold is.
+    private func unfold(_ id: ViewID?) {
+        guard let id, state.collapsedViews.contains(id) else { return }
+        setCollapsedViews(state.collapsedViews.subtracting([id]))
+    }
+
     /// Deletes an area and leaves its lists where they stand (Lists screen spec, sections 3 and 6): the line goes, so
     /// each list moves into the area above, or to the root above every line when the area was the first, and then the
     /// area is tombstoned with `delete(view:)`, which is unchanged for it. These are several writes, so a refusal
@@ -707,12 +767,8 @@ public final class TaskViewList: Routable {
             state.problem = Problem.couldNotRead.sentence
             return
         }
-        // The unfold comes after the read, which takes the folds back from the store: before it, a write of the
-        // unfold that failed would be read back as the branch folded, and the field would open on a row the model
-        // does not draw. After it, the branch is unfolded on screen whether or not the write held, as every fold is.
-        if let parent = new.parent, state.collapsedViews.contains(parent) {
-            setCollapsedViews(state.collapsedViews.subtracting([parent]))
-        }
+        // After the read, so that the field opens on a row the model draws.
+        unfold(new.parent)
         // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
         // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` for
         // the Inbox it falls back on. Here the read that just ran is the only thing that can say whether the
@@ -777,7 +833,8 @@ public final class TaskViewList: Routable {
                 return list.isSelected
             }?.id
             return Model(
-                rows: drawn, selection: selection, isEditing: isEditing, confirmation: confirmation, problem: problem
+                rows: drawn, selection: selection, isEditing: isEditing, confirmation: confirmation,
+                movePicker: movePicker, problem: problem
             )
         }
 
@@ -804,16 +861,42 @@ public final class TaskViewList: Routable {
             }
         }
 
+        /// The picker up over the rows, nil when none is: the whole tree in tree order with the folds ignored, each row
+        /// drawn by the screen's rule for the width and edit mode with none of this person's session on it, no draft,
+        /// no fold, since nothing in the picker is hidden for a chevron to say so, and no highlight, since the picker
+        /// marks the present parent instead; the list being moved and every list inside it greyed out, since none of
+        /// them can take it (Lists screen spec, section 6).
+        private var movePicker: Model.MovePicker? {
+            guard case .movePicker(let id)? = dialog, let moving = rows.first(where: { $0.id == id }) else {
+                return nil
+            }
+            let greyed = TaskViewList.subtree(of: id, in: rows)
+            return Model.MovePicker(
+                title: "Move “\(moving.title)” to…", isTopLevelCurrent: moving.parent == nil,
+                rows: rows.map { row in
+                    let kind = row.drawnKind(
+                        in: width, isEditing: isEditing, count: counts[row.id], isFolded: false, isSelected: false
+                    )
+                    return Model.PickerRow(
+                        row: Model.Row(id: row.id, depth: row.depth, kind: kind, draft: nil),
+                        isDisabled: greyed.contains(row.id), isCurrent: row.id == moving.parent
+                    )
+                }
+            )
+        }
+
         /// The dialog up over the rows, one at a time, which holds the id of the row it is up for and nothing of what
-        /// it says: the confirmation of a delete, on the list or the area it would delete. What it says is computed
-        /// from the rows on every read of the model, and a read that no longer holds its row takes it down (`reread`).
+        /// it says: the confirmation of a delete, on the list or the area it would delete, or the picker of Move to…,
+        /// on the list it would move. What it says is computed from the rows on every read of the model, and a read
+        /// that no longer holds its row takes it down (`reread`).
         enum Dialog {
             case deleteConfirmation(ViewID)
+            case movePicker(ViewID)
 
             /// The row the dialog is up for.
             var row: ViewID {
                 switch self {
-                case .deleteConfirmation(let id): id
+                case .deleteConfirmation(let id), .movePicker(let id): id
                 }
             }
         }
