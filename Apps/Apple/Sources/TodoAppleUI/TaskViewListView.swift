@@ -41,7 +41,7 @@ struct TaskViewListView: View {
             List(model.rows, selection: selection) { row in
                 Group {
                     if let draft = row.draft {
-                        TitleField(draft: draft, send: send)
+                        TitleField("Title", draft: draft, send: send)
                     } else {
                         // A tap on the title is the row's choice, the highlighted row's too, which the List does not
                         // report: on the Mac a click on the highlighted row moves no highlight and writes no
@@ -236,36 +236,5 @@ private struct MovePickerList: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
             .onTapGesture(perform: titleTapped)
-    }
-}
-
-/// The field a row draws while it is being renamed, a view of its own so that each field watches its own
-/// focus: `.titleFieldLostFocus` names no row, and one flag shared by every row could not tell the field that
-/// lost focus from the one a rename moved to.
-private struct TitleField: View {
-    let draft: String
-    let send: (TaskViewList.UserAction) -> Void
-
-    /// Whether the caret is in this field, which only the view can know (spec section 2).
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        TextField("Title", text: Binding(get: { draft }, set: { send(.titleFieldChanged($0)) }))
-            .focused($isFocused)
-            .onSubmit { send(.titleFieldSubmitted) }
-            #if os(macOS)
-            // Esc. iOS and watchOS lack the modifier; what cancels a rename there is decided when they arrive.
-            .onExitCommand { send(.titleFieldCancelled) }
-            #endif
-            // A field opens for a person to type in, whether the menu or the toolbar opened it.
-            .onAppear { isFocused = true }
-            .onChange(of: isFocused) { _, focused in
-                guard !focused else { return }
-                send(.titleFieldLostFocus)
-                // What this view holds is from before `send`, so whether the field stays is not known here,
-                // and the caret is asked back either way: a field still open after a lost focus is one whose
-                // name the module refused.
-                isFocused = true
-            }
     }
 }
