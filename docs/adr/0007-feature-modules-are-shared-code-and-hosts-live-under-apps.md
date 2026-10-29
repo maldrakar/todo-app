@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), `docs/specs/navigation-state.md` (approved 2026-10-22), `docs/specs/lists-screen.md` (approved 2026-10-25), #63, #67, #100, #117, #142, #151, ADR-0001, ADR-0006, ADR-0009
-- Amended: 2026-10-14, after the approval of the navigation spec, 2026-10-15, after the owner's review of #100, 2026-10-22, after the approval of the navigation state spec, and 2026-10-26, after the owner's reviews of #151 (see the end)
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), `docs/specs/navigation-state.md` (approved 2026-10-22), `docs/specs/lists-screen.md` (approved 2026-10-25), #63, #67, #100, #117, #142, #146, #151, ADR-0001, ADR-0006, ADR-0009
+- Amended: 2026-10-14, after the approval of the navigation spec, 2026-10-15, after the owner's review of #100, 2026-10-22, after the approval of the navigation state spec, 2026-10-26, after the owner's reviews of #151, and 2026-10-27, in #146 (see the end)
 
 ## Context
 
@@ -48,3 +48,9 @@ A component's model knows no screen: a tile does not know whether it stands in a
 A component's colours are semantic colours at the level of the component (the owner's fourth review). The tile's are `DesignSystem.Color.Components.Tile`, each giving the tile's background and the colour of the glyph on it, and `DesignSystem.Color.Components` is the home of every later component's colours. The design system defines the tile's by the canvas's `paint` rule from eleven bases nothing outside it sees, the background the base at 15 % opacity in the light and 24 % in the dark and the glyph the base mixed toward the ink or toward white, so that they are the canvas's and not shades worked out by hand. A component's model takes only the colours its component may use, so `TileModel` takes the tile's colour and holds no colour logic: it is plain data. No value of the look is optional either: the icons have a case for the default glyph, `bullets`, and the feature module that builds a model picks `.stone` and `.bullets` for a colour or an icon whose name is missing or unknown, so a platform draws every value it is given and chooses no default of its own.
 
 A platform package holds only the renderers that turn the design system's values into the platform's, on Apple initializers of `Color`, `Font`, `Animation` and `Image`, and the views that draw a component's model, such as `ListTile` for a `TileModel`; a view takes every colour, font and animation it draws with from the design system through them. The rest of the decision holds.
+
+## Amendment, 2026-10-27
+
+Made in #146, the plan's fifth task of the Lists screen, whose sidebar builds its rows' tiles and title fonts for the width class of its window (`docs/specs/lists-screen.md`, sections 8 and 9; the amendment of 2026-10-26). The class was the root's own type, `AppModule.Width`, since the root alone cut the window's layout by it; a child never imports the root, so the sidebar could not name it, and a second enum of the sidebar's with the same two cases, onto which the root mapped its own, would be the same value said twice (`docs/style.md`, "One shape everywhere it fits").
+
+**The `FeatureModule` target also holds the width class of a window, `WindowWidth`, beside the stack and the seat.** It is what a window's view reports and what every module that lays its screen out by the window reads, the root and the sidebar first, and it names no screen. The root takes it and hands it to the sidebar, and there is no `AppModule.Width` left. The target still depends on nothing, and the rest of the decision holds.

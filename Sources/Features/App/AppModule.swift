@@ -70,14 +70,6 @@ public final class AppModule: Routable {
         case wide(column: StackElementID?, path: [StackElementID])
     }
 
-    /// The width class of a window, which only its view can know and which it reports without deciding anything by
-    /// it (`docs/style.md`, "Views"; navigation state spec, section 4): narrow, iPhone's and a narrow iPad window,
-    /// and wide, the Mac's and a wide iPad window.
-    public enum Width: Equatable, Sendable {
-        case narrow
-        case wide
-    }
-
     /// What the root view may send: what the views of the window's modules send, each wrapped in the case of the
     /// module it is for, so that the root view hands each module's view a closure over that module's actions alone,
     /// the way back its stack's path reports, and the root's own toolbar button. Named for the control and the
@@ -136,9 +128,10 @@ public final class AppModule: Routable {
         /// pressed anything, and a view's closure spells user actions alone (the owner, 2026-10-20, on the window's
         /// way in).
         ///
-        /// It moves the layout and nothing else: no screen is made or dropped, no sentence moves and the route stays,
-        /// so the width the window already has moves nothing.
-        case widthChanged(Width)
+        /// It moves the layout, and the sidebar's tiles and title fonts, which the sidebar builds for the width it is
+        /// handed (Lists screen spec, sections 8 and 9), and nothing else: no screen is made or dropped, no sentence
+        /// moves and the route stays, so the width the window already has moves nothing.
+        case widthChanged(WindowWidth)
     }
 
     /// What the root asks of the platform, since there is no module above it.
@@ -172,17 +165,17 @@ public final class AppModule: Routable {
     /// The route defaults to the default window, so that a caller with no route to hand on spells none (owner's
     /// review of #103, as quick entry's `init` has it since #102).
     ///
-    /// The width is the class the window opens with, so that its first frame already has the shape of its layout
-    /// (navigation state spec, section 4). It has no default: a window made wide and told otherwise on its first
-    /// frame is the spec's fallback for a host that does not know the class when the window is made, and a default
-    /// here would make that fallback a rule of the core (`docs/style.md`, "A lower layer holds no policy of its
-    /// client").
+    /// The width is the class the window opens with, so that its first frame already has the shape of its layout and
+    /// the sidebar its tiles (navigation state spec, section 4), and the sidebar is made with it. It has no default: a
+    /// window made wide and told otherwise on its first frame is the spec's fallback for a host that does not know the
+    /// class when the window is made, and a default here would make that fallback a rule of the core (`docs/style.md`,
+    /// "A lower layer holds no policy of its client").
     ///
     /// Throws what the sidebar's `init` throws and nothing else, as M2's root did: a window is not made around a
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A screen of the stack that
     /// cannot be made is its opener's to say, and quick entry cannot fail to be made.
-    public init(store: Store, route: Route = .default, width: Width) throws(StoreError) {
-        let taskViewList = try TaskViewList(store: store, route: route.sidebar)
+    public init(store: Store, route: Route = .default, width: WindowWidth) throws(StoreError) {
+        let taskViewList = try TaskViewList(store: store, route: route.sidebar, width: width)
         // The stack and the seat are built once, here, each with the way to make what it holds: a closure over the
         // `init` of the kind the route names that captures the store and never this root. The root holds both in its
         // state, so a closure holding the root would close a cycle, root to state to stack or seat to closure to
@@ -226,10 +219,9 @@ public final class AppModule: Routable {
             return nil
         case .action(.quickEntryButtonTapped):
             // The root's own gesture, so the root's sentence goes with it, as each module's sentence goes with its own
-            // gestures; a gesture in a child is the child's, and leaves it (the owner, 2026-10-20). A quick entry
-            // already up has the head of every quick entry, so its seat keeps it, draft and all.
+            // gestures; a gesture in a child is the child's, and leaves it (the owner, 2026-10-20).
             state.problem = nil
-            react(to: state.quickEntry.apply(QuickEntry.Route()))
+            openQuickEntry()
             return nil
         case .changed(let changes):
             // Every module of the window gets the change and decides for itself whether it reads it: the sidebar
@@ -269,10 +261,12 @@ public final class AppModule: Routable {
             state.problem = Problem.unreadableLink.sentence
             return nil
         case .widthChanged(let width):
-            // The layout is computed from the width and the stack on every read, so this moves the layout alone; the
-            // stack is not walked, since no destination was written, and the same width again moves nothing.
+            // The layout is computed from the width and the stack on every read, so the root's own part is the width
+            // alone. The sidebar is handed it too, since its rows take the tiles of the width they are drawn at, and
+            // it answers nothing; it is reached through the stack, whose walk after the event finds no destination
+            // written and moves nothing. The same width again moves nothing in either.
             state.width = width
-            return nil
+            return react(to: state.stack.send(.widthChanged(width)))
         }
     }
 
@@ -287,9 +281,20 @@ public final class AppModule: Routable {
             // A window is the platform's to open, so the request leaves the root under its own name, with the
             // sidebar's own route for the new window and no quick entry (spec section 4, the rule of bubbling).
             return .openWindow(Route(sidebar: sidebar, quickEntry: nil))
+        case .newTaskRequested?:
+            // Quick entry over the window, as the root's own button opens it. The root's sentence stays, since the
+            // gesture is the sidebar's, and a gesture in a child is the child's (the owner, 2026-10-20).
+            openQuickEntry()
+            return nil
         case nil:
             return nil
         }
+    }
+
+    /// Puts quick entry up over the window, the root's modal (spec section 4). A quick entry already up has the head
+    /// of every quick entry, so its seat keeps it, draft and all.
+    private func openQuickEntry() {
+        react(to: state.quickEntry.apply(QuickEntry.Route()))
     }
 
     /// What quick entry asked for: to be closed, and the root drops it. With its task created, that is the modal's
@@ -317,8 +322,8 @@ public final class AppModule: Routable {
         var quickEntry: Seat<QuickEntry, Never>
         var problem: String?
         /// The class the window's view reported last, or the one the window was made with, which the layout is cut
-        /// by and nothing else reads.
-        var width: Width
+        /// by and nothing else reads: the sidebar is handed the same class and keeps its own.
+        var width: WindowWidth
 
         /// The model the root view draws: the sidebar's and each screen's, as each computes it, the layout of the
         /// screens over the sidebar, quick entry's, and the root's sentence.

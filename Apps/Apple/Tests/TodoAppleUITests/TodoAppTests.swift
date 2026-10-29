@@ -10,24 +10,24 @@ import TaskViewListFeature
 import TodoCore
 
 /// Which identity the store wrote under is out of reach through the host, which keeps the store to itself, so
-/// each launch writes a folder and a store opened after every launch has closed its own reads back the device
-/// the journal recorded for each folder.
+/// each launch writes a list and a store opened after every launch has closed its own reads back the device
+/// the journal recorded for each list.
 @Test @MainActor func launchOpensTheDatabaseAtTheGivenPathAndKeepsTheDeviceBesideIt() throws {
     try withFreshDatabase { database in
         _ = try TodoApp.launch(environment: ["TODO_DB": database])
         #expect(FileManager.default.fileExists(atPath: database))
         let minted = try #require(DeviceFile.read(beside: database), "the first launch keeps the identity it minted")
 
-        let second = try launchAndCreateAFolder(["TODO_DB": database])
+        let second = try launchAndCreateAList(["TODO_DB": database])
         #expect(DeviceFile.read(beside: database) == minted, "a launch that minted again would have kept its own")
 
-        let third = try launchAndCreateAFolder(["TODO_DB": database, "TODO_DEVICE": "given"])
+        let third = try launchAndCreateAList(["TODO_DB": database, "TODO_DEVICE": "given"])
         #expect(DeviceFile.read(beside: database) == minted, "an identity the environment names is not kept")
 
-        let fourth = try launchAndCreateAFolder(["TODO_DB": database, "TODO_DEVICE": ""])
+        let fourth = try launchAndCreateAList(["TODO_DB": database, "TODO_DEVICE": ""])
 
         let journal = try Store.open(path: database, device: Store.newDeviceID(), now: Store.systemNow).journal(after: 0)
-        let writers = { (folder: ViewID) in Set(journal.filter { $0.entityID == folder.rawValue }.map(\.device)) }
+        let writers = { (list: ViewID) in Set(journal.filter { $0.entityID == list.rawValue }.map(\.device)) }
         #expect(writers(second) == [minted])
         #expect(writers(third) == ["given"], "TODO_DEVICE outranks the file")
         #expect(writers(fourth) == [minted], "an empty TODO_DEVICE is unset, as the demo reads it")
@@ -273,7 +273,7 @@ import TodoCore
         withObservationTracking { _ = second.model } onChange: {
             MainActor.assumeIsolated { order.steps.append(.secondModelMoved) }
         }
-        first.send(.taskViewList(.createFolderButtonTapped))
+        first.send(.taskViewList(.newListMenuItemChosen(in: nil)))
         order.steps.append(.firstSendReturned)
         #expect(order.steps == [.secondModelMoved, .firstSendReturned])
     }
@@ -309,7 +309,7 @@ import TodoCore
         }
         let later = try app.makeWindow(path: nil, width: .wide).host
         #expect(closed == nil)
-        writer.send(.taskViewList(.createFolderButtonTapped))
+        writer.send(.taskViewList(.newListMenuItemChosen(in: nil)))
         let opened = try app.makeWindow(path: nil, width: .wide).host
         #expect(later.model == opened.model, "the fan-out after the closed window reached the window after it")
     }
@@ -347,7 +347,7 @@ import TodoCore
 
         let before = redraws.map(\.count)
         let redrawn = { zip(redraws, before).allSatisfy { $0.count > $1 } }
-        writer.send(.taskViewList(.createFolderButtonTapped))
+        writer.send(.taskViewList(.newListMenuItemChosen(in: nil)))
         turnTheRunLoop(until: redrawn)
         settleTheRunLoop()
         #expect(redrawn(), "the change set redrew both windows and handed each a new value of its view")
@@ -526,13 +526,13 @@ private struct ContentClosure<Content: View>: View {
     try body(directory.appending(path: "todo.sqlite").path(percentEncoded: false))
 }
 
-/// Launches, creates a folder the way a person does in the one window, and answers the folder's id. The
+/// Launches, creates a list the way a person does in the one window, and answers the list's id. The
 /// composition root and the host are released when this returns, and the store with them, so the next launch
 /// over the same file is the only one open.
-@MainActor private func launchAndCreateAFolder(_ environment: [String: String]) throws -> ViewID {
+@MainActor private func launchAndCreateAList(_ environment: [String: String]) throws -> ViewID {
     let app = try TodoApp.launch(environment: environment)
     let host = try app.makeWindow(path: nil, width: .wide).host
     let before = Set(host.model.taskViewList.rows.map(\.id))
-    host.send(.taskViewList(.createFolderButtonTapped))
+    host.send(.taskViewList(.newListMenuItemChosen(in: nil)))
     return try #require(Set(host.model.taskViewList.rows.map(\.id)).subtracting(before).first)
 }

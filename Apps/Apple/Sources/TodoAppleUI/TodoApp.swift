@@ -1,6 +1,7 @@
 // Apps/Apple/Sources/TodoAppleUI/TodoApp.swift
 import AppFeature
 import DeviceFile
+import FeatureModule
 import Foundation
 import TodoCore
 
@@ -107,7 +108,7 @@ final class TodoApp {
     /// (`WindowView`), and once the caller lets go the host is released and the next fan-out passes it by. It throws
     /// what the root's `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the
     /// throw.
-    func makeWindow(path: String?, width: AppModule.Width) throws -> Window {
+    func makeWindow(path: String?, width: WindowWidth) throws -> Window {
         let unspentLaunchRoute = hostsMade == 0 ? launchRoute : nil
         let route = path.map { (try? AppModule.Route(path: $0)) ?? .default } ?? unspentLaunchRoute ?? .default
         let root = try AppModule(store: store, route: route, width: width)
@@ -174,7 +175,7 @@ final class TodoApp {
         /// composition root's way in, as a link does, and never by the view's closure over user actions; the view
         /// reports the width through this and decides nothing by it (`docs/style.md`, "Views"; the owner, 2026-10-20,
         /// on the window's way in). It holds the host weakly, as `open` does.
-        let widthChanged: @MainActor (AppModule.Width) -> Void
+        let widthChanged: @MainActor (WindowWidth) -> Void
     }
 
     /// Hands what a commit touched to every host still alive, in the order they were made, and forgets the

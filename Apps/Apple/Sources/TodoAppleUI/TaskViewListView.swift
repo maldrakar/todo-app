@@ -6,8 +6,12 @@ import TodoCore
 /// The list of views, drawn as the module assembled it, every gesture sent as the one action its control is
 /// named for (spec section 2). A deselect is no gesture here: the List cannot remove the highlight (`selection`). It
 /// knows nothing about renaming beyond what a row says: a row with a `draft` draws a field, and every other row
-/// its title. It has no title of its own, so its row in the back button's menu over a screen pushed on it is empty,
+/// what its kind is, through the one switch over it (`docs/style.md`, "Views"): an area's line with its label, and a
+/// list's title. It has no title of its own, so its row in the back button's menu over a screen pushed on it is empty,
 /// where the screens over it are named by theirs (the owner, 2026-10-25, #126).
+///
+/// The Lists screen's look, the tiles, the counts, the chevrons and the bar, is the plan's seventh and eighth tasks':
+/// until then this view draws the model's new rows with the look it had (Lists screen plan, Task 5).
 struct TaskViewListView: View {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
@@ -37,22 +41,35 @@ struct TaskViewListView: View {
                     if let draft = row.draft {
                         TitleField(draft: draft, send: send)
                     } else {
-                        // A tap on the title is the row's choice, the highlighted row's too, which the List does not
-                        // report: on the Mac a click on the highlighted row moves no highlight and writes no
-                        // selection, so the task open in its list stayed open, where a click on the highlighted view
-                        // closes it (`TaskViewList`). The title fills the row to its trailing edge so that the tap
-                        // covers the row past the title's text, and it replaces the List's own selection there; the
-                        // row's insets and a nested row's indent stay the List's, and the arrow keys still go
-                        // through `selection`. On 2026-10-18, on the Mac: a click on a view's title or on the rest of
-                        // its row chose it, one action each, and on the highlighted view closed its task; the same
-                        // day, a tap on the title's text alone, sent only for the highlighted row, left a click on
-                        // another view's title choosing nothing. On 2026-10-20, in the iOS 26.3 simulator, a tap on
-                        // another view's row pushed its list on iPhone, and on the iPad a tap on the highlighted view
-                        // closed its task.
-                        Text(row.title)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(.rect)
-                            .onTapGesture { send(.rowSelected(row.id)) }
+                        switch row.kind {
+                        case .area(let label):
+                            // A line across the row, with the area's name beside it when it has one. Not selectable, so
+                            // that a click on the line puts no highlight on it: an area never opens, and the module
+                            // moves nothing for `.rowSelected` on it, so a highlight the List put there would stay
+                            // beside the list of the view chosen before.
+                            HStack {
+                                if let label { Text(label) }
+                                VStack { Divider() }
+                            }
+                            .selectionDisabled()
+                        case .list(let list):
+                            // A tap on the title is the row's choice, the highlighted row's too, which the List does
+                            // not report: on the Mac a click on the highlighted row moves no highlight and writes no
+                            // selection, so the task open in its list stayed open, where a click on the highlighted
+                            // view closes it (`TaskViewList`). The title fills the row to its trailing edge so that the
+                            // tap covers the row past the title's text, and it replaces the List's own selection there;
+                            // the row's insets and a nested row's indent stay the List's, and the arrow keys still go
+                            // through `selection`. On 2026-10-18, on the Mac: a click on a view's title or on the rest
+                            // of its row chose it, one action each, and on the highlighted view closed its task; the
+                            // same day, a tap on the title's text alone, sent only for the highlighted row, left a
+                            // click on another view's title choosing nothing. On 2026-10-20, in the iOS 26.3 simulator,
+                            // a tap on another view's row pushed its list on iPhone, and on the iPad a tap on the
+                            // highlighted view closed its task.
+                            Text(list.title)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(.rect)
+                                .onTapGesture { send(.rowSelected(row.id)) }
+                        }
                     }
                 }
                 // The tree as the flat rows carry it: a number to indent by, so that drawing it decides nothing
@@ -87,9 +104,20 @@ struct TaskViewListView: View {
         // ideal, because the column opens at the width AppKit saved for it (`NSSplitView Subview Frames` in the
         // app's defaults): with a saved width, an ideal of 220 opened at 180, the minimum it had then.
         .navigationSplitViewColumnWidth(min: 220, ideal: 220)
+        #if !os(watchOS)
+        // The sidebar's "+", a menu with an item for each thing it makes, each sending the action its item is named for:
+        // where a list or an area goes, and that New Task is quick entry, is the module's to decide (Lists screen spec,
+        // section 8). The look is the plan's Tasks 7 and 8. Not on the watch, where `Menu` is unavailable (a file
+        // typechecked against the watchOS 10 SDK with Xcode 27.1 on 2026-10-27), and whose build is a compile check in
+        // this epic, as it is for the row's menu above.
         .toolbar {
-            Button("New Folder", systemImage: "folder.badge.plus") { send(.createFolderButtonTapped) }
+            Menu("Add", systemImage: "plus") {
+                Button("New Task") { send(.newTaskMenuItemChosen) }
+                Button("New List") { send(.newListMenuItemChosen(in: nil)) }
+                Button("New Area") { send(.newAreaMenuItemChosen) }
+            }
         }
+        #endif
     }
 
     /// The highlight, read from the model and moved only by an action, the shape a text field's binding has

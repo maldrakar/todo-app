@@ -58,16 +58,24 @@ let package = Package(
         // routable module and its seat, the error a route's text form is refused with, the destination a screen
         // declares what is open over it in, the stack a flow holds the screens over its base in, the id of an
         // element of it, the protocol of a flow's enum of screens and the notice the stack sends (ADR-0007,
-        // amendment of 2026-10-22). It still depends on nothing: a seat and a stack are handed the way to make
-        // what they hold by their owner, so the contract names no dependency, and a screen that needs none, or
-        // others than the store, needs nothing from it (ADR-0007, amendment of 2026-10-15).
+        // amendment of 2026-10-22), and the width class of a window, which the root lays its window out by and the
+        // sidebar builds its rows for, here since a child never imports the root (ADR-0007, amendment of
+        // 2026-10-27). It still depends on nothing: a seat and a stack are handed the way to make what they hold by
+        // their owner, so the contract names no dependency, and a screen that needs none, or others than the
+        // store, needs nothing from it (ADR-0007, amendment of 2026-10-15).
         .target(name: "FeatureModule"),
         // One target per feature, so that `internal` means "inside this feature" and the dependency graph
         // is read here rather than taken on trust: a feature depends on the core, the contract and the
         // features whose routes its destination holds, the screens it declares open over it (ADR-0009,
         // amendment of 2026-10-22), and never on a sibling or on the root module (ADR-0007). The sidebar
-        // declares the task list, and the task list declares the task screen.
-        .target(name: "TaskViewListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskListFeature"], path: "Sources/Features/TaskViewList"),
+        // declares the task list, and the task list declares the task screen. A feature that builds the models
+        // of its screen's components depends on the design system's two targets too, as the sidebar builds
+        // each row's tile and chooses its title's font (ADR-0007, amendment of 2026-10-26).
+        .target(
+            name: "TaskViewListFeature",
+            dependencies: ["TodoCore", "FeatureModule", "TaskListFeature", "DesignSystem", "DesignSystemComponents"],
+            path: "Sources/Features/TaskViewList"
+        ),
         .target(name: "TaskListFeature", dependencies: ["TodoCore", "FeatureModule", "TaskScreenFeature"], path: "Sources/Features/TaskList"),
         .target(name: "TaskScreenFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/TaskScreen"),
         .target(name: "QuickEntryFeature", dependencies: ["TodoCore", "FeatureModule"], path: "Sources/Features/QuickEntry"),
@@ -104,7 +112,10 @@ let package = Package(
         .testTarget(name: "FeatureModuleTests", dependencies: ["FeatureModule"]),
         .testTarget(
             name: "TaskViewListFeatureTests",
-            dependencies: ["TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]
+            dependencies: [
+                "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "FeatureModule", "TodoCore", "SQLiteKit",
+                "TestSupport", "DesignSystem", "DesignSystemComponents",
+            ]
         ),
         .testTarget(
             name: "TaskListFeatureTests",
@@ -114,7 +125,10 @@ let package = Package(
         .testTarget(name: "QuickEntryFeatureTests", dependencies: ["QuickEntryFeature", "FeatureModule", "TodoCore", "SQLiteKit", "TestSupport"]),
         .testTarget(
             name: "AppFeatureTests",
-            dependencies: ["AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature", "QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport"]
+            dependencies: [
+                "AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature",
+                "QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport", "DesignSystemComponents",
+            ]
         ),
     ],
     swiftLanguageModes: [.v6]

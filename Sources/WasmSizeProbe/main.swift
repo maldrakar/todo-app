@@ -21,12 +21,13 @@ import WASILibc
 /// client, and the `todo` demo is the wrong stand-in for one: the demo carries an argument parser, a formatter
 /// and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about the core. This
 /// executable does what a web entry point will: it builds the root module over a store in memory from a
-/// window's path, which is the web's address bar, and drives every module of the window — a selection, a rename
-/// and a new folder in the sidebar, a link applied as `.route` through the window's stack, quick entry creating
-/// a task, a tap in the list sent to its element of the stack, which pushes the task, the way back as the
-/// shorter path, the window narrowing, Cancel, and Open in New Window, whose path it writes down — with the
-/// change each write produced, and a path the routes refuse, and it reads the layout the root cuts for the
-/// window's width. Beside that it calls the core's public API directly, and each group of calls has a client
+/// window's path, which is the web's address bar, and drives every module of the window — a selection, a rename,
+/// a new list, a list made inside it, a fold, a new area and New task in the sidebar, a link applied as `.route`
+/// through the window's stack, quick entry creating a task, a tap in the list sent to its element of the stack,
+/// which pushes the task, the way back as the shorter path, the window narrowing, Cancel, and Open in New Window,
+/// whose path it writes down — with the change each write produced, and a path the routes refuse, and it reads
+/// the layout the root cuts for the window's width and the sidebar's rows, the tiles built for that width among
+/// them. Beside that it calls the core's public API directly, and each group of calls has a client
 /// that ships it. The writes, the reads, a page and search are what the modules M3 adds will call. The filter
 /// codec and the journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in
 /// them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the platform clock a
@@ -128,7 +129,7 @@ private enum WasmSizeProbe {
         var pending: [ChangeSet] = []
         appStore.onChange = { pending.append($0) }
         // Made wide, as a browser window opens, and narrowed further down, so that the layout the root cuts by the
-        // width is in the measurement in both its shapes.
+        // width, and the sidebar's tiles, are in the measurement in both their shapes.
         let app = try AppModule(store: appStore, route: try AppModule.Route(path: "/"), width: .wide)
         @discardableResult
         func perform(_ event: AppModule.Event) -> AppModule.Output? {
@@ -140,11 +141,24 @@ private enum WasmSizeProbe {
         perform(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today))))
         perform(.action(.taskViewList(.titleFieldChanged("Today, open"))))
         perform(.action(.taskViewList(.titleFieldSubmitted)))
-        // Read between the two writes: after the folder the highlight is on the folder, and the title the rename
-        // put on the row would not reach a `print` at all.
-        let renamed = app.model.taskViewList.rows.first(where: \.isSelected)?.title ?? "none"
-        perform(.action(.taskViewList(.createFolderButtonTapped)))
-        let newFolder = app.model.taskViewList.rows.first(where: \.isSelected)
+        let renamed = highlightedTitle(in: app.model) ?? "none"
+        // New list from "+", named as it opens; a list made inside it, which takes its colour and unfolds it; the
+        // outer list folded by its chevron; an area from "+", left unnamed, which an area may be; and New task, which
+        // the sidebar asks the root for and the root answers with quick entry, which the link below keeps up. The
+        // sidebar is read before the window narrows and after, through one switch over a row's kinds.
+        perform(.action(.taskViewList(.newListMenuItemChosen(in: nil))))
+        let newList = app.model.taskViewList.rows.first { $0.draft != nil }
+        perform(.action(.taskViewList(.titleFieldSubmitted)))
+        if let newList {
+            perform(.action(.taskViewList(.newListMenuItemChosen(in: newList.id))))
+            perform(.action(.taskViewList(.titleFieldSubmitted)))
+            perform(.action(.taskViewList(.disclosureTapped(newList.id))))
+        }
+        perform(.action(.taskViewList(.newAreaMenuItemChosen)))
+        perform(.action(.taskViewList(.titleFieldSubmitted)))
+        perform(.action(.taskViewList(.newTaskMenuItemChosen)))
+        let askedForQuickEntry = app.model.quickEntry != nil
+        let wideSidebar = sidebarLine(of: app.model)
         // A link, read from its path and followed through the window's stack, with quick entry up over the Inbox;
         // quick entry files a task, whose change reaches the list; a tap on the list's element, in the column,
         // pushes the task, and the way back, the detail's path one shorter, which is empty, pops it and leaves the
@@ -162,6 +176,7 @@ private enum WasmSizeProbe {
         let opened = label(idsOverTheSidebar(in: app.model.layout).last.flatMap { app.model.screens[$0] })
         perform(.action(.wentBack(to: [])))
         perform(.widthChanged(.narrow))
+        let narrowSidebar = sidebarLine(of: app.model)
         perform(.action(.quickEntryButtonTapped))
         let drafted = app.model.quickEntry?.draft ?? "none"
         perform(.action(.quickEntry(.cancelButtonTapped)))
@@ -187,7 +202,8 @@ private enum WasmSizeProbe {
         print("journal \(exported.count) operations, first \(exported.first.map { "\($0.entity.rawValue).\($0.field) at \($0.clock.raw)" } ?? "none"), pair \(JournalOperation.pairID(view, review))")
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
-        print("root \(root.taskViewList.rows.count) views, renamed \(renamed), folder \(newFolder?.title ?? "none") \(newFolder?.draft == nil ? "named" : "being named"), problem \(root.taskViewList.problem != nil)")
+        print("root \(root.taskViewList.rows.count) rows, renamed \(renamed), new list \(newList?.draft ?? "none"), quick entry from the sidebar \(askedForQuickEntry), problem \(root.taskViewList.problem != nil)")
+        print("sidebar wide \(wideSidebar); narrow \(narrowSidebar)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
@@ -234,6 +250,43 @@ private enum WasmSizeProbe {
         case .wide(let column?, let path): [column] + path
         case .wide(nil, let path): path
         }
+    }
+
+    /// The title of the sidebar's highlighted row, and nil when none is: one switch over a row's kinds, as the
+    /// sidebar's view has, an area's line never highlighted.
+    private static func highlightedTitle(in model: AppModule.Model) -> String? {
+        for row in model.taskViewList.rows {
+            switch row.kind {
+            case .list(let list) where list.isSelected: return list.title
+            case .list, .area: continue
+            }
+        }
+        return nil
+    }
+
+    /// The sidebar as a line: how many lists it draws and how many of them are folded, its areas by their labels, and
+    /// the first list's tile, count and title: one switch over a row's kinds, as the sidebar's view has.
+    private static func sidebarLine(of model: AppModule.Model) -> String {
+        var lists = 0
+        var folded = 0
+        var areas: [String] = []
+        var first = "no list"
+        for row in model.taskViewList.rows {
+            switch row.kind {
+            case .area(let label):
+                areas.append(label ?? "unnamed")
+            case .list(let list):
+                if lists == 0 {
+                    let count = list.countText.isEmpty ? "uncounted" : list.countText
+                    let emphasis = list.titleFont.weight == .regular ? "plain" : "emphasized"
+                    let tile = "\(list.tile.side) pt \(list.tile.color.rawValue) \(list.tile.glyph.icon.rawValue) tile"
+                    first = "\(list.title) \(count) on a \(tile), \(emphasis), at \(row.depth)"
+                }
+                lists += 1
+                if list.isCollapsed { folded += 1 }
+            }
+        }
+        return "\(lists) lists, \(folded) folded, areas \(areas.joined(separator: " and ")), first \(first)"
     }
 
     /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.
