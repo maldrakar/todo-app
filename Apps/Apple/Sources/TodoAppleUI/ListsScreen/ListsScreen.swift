@@ -43,6 +43,9 @@ struct ListsScreen: View {
     /// The frames the tree's items last reported, which the drag finds rows by.
     @State private var itemFrames = ListsDrag.ItemFrames()
 
+    /// Where the tree stands up and down in its viewport, which a field that opens is shown by (`showField`).
+    @State private var treePosition = TreePosition()
+
     init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) {
         self.model = model
         self.send = send
@@ -85,14 +88,21 @@ struct ListsScreen: View {
         model.rows.first { $0.draft != nil }?.id
     }
 
-    /// The tree: the items in a lazy stack, each as wide as the tree, the lifted row's card over them, and the drag's
+    /// The tree: the items in a stack, each as wide as the tree, the lifted row's card over them, and the drag's
     /// recognizer behind them. The content is at least as tall as the viewport and stands at its top, since a
     /// `ScrollView` over both axes centres content shorter than itself, and a tree that a lifted block shortened would
     /// jump down (spike #145).
+    ///
+    /// The stack makes every row, a `VStack` where the spike's was a `LazyVStack`. A lazy stack made a new row's field
+    /// below the screen and dropped it again as the tree scrolled there, and the field lost the caret as it went, which
+    /// is a lost focus to the module, so the field closed before it was seen: by taps on "+" → New Area, + List and
+    /// + Area, from the top of the seeded tree (the controller's hand check of #148, the iOS 26.3 simulator,
+    /// 2026-10-29). The tree is tens of rows, as the module reads it whole (`TaskViewList`, `.changed`), and the
+    /// drag's rule reads whatever frames the rows report.
     private func tree(
         _ drawn: [ListsTreeItem], width: CGFloat, visibleRight: CGFloat, items: [ListsTreeItem]
     ) -> some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(drawn) { item in
                 self.item(item, width: width, visibleRight: visibleRight)
                     .frame(width: width, alignment: .leading)
@@ -112,6 +122,9 @@ struct ListsScreen: View {
         .onGeometryChange(for: CGFloat.self) { proxy in
             max(0, -proxy.frame(in: .named(Self.viewportSpace)).minX)
         } action: { sidewaysOffset = $0 }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.frame(in: .named(Self.viewportSpace)).minY
+        } action: { treePosition.contentTop = $0 }
         #if os(iOS)
         // The drag is UIKit's long press, unavailable on macOS and watchOS, where the screen has none.
         .background {
@@ -247,18 +260,17 @@ struct ListsScreen: View {
         }
     }
 
-    /// Shows the field that has just opened on the row. A row the lazy stack has not laid out, a new list in the last
-    /// area or a new area at the end of a long tree, has no field yet, and would never take the caret: the tree scrolls
-    /// it to the middle of the screen, and sideways as far as its need, the field's 140 pt among it, the field focusing
-    /// itself as it appears. A row it has laid out, one on screen renamed from its menu, is scrolled as little as shows
-    /// its field's span, once that span is laid out, which for a shallow row on screen is not at all. A scroll to the
-    /// row itself with no anchor moved the tree sideways to its far end, since a row wider than the screen is never
-    /// wholly in view (the iOS 26.3 simulator, 2026-10-29).
+    /// Shows the field that has just opened on the row, read from where the row stands. A row on screen, one renamed
+    /// from its menu, is scrolled as little as shows its field's span, once that span is laid out, which for a shallow
+    /// row is not at all. A row off screen, a new list in the last area or a new area at the end of a long tree, is
+    /// scrolled to the middle of the screen, and sideways as far as its need, the field's 140 pt among it. A scroll to
+    /// the row itself with no anchor moved the tree sideways to its far end, since a row wider than the screen is
+    /// never wholly in view (the iOS 26.3 simulator, 2026-10-29).
     private func showField(
         of id: ViewID, among items: [ListsTreeItem], width: CGFloat, scroller: ScrollViewProxy
     ) {
         let motion = reduceMotion ? nil : Animation(.popover)
-        guard itemFrames.byID[.row(id)] == nil else {
+        if let frame = itemFrames.byID[.row(id)], treePosition.shows(frame, in: viewport.height) {
             Task { @MainActor in
                 withAnimation(motion) { scroller.scrollTo(Self.fieldSpanID) }
             }
@@ -360,6 +372,23 @@ struct ListsScreen: View {
 
     /// The identity of the open field's span (`fieldSpan`).
     private static let fieldSpanID = "ListsScreen.fieldSpan"
+}
+
+extension ListsScreen {
+    /// Where the top of the tree's content stands in its viewport, which moves with every frame of a scroll and which
+    /// only a field that opens reads: kept in a class that nothing observes and held in the screen's state, so that a
+    /// scroll does not draw the screen again, as the drag's frames are (`ListsDrag.ItemFrames`).
+    @MainActor
+    final class TreePosition {
+        var contentTop: CGFloat = 0
+
+        /// Whether a frame of the tree's content stands wholly in a viewport of the height. The viewport is the part of
+        /// the screen between the bars, so its height leaves them out, and its top is the content's top at rest: 674
+        /// and 0 on an iPhone 17 (the iOS 26.3 simulator, 2026-10-29).
+        func shows(_ frame: CGRect, in height: CGFloat) -> Bool {
+            contentTop + frame.minY >= 0 && contentTop + frame.maxY <= height
+        }
+    }
 }
 
 extension View {

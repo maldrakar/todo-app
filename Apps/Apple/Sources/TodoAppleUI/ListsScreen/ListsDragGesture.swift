@@ -108,8 +108,8 @@ struct ListsDrag {
 
     /// The drag once the finger is at the point. Over the slot the slot stays, so that it does not flicker under the
     /// finger, the slot being taller than a row; over a row it goes before that row in the row's upper half and after
-    /// it in the lower; above the first row it goes to the top, and below the last to the end. Only the rows laid out
-    /// report frames, so the rule counts no rows and holds in a lazy stack (spike #145).
+    /// it in the lower; above the first row it goes to the top, and below the last to the end. The rule reads the
+    /// frames the rows reported and counts no rows, so it holds in a lazy stack too (spike #145).
     private func moved(
         to point: CGPoint, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect]
     ) -> ListsDrag {
