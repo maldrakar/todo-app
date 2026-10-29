@@ -453,9 +453,9 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
 }
 
 /// A dialog's actions with no such dialog up move nothing, the sentence and an open field included: SwiftUI writes a
-/// dismissal into an alert's or a sheet's binding after a close the module drove, which lands here, and so does a tap
-/// that arrives after its dialog went (Lists screen plan, Task 6). With the picker up the confirmation's actions move
-/// nothing, and with the confirmation up the picker's.
+/// sheet's dismissal into its binding after a close the module drove, which lands here, and so does a tap that arrives
+/// after its dialog went (Lists screen plan, Task 6). With the picker up the confirmation's actions move nothing, and
+/// with the confirmation up the picker's.
 @Test func aDialogActionWithNoDialogUpMovesNothing() throws {
     let store = try makeStore()
     let errands = try store.createView(NewTaskView(title: "Errands"))
