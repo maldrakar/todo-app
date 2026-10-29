@@ -6,15 +6,15 @@ import TaskViewListFeature
 /// ADR-0009, amendment of 2026-10-25): the confirmation of a delete as an alert, its title and message with Delete and
 /// Cancel, and the picker of Move to… as a sheet, whose content each view draws in its own look, so that the phone's
 /// screen, the sidebar and the plan's eighth task's sidebar put them up the one way.
-struct ListsDialogs<Picker: View>: ViewModifier {
+struct ListsDialogs<PickerContent: View>: ViewModifier {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
-    private let picker: (TaskViewList.Model.MovePicker) -> Picker
+    private let picker: (TaskViewList.Model.MovePicker) -> PickerContent
 
     /// The dialogs of the model, which send their actions, the picker drawn by `picker` while it is up.
     init(
         model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void,
-        @ViewBuilder picker: @escaping (TaskViewList.Model.MovePicker) -> Picker
+        @ViewBuilder picker: @escaping (TaskViewList.Model.MovePicker) -> PickerContent
     ) {
         self.model = model
         self.send = send

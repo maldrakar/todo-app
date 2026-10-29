@@ -78,7 +78,6 @@ struct ListsScreen: View {
         .modifier(ListsDialogs(model: model, send: send) { MovePickerSheet(model: $0, send: send) })
     }
 
-
     // MARK: The tree
 
     /// The row whose field is open, the one row whose `draft` is not nil, and nil while no field is.
