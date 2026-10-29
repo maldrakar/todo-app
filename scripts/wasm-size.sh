@@ -6,9 +6,9 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.5625 MiB. The probe measures 6,602,384 bytes with Swift 6.4.0 as this is written, so the budget is that with four
+# 6.5625 MiB. The probe measures 6,601,657 bytes with Swift 6.4.0 as this is written, so the budget is that with four
 # percent to spare, rounded up to a whole 64 KiB, which leaves it where #146 put it. What has moved the reading since is
-# the code: 6,563,465 bytes on the `main` this was measured beside, aa85351, and the other 38,919 once the sidebar made
+# the code: 6,563,465 bytes on the `main` this was measured beside, aa85351, and the other 38,192 once the sidebar made
 # its edits, edit mode, the confirmation of a delete, the move picker and the drop read into a parent and a place, and
 # the probe drove the picker and a drop (#147). The binary carries the path of the directory it was built in, so a
 # reading moves by a few hundred bytes with the checkout's path, and the two above were taken in one. In #146 it was
