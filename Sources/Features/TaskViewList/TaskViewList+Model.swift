@@ -4,8 +4,8 @@ import DesignSystemComponents
 import TodoCore
 
 extension TaskViewList {
-    /// What a view draws: the rows of the tree, the highlighted one named once more for a list bound to one value, and
-    /// the sentence.
+    /// What a view draws: the rows of the tree, the highlighted one named once more for a list bound to one value,
+    /// whether the screen is in edit mode, the dialog up over the rows, and the sentence.
     public struct Model: Equatable, Sendable {
         /// One row of the tree, an area's line or a list's row (spec section 5).
         public struct Row: Equatable, Sendable, Identifiable {
@@ -36,7 +36,8 @@ extension TaskViewList {
         /// 2026-10-25, on the spec's first revision).
         public enum Kind: Equatable, Sendable {
             /// An area's line, with its name as its label, and nil for an area that has none: the line alone is the
-            /// whole of how an unnamed area looks (spec section 3).
+            /// whole of how an unnamed area looks (spec section 3). In edit mode an unnamed area's label is "Area", the
+            /// label a tap renames it by (spec section 1).
             case area(label: String?)
             /// A list's row, with everything it draws.
             case list(ListRow)
@@ -55,9 +56,9 @@ extension TaskViewList {
             /// drawn depth and whether the row has lists inside it.
             public let titleFont: DesignSystem.Font
 
-            /// The number of the list's open tasks as text, and the empty string for a count of zero and for a list
-            /// that has no count: a view draws it as it is, and a zero is drawn as nothing on every list (spec
-            /// section 4).
+            /// The number of the list's open tasks as text, and the empty string for a count of zero, for a list
+            /// that has no count and in edit mode, where counts leave the rows: a view draws it as it is, and a zero is
+            /// drawn as nothing on every list (spec sections 1 and 4).
             public let countText: String
 
             /// Whether the list has lists inside it, which a chevron folds.
@@ -70,6 +71,42 @@ extension TaskViewList {
             /// Whether this row is the highlighted one, which `selection` names too: the row of the view whose list is
             /// declared, or the folded list whose branch hides that row.
             public let isSelected: Bool
+        }
+
+        /// What the confirmation of a delete asks, finished: the question, which names the list or the area, and what
+        /// the delete takes with it and what it leaves (spec section 6).
+        public struct Confirmation: Equatable, Sendable {
+            public let title: String
+            public let message: String
+        }
+
+        /// What the picker of Move to… draws (spec section 6).
+        public struct MovePicker: Equatable, Sendable {
+            /// A row of the picker: the row the screen draws, and what the picker says about it.
+            public struct Row: Equatable, Sendable, Identifiable {
+                public var id: ViewID { row.id }
+
+                /// The row as the screen draws it, of the same kind, at the same depth and with the same tile and
+                /// title font, so that a view draws it with the screen's own row; it carries no draft, no fold and no
+                /// highlight.
+                public let row: Model.Row
+
+                /// Whether the row cannot take the list, being the list itself or a list inside it, which a view
+                /// greys out.
+                public let isDisabled: Bool
+
+                /// Whether the row is the list's present parent, a list or an area's line, which a view marks.
+                public let isCurrent: Bool
+            }
+
+            /// The title, which names the list being moved.
+            public let title: String
+
+            /// Whether the list being moved stands at the root, which marks "Top level" as its present parent.
+            public let isTopLevelCurrent: Bool
+
+            /// The whole tree in tree order, every level of it and the folds ignored.
+            public let rows: [Row]
         }
 
         public let rows: [Row]
@@ -92,6 +129,23 @@ extension TaskViewList {
         /// 2026-10-29, #158). Only the light moves: the list declared stays open, a click on the lit row declares that
         /// row's own list as a click on any row does, and the row lights up again once no fold hides it.
         public let selection: ViewID?
+
+        /// Whether the screen is in edit mode, entered from "…" and left with Done: every row then takes a grip and a
+        /// tap renames it, and the counts and an unnamed area's missing label are drawn as `rows` gives them in it
+        /// (spec section 7). It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
+        public let isEditing: Bool
+
+        /// The confirmation of a delete while it is up, and nil when none is: a view draws it as an alert, its title
+        /// and message with two buttons of the view's own, Delete and Cancel, which send `deleteConfirmed` and
+        /// `deleteCancelled` (spec section 6). It is the module's state and not a screen, and no relaunch restores it
+        /// (ADR-0009, amendment of 2026-10-25).
+        public let confirmation: Confirmation?
+
+        /// The picker of Move to… while it is open, and nil when it is closed: a view draws it as a sheet, "Top level"
+        /// first and then its rows, which send `movePickerRowTapped`, with a Cancel of the view's own that sends
+        /// `movePickerCancelled` (spec section 6). It is the module's state and not a screen, and no relaunch restores
+        /// it (ADR-0009, amendment of 2026-10-25).
+        public let movePicker: MovePicker?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one

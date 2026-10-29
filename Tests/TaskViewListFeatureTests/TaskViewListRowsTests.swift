@@ -9,10 +9,13 @@ import TaskScreenFeature
 import TaskViewListFeature
 import TodoCore
 
-private let inbox = BuiltInTaskViews.inbox
+/// The Inbox, which a sidebar made on no list declares. Not private, since the edits' tests compare a sidebar on it
+/// too.
+let inbox = BuiltInTaskViews.inbox
 
-/// The five views every store starts with, in the order the seed ranks them.
-private let builtIns = [
+/// The five views every store starts with, in the order the seed ranks them. Not private, since the edits' tests
+/// compare the order of their rows with it too.
+let builtIns = [
     inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash,
 ]
 
@@ -23,30 +26,35 @@ private func stored(_ id: ViewID, in store: Store) throws -> [String?] {
     return [view.title, view.parent?.rawValue, view.kind.rawValue, view.color?.rawValue, view.icon]
 }
 
-/// The row a field is open on, which is how a test finds the row a New list or a New area just made.
-private func rowBeingNamed(in model: TaskViewList.Model) throws -> TaskViewList.Model.Row {
+/// The row a field is open on, which is how a test finds the row a New list or a New area just made. Not private,
+/// since the edits' tests find the row a tap in edit mode opened with it too.
+func rowBeingNamed(in model: TaskViewList.Model) throws -> TaskViewList.Model.Row {
     try #require(model.rows.first { $0.draft != nil })
 }
 
-/// The key the sidebar keeps its folds under in the device's own state, as the module names it (ADR-0010).
-private let collapsedViewsKey = "taskViewList.collapsed"
+/// The key the sidebar keeps its folds under in the device's own state, as the module names it (ADR-0010). Not
+/// private, since the edits' tests read the unfold a move writes under it too.
+let collapsedViewsKey = "taskViewList.collapsed"
 
 /// Opens the field on Today, types a blank name and submits it, so that the list holds a field open on a refused
-/// draft and the sentence that refused it, which an event that moves nothing leaves where they are.
-private func refusingAName(_ list: TaskViewList) {
+/// draft and the sentence that refused it, which an event that moves nothing leaves where they are. Not private, since
+/// the edits' tests hold a refused name through a dialog's actions with it too.
+func refusingAName(_ list: TaskViewList) {
     _ = list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
     _ = list.send(.action(.titleFieldChanged(" ")))
     _ = list.send(.action(.titleFieldSubmitted))
 }
 
-/// The list row a view's row draws, and nil for an area's line: what a test reads a tile, a font and a count off.
-private func listRow(_ row: TaskViewList.Model.Row) -> TaskViewList.Model.ListRow? {
+/// The list row a view's row draws, and nil for an area's line: what a test reads a tile, a font and a count off. Not
+/// private, since the edits' tests read the counts edit mode empties with it too.
+func listRow(_ row: TaskViewList.Model.Row) -> TaskViewList.Model.ListRow? {
     guard case .list(let list) = row.kind else { return nil }
     return list
 }
 
-/// The list row the model draws for a view, and nil when no row holds the view or its row is an area's line.
-private func listRow(_ id: ViewID, in model: TaskViewList.Model) -> TaskViewList.Model.ListRow? {
+/// The list row the model draws for a view, and nil when no row holds the view or its row is an area's line. Not
+/// private, since the edits' tests read a count and a fold off it too.
+func listRow(_ id: ViewID, in model: TaskViewList.Model) -> TaskViewList.Model.ListRow? {
     model.rows.first { $0.id == id }.flatMap(listRow)
 }
 

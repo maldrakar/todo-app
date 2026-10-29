@@ -966,3 +966,24 @@ private let linkSentence = "The link could not be opened."
     #expect(app.model.quickEntry == twin.model.quickEntry)
     #expect(app.model.problem == linkSentence)
 }
+
+/// A list deleted from the sidebar's confirmation goes with the lists inside it, and the list open on it asks to be
+/// closed on the change the delete produced, which the window takes after the `send` that wrote, as it takes a peer's:
+/// the stack drops the list, the sidebar declares nothing, so nothing is highlighted and the window's route names no
+/// list (Lists screen spec, section 6; navigation state spec, section 3).
+@Test func deletingTheOpenListClosesItAndLeavesNothingChosen() throws {
+    let store = try makeStore()
+    let work = try taggedView("Work", in: store)
+    let reviews = try store.createView(NewTaskView(title: "Reviews", parent: work.view))
+    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"), width: .wide)
+    try #require(idsOverTheSidebar(in: app.model).count == 1, "the list is open on the view before it goes")
+    #expect(app.send(.action(.taskViewList(.deleteMenuItemChosen(work.view)))) == nil)
+    #expect(app.model.taskViewList.confirmation?.title == "Delete “Work”?")
+    let deleted = try changeSet(of: store) { #expect(app.send(.action(.taskViewList(.deleteConfirmed))) == nil) }
+    #expect(app.send(.changed(deleted)) == nil)
+    #expect(idsOverTheSidebar(in: app.model).isEmpty)
+    #expect(app.model.screens.isEmpty)
+    #expect(app.model.taskViewList == (try sidebarOn(ViewID(), in: store, width: .wide)), "the views, nothing highlighted and nothing said")
+    #expect(app.route == .default)
+    #expect(try store.view(reviews) == nil)
+}

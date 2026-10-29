@@ -18,6 +18,11 @@ import TodoCore
 /// own layout, and the count of its open tasks as text (Lists screen spec, sections 1, 4 and 5; ADR-0007, amendment
 /// of 2026-10-26). The module reads the counts beside the rows, and the width moves the tiles with no read at all.
 ///
+/// It edits the tree too (Lists screen spec, sections 6 and 7): edit mode, a delete it asks about first, Move to… and
+/// the drag's drop, which it reads into a parent and a place. The confirmation and the picker are its state and not
+/// screens, two optionals of its model, since neither has a subject a link could name (ADR-0009, amendment of
+/// 2026-10-25).
+///
 /// It is the base of its window's stack, and the task list's opener. A choice here declares the list of that view's
 /// tasks in this module's destination, and the window's stack makes, keeps and drops the list (ADR-0009, amendment of
 /// 2026-10-22): the module holds no screen, and hears what the list asks for as `.destinationAnswered`. The list is
@@ -83,6 +88,25 @@ public final class TaskViewList: Routable {
         case newAreaMenuItemChosen
         /// New task, from "+".
         case newTaskMenuItemChosen
+        /// Edit, from "…" on the phone and the iPad.
+        case editMenuItemChosen
+        /// Done, the check that ends edit mode.
+        case doneButtonTapped
+        /// Delete on a list's menu, or Delete area on an area's.
+        case deleteMenuItemChosen(ViewID)
+        /// The confirmation's Delete.
+        case deleteConfirmed
+        /// The confirmation's Cancel.
+        case deleteCancelled
+        /// Move to… on a list's menu.
+        case moveToMenuItemChosen(ViewID)
+        /// A row of the move picker, and nil for its "Top level".
+        case movePickerRowTapped(ViewID?)
+        /// The move picker's Cancel.
+        case movePickerCancelled
+        /// The drag's one report, on release: the row let go after another row, nil for the top of the tree, at the
+        /// depth the drag chose.
+        case rowDropped(ViewID, after: ViewID?, depth: Int)
     }
 
     public enum Event: RoutedEvent {
@@ -194,6 +218,14 @@ public final class TaskViewList: Routable {
         // of #77 and #101).
         switch event {
         case .action(.rowSelected(let id)):
+            // In edit mode a tap on a row renames it, an area's line among them, whose label is what a person taps
+            // (Lists screen spec, section 7): it opens the row's field as the Rename menu item does, and declares
+            // nothing. A tap on the row whose field is open already moves nothing, so that what was typed there and the
+            // sentence that refused it stay.
+            if state.isEditing {
+                if state.rename?.id != id { openTitleField(on: id) }
+                return nil
+            }
             // The list's route on the view, declared every time, the highlighted row's own included: choosing the
             // row that is already chosen is still a choice, and every declaration is a new write. On the view the
             // list is on, the stack keeps the list and hands it the declaration, whose empty tail closes the task
@@ -227,14 +259,7 @@ public final class TaskViewList: Routable {
             setDestination(TaskList.Route(head: id))
             return nil
         case .action(.renameMenuItemChosen(let id)):
-            // The title comes off the row and not out of a read: the row is what the person chose the menu
-            // item on, and a read here would open the field on a title nobody was looking at. A row that is
-            // not there opens nothing, the way the field actions below do nothing without a field.
-            guard let row = state.rows.first(where: { $0.id == id }) else { return nil }
-            // One field at a time: the rename that was open is replaced, draft and all, which is what makes
-            // the menu item on a second row move the field rather than open another one.
-            state.rename = State.Rename(id: id, draft: row.title)
-            state.problem = nil
+            openTitleField(on: id)
             return nil
         case .action(.titleFieldChanged(let text)):
             // The four field actions are ignored when no field is open: what a gesture means is the
@@ -300,6 +325,95 @@ public final class TaskViewList: Routable {
             // A line at the root's end, after every list and area there, and unnamed until a name is typed into the
             // field it opens with (Lists screen spec, section 3).
             create(NewTaskView(title: "", kind: .area))
+            return nil
+        case .action(.editMenuItemChosen):
+            // Edit mode is session state (ADR-0009, amendment of 2026-10-25), and entering it answers nothing a person
+            // was told, so an open field and the sentence stay where they are.
+            state.isEditing = true
+            return nil
+        case .action(.doneButtonTapped):
+            // Done settles an open field as Return does, and leaves edit mode unless the name was refused: the field
+            // then stays open on what was typed, and edit mode with it, since the person is mid-word (Lists screen
+            // spec, section 7). With no field open it ends edit mode and moves nothing else.
+            if let rename = state.rename { commit(rename) }
+            if state.rename == nil { state.isEditing = false }
+            return nil
+        case .action(.deleteMenuItemChosen(let id)):
+            // Delete always asks (Lists screen spec, section 6), on a list and on an area alike, and a row that is not
+            // there asks nothing. Asking writes nothing, so an open field and the sentence stay where they are.
+            guard state.rows.contains(where: { $0.id == id }) else { return nil }
+            state.dialog = .deleteConfirmation(id)
+            return nil
+        case .action(.deleteConfirmed):
+            // With no confirmation up there is nothing to confirm, and nothing moves. The confirmation goes down
+            // whatever the store answers, as a field closes on a refused write (`commit`).
+            guard case .deleteConfirmation(let id)? = state.dialog, let row = state.rows.first(where: { $0.id == id })
+            else { return nil }
+            state.dialog = nil
+            // A field open on a row the delete takes goes with it and says nothing: the person deleted the row, and
+            // the sentence a reread gives a field whose row went, that the new name was not saved, would answer
+            // something nobody asked. An area takes no field but its own, since its lists stay.
+            let taken: Set<ViewID> = row.kind == .area ? [id] : TaskViewList.subtree(of: id, in: state.rows)
+            if let rename = state.rename, taken.contains(rename.id) { state.rename = nil }
+            switch row.kind {
+            case .list:
+                // The list and every list under it in one transaction, and no task: a rule selects the tasks, and a
+                // rule gone selects nothing (Lists screen spec, section 6).
+                writeAndReread { () throws(StoreError) in try store.delete(viewTree: id) }
+            case .area:
+                // Several writes, so a refusal part-way leaves some lists moved and the area in place, which the
+                // general sentence, that nothing was written, would deny (`deleteArea`).
+                writeAndReread(refusal: .couldNotDeleteArea) { () throws(StoreError) in try deleteArea(id) }
+            }
+            return nil
+        case .action(.deleteCancelled):
+            // Cancel takes the confirmation down, and with none up, a second tap or a write that lands after the
+            // module took it down, moves nothing.
+            guard case .deleteConfirmation? = state.dialog else { return nil }
+            state.dialog = nil
+            return nil
+        case .action(.moveToMenuItemChosen(let id)):
+            // Move to… is a list's, and opens the picker over the whole tree (Lists screen spec, section 6): an area
+            // moves along the root alone, by the drag, and a row that is not there opens nothing. Opening it writes
+            // nothing, so an open field and the sentence stay where they are.
+            guard state.rows.contains(where: { $0.id == id && $0.kind == .list }) else { return nil }
+            state.dialog = .movePicker(id)
+            return nil
+        case .action(.movePickerRowTapped(let destination)):
+            // With no picker up a tap moves nothing. Top level puts the list where the root rule says, and a line or a
+            // list takes it last among its lists; a greyed-out row, the list itself or one inside it, cannot take it,
+            // and a tap on one, or on a row that is not there, moves nothing and leaves the picker up (Lists screen
+            // spec, sections 3 and 6).
+            guard case .movePicker(let id)? = state.dialog else { return nil }
+            let placement: Placement
+            if let destination {
+                guard state.rows.contains(where: { $0.id == destination }),
+                      !TaskViewList.subtree(of: id, in: state.rows).contains(destination)
+                else { return nil }
+                placement = .end
+            } else {
+                placement = TaskViewList.rootPlacement(of: id, in: state.rows)
+            }
+            // The picker closes whatever the store answers, as the confirmation does.
+            state.dialog = nil
+            move(id, to: destination, at: placement)
+            return nil
+        case .action(.movePickerCancelled):
+            // Cancel closes the picker, and with none up, a second tap or a write that lands after the module closed
+            // it, moves nothing.
+            guard case .movePicker? = state.dialog else { return nil }
+            state.dialog = nil
+            return nil
+        case .action(.rowDropped(let id, let after, let depth)):
+            // What a drop means is the module's to read (Lists screen spec, section 5): a parent and a place, among the
+            // rows as they are drawn, where the view drew the slot. A drop that names a row they do not hold, or puts a
+            // row inside itself, moves nothing; any other moves the row as the picker does, and the sentence and an
+            // open field fare as they do there.
+            let drawn = TaskViewList.unfolded(state.rows, collapsedViews: state.collapsedViews, declared: nil).rows
+            guard let target = TaskViewList.dropTarget(of: id, after: after, depth: depth, in: drawn) else {
+                return nil
+            }
+            move(id, to: target.parent, at: target.placement)
             return nil
         case .action(.newTaskMenuItemChosen):
             // Quick entry is the root's modal over the window, so the module asks for it, and moves nothing of its own,
@@ -463,6 +577,11 @@ public final class TaskViewList: Routable {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
         let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
+        // A dialog goes with its row, and says nothing, as the highlight goes: the row leaving the tree says what
+        // happened, and a dialog left up would ask about a row the module no longer holds.
+        if let dialog = state.dialog, !rows.contains(where: { $0.id == dialog.id }) {
+            state.dialog = nil
+        }
         if let rename = state.rename, !rows.contains(where: { $0.id == rename.id }) {
             // The name comes off the rows as they still are: the ones being read in no longer hold the
             // view, and after the assignment below there is nothing left to call it. A row already gone
@@ -475,6 +594,21 @@ public final class TaskViewList: Routable {
         state.rows = rows
         state.counts = counts
         state.collapsedViews = collapsedViews
+    }
+
+    /// Opens the field on a row, with the row's title as its draft: the Rename menu item, and a tap on a row in edit
+    /// mode.
+    ///
+    /// The title comes off the row and not out of a read: the row is what the person chose the menu item on, and a
+    /// read here would open the field on a title nobody was looking at. A row that is not there opens nothing, the way
+    /// the field actions do nothing without a field.
+    ///
+    /// One field at a time: the rename that was open is replaced, draft and all, which is what makes the menu item on
+    /// a second row move the field rather than open another one.
+    private func openTitleField(on id: ViewID) {
+        guard let row = state.rows.first(where: { $0.id == id }) else { return }
+        state.rename = State.Rename(id: id, draft: row.title)
+        state.problem = nil
     }
 
     /// Writes the draft and closes the field, or refuses it and leaves the field where it is.
@@ -522,6 +656,69 @@ public final class TaskViewList: Routable {
             // which is the smaller of the two facts and must not take the place of the larger.
             if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
         }
+    }
+
+    /// Writes a person's edit of the tree, a delete, a move from the picker or a drop, and reads the rows back,
+    /// answering whether both held. A refusal is said with the module's one sentence for a refused write, or with the
+    /// `refusal` a caller passes for a write that has a sentence of its own; a write that held takes the sentence away,
+    /// except while a field is open, whose sentence explains it, as a click leaves it (`rowSelected`).
+    ///
+    /// The rows are read back after a refusal too, since what the store refused can be a peer's change the module has
+    /// not heard of yet, a list deleted under the confirmation, and an area's deletion refused at one of its lists has
+    /// moved the lists before it (Lists screen spec, "Risks"). A read that fails says the list may be out of date only
+    /// when nothing else was said: after a refusal, the refusal is the larger fact, and stays (`commit`).
+    @discardableResult
+    private func writeAndReread(refusal: Problem = .couldNotSave, _ write: () throws(StoreError) -> Void) -> Bool {
+        let written: Bool
+        do {
+            try write()
+            written = true
+            if state.rename == nil { state.problem = nil }
+        } catch {
+            written = false
+            state.problem = refusal.sentence
+        }
+        do {
+            try reread()
+        } catch {
+            if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
+            return false
+        }
+        return written
+    }
+
+    /// Moves a list under a parent, nil for the root, to a place among its lists, from the picker or a drop, and
+    /// unfolds the parent once the rows are read back, so that the list is on screen where it went (Lists screen spec,
+    /// sections 5 and 6).
+    private func move(_ id: ViewID, to parent: ViewID?, at placement: Placement) {
+        guard writeAndReread({ () throws(StoreError) in try store.move(view: id, to: parent, at: placement) }) else {
+            return
+        }
+        unfold(parent)
+    }
+
+    /// Unfolds the list a row was just put into, written to the device's state as every fold is, so that the row is on
+    /// screen where it went; a list that is not folded, an area, whose line never folds, and the root, nil, are left as
+    /// they are.
+    ///
+    /// It comes after the read of the rows, which takes the folds back from the store: before it, a write of the unfold
+    /// that failed would be read back as the branch folded, and the row would be hidden where it went. After it, the
+    /// branch is unfolded on screen whether or not the write held, as every fold is.
+    private func unfold(_ id: ViewID?) {
+        guard let id, state.collapsedViews.contains(id) else { return }
+        setCollapsedViews(state.collapsedViews.subtracting([id]))
+    }
+
+    /// Deletes an area and leaves its lists where they stand (Lists screen spec, sections 3 and 6): each list moves
+    /// where `listMoves(deletingArea:in:)` reads it goes, and then the area is tombstoned with `delete(view:)`, which
+    /// is unchanged for it. These are several writes, so a refusal between them leaves the lists before it moved and
+    /// the area in place, which the next attempt finishes (spec, "Risks"). That is why a refusal of any of them is said
+    /// with `couldNotDeleteArea` and not with the general sentence, which would be untrue.
+    private func deleteArea(_ id: ViewID) throws(StoreError) {
+        for move in TaskViewList.listMoves(deletingArea: id, in: state.rows) {
+            try store.move(view: move.list, to: move.parent, at: move.placement)
+        }
+        try store.delete(view: id)
     }
 
     /// The sentence a refused write reads as.
@@ -581,12 +778,8 @@ public final class TaskViewList: Routable {
             state.problem = Problem.couldNotRead.sentence
             return
         }
-        // The unfold comes after the read, which takes the folds back from the store: before it, a write of the
-        // unfold that failed would be read back as the branch folded, and the field would open on a row the model
-        // does not draw. After it, the branch is unfolded on screen whether or not the write held, as every fold is.
-        if let parent = new.parent, state.collapsedViews.contains(parent) {
-            setCollapsedViews(state.collapsedViews.subtracting([parent]))
-        }
+        // After the read, so that the field opens on a row the model draws.
+        unfold(new.parent)
         // The invariant that holds this shut, and it is exactly this wide: what this module puts on a row
         // of its own accord goes onto a row the list holds, here after a write of its own, and in `init` for
         // the Inbox it falls back on. Here the read that just ran is the only thing that can say whether the
@@ -606,10 +799,11 @@ public final class TaskViewList: Routable {
     private static let newListTitle = "New list"
 
     /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
-    /// lists folded on this device, the width class of the window, the rename a person has open, the list declared over
-    /// the module, and the sentence they were last told. One entity, moved field by field, from which the model is
-    /// computed on every read, so that nothing on screen is state in its own right and there is no second copy to keep
-    /// in step (owner's reviews of #77 and #101): the highlight is read off the destination, and is not kept beside it.
+    /// lists folded on this device, the width class of the window, the rename a person has open, whether they are in
+    /// edit mode, the dialog up over the rows, the list declared over the module, and the sentence they were last told.
+    /// One entity, moved field by field, from which the model is computed on every read, so that nothing on screen is
+    /// state in its own right and there is no second copy to keep in step (owner's reviews of #77 and #101): the
+    /// highlight is read off the destination, and is not kept beside it.
     ///
     /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the
     /// array inside it is copy-on-write, so a class buys nothing here and would put a second reference type
@@ -621,20 +815,23 @@ public final class TaskViewList: Routable {
         var collapsedViews: Set<ViewID>
         var width: WindowWidth
         var rename: Rename?
+        var isEditing = false
+        var dialog: Dialog?
         var destination: Destination<TaskList.Route>
         var problem: String?
 
         /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
-        /// this person's session projected onto them — the tiles and fonts for the width, the counts, the folds, the
-        /// highlight on the list's row of the view whose list is declared, or on the folded list that hides that row,
-        /// the draft on the row they are renaming — the highlighted row's id, and the sentence, if any.
+        /// this person's session projected onto them — the tiles and fonts for the width, the counts and the labels as
+        /// edit mode shows them, the folds, the highlight on the list's row of the view whose list is declared, or on
+        /// the folded list that hides that row, the draft on the row they are renaming — the highlighted row's id,
+        /// whether they are in edit mode, and the sentence, if any.
         var model: Model {
             let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
             let drawn = shown.rows.map {
                 Model.Row(
                     id: $0.id, depth: $0.depth,
                     kind: $0.drawnKind(
-                        in: width, count: counts[$0.id], isFolded: collapsedViews.contains($0.id),
+                        in: width, isEditing: isEditing, count: counts[$0.id], isFolded: collapsedViews.contains($0.id),
                         isSelected: $0.id == shown.highlighted
                     ),
                     draft: rename?.text(on: $0.id)
@@ -647,7 +844,64 @@ public final class TaskViewList: Routable {
                 guard case .list(let list) = row.kind else { return false }
                 return list.isSelected
             }?.id
-            return Model(rows: drawn, selection: selection, problem: problem)
+            return Model(
+                rows: drawn, selection: selection, isEditing: isEditing, confirmation: confirmation,
+                movePicker: movePicker, problem: problem
+            )
+        }
+
+        /// The confirmation up over the rows, nil when none is, its question and what it says the delete takes computed
+        /// from the rows on every read, so that a list a peer puts under the one being deleted is counted among those
+        /// that go with it (Lists screen spec, section 6).
+        private var confirmation: Model.Confirmation? {
+            guard case .deleteConfirmation(let id)? = dialog, let row = rows.first(where: { $0.id == id }) else {
+                return nil
+            }
+            switch row.kind {
+            case .area:
+                // An unnamed area has no name to put in the question, and an invented one is worse than none.
+                let title = row.title.isEmpty ? "Delete the area?" : "Delete the “\(row.title)” area?"
+                return Model.Confirmation(title: title, message: "Its lists stay.")
+            case .list:
+                let inside = TaskViewList.subtree(of: id, in: rows).count - 1
+                let going = switch inside {
+                case 0: ""
+                case 1: "One list inside it goes with it. "
+                default: "\(inside) lists inside it go with it. "
+                }
+                return Model.Confirmation(title: "Delete “\(row.title)”?", message: going + "No task is deleted.")
+            }
+        }
+
+        /// The picker up over the rows, nil when none is: its title names the list being moved, "Top level" is marked
+        /// when the list stands at the root, and its rows are the whole tree as `pickerRows` reads it (Lists screen
+        /// spec, section 6).
+        private var movePicker: Model.MovePicker? {
+            guard case .movePicker(let id)? = dialog, let moving = rows.first(where: { $0.id == id }) else {
+                return nil
+            }
+            return Model.MovePicker(
+                title: "Move “\(moving.title)” to…", isTopLevelCurrent: moving.parent == nil,
+                rows: TaskViewList.pickerRows(
+                    moving: moving, among: rows, in: width, isEditing: isEditing, counts: counts
+                )
+            )
+        }
+
+        /// The dialog up over the rows, one at a time, which holds the id of the row it is up for and nothing of what
+        /// it says: the confirmation of a delete, on the list or the area it would delete, or the picker of Move to…,
+        /// on the list it would move. What it says is computed from the rows on every read of the model, and a read
+        /// that no longer holds its row takes it down (`reread`).
+        enum Dialog {
+            case deleteConfirmation(ViewID)
+            case movePicker(ViewID)
+
+            /// The id of the row the dialog is up for.
+            var id: ViewID {
+                switch self {
+                case .deleteConfirmation(let id), .movePicker(let id): id
+                }
+            }
         }
 
         /// The rename a person has open: the row the field is on, and the text in it.
@@ -669,6 +923,7 @@ public final class TaskViewList: Routable {
         case viewIsGone(title: String)
         case areaIsGone
         case couldNotSave
+        case couldNotDeleteArea
         case couldNotOpenList
 
         var sentence: String {
@@ -678,6 +933,7 @@ public final class TaskViewList: Routable {
             case .viewIsGone(let title): "“\(title)” is no longer there, so the new name was not saved."
             case .areaIsGone: "The area is no longer there, so the new name was not saved."
             case .couldNotSave: "The change could not be saved, so nothing was written."
+            case .couldNotDeleteArea: "The area could not be deleted, so some of its lists may have moved already."
             case .couldNotOpenList: "The list could not be opened."
             }
         }

@@ -19,6 +19,10 @@ extension TaskViewList {
         let color: TaskViewColor?
         let icon: String?
 
+        /// The row's parent as the walk resolved it: nil for an item of the root, and for a parent the walk has not
+        /// passed, the same reading the depth makes, so that a row's parent is always a row the read holds.
+        let parent: ViewID?
+
         /// The depth the row is drawn at (`Model.Row.depth`).
         let depth: Int
         let hasChildren: Bool
@@ -39,14 +43,37 @@ extension TaskViewList {
         var passed: [ViewID: (depth: Int, isArea: Bool)] = [:]
         return views.indices.map { index in
             let view = views[index]
-            let parent = view.parent.flatMap { passed[$0] }
-            let depth = parent.map { $0.isArea ? $0.depth : $0.depth + 1 } ?? 0
+            let parent = view.parent.flatMap { id in passed[id].map { (id: id, row: $0) } }
+            let depth = parent.map { $0.row.isArea ? $0.row.depth : $0.row.depth + 1 } ?? 0
             passed[view.id] = (depth, view.kind == .area)
             return ReadRow(
-                id: view.id, title: view.title, kind: view.kind, color: view.color, icon: view.icon, depth: depth,
+                id: view.id, title: view.title, kind: view.kind, color: view.color, icon: view.icon,
+                parent: parent?.id, depth: depth,
                 hasChildren: views.indices.contains(index + 1) && views[index + 1].parent == view.id
             )
         }
+    }
+
+    /// The row and every row under it, however deep, by the parents the read resolved: a list and the lists inside it,
+    /// or an area and its lists with theirs. One pass in tree order, where a parent stands before its children, so a
+    /// row is under the first exactly when its parent was taken before it, the way `Store.delete(viewTree:)` takes the
+    /// tree it deletes.
+    static func subtree(of id: ViewID, in rows: [ReadRow]) -> Set<ViewID> {
+        var taken: Set<ViewID> = [id]
+        for row in rows where row.parent.map({ taken.contains($0) }) == true {
+            taken.insert(row.id)
+        }
+        return taken
+    }
+
+    /// Where a list put at the root goes (Lists screen spec, section 3): after the last list of the root that stands
+    /// before the first area, so that it stands above every line and never under the last one, or at the start of the
+    /// root when no list stands there. The list itself is passed over, since a placement ranks a list among its
+    /// siblings without it. The rule serves Move to…'s Top level and the lists of a deleted first area, and nothing
+    /// else: "+" puts a list into the last area, and a drop at the top of the tree puts it at the start of the root.
+    static func rootPlacement(of id: ViewID, in rows: [ReadRow]) -> Placement {
+        let last = rows.prefix { $0.kind != .area }.last { $0.parent == nil && $0.id != id }
+        return last.map { .after($0.id) } ?? .start
     }
 
     /// The rows a person sees: every read row but the lists inside a folded one, however deep (Lists screen spec,
@@ -77,6 +104,87 @@ extension TaskViewList {
         return (shown, highlighted)
     }
 
+    /// The rows of the picker that moves a list: the whole tree in tree order with the folds ignored, each row drawn by
+    /// the screen's own rule, `drawnKind`, for the width and edit mode, with none of this person's session on it, no
+    /// draft, no fold, since nothing in the picker is hidden for a chevron to say so, and no highlight, since the
+    /// picker marks the present parent instead; the list being moved and every list inside it greyed out, since none
+    /// of them can take it (Lists screen spec, section 6).
+    static func pickerRows(
+        moving list: ReadRow, among rows: [ReadRow], in width: WindowWidth, isEditing: Bool, counts: [ViewID: Int]
+    ) -> [Model.MovePicker.Row] {
+        let greyed = subtree(of: list.id, in: rows)
+        return rows.map { row in
+            let kind = row.drawnKind(
+                in: width, isEditing: isEditing, count: counts[row.id], isFolded: false, isSelected: false
+            )
+            return Model.MovePicker.Row(
+                row: Model.Row(id: row.id, depth: row.depth, kind: kind, draft: nil),
+                isDisabled: greyed.contains(row.id), isCurrent: row.id == list.parent
+            )
+        }
+    }
+
+    /// Where an area's lists go when the area is deleted, in rank order, each with its new parent and its place, so
+    /// that they stand where they stood (Lists screen spec, sections 3 and 6): the line goes, so each goes to the end
+    /// of the area above, or, when the area was the first, to the root above every line, the first where the root rule
+    /// puts a list and each next one after the one before it, which is where the rule puts it once that one stands
+    /// there. It is read from the rows once, before any of the moves is written, so that they keep their order.
+    static func listMoves(
+        deletingArea id: ViewID, in rows: [ReadRow]
+    ) -> [(list: ViewID, parent: ViewID?, placement: Placement)] {
+        let above = rows.prefix { $0.id != id }.last { $0.kind == .area }
+        var moves: [(list: ViewID, parent: ViewID?, placement: Placement)] = []
+        for list in rows where list.parent == id {
+            let placement: Placement = if above != nil {
+                .end
+            } else if let previous = moves.last {
+                .after(previous.list)
+            } else {
+                rootPlacement(of: list.id, in: rows)
+            }
+            moves.append((list.id, above?.id, placement))
+        }
+        return moves
+    }
+
+    /// Where a row let go after another at a depth goes: its new parent and its place among that parent's lists (Lists
+    /// screen spec, sections 5 and 7). The rows are the drawn ones, the folds applied, since the slot a view draws
+    /// stands between drawn rows, and the answer is nil when the drop names a row they do not hold, or would put a row
+    /// inside itself, `after` being the row moved or a row under it.
+    ///
+    /// A list's depth is clamped to what the rows allow, since a number a view sends is never trusted: no shallower
+    /// than the row that follows `after` once the row moved and the rows under it are passed over, 0 when none follows,
+    /// and no deeper than one past `after`. Then no `after` is the start of the root, and an area's line is the start
+    /// of that area, whatever the depth; one past `after` is the start of `after`; and `after`'s depth or shallower is
+    /// right after `after`'s ancestor at that depth, `after` itself at its own, in the ancestor's parent. Under an area
+    /// the drawn depths start at its line's, so the ancestor at depth 0 there is a list of the area, never the line.
+    ///
+    /// An area moves along the root alone, as one block with its lists, so its depth is not read: no `after` is the
+    /// start of the root, and any other is the root right after the block `after` stands in, its topmost ancestor.
+    ///
+    /// Both walks up the parents end, since a row's parent is a row read before it (`rows(of:)`), and neither recurses.
+    static func dropTarget(
+        of id: ViewID, after: ViewID?, depth: Int, in rows: [ReadRow]
+    ) -> (parent: ViewID?, placement: Placement)? {
+        guard let moved = rows.first(where: { $0.id == id }) else { return nil }
+        guard let after else { return (nil, .start) }
+        let inside = subtree(of: id, in: rows)
+        guard let index = rows.firstIndex(where: { $0.id == after }), !inside.contains(after) else { return nil }
+        let rowsByID = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let above = rows[index]
+        var ancestor = above
+        if moved.kind == .area {
+            while let parent = ancestor.parent.flatMap({ rowsByID[$0] }) { ancestor = parent }
+            return (nil, .after(ancestor.id))
+        }
+        if above.kind == .area { return (above.id, .start) }
+        let below = rows[(index + 1)...].first { !inside.contains($0.id) }
+        let clamped = min(max(depth, below?.depth ?? 0), above.depth + 1)
+        if clamped > above.depth { return (above.id, .start) }
+        while ancestor.depth > clamped, let parent = ancestor.parent.flatMap({ rowsByID[$0] }) { ancestor = parent }
+        return (ancestor.parent, .after(ancestor.id))
+    }
+
     /// The number of open tasks each view selects, which the store answers for every view in one call and which is
     /// read beside every read of the rows, since a change to any task can move any count (Lists screen spec, section
     /// 4). `today` is the UTC day of the machine's clock, read again at every read, as the task list reads its own
@@ -88,21 +196,28 @@ extension TaskViewList {
 }
 
 extension TaskViewList.ReadRow {
-    /// What the row draws in a window of the width class, with the count the store answered for it, whether the device
-    /// holds it folded and whether it is the highlighted one: an area's line, which carries its name and nothing else,
-    /// or a list's row with everything finished. A fold is drawn only on a list with lists inside it, where a chevron
-    /// can take it back. The tile and the title's font are the Lists screen's layout, built here from the row and the
-    /// width whenever the model is computed, so that a window that narrows or widens moves them with no read of the
-    /// store (ADR-0007, amendment of 2026-10-26).
-    func drawnKind(in width: WindowWidth, count: Int?, isFolded: Bool, isSelected: Bool) -> TaskViewList.Model.Kind {
+    /// What the row draws in a window of the width class, in edit mode or out of it, with the count the store answered
+    /// for it, whether the device holds it folded and whether it is the highlighted one: an area's line, which carries
+    /// its name and nothing else, or a list's row with everything finished. A fold is drawn only on a list with lists
+    /// inside it, where a chevron can take it back. The tile and the title's font are the Lists screen's layout, built
+    /// here from the row and the width whenever the model is computed, so that a window that narrows or widens moves
+    /// them with no read of the store (ADR-0007, amendment of 2026-10-26).
+    ///
+    /// Edit mode takes the counts off the rows and gives an unnamed area the label "Area", which a tap renames it by,
+    /// where outside it the line alone is the whole of how such an area looks (Lists screen spec, sections 1 and 3).
+    func drawnKind(
+        in width: WindowWidth, isEditing: Bool, count: Int?, isFolded: Bool, isSelected: Bool
+    ) -> TaskViewList.Model.Kind {
         switch kind {
         case .area:
-            return .area(label: title.isEmpty ? nil : title)
+            if !title.isEmpty { return .area(label: title) }
+            return .area(label: isEditing ? "Area" : nil)
         case .list:
             let size = RowSize(width, depth: depth)
+            let shownCount = isEditing ? nil : count.flatMap { $0 > 0 ? $0 : nil }
             return .list(TaskViewList.Model.ListRow(
                 title: title, tile: size.tile(tileColor, tileIcon), titleFont: size.titleFont(emphasized: hasChildren),
-                countText: count.flatMap { $0 > 0 ? String($0) : nil } ?? "", hasChildren: hasChildren,
+                countText: shownCount.map(String.init) ?? "", hasChildren: hasChildren,
                 isCollapsed: hasChildren && isFolded, isSelected: isSelected
             ))
         }
