@@ -104,6 +104,44 @@ extension TaskViewList {
         return (shown, highlighted)
     }
 
+    /// Where a row let go after another at a depth goes: its new parent and its place among that parent's lists (Lists
+    /// screen spec, sections 5 and 7). The rows are the drawn ones, the folds applied, since the slot a view draws
+    /// stands between drawn rows, and the answer is nil when the drop names a row they do not hold, or would put a row
+    /// inside itself, `after` being the row moved or a row under it.
+    ///
+    /// A list's depth is clamped to what the rows allow, since a number a view sends is never trusted: no shallower
+    /// than the row that follows `after` once the row moved and the rows under it are passed over, 0 when none follows,
+    /// and no deeper than one past `after`. Then no `after` is the start of the root, and an area's line is the start
+    /// of that area, whatever the depth; one past `after` is the start of `after`; and `after`'s depth or shallower is
+    /// right after `after`'s ancestor at that depth, `after` itself at its own, in the ancestor's parent. Under an area
+    /// the drawn depths start at its line's, so the ancestor at depth 0 there is a list of the area, never the line.
+    ///
+    /// An area moves along the root alone, as one block with its lists, so its depth is not read: no `after` is the
+    /// start of the root, and any other is the root right after the block `after` stands in, its topmost ancestor.
+    ///
+    /// Both walks up the parents end, since a row's parent is a row read before it (`rows(of:)`), and neither recurses.
+    static func dropTarget(
+        of id: ViewID, after: ViewID?, depth: Int, in rows: [ReadRow]
+    ) -> (parent: ViewID?, placement: Placement)? {
+        guard let moved = rows.first(where: { $0.id == id }) else { return nil }
+        guard let after else { return (nil, .start) }
+        let inside = subtree(of: id, in: rows)
+        guard let index = rows.firstIndex(where: { $0.id == after }), !inside.contains(after) else { return nil }
+        let parents = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let above = rows[index]
+        var ancestor = above
+        if moved.kind == .area {
+            while let parent = ancestor.parent.flatMap({ parents[$0] }) { ancestor = parent }
+            return (nil, .after(ancestor.id))
+        }
+        if above.kind == .area { return (above.id, .start) }
+        let below = rows[(index + 1)...].first { !inside.contains($0.id) }
+        let clamped = min(max(depth, below?.depth ?? 0), above.depth + 1)
+        if clamped > above.depth { return (above.id, .start) }
+        while ancestor.depth > clamped, let parent = ancestor.parent.flatMap({ parents[$0] }) { ancestor = parent }
+        return (ancestor.parent, .after(ancestor.id))
+    }
+
     /// The number of open tasks each view selects, which the store answers for every view in one call and which is
     /// read beside every read of the rows, since a change to any task can move any count (Lists screen spec, section
     /// 4). `today` is the UTC day of the machine's clock, read again at every read, as the task list reads its own

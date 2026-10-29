@@ -464,10 +464,10 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
     #expect(try store.journal(after: 0).count == written)
 }
 
-/// A move from the picker the store refuses says so with the module's one sentence for a refused write, closes the
-/// picker and reads the rows back, folds and all: a list a peer deleted before the change saying so arrived is gone
-/// from them.
-@Test func aMoveTheStoreRefusesSaysSo() throws {
+/// A move from the picker or a drop the store refuses says so with the module's one sentence for a refused write and
+/// reads the rows back, the picker closed: a list a peer deleted before the change saying so arrived is gone from
+/// them, the destination of the picker's move and the row a drop was let go after.
+@Test func aMoveFromThePickerOrADropTheStoreRefusesSaysSo() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let errands = try store.createView(NewTaskView(title: "Errands"))
@@ -479,4 +479,172 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
     #expect(list.model.movePicker == nil)
     #expect(list.model.rows == (try sidebarOn(inbox, in: store)).rows, "the rows read back, Projects gone")
     #expect(try store.view(errands)?.parent == nil)
+
+    let tree = try Tree()
+    let dropping = try tree.sidebar()
+    try tree.store.delete(view: tree.office)
+    #expect(dropping.send(.action(.rowDropped(tree.errands, after: tree.office, depth: 1))) == nil)
+    #expect(dropping.model.problem == couldNotSave)
+    #expect(dropping.model.rows == (try sidebarOn(inbox, in: tree.store)).rows, "the rows read back, Office gone")
+    #expect(try tree.store.view(tree.errands)?.parent == nil)
+}
+
+/// The tree the drop's tests move rows about in, past the five built-in views, each drawn at the depth beside it:
+/// Projects 0, with Home 1 and Office 1 inside, Home with Garden 2 and Garden with Seeds 3; Errands 0 at the root; the
+/// area Work 0, with Clients 0, which holds Acme 1, and Billing 0; and the area Later 0, with Someday 0.
+private struct Tree {
+    let store: Store
+    let projects, home, garden, seeds, office, errands, work, clients, acme, billing, later, someday: ViewID
+
+    init() throws {
+        store = try makeStore()
+        projects = try store.createView(NewTaskView(title: "Projects"))
+        home = try store.createView(NewTaskView(title: "Home", parent: projects))
+        garden = try store.createView(NewTaskView(title: "Garden", parent: home))
+        seeds = try store.createView(NewTaskView(title: "Seeds", parent: garden))
+        office = try store.createView(NewTaskView(title: "Office", parent: projects))
+        errands = try store.createView(NewTaskView(title: "Errands"))
+        work = try store.createView(NewTaskView(title: "Work", kind: .area))
+        clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+        acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
+        billing = try store.createView(NewTaskView(title: "Billing", parent: work))
+        later = try store.createView(NewTaskView(title: "Later", kind: .area))
+        someday = try store.createView(NewTaskView(title: "Someday", parent: later))
+    }
+
+    /// A sidebar made on the tree, on no list.
+    func sidebar() throws -> TaskViewList {
+        try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    }
+
+    /// The lists and areas a parent holds in the store, in rank order, nil for the root's.
+    func children(of parent: ViewID?) throws -> [ViewID] {
+        try store.children(ofView: parent).map(\.id)
+    }
+}
+
+/// A row let go one level deeper than the row above it becomes that row's first child, before the lists already inside
+/// it, and the row above unfolds when it was folded, so that the row is on screen where it went (Lists screen spec,
+/// section 5). The module then draws what one made now on the store draws, and says nothing.
+@Test func aDropDeeperMakesTheRowTheFirstChildOfTheRowAbove() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    _ = list.send(.action(.disclosureTapped(tree.home)))
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.home, depth: 2))) == nil)
+    #expect(try tree.children(of: tree.home) == [tree.errands, tree.garden])
+    #expect(try tree.store.deviceState(collapsedViewsKey, as: [String].self) == [])
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+    #expect(list.model.rows.dropFirst(5).map(\.depth) == [0, 1, 2, 2, 3, 1, 0, 0, 1, 0, 0, 0])
+}
+
+/// A row let go at the depth of the row above it becomes that row's next sibling, in the same parent: after Office in
+/// Projects, and, with Home folded, after Home, since the drop reads the rows as they are drawn, where the row under a
+/// folded list is the one after its branch.
+@Test func aDropAtTheSameDepthMakesItTheNextSibling() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.office, depth: 1))) == nil)
+    #expect(try tree.children(of: tree.projects) == [tree.home, tree.office, tree.errands])
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+    _ = list.send(.action(.disclosureTapped(tree.home)))
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.home, depth: 1))) == nil)
+    #expect(try tree.children(of: tree.projects) == [tree.home, tree.errands, tree.office])
+    #expect(listRow(tree.home, in: list.model)?.isCollapsed == true, "the fold stays")
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+}
+
+/// A row let go shallower than the row above it becomes the next sibling of that row's ancestor at the depth it was let
+/// go at, found by walking up the parents: after Seeds at depth 2 it follows Garden in Home, and at depth 1 Home in
+/// Projects. Under an area the drawn depths start at its line's, so after Acme at depth 0 a row follows Clients in the
+/// area and does not go to the root (Lists screen spec, sections 3 and 5).
+@Test func aDropShallowerMakesItTheNextSiblingOfTheAncestorAtThatDepth() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.seeds, depth: 2))) == nil)
+    #expect(try tree.children(of: tree.home) == [tree.garden, tree.errands])
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.seeds, depth: 1))) == nil)
+    #expect(try tree.children(of: tree.projects) == [tree.home, tree.errands, tree.office])
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.acme, depth: 0))) == nil)
+    #expect(try tree.children(of: tree.work) == [tree.clients, tree.errands, tree.billing])
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+}
+
+/// A list let go right under an area's line goes into the area, first under the line, at whatever depth it was let go,
+/// and never onto the root (Lists screen spec, section 7).
+@Test func aDropUnderAnAreasLineGoesIntoTheArea() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.work, depth: 0))) == nil)
+    #expect(try tree.children(of: tree.work) == [tree.errands, tree.clients, tree.billing])
+    #expect(list.send(.action(.rowDropped(tree.office, after: tree.later, depth: 3))) == nil)
+    #expect(try tree.children(of: tree.later) == [tree.office, tree.someday])
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+}
+
+/// A row let go at the top of the tree, after no row, goes to the start of the root, at whatever depth it was let go.
+@Test func aDropAtTheTopGoesToTheStartOfTheRoot() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    #expect(list.send(.action(.rowDropped(tree.seeds, after: nil, depth: 2))) == nil)
+    #expect(try tree.children(of: nil).first == tree.seeds)
+    #expect(list.model.rows.first?.id == tree.seeds)
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+}
+
+/// The depth a view sends is clamped to what the rows allow and never trusted (Lists screen plan, global constraints):
+/// no deeper than one past the row above, and no shallower than the row below once the row being moved and the lists
+/// inside it are passed over, so that Garden, let go under Home with its Seeds, can follow Home.
+@Test func aDepthOutsideWhatTheRowsAllowIsClamped() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.office, depth: 7))) == nil)
+    #expect(try tree.children(of: tree.office) == [tree.errands])
+    #expect(list.send(.action(.rowDropped(tree.errands, after: tree.seeds, depth: -3))) == nil)
+    #expect(try tree.children(of: tree.projects) == [tree.home, tree.errands, tree.office])
+    #expect(list.send(.action(.rowDropped(tree.garden, after: tree.home, depth: -1))) == nil)
+    #expect(try tree.children(of: tree.projects) == [tree.home, tree.garden, tree.errands, tree.office])
+    #expect(try tree.children(of: tree.garden) == [tree.seeds])
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+}
+
+/// An area moves along the root alone, as one block with its lists (Lists screen spec, section 7): let go at the top it
+/// goes to the start of the root, and let go after any other row it goes, at the root, after the block that row stands
+/// in, its topmost ancestor, whatever the depth: after Someday, inside Later's block, Work follows Later, and after
+/// Errands it stands above Later again.
+@Test func anAreaDropsAfterTheBlockOfTheRowAbove() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    let roots = Array(try tree.children(of: nil).prefix(7))
+    #expect(roots == builtIns + [tree.projects, tree.errands], "this is the setup")
+    #expect(list.send(.action(.rowDropped(tree.work, after: tree.someday, depth: 0))) == nil)
+    #expect(try tree.children(of: nil) == roots + [tree.later, tree.work])
+    #expect(list.send(.action(.rowDropped(tree.work, after: tree.errands, depth: 2))) == nil)
+    #expect(try tree.children(of: nil) == roots + [tree.work, tree.later])
+    #expect(list.send(.action(.rowDropped(tree.later, after: nil, depth: 1))) == nil)
+    #expect(try tree.children(of: nil) == [tree.later] + roots + [tree.work])
+    #expect(try tree.children(of: tree.work) == [tree.clients, tree.billing], "the lists went with it")
+    #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
+}
+
+/// A drop names rows a view drew, and one naming a row the module does not draw moves nothing: an id or an `after` no
+/// row holds, or a row hidden in a folded branch, beside which no slot is drawn. Nor can a row be put inside itself, so
+/// an `after` that is the row being moved, a list inside it, or a list of an area being moved moves nothing too. Nothing
+/// moves, an open field and its sentence included, and nothing is written.
+@Test func aDropOfOrOntoARowTheModuleDoesNotHoldMovesNothing() throws {
+    let tree = try Tree()
+    let list = try tree.sidebar()
+    refusingAName(list)
+    _ = list.send(.action(.disclosureTapped(tree.home)))
+    let before = list.model
+    let written = try tree.store.journal(after: 0).count
+    let drops: [(ViewID, ViewID?, Int)] = [
+        (ViewID(), tree.errands, 0), (tree.errands, ViewID(), 0), (tree.errands, tree.garden, 2),
+        (tree.garden, tree.office, 1), (tree.projects, tree.projects, 0), (tree.projects, tree.office, 1),
+        (tree.work, tree.acme, 0), (tree.work, tree.work, 0),
+    ]
+    for (id, after, depth) in drops {
+        #expect(list.send(.action(.rowDropped(id, after: after, depth: depth))) == nil)
+        #expect(list.model == before)
+    }
+    #expect(try tree.store.journal(after: 0).count == written)
 }

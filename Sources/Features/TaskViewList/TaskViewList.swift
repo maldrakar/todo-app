@@ -99,6 +99,9 @@ public final class TaskViewList: Routable {
         case movePickerRowTapped(ViewID?)
         /// The move picker's Cancel.
         case movePickerCancelled
+        /// The drag's one report, on release: the row let go after another row, nil for the top of the tree, at the
+        /// depth the drag chose.
+        case rowDropped(ViewID, after: ViewID?, depth: Int)
     }
 
     public enum Event: RoutedEvent {
@@ -392,6 +395,15 @@ public final class TaskViewList: Routable {
             // moves nothing.
             guard case .movePicker? = state.dialog else { return nil }
             state.dialog = nil
+            return nil
+        case .action(.rowDropped(let id, let after, let depth)):
+            // What a drop means is the module's to read (Lists screen spec, section 5): a parent and a place, among the
+            // rows as they are drawn, where the view drew the slot. A drop that names a row they do not hold, or puts a
+            // row inside itself, moves nothing; any other moves the row as the picker does, and the sentence and an open
+            // field fare as they do there.
+            let drawn = TaskViewList.unfolded(state.rows, collapsedViews: state.collapsedViews, declared: nil).rows
+            guard let target = TaskViewList.dropTarget(of: id, after: after, depth: depth, in: drawn) else { return nil }
+            move(id, to: target.parent, at: target.placement)
             return nil
         case .action(.newTaskMenuItemChosen):
             // Quick entry is the root's modal over the window, so the module asks for it, and moves nothing of its own,
