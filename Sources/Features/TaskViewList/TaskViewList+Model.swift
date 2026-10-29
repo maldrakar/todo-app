@@ -36,7 +36,8 @@ extension TaskViewList {
         /// 2026-10-25, on the spec's first revision).
         public enum Kind: Equatable, Sendable {
             /// An area's line, with its name as its label, and nil for an area that has none: the line alone is the
-            /// whole of how an unnamed area looks (spec section 3).
+            /// whole of how an unnamed area looks (spec section 3). In edit mode an unnamed area's label is "Area", the
+            /// label a tap renames it by (spec section 1).
             case area(label: String?)
             /// A list's row, with everything it draws.
             case list(ListRow)
@@ -55,9 +56,9 @@ extension TaskViewList {
             /// drawn depth and whether the row has lists inside it.
             public let titleFont: DesignSystem.Font
 
-            /// The number of the list's open tasks as text, and the empty string for a count of zero and for a list
-            /// that has no count: a view draws it as it is, and a zero is drawn as nothing on every list (spec
-            /// section 4).
+            /// The number of the list's open tasks as text, and the empty string for a count of zero, for a list
+            /// that has no count and in edit mode, where counts leave the rows: a view draws it as it is, and a zero is
+            /// drawn as nothing on every list (spec sections 1 and 4).
             public let countText: String
 
             /// Whether the list has lists inside it, which a chevron folds.
@@ -92,6 +93,11 @@ extension TaskViewList {
         /// 2026-10-29, #158). Only the light moves: the list declared stays open, a click on the lit row declares that
         /// row's own list as a click on any row does, and the row lights up again once no fold hides it.
         public let selection: ViewID?
+
+        /// Whether the screen is in edit mode, entered from "…" and left with Done: every row then takes a grip and a
+        /// tap renames it, and the counts and an unnamed area's missing label are drawn as `rows` gives them in it
+        /// (spec section 7). It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
+        public let isEditing: Bool
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one

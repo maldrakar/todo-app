@@ -83,6 +83,10 @@ public final class TaskViewList: Routable {
         case newAreaMenuItemChosen
         /// New task, from "+".
         case newTaskMenuItemChosen
+        /// Edit, from "…" on the phone and the iPad.
+        case editMenuItemChosen
+        /// Done, the check that ends edit mode.
+        case doneButtonTapped
     }
 
     public enum Event: RoutedEvent {
@@ -194,6 +198,13 @@ public final class TaskViewList: Routable {
         // of #77 and #101).
         switch event {
         case .action(.rowSelected(let id)):
+            // In edit mode a tap on a row renames it, an area's line among them, whose label is what a person taps
+            // (Lists screen spec, section 7): it opens the row's field as the Rename menu item does, and declares
+            // nothing.
+            if state.isEditing {
+                openTitleField(on: id)
+                return nil
+            }
             // The list's route on the view, declared every time, the highlighted row's own included: choosing the
             // row that is already chosen is still a choice, and every declaration is a new write. On the view the
             // list is on, the stack keeps the list and hands it the declaration, whose empty tail closes the task
@@ -227,14 +238,7 @@ public final class TaskViewList: Routable {
             setDestination(TaskList.Route(head: id))
             return nil
         case .action(.renameMenuItemChosen(let id)):
-            // The title comes off the row and not out of a read: the row is what the person chose the menu
-            // item on, and a read here would open the field on a title nobody was looking at. A row that is
-            // not there opens nothing, the way the field actions below do nothing without a field.
-            guard let row = state.rows.first(where: { $0.id == id }) else { return nil }
-            // One field at a time: the rename that was open is replaced, draft and all, which is what makes
-            // the menu item on a second row move the field rather than open another one.
-            state.rename = State.Rename(id: id, draft: row.title)
-            state.problem = nil
+            openTitleField(on: id)
             return nil
         case .action(.titleFieldChanged(let text)):
             // The four field actions are ignored when no field is open: what a gesture means is the
@@ -300,6 +304,18 @@ public final class TaskViewList: Routable {
             // A line at the root's end, after every list and area there, and unnamed until a name is typed into the
             // field it opens with (Lists screen spec, section 3).
             create(NewTaskView(title: "", kind: .area))
+            return nil
+        case .action(.editMenuItemChosen):
+            // Edit mode is session state (ADR-0009, amendment of 2026-10-25), and entering it answers nothing a person
+            // was told, so an open field and the sentence stay where they are.
+            state.isEditing = true
+            return nil
+        case .action(.doneButtonTapped):
+            // Done settles an open field as Return does, and leaves edit mode unless the name was refused: the field
+            // then stays open on what was typed, and edit mode with it, since the person is mid-word (Lists screen
+            // spec, section 7). With no field open it ends edit mode and moves nothing else.
+            if let rename = state.rename { commit(rename) }
+            if state.rename == nil { state.isEditing = false }
             return nil
         case .action(.newTaskMenuItemChosen):
             // Quick entry is the root's modal over the window, so the module asks for it, and moves nothing of its own,
@@ -477,6 +493,20 @@ public final class TaskViewList: Routable {
         state.collapsedViews = collapsedViews
     }
 
+    /// Opens the field on a row, with the row's title as its draft: the Rename menu item, and a tap on a row in edit mode.
+    ///
+    /// The title comes off the row and not out of a read: the row is what the person chose the menu item on, and a
+    /// read here would open the field on a title nobody was looking at. A row that is not there opens nothing, the way
+    /// the field actions do nothing without a field.
+    ///
+    /// One field at a time: the rename that was open is replaced, draft and all, which is what makes the menu item on
+    /// a second row move the field rather than open another one.
+    private func openTitleField(on id: ViewID) {
+        guard let row = state.rows.first(where: { $0.id == id }) else { return }
+        state.rename = State.Rename(id: id, draft: row.title)
+        state.problem = nil
+    }
+
     /// Writes the draft and closes the field, or refuses it and leaves the field where it is.
     ///
     /// The empty title is refused here and not by the store: what a person's word for a view has to be is
@@ -606,8 +636,8 @@ public final class TaskViewList: Routable {
     private static let newListTitle = "New list"
 
     /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
-    /// lists folded on this device, the width class of the window, the rename a person has open, the list declared over
-    /// the module, and the sentence they were last told. One entity, moved field by field, from which the model is
+    /// lists folded on this device, the width class of the window, the rename a person has open, whether they are in
+    /// edit mode, the list declared over the module, and the sentence they were last told. One entity, moved field by field, from which the model is
     /// computed on every read, so that nothing on screen is state in its own right and there is no second copy to keep
     /// in step (owner's reviews of #77 and #101): the highlight is read off the destination, and is not kept beside it.
     ///
@@ -621,20 +651,22 @@ public final class TaskViewList: Routable {
         var collapsedViews: Set<ViewID>
         var width: WindowWidth
         var rename: Rename?
+        var isEditing = false
         var destination: Destination<TaskList.Route>
         var problem: String?
 
         /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
-        /// this person's session projected onto them — the tiles and fonts for the width, the counts, the folds, the
-        /// highlight on the list's row of the view whose list is declared, or on the folded list that hides that row,
-        /// the draft on the row they are renaming — the highlighted row's id, and the sentence, if any.
+        /// this person's session projected onto them — the tiles and fonts for the width, the counts and the labels as
+        /// edit mode shows them, the folds, the highlight on the list's row of the view whose list is declared, or on
+        /// the folded list that hides that row, the draft on the row they are renaming — the highlighted row's id,
+        /// whether they are in edit mode, and the sentence, if any.
         var model: Model {
             let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
             let drawn = shown.rows.map {
                 Model.Row(
                     id: $0.id, depth: $0.depth,
                     kind: $0.drawnKind(
-                        in: width, count: counts[$0.id], isFolded: collapsedViews.contains($0.id),
+                        in: width, isEditing: isEditing, count: counts[$0.id], isFolded: collapsedViews.contains($0.id),
                         isSelected: $0.id == shown.highlighted
                     ),
                     draft: rename?.text(on: $0.id)
@@ -647,7 +679,7 @@ public final class TaskViewList: Routable {
                 guard case .list(let list) = row.kind else { return false }
                 return list.isSelected
             }?.id
-            return Model(rows: drawn, selection: selection, problem: problem)
+            return Model(rows: drawn, selection: selection, isEditing: isEditing, problem: problem)
         }
 
         /// The rename a person has open: the row the field is on, and the text in it.
