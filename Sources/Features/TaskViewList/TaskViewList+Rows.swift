@@ -127,18 +127,18 @@ extension TaskViewList {
         guard let after else { return (nil, .start) }
         let inside = subtree(of: id, in: rows)
         guard let index = rows.firstIndex(where: { $0.id == after }), !inside.contains(after) else { return nil }
-        let parents = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let rowsByID = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let above = rows[index]
         var ancestor = above
         if moved.kind == .area {
-            while let parent = ancestor.parent.flatMap({ parents[$0] }) { ancestor = parent }
+            while let parent = ancestor.parent.flatMap({ rowsByID[$0] }) { ancestor = parent }
             return (nil, .after(ancestor.id))
         }
         if above.kind == .area { return (above.id, .start) }
         let below = rows[(index + 1)...].first { !inside.contains($0.id) }
         let clamped = min(max(depth, below?.depth ?? 0), above.depth + 1)
         if clamped > above.depth { return (above.id, .start) }
-        while ancestor.depth > clamped, let parent = ancestor.parent.flatMap({ parents[$0] }) { ancestor = parent }
+        while ancestor.depth > clamped, let parent = ancestor.parent.flatMap({ rowsByID[$0] }) { ancestor = parent }
         return (ancestor.parent, .after(ancestor.id))
     }
 

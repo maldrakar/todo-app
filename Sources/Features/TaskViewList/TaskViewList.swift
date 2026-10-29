@@ -18,6 +18,11 @@ import TodoCore
 /// own layout, and the count of its open tasks as text (Lists screen spec, sections 1, 4 and 5; ADR-0007, amendment
 /// of 2026-10-26). The module reads the counts beside the rows, and the width moves the tiles with no read at all.
 ///
+/// It edits the tree too (Lists screen spec, sections 6 and 7): edit mode, a delete it asks about first, Move to… and
+/// the drag's drop, which it reads into a parent and a place. The confirmation and the picker are its state and not
+/// screens, two optionals of its model, since neither has a subject a link could name (ADR-0009, amendment of
+/// 2026-10-25).
+///
 /// It is the base of its window's stack, and the task list's opener. A choice here declares the list of that view's
 /// tasks in this module's destination, and the window's stack makes, keeps and drops the list (ADR-0009, amendment of
 /// 2026-10-22): the module holds no screen, and hears what the list asks for as `.destinationAnswered`. The list is
@@ -365,9 +370,9 @@ public final class TaskViewList: Routable {
             state.dialog = nil
             return nil
         case .action(.moveToMenuItemChosen(let id)):
-            // Move to… is a list's, and opens the picker over the whole tree (Lists screen spec, section 6): an area moves
-            // along the root alone, by the drag, and a row that is not there opens nothing. Opening it writes nothing, so
-            // an open field and the sentence stay where they are.
+            // Move to… is a list's, and opens the picker over the whole tree (Lists screen spec, section 6): an area
+            // moves along the root alone, by the drag, and a row that is not there opens nothing. Opening it writes
+            // nothing, so an open field and the sentence stay where they are.
             guard state.rows.contains(where: { $0.id == id && $0.kind == .list }) else { return nil }
             state.dialog = .movePicker(id)
             return nil
@@ -391,18 +396,20 @@ public final class TaskViewList: Routable {
             move(id, to: destination, at: placement)
             return nil
         case .action(.movePickerCancelled):
-            // Cancel closes the picker, and with none up, a second tap or a write that lands after the module closed it,
-            // moves nothing.
+            // Cancel closes the picker, and with none up, a second tap or a write that lands after the module closed
+            // it, moves nothing.
             guard case .movePicker? = state.dialog else { return nil }
             state.dialog = nil
             return nil
         case .action(.rowDropped(let id, let after, let depth)):
             // What a drop means is the module's to read (Lists screen spec, section 5): a parent and a place, among the
             // rows as they are drawn, where the view drew the slot. A drop that names a row they do not hold, or puts a
-            // row inside itself, moves nothing; any other moves the row as the picker does, and the sentence and an open
-            // field fare as they do there.
+            // row inside itself, moves nothing; any other moves the row as the picker does, and the sentence and an
+            // open field fare as they do there.
             let drawn = TaskViewList.unfolded(state.rows, collapsedViews: state.collapsedViews, declared: nil).rows
-            guard let target = TaskViewList.dropTarget(of: id, after: after, depth: depth, in: drawn) else { return nil }
+            guard let target = TaskViewList.dropTarget(of: id, after: after, depth: depth, in: drawn) else {
+                return nil
+            }
             move(id, to: target.parent, at: target.placement)
             return nil
         case .action(.newTaskMenuItemChosen):
@@ -586,7 +593,8 @@ public final class TaskViewList: Routable {
         state.collapsedViews = collapsedViews
     }
 
-    /// Opens the field on a row, with the row's title as its draft: the Rename menu item, and a tap on a row in edit mode.
+    /// Opens the field on a row, with the row's title as its draft: the Rename menu item, and a tap on a row in edit
+    /// mode.
     ///
     /// The title comes off the row and not out of a read: the row is what the person chose the menu item on, and a
     /// read here would open the field on a title nobody was looking at. A row that is not there opens nothing, the way
@@ -654,8 +662,8 @@ public final class TaskViewList: Routable {
     ///
     /// The rows are read back after a refusal too, since what the store refused can be a peer's change the module has
     /// not heard of yet, a list deleted under the confirmation, and an area's deletion refused at one of its lists has
-    /// moved the lists before it (Lists screen spec, "Risks"). A read that fails then has nothing to add: the refusal is
-    /// the larger fact, and stays (`commit`).
+    /// moved the lists before it (Lists screen spec, "Risks"). A read that fails then has nothing to add: the refusal
+    /// is the larger fact, and stays (`commit`).
     @discardableResult
     private func writeAndReread(_ write: () throws(StoreError) -> Void) -> Bool {
         do {
@@ -801,9 +809,10 @@ public final class TaskViewList: Routable {
 
     /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
     /// lists folded on this device, the width class of the window, the rename a person has open, whether they are in
-    /// edit mode, the dialog up over the rows, the list declared over the module, and the sentence they were last told. One entity, moved field by field, from which the model is
-    /// computed on every read, so that nothing on screen is state in its own right and there is no second copy to keep
-    /// in step (owner's reviews of #77 and #101): the highlight is read off the destination, and is not kept beside it.
+    /// edit mode, the dialog up over the rows, the list declared over the module, and the sentence they were last told.
+    /// One entity, moved field by field, from which the model is computed on every read, so that nothing on screen is
+    /// state in its own right and there is no second copy to keep in step (owner's reviews of #77 and #101): the
+    /// highlight is read off the destination, and is not kept beside it.
     ///
     /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the
     /// array inside it is copy-on-write, so a class buys nothing here and would put a second reference type

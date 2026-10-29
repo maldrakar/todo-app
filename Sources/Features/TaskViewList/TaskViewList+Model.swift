@@ -4,8 +4,8 @@ import DesignSystemComponents
 import TodoCore
 
 extension TaskViewList {
-    /// What a view draws: the rows of the tree, the highlighted one named once more for a list bound to one value, and
-    /// the sentence.
+    /// What a view draws: the rows of the tree, the highlighted one named once more for a list bound to one value,
+    /// whether the screen is in edit mode, the dialog up over the rows, and the sentence.
     public struct Model: Equatable, Sendable {
         /// One row of the tree, an area's line or a list's row (spec section 5).
         public struct Row: Equatable, Sendable, Identifiable {
@@ -82,7 +82,7 @@ extension TaskViewList {
 
         /// What the picker of Move to… draws (spec section 6).
         public struct MovePicker: Equatable, Sendable {
-            /// The question, which names the list being moved.
+            /// The title, which names the list being moved.
             public let title: String
 
             /// Whether the list being moved stands at the root, which marks "Top level" as its present parent.
@@ -133,8 +133,8 @@ extension TaskViewList {
         /// (spec section 7). It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
         public let isEditing: Bool
 
-        /// The confirmation of a delete while it is up, and nil when none is: a view draws it as an alert, its title and
-        /// message with two buttons of the view's own, Delete and Cancel, which send `deleteConfirmed` and
+        /// The confirmation of a delete while it is up, and nil when none is: a view draws it as an alert, its title
+        /// and message with two buttons of the view's own, Delete and Cancel, which send `deleteConfirmed` and
         /// `deleteCancelled` (spec section 6). It is the module's state and not a screen, and no relaunch restores it
         /// (ADR-0009, amendment of 2026-10-25).
         public let confirmation: Confirmation?

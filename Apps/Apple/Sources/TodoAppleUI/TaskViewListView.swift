@@ -12,8 +12,8 @@ import TodoCore
 ///
 /// The Lists screen's look, the tiles, the counts, the chevrons and the bar, is the plan's seventh and eighth tasks':
 /// until then this view draws the model's new rows with the look it had (Lists screen plan, Task 5), and the edits as
-/// plainly: the confirmation as an alert, the move picker as a sheet of a plain list, and edit mode from a button on the
-/// toolbar (Task 6).
+/// plainly: the confirmation as an alert, the move picker as a sheet of a plain list, and edit mode from a button on
+/// the toolbar (Task 6).
 struct TaskViewListView: View {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
@@ -146,9 +146,10 @@ struct TaskViewListView: View {
     }
 
     /// Whether the confirmation is up, read from the model and moved only by an action, as quick entry's sheet is
-    /// (`RootView`). The alert's buttons send their own actions, and SwiftUI dismisses the alert after a button's action
-    /// has run, writing false into this binding, which goes to the module as Cancel: after Delete or Cancel the module
-    /// has taken the confirmation down already, and it moves nothing (`TaskViewList`, the trap of the plan's Task 6).
+    /// (`RootView`). The alert's buttons send their own actions, and SwiftUI dismisses the alert after a button's
+    /// action has run, writing false into this binding, which goes to the module as Cancel: after Delete or Cancel the
+    /// module has taken the confirmation down already, and it moves nothing (`TaskViewList`, the trap of the plan's
+    /// Task 6).
     private var isConfirmationUp: Binding<Bool> {
         Binding(get: { model.confirmation != nil }, set: { isUp in
             guard !isUp else { return }

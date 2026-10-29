@@ -1,8 +1,6 @@
 import Testing
 import TestSupport
-import FeatureModule
 import SQLiteKit
-import TaskListFeature
 import TaskViewListFeature
 import TodoCore
 
@@ -202,8 +200,8 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
 
 /// A delete the store refuses says so with the module's one sentence for a refused write, takes the confirmation down
 /// and reads the rows back: a list a peer deleted before the change saying so arrived is gone from them. An area is
-/// refused at the first of its lists a peer deleted, after the lists before it moved, and stays, so the next attempt
-/// finishes it (Lists screen spec, "Risks"), and says nothing.
+/// refused at the first of its lists a peer deleted, after the lists before it moved, and stays, so that the next
+/// attempt finishes it and says nothing (Lists screen spec, "Risks").
 @Test func aDeleteTheStoreRefusesSaysSoAndTheNextAttemptFinishesAnArea() throws {
     let store = try makeStore()
     let errands = try store.createView(NewTaskView(title: "Errands"))
@@ -265,8 +263,8 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
 
 /// Move to… opens the picker over the whole tree in tree order, each row drawn as the screen draws it with nothing
 /// highlighted, the list being moved and every list inside it greyed out, and its present parent marked: a list, an
-/// area's line, or "Top level" for a list of the root (Lists screen spec, section 6). Its rows follow the width and edit
-/// mode as the screen's do. Asking writes nothing, and on an area or a row that is not there it opens nothing.
+/// area's line, or "Top level" for a list of the root (Lists screen spec, section 6). Its rows follow the width and
+/// edit mode as the screen's do. Asking writes nothing, and on an area or a row that is not there it opens nothing.
 @Test func movePickerShowsTheWholeTreeWithTheListAndItsSubtreeDisabledAndItsParentCurrent() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk"))
@@ -334,8 +332,8 @@ private let couldNotSave = "The change could not be saved, so nothing was writte
 
 /// A tap on a list in the picker moves the list being moved under it, last among the lists there, unfolds it so that
 /// the list is on screen where it went, and closes the picker; a tap on an area's line moves it last under the line
-/// (Lists screen spec, section 6). Each time the module ends as one made now on the store draws it, the unfold read back
-/// from the device's state, and says nothing.
+/// (Lists screen spec, section 6). Each time the module ends as one made now on the store draws it, the unfold read
+/// back from the device's state, and says nothing.
 @Test func aTapInThePickerMovesTheListLastUnfoldsTheDestinationAndClosesIt() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
@@ -628,8 +626,8 @@ private struct Tree {
 
 /// A drop names rows a view drew, and one naming a row the module does not draw moves nothing: an id or an `after` no
 /// row holds, or a row hidden in a folded branch, beside which no slot is drawn. Nor can a row be put inside itself, so
-/// an `after` that is the row being moved, a list inside it, or a list of an area being moved moves nothing too. Nothing
-/// moves, an open field and its sentence included, and nothing is written.
+/// an `after` that is the row being moved, a list inside it, or a list of an area being moved moves nothing too.
+/// Nothing moves, an open field and its sentence included, and nothing is written.
 @Test func aDropOfOrOntoARowTheModuleDoesNotHoldMovesNothing() throws {
     let tree = try Tree()
     let list = try tree.sidebar()
