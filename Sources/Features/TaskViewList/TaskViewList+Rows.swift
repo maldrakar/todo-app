@@ -19,6 +19,10 @@ extension TaskViewList {
         let color: TaskViewColor?
         let icon: String?
 
+        /// The row's parent as the walk resolved it: nil for an item of the root, and for a parent the walk has not
+        /// passed, the same reading the depth makes, so that a row's parent is always a row the read holds.
+        let parent: ViewID?
+
         /// The depth the row is drawn at (`Model.Row.depth`).
         let depth: Int
         let hasChildren: Bool
@@ -39,14 +43,37 @@ extension TaskViewList {
         var passed: [ViewID: (depth: Int, isArea: Bool)] = [:]
         return views.indices.map { index in
             let view = views[index]
-            let parent = view.parent.flatMap { passed[$0] }
-            let depth = parent.map { $0.isArea ? $0.depth : $0.depth + 1 } ?? 0
+            let parent = view.parent.flatMap { id in passed[id].map { (id: id, row: $0) } }
+            let depth = parent.map { $0.row.isArea ? $0.row.depth : $0.row.depth + 1 } ?? 0
             passed[view.id] = (depth, view.kind == .area)
             return ReadRow(
-                id: view.id, title: view.title, kind: view.kind, color: view.color, icon: view.icon, depth: depth,
+                id: view.id, title: view.title, kind: view.kind, color: view.color, icon: view.icon,
+                parent: parent?.id, depth: depth,
                 hasChildren: views.indices.contains(index + 1) && views[index + 1].parent == view.id
             )
         }
+    }
+
+    /// The row and every row under it, however deep, by the parents the read resolved: a list and the lists inside it,
+    /// or an area and its lists with theirs. One pass in tree order, where a parent stands before its children, so a
+    /// row is under the first exactly when its parent was taken before it, the way `Store.delete(viewTree:)` takes the
+    /// tree it deletes.
+    static func subtree(of id: ViewID, in rows: [ReadRow]) -> Set<ViewID> {
+        var taken: Set<ViewID> = [id]
+        for row in rows where row.parent.map({ taken.contains($0) }) == true {
+            taken.insert(row.id)
+        }
+        return taken
+    }
+
+    /// Where a list put at the root goes (Lists screen spec, section 3): after the last list of the root that stands
+    /// before the first area, so that it stands above every line and never under the last one, or at the start of the
+    /// root when no list stands there. The list itself is passed over, since a placement ranks a list among its
+    /// siblings without it. The rule serves the lists of a deleted first area, and nothing else in this module: "+"
+    /// puts a list into the last area, and a drop at the top of the tree puts it at the start of the root.
+    static func rootPlacement(of id: ViewID, in rows: [ReadRow]) -> Placement {
+        let last = rows.prefix { $0.kind != .area }.last { $0.parent == nil && $0.id != id }
+        return last.map { .after($0.id) } ?? .start
     }
 
     /// The rows a person sees: every read row but the lists inside a folded one, however deep (Lists screen spec,
