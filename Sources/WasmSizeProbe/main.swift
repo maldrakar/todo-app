@@ -22,7 +22,8 @@ import WASILibc
 /// and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about the core. This
 /// executable does what a web entry point will: it builds the root module over a store in memory from a
 /// window's path, which is the web's address bar, and drives every module of the window — a selection, a rename,
-/// a new list, a list made inside it, a fold, a new area and New task in the sidebar, a link applied as `.route`
+/// a new list, a list made inside it, a fold, a new area, Move to… into it, a drop back to the root and New task in
+/// the sidebar, a link applied as `.route`
 /// through the window's stack, quick entry creating a task, a tap in the list sent to its element of the stack,
 /// which pushes the task, the way back as the shorter path, the window narrowing, Cancel, and Open in New Window,
 /// whose path it writes down — with the change each write produced, and a path the routes refuse, and it reads
@@ -155,7 +156,20 @@ private enum WasmSizeProbe {
             perform(.action(.taskViewList(.disclosureTapped(newList.id))))
         }
         perform(.action(.taskViewList(.newAreaMenuItemChosen)))
+        let newArea = app.model.taskViewList.rows.first { $0.draft != nil }
         perform(.action(.taskViewList(.titleFieldSubmitted)))
+        // Move to… on the outer list, its picker read through one switch over its rows' kinds, as the picker's view
+        // has, and a tap on the new area's line, which moves the list into the area; then the list let go after Today
+        // at the root's depth, which the sidebar reads into a parent and a place.
+        var picker = "no picker"
+        var dropped = "nowhere"
+        if let newList, let newArea {
+            perform(.action(.taskViewList(.moveToMenuItemChosen(newList.id))))
+            picker = pickerLine(of: app.model)
+            perform(.action(.taskViewList(.movePickerRowTapped(newArea.id))))
+            perform(.action(.taskViewList(.rowDropped(newList.id, after: BuiltInTaskViews.today, depth: 0))))
+            dropped = app.model.taskViewList.rows.firstIndex { $0.id == newList.id }.map { "at row \($0)" } ?? "gone"
+        }
         perform(.action(.taskViewList(.newTaskMenuItemChosen)))
         let askedForQuickEntry = app.model.quickEntry != nil
         let wideSidebar = sidebarLine(of: app.model)
@@ -204,6 +218,7 @@ private enum WasmSizeProbe {
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
         print("root \(root.taskViewList.rows.count) rows, renamed \(renamed), new list \(newList?.draft ?? "none"), quick entry from the sidebar \(askedForQuickEntry), problem \(root.taskViewList.problem != nil)")
         print("sidebar wide \(wideSidebar); narrow \(narrowSidebar)")
+        print("picker \(picker), then dropped \(dropped)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
@@ -287,6 +302,21 @@ private enum WasmSizeProbe {
             }
         }
         return "\(lists) lists, \(folded) folded, areas \(areas.joined(separator: " and ")), first \(first)"
+    }
+
+    /// The move picker as a line: its title, how many rows it offers and how many of them are greyed out, and the
+    /// present parent, by its label or title, or "Top level": one switch over a row's kinds, as the picker's view has.
+    private static func pickerLine(of model: AppModule.Model) -> String {
+        guard let picker = model.taskViewList.movePicker else { return "no picker" }
+        var current = picker.isTopLevelCurrent ? "Top level" : "nothing"
+        for pickerRow in picker.rows where pickerRow.isCurrent {
+            switch pickerRow.row.kind {
+            case .area(let label): current = label ?? "an unnamed area"
+            case .list(let list): current = list.title
+            }
+        }
+        let greyed = picker.rows.filter(\.isDisabled).count
+        return "\(picker.title) of \(picker.rows.count) rows, \(greyed) greyed out, in \(current)"
     }
 
     /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.
