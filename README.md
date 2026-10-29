@@ -146,17 +146,30 @@ CONTAINER="$(xcrun simctl get_app_container booted dev.maldrakar.todo data)"
 TODO_DB="$CONTAINER/Library/Application Support/todo/todo.sqlite" swift run todo add "Buy milk"
 ```
 
-The window holds the Mac's views. iPhone shows them as one stack, the sidebar, a view's list over it and a task over
-the list, and the back button or a swipe from the left edge goes back one screen; back on the sidebar, the list is
-closed and no view stays highlighted. The list is titled by its view and the task by its own title, so the back
-button's long-press menu over a task names its list; the sidebar has no title, and its row in that menu is blank. A
-link to a view that is gone leaves the screens as they were, and "The list could not be opened." stands at the bottom
+The window holds the Mac's views. iPhone shows them as one stack, the Lists screen, a view's list over it and a task
+over the list, and the back button or a swipe from the left edge goes back one screen; back on the Lists screen, the
+list is closed and no view stays highlighted. The list is titled by its view and the task by its own title, so the back
+button's long-press menu over a task names its list; the Lists screen has no title, and its row in that menu is blank.
+A link to a view that is gone leaves the screens as they were, and "The list could not be opened." stands at the bottom
 of the screen on top, a task's included; in a wide iPad window it stands at the bottom of the pane while the sidebar
 is hidden, and under the sidebar's rows while it shows. A swipe down closes quick entry's sheet as Cancel does. On the
 iPad, Open in New Window, in a sidebar row's context menu, opens that view in a window of its own. A link opens its
 view or task in the window it reaches, and one that does not read, `todo://view/<id>` one slash short among them,
 leaves the window as it was and says "The link could not be opened." across its bottom, until the Quick Entry button
 or a link that reads takes the sentence away.
+
+The Lists screen on iPhone is the canvas's: each list a row with its tile, its title and the number of its open tasks,
+a chevron on a list with lists inside it that folds the branch, guides down the levels, and each area a line across
+the tree, with its name on it when it has one; a tree too deep for the screen's width scrolls sideways, and the counts
+and chevrons stay at its right edge. A tap opens a list, and a long press opens Rename, New List, Move to… and Delete
+on a list, and Rename, New List and Delete Area on an area's line. At the bottom, "…" holds Edit, the search capsule
+does nothing yet, and "+" holds New Task, which opens quick entry, New List, which adds a list at the end of the last
+area, or of the tree when there is no area, and New Area, which adds a line at the end; each opens its name field on
+the new row, scrolled into view. Edit mode takes the counts away and gives every row a grip: a tap on a row or a line
+opens its name field, a long press lifts a row, a list with the lists inside it or an area with its lists, and carries
+it to a new place, sideways for a new level, and the bar holds + List, + Area and Done. Move to… opens a sheet of the
+whole tree to choose the new parent from, and Delete always asks. The wide windows, the Mac's and the iPad's, keep the
+sidebar's plain look for now (#149).
 
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.
