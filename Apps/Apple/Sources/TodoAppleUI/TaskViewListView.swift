@@ -11,7 +11,9 @@ import TodoCore
 /// where the screens over it are named by theirs (the owner, 2026-10-25, #126).
 ///
 /// The Lists screen's look, the tiles, the counts, the chevrons and the bar, is the plan's seventh and eighth tasks':
-/// until then this view draws the model's new rows with the look it had (Lists screen plan, Task 5).
+/// until then this view draws the model's new rows with the look it had (Lists screen plan, Task 5), and the edits as
+/// plainly: the confirmation as an alert, the move picker as a sheet of a plain list, and edit mode from a button on the
+/// toolbar (Task 6).
 struct TaskViewListView: View {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
@@ -81,12 +83,17 @@ struct TaskViewListView: View {
                 // it.
                 .contextMenu {
                     Button("Rename") { send(.renameMenuItemChosen(row.id)) }
+                    Button("New List") { send(.newListMenuItemChosen(in: row.id)) }
                     // Only where a window can open beside this one, which iPhone cannot (`docs/specs/navigation.md`,
                     // section 5). It asks for the window, and the root passes the request on as its output, which
                     // the window's view answers by opening the window (`WindowView`).
                     if supportsMultipleWindows {
                         Button("Open in New Window") { send(.openInNewWindowMenuItemChosen(row.id)) }
                     }
+                    // On an area's line too, where the module moves nothing for Move to…, since an area moves along
+                    // the root alone; the menus of each kind are the plan's seventh and eighth tasks'.
+                    Button("Move to…") { send(.moveToMenuItemChosen(row.id)) }
+                    Button("Delete", role: .destructive) { send(.deleteMenuItemChosen(row.id)) }
                 }
                 #endif
             }
@@ -116,8 +123,47 @@ struct TaskViewListView: View {
                 Button("New List") { send(.newListMenuItemChosen(in: nil)) }
                 Button("New Area") { send(.newAreaMenuItemChosen) }
             }
+            // Edit, which "…" holds on the phone and the iPad, and Done, the check that ends edit mode, as one button
+            // that says which the model is in (Lists screen spec, section 7).
+            if model.isEditing {
+                Button("Done") { send(.doneButtonTapped) }
+            } else {
+                Button("Edit") { send(.editMenuItemChosen) }
+            }
         }
         #endif
+        .alert(model.confirmation?.title ?? "", isPresented: isConfirmationUp, presenting: model.confirmation) { _ in
+            Button("Delete", role: .destructive) { send(.deleteConfirmed) }
+            Button("Cancel", role: .cancel) { send(.deleteCancelled) }
+        } message: { confirmation in
+            Text(confirmation.message)
+        }
+        .sheet(isPresented: isMovePickerUp) {
+            if let movePicker = model.movePicker {
+                MovePickerList(picker: movePicker, send: send)
+            }
+        }
+    }
+
+    /// Whether the confirmation is up, read from the model and moved only by an action, as quick entry's sheet is
+    /// (`RootView`). The alert's buttons send their own actions, and SwiftUI dismisses the alert after a button's action
+    /// has run, writing false into this binding, which goes to the module as Cancel: after Delete or Cancel the module
+    /// has taken the confirmation down already, and it moves nothing (`TaskViewList`, the trap of the plan's Task 6).
+    private var isConfirmationUp: Binding<Bool> {
+        Binding(get: { model.confirmation != nil }, set: { isUp in
+            guard !isUp else { return }
+            send(.deleteCancelled)
+        })
+    }
+
+    /// Whether the move picker is up, read from the model and moved only by an action. The swipe down, and Esc on the
+    /// Mac, are one write of false, which goes to the module as the picker's Cancel; the write that follows a close the
+    /// module drove, a row tapped or Cancel, reaches no picker and moves nothing.
+    private var isMovePickerUp: Binding<Bool> {
+        Binding(get: { model.movePicker != nil }, set: { isUp in
+            guard !isUp else { return }
+            send(.movePickerCancelled)
+        })
     }
 
     /// The highlight, read from the model and moved only by an action, the shape a text field's binding has
@@ -136,6 +182,53 @@ struct TaskViewListView: View {
         return Binding(get: { model.selection }, set: { id in
             if let id { send(.rowSelected(id)) } else { emptiedHighlights += 1 }
         })
+    }
+}
+
+/// The move picker, drawn from its model with no look of its own until the plan's seventh task: "Top level" and the
+/// rows in a plain list, each sending its tap, the present parent checked and the rows that cannot take the list
+/// disabled, and Cancel in the bar.
+private struct MovePickerList: View {
+    let picker: TaskViewList.Model.MovePicker
+    let send: (TaskViewList.UserAction) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Button { send(.movePickerRowTapped(nil)) } label: {
+                    HStack {
+                        Text("Top level")
+                        if picker.isTopLevelCurrent { Image(systemName: "checkmark") }
+                    }
+                }
+                ForEach(picker.rows) { pickerRow in
+                    Button { send(.movePickerRowTapped(pickerRow.id)) } label: {
+                        HStack {
+                            // The one switch over a row's kind in the picker, every case drawn (`docs/style.md`,
+                            // "Views"): an area's line with its label, and a list's title.
+                            switch pickerRow.row.kind {
+                            case .area(let label):
+                                if let label { Text(label) }
+                                VStack { Divider() }
+                            case .list(let list):
+                                Text(list.title)
+                            }
+                            if pickerRow.isCurrent { Image(systemName: "checkmark") }
+                        }
+                        .padding(.leading, CGFloat(pickerRow.row.depth) * 16)
+                    }
+                    .disabled(pickerRow.isDisabled)
+                }
+            }
+            .navigationTitle(picker.title)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { send(.movePickerCancelled) }
+                }
+            }
+        }
+        // A sheet on the Mac is as large as what it holds, and a list asks for no height of its own.
+        .frame(minWidth: 320, minHeight: 400)
     }
 }
 
