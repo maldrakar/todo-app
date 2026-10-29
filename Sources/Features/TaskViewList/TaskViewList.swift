@@ -220,9 +220,10 @@ public final class TaskViewList: Routable {
         case .action(.rowSelected(let id)):
             // In edit mode a tap on a row renames it, an area's line among them, whose label is what a person taps
             // (Lists screen spec, section 7): it opens the row's field as the Rename menu item does, and declares
-            // nothing.
+            // nothing. A tap on the row whose field is open already moves nothing, so that what was typed there and the
+            // sentence that refused it stay.
             if state.isEditing {
-                openTitleField(on: id)
+                if state.rename?.id != id { openTitleField(on: id) }
                 return nil
             }
             // The list's route on the view, declared every time, the highlighted row's own included: choosing the

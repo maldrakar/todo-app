@@ -90,6 +90,29 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
     #expect(list.model == (try sidebarOn(inbox, in: store)))
 }
 
+/// In edit mode a tap on the row whose field is already open moves nothing: the field keeps what was typed and the
+/// sentence a refusal set, since the person tapped the row they are naming, and a field opened afresh would throw the
+/// draft away for the stored title. A tap on another row moves the field, as the Rename menu item does.
+@Test func anEditModeTapOnTheRowBeingRenamedMovesNothing() throws {
+    let store = try makeStore()
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    _ = list.send(.action(.editMenuItemChosen))
+    _ = list.send(.action(.rowSelected(BuiltInTaskViews.today)))
+    _ = list.send(.action(.titleFieldChanged("Tomor")))
+    let typing = list.model
+    #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
+    #expect(list.model == typing)
+    _ = list.send(.action(.titleFieldChanged(" ")))
+    _ = list.send(.action(.doneButtonTapped))
+    let refused = list.model
+    #expect(refused.problem == "A title cannot be empty.", "the refusal is the setup; without it this proves nothing")
+    #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
+    #expect(list.model == refused)
+    #expect(list.send(.action(.rowSelected(inbox))) == nil)
+    #expect(try rowBeingNamed(in: list.model).id == inbox)
+    #expect(try rowBeingNamed(in: list.model).draft == "Inbox")
+}
+
 /// The sentence a write the store refuses reads as, the module's one sentence for every refusal of a write.
 private let couldNotSave = "The change could not be saved, so nothing was written."
 
