@@ -41,7 +41,7 @@ struct ListsScreen: View {
     @State private var drag: ListsDrag?
 
     /// The frames the tree's items last reported, which the drag finds rows by.
-    @State private var itemFrames = ListsTreeFrames()
+    @State private var itemFrames = ListsDrag.ItemFrames()
 
     init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) {
         self.model = model
@@ -51,23 +51,17 @@ struct ListsScreen: View {
     var body: some View {
         let items = ListsTreeItem.items(of: model.rows)
         let drawn = drag?.drawn(items) ?? items
-        let width = drawn.reduce(viewport.width) { max($0, widthNeeded(by: $1)) }
+        // Over every row and not the drawn ones, so that lifting the deepest rows does not narrow the tree under a
+        // still finger, which would slide it sideways and move the depth the finger chose.
+        let width = items.reduce(viewport.width) { max($0, widthNeeded(by: $1)) }
         ScrollViewReader { scroller in
             ScrollView([.horizontal, .vertical]) {
                 tree(drawn, width: width, visibleRight: sidewaysOffset + viewport.width, items: items)
             }
             .coordinateSpace(.named(Self.viewportSpace))
-            // A field can open on a row the lazy stack has not laid out, a new list in the last area or a new area at
-            // the end of a long tree, and the stack makes no field for it, so it would never take the caret: the tree
-            // scrolls that row to the middle of the screen, at the tree's leading edge where the field is, and the
-            // field focuses itself as it appears. A row the stack has laid out, one on screen renamed from its menu,
-            // stays where it is: the scroll with no anchor moved the tree sideways too, since a row wider than the
-            // screen is never wholly in view (the iOS 26.3 simulator, 2026-10-29).
             .onChange(of: rowWithField) { _, id in
-                guard let id, itemFrames.frames[.row(id)] == nil else { return }
-                withAnimation(reduceMotion ? nil : Animation(.popover)) {
-                    scroller.scrollTo(ListsTreeItem.ID.row(id), anchor: UnitPoint(x: 0, y: 0.5))
-                }
+                guard let id else { return }
+                showField(of: id, among: items, width: width, scroller: scroller)
             }
         }
         // A tree as narrow as the screen does not move sideways under a finger, as the canvas's does not.
@@ -76,24 +70,13 @@ struct ListsScreen: View {
         .background(Color(.paper))
         .safeAreaInset(edge: .top, spacing: 0) { top }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottom }
-        #if os(iOS)
+        #if !os(macOS)
         // The canvas has no title and no bar over the tree; the screens pushed over it keep theirs. The placement is
         // unavailable on macOS.
         .toolbar(.hidden, for: .navigationBar)
         #endif
-        .alert(model.confirmation?.title ?? "", isPresented: isConfirmationUp, presenting: model.confirmation) { _ in
-            Button("Delete", role: .destructive) { send(.deleteConfirmed) }
-            Button("Cancel", role: .cancel) { send(.deleteCancelled) }
-        } message: { confirmation in
-            Text(confirmation.message)
-        }
-        .sheet(isPresented: isMovePickerUp) {
-            if let movePicker = model.movePicker {
-                MovePickerSheet(model: movePicker, send: send)
-            }
-        }
+        .modifier(ListsDialogs(model: model, send: send) { MovePickerSheet(model: $0, send: send) })
     }
-
 
 
     // MARK: The tree
@@ -117,7 +100,8 @@ struct ListsScreen: View {
                     .background {
                         GeometryReader { proxy in
                             Color.clear.preference(
-                                key: ListsTreeFramesKey.self, value: [item.id: proxy.frame(in: .named(Self.treeSpace))]
+                                key: ListsDrag.ItemFramesKey.self,
+                                value: [item.id: proxy.frame(in: .named(Self.treeSpace))]
                             )
                         }
                     }
@@ -132,12 +116,14 @@ struct ListsScreen: View {
         #if os(iOS)
         // The drag is UIKit's long press, unavailable on macOS and watchOS, where the screen has none.
         .background {
-            ListsDragGesture(isEnabled: model.isEditing) { phase in dragMoved(phase, among: items) }
+            ListsDragGesture(isEnabled: model.isEditing, isRowLifted: drag != nil) { phase in
+                pressChanged(phase, among: items)
+            }
         }
         #endif
         .coordinateSpace(.named(Self.treeSpace))
-        .onPreferenceChange(ListsTreeFramesKey.self) { [itemFrames] frames in
-            MainActor.assumeIsolated { itemFrames.frames = frames }
+        .onPreferenceChange(ListsDrag.ItemFramesKey.self) { [itemFrames] frames in
+            MainActor.assumeIsolated { itemFrames.byID = frames }
         }
     }
 
@@ -146,11 +132,11 @@ struct ListsScreen: View {
     @ViewBuilder private func item(_ item: ListsTreeItem, width: CGFloat, visibleRight: CGFloat) -> some View {
         switch item {
         case .list(let row, let list, let guides):
-            listRow(row, list, guides: guides, width: width, visibleRight: visibleRight)
+            listRow(row, list, guides: guides, need: widthNeeded(by: item), width: width, visibleRight: visibleRight)
         case .area(let row, let label):
             areaLine(row, label: label, visibleRight: visibleRight)
         case .slot(let depth, let guides):
-            ListsDragSlot(depth: depth, guides: guides, visibleRight: visibleRight)
+            ListsDrag.Slot(depth: depth, guides: guides, visibleRight: visibleRight)
         }
     }
 
@@ -158,22 +144,30 @@ struct ListsScreen: View {
     /// of the screen, whose room the title leaves them. The highlighted row, the list declared over the screen, stands
     /// on the fill colour while that list is pushed and as it slides away, which the canvas's press on a row is; Back
     /// takes the highlight away (`TaskViewList`, `.uncovered`). A tap on the row is its choice outside edit mode and
-    /// its rename in it. Its field ends where the accessories start on screen, as the canvas's does, where a title may
-    /// run on under them to be read when the tree is scrolled sideways.
+    /// its rename in it.
+    ///
+    /// A title runs on under the accessories, to be read when the tree is scrolled sideways, and so does the canvas's
+    /// field, across the whole tree. This field stops where the accessories start on screen instead, so that its end
+    /// and its caret are never under them, but never short of the row's need, its title's 140 pt among it, which the
+    /// tree scrolls sideways to show when the field opens (`showField`).
     private func listRow(
-        _ row: TaskViewList.Model.Row, _ list: TaskViewList.Model.ListRow, guides: [CGFloat], width: CGFloat,
-        visibleRight: CGFloat
+        _ row: TaskViewList.Model.Row, _ list: TaskViewList.Model.ListRow, guides: [CGFloat], need: CGFloat,
+        width: CGFloat, visibleRight: CGFloat
     ) -> some View {
         let background = list.isSelected ? Color(.fill) : Color(.paper)
+        let titleStart = ListRowView.tileLeading(atDepth: row.depth) + list.tile.side + ListRowView.tileToTitle
         return ListRowView(list, depth: row.depth, draft: row.draft, send: send)
-            .padding(.trailing, ListRowAccessories.width(isEditing: model.isEditing))
-            .frame(width: row.draft == nil ? width : min(width, visibleRight), alignment: .leading)
+            .padding(.trailing, ListRowView.Accessories.width(isEditing: model.isEditing))
+            .frame(width: row.draft == nil ? width : min(width, max(visibleRight, need)), alignment: .leading)
             .frame(width: width, alignment: .leading)
-            .background { TreeGuides(guides) }
+            .background { ListsTreeItem.Guides(guides) }
             .overlay(alignment: .leading) {
-                ListRowAccessories(list, id: row.id, isEditing: model.isEditing, background: background, send: send)
-                    .frame(width: visibleRight, alignment: .trailing)
+                ListRowView.Accessories(
+                    list, id: row.id, isEditing: model.isEditing, background: background, send: send
+                )
+                .frame(width: visibleRight, alignment: .trailing)
             }
+            .overlay(alignment: .leading) { fieldSpan(of: row, from: titleStart, to: need) }
             .background(background)
             .contentShape(.rect)
             .rowTap(row, send: send)
@@ -208,6 +202,7 @@ struct ListsScreen: View {
     private func areaLine(_ row: TaskViewList.Model.Row, label: String?, visibleRight: CGFloat) -> some View {
         AreaLine(label: label, draft: row.draft, isEditing: model.isEditing, send: send)
             .frame(width: visibleRight, alignment: .leading)
+            .overlay(alignment: .leading) { fieldSpan(of: row, from: 0, to: AreaLine.fieldEnd) }
             .contentShape(.rect)
             .rowTap(row, send: send)
             #if !os(watchOS)
@@ -225,16 +220,58 @@ struct ListsScreen: View {
             #endif
     }
 
-    /// How wide the tree must be for an item: for a list's row, its tile at its depth, a title of 140 pt and the room
-    /// its count, chevron and grip take (`Phone.dc.html`, a row's `need`); an area's line and the slot fit any width,
-    /// the slot at most one level deeper than the row before it, whose card has room to spare at that row's width.
+    /// How wide the tree must be for an item, its need: for a list's row, its tile at its depth, a title of 140 pt and
+    /// the room its count, chevron and grip take (`Phone.dc.html`, a row's `need`); an area's line fits any width, and
+    /// the slot, which is never among the rows the tree's width is read from, needs nothing either.
     private func widthNeeded(by item: ListsTreeItem) -> CGFloat {
         switch item {
         case .list(let row, let list, _):
             ListRowView.tileLeading(atDepth: row.depth) + list.tile.side + ListRowView.tileToTitle
-                + ListRowView.minimumTitleWidth + ListRowAccessories.width(isEditing: model.isEditing)
+                + ListRowView.minimumTitleWidth + ListRowView.Accessories.width(isEditing: model.isEditing)
         case .area, .slot:
             0
+        }
+    }
+
+    /// The part of a row its open field needs on screen, from where the field starts to the end of the row's need,
+    /// which the scroll to a field that opens shows with the least movement, and nothing on a row with no field open:
+    /// one row at a time has a field, so its identity is one constant.
+    @ViewBuilder private func fieldSpan(
+        of row: TaskViewList.Model.Row, from start: CGFloat, to end: CGFloat
+    ) -> some View {
+        if row.draft != nil {
+            Color.clear
+                .frame(width: max(0, end - start))
+                .frame(maxHeight: .infinity)
+                .padding(.leading, start)
+                .id(Self.fieldSpanID)
+        }
+    }
+
+    /// Shows the field that has just opened on the row. A row the lazy stack has not laid out, a new list in the last
+    /// area or a new area at the end of a long tree, has no field yet, and would never take the caret: the tree scrolls
+    /// it to the middle of the screen, and sideways as far as its need, the field's 140 pt among it, the field focusing
+    /// itself as it appears. A row it has laid out, one on screen renamed from its menu, is scrolled as little as shows
+    /// its field's span, once that span is laid out, which for a shallow row on screen is not at all. A scroll to the
+    /// row itself with no anchor moved the tree sideways to its far end, since a row wider than the screen is never
+    /// wholly in view (the iOS 26.3 simulator, 2026-10-29).
+    private func showField(
+        of id: ViewID, among items: [ListsTreeItem], width: CGFloat, scroller: ScrollViewProxy
+    ) {
+        let motion = reduceMotion ? nil : Animation(.popover)
+        guard itemFrames.byID[.row(id)] == nil else {
+            Task { @MainActor in
+                withAnimation(motion) { scroller.scrollTo(Self.fieldSpanID) }
+            }
+            return
+        }
+        // The anchor's x puts that fraction of the row's width at the same fraction of the screen's, so the tree's
+        // offset is the fraction of how far it scrolls, and the row's need ends at the right edge.
+        let need = items.first { $0.rowID == id }.map { widthNeeded(by: $0) } ?? 0
+        let travel = width - viewport.width
+        let sideways = travel > 0 ? min(1, max(0, need - viewport.width) / travel) : 0
+        withAnimation(motion) {
+            scroller.scrollTo(ListsTreeItem.ID.row(id), anchor: UnitPoint(x: sideways, y: 0.5))
         }
     }
 
@@ -244,7 +281,7 @@ struct ListsScreen: View {
     /// motion.
     @ViewBuilder private func card(among items: [ListsTreeItem], visibleRight: CGFloat) -> some View {
         if let drag, let lifted = drag.lifted(among: items) {
-            ListsDragCard(lifted, depth: drag.depth, visibleRight: visibleRight, send: send)
+            ListsDrag.Card(lifted, depth: drag.depth, visibleRight: visibleRight, send: send)
                 .offset(y: drag.location.y - drag.grabOffset)
                 .animation(reduceMotion ? nil : Animation(.popover), value: drag.depth)
         }
@@ -253,31 +290,15 @@ struct ListsScreen: View {
     #if os(iOS)
     // The handler of `ListsDragGesture`, which is iOS's alone.
 
-    /// A stage of the long press, among the items drawn with no row lifted: the lift, every move, which moves the slot
-    /// on the popover's motion when it changes its place or its depth, and the release, which sends the drop once and
-    /// puts the row down; a press that is cancelled puts it down and sends nothing.
-    private func dragMoved(_ phase: ListsDragGesture.Phase, among items: [ListsTreeItem]) {
-        let motion = reduceMotion ? nil : Animation(.popover)
-        switch phase {
-        case .began(let point):
-            guard let lifted = ListsDrag(liftingAt: point, among: items, frames: itemFrames.frames) else { return }
-            withAnimation(motion) { drag = lifted }
-        case .changed(let point):
-            guard let current = drag else { return }
-            let moved = current.moved(to: point, among: items, frames: itemFrames.frames)
-            if moved.slot != current.slot || moved.depth != current.depth {
-                withAnimation(motion) { drag = moved }
-            } else {
-                drag = moved
-            }
-        case .ended:
-            guard let current = drag else { return }
-            withAnimation(motion) {
-                send(current.drop(among: items))
-                drag = nil
-            }
-        case .cancelled:
-            withAnimation(motion) { drag = nil }
+    /// Hands a stage of the long press to the drag, among the items drawn with no row lifted, and sends the drop the
+    /// release reports. The lift, the release and a move of the slot to another place or depth go on the popover's
+    /// motion, and a move that leaves the slot where it was, the card alone following the finger, on none.
+    private func pressChanged(_ phase: ListsDrag.Phase, among items: [ListsTreeItem]) {
+        let step = ListsDrag.after(phase, from: drag, among: items, frames: itemFrames.byID)
+        let slotMoves = step.drag?.slot != drag?.slot || step.drag?.depth != drag?.depth
+        withAnimation(slotMoves && !reduceMotion ? Animation(.popover) : nil) {
+            if let drop = step.drop { send(drop) }
+            drag = step.drag
         }
     }
     #endif
@@ -332,31 +353,14 @@ struct ListsScreen: View {
             .allowsHitTesting(false)
     }
 
-    // MARK: The dialogs
-
-    /// Whether the confirmation is up, read from the model and moved only by an action, which a write of false is not.
-    /// Every dismissal of an alert is one of its own buttons, since iOS has no tap outside one, and each button sends
-    /// its own action, so the alert's dismissal is its Cancel through the button, whichever SwiftUI does first, the
-    /// button's action or its write into this binding (`TaskViewListView`, 2026-10-29).
-    private var isConfirmationUp: Binding<Bool> {
-        Binding(get: { model.confirmation != nil }, set: { _ in })
-    }
-
-    /// Whether the move picker is up, read from the model and moved only by an action. The swipe down is one write of
-    /// false, which goes to the module as the picker's Cancel; the write that follows a close the module drove, a row
-    /// tapped or Cancel, reaches no picker and moves nothing.
-    private var isMovePickerUp: Binding<Bool> {
-        Binding(get: { model.movePicker != nil }, set: { isUp in
-            guard !isUp else { return }
-            send(.movePickerCancelled)
-        })
-    }
-
     /// The coordinate space of the tree's content, which the rows report their frames in and the drag's recognizer
     /// measures the finger in, and the one of the scroll view's viewport, against which the content's sideways offset
     /// is read.
     private nonisolated static let treeSpace = "ListsScreen.tree"
     private nonisolated static let viewportSpace = "ListsScreen.viewport"
+
+    /// The identity of the open field's span (`fieldSpan`).
+    private static let fieldSpanID = "ListsScreen.fieldSpan"
 }
 
 extension View {
@@ -446,5 +450,29 @@ enum ListsTreeItem: Identifiable {
     /// Where the guide under a tile of the side at the depth stands: under its centre (`Phone.dc.html`, `guidesFor`).
     private static func guideCentre(atDepth depth: Int, tileSide: Double) -> CGFloat {
         ListRowView.tileLeading(atDepth: depth) + tileSide / 2
+    }
+
+    /// The guides down the levels a row stands under, 1.5 pt in the line colour, one under the centre of each
+    /// ancestor's tile (`Phone.dc.html`, `.guide`), drawn the whole height of the row so that the rows of a branch join
+    /// them into lines.
+    struct Guides: View {
+        /// Where each guide's centre stands, from the tree's leading edge.
+        private let centres: [CGFloat]
+
+        init(_ centres: [CGFloat]) {
+            self.centres = centres
+        }
+
+        var body: some View {
+            ZStack(alignment: .topLeading) {
+                ForEach(centres.indices, id: \.self) { index in
+                    Rectangle()
+                        .fill(Color(.line))
+                        .frame(width: 1.5)
+                        .offset(x: centres[index] - 0.75)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
     }
 }

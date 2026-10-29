@@ -115,39 +115,8 @@ struct TaskViewListView: View {
             }
         }
         #endif
-        .alert(model.confirmation?.title ?? "", isPresented: isConfirmationUp, presenting: model.confirmation) { _ in
-            Button("Delete", role: .destructive) { send(.deleteConfirmed) }
-            Button("Cancel", role: .cancel) { send(.deleteCancelled) }
-        } message: { confirmation in
-            Text(confirmation.message)
-        }
-        .sheet(isPresented: isMovePickerUp) {
-            if let movePicker = model.movePicker {
-                MovePickerList(model: movePicker, send: send)
-            }
-        }
-    }
-
-    /// Whether the confirmation is up, read from the model and moved only by an action, which a write of false is not.
-    /// Every dismissal of an alert is one of its own buttons: iOS has no tap outside one, and Esc on the Mac and an
-    /// iPad's keyboard press its Cancel. Each button sends its own action, Delete `deleteConfirmed` and Cancel
-    /// `deleteCancelled`, so the alert's dismissal is still its Cancel action, through the button, whichever SwiftUI
-    /// does first, the button's action or its write into this binding. A write sent as Cancel would take the
-    /// confirmation down before a Delete that ran after it. On the Mac on 2026-10-29, by hand, Delete deleted with a
-    /// binding that sent the write as Cancel, so there the action ran first. The sheet's binding below is the other
-    /// kind: a swipe down and Esc are writes of false with no button behind them.
-    private var isConfirmationUp: Binding<Bool> {
-        Binding(get: { model.confirmation != nil }, set: { _ in })
-    }
-
-    /// Whether the move picker is up, read from the model and moved only by an action. The swipe down, and Esc on the
-    /// Mac, are one write of false, which goes to the module as the picker's Cancel; the write that follows a close the
-    /// module drove, a row tapped or Cancel, reaches no picker and moves nothing.
-    private var isMovePickerUp: Binding<Bool> {
-        Binding(get: { model.movePicker != nil }, set: { isUp in
-            guard !isUp else { return }
-            send(.movePickerCancelled)
-        })
+        // The confirmation as an alert and the picker as a sheet of a plain list (`ListsDialogs`).
+        .modifier(ListsDialogs(model: model, send: send) { MovePickerList(model: $0, send: send) })
     }
 
     /// The highlight, read from the model and moved only by an action, the shape a text field's binding has

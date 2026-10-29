@@ -13,6 +13,14 @@ struct AreaLine: View {
     private let isEditing: Bool
     private let send: (TaskViewList.UserAction) -> Void
 
+    /// Where the field of a line being renamed ends, from the line's leading edge, which the screen keeps on screen
+    /// when the field opens.
+    static let fieldEnd = leading + fieldWidth
+
+    /// The canvas's 20 pt before the label, the field or the line, and the field's 160.
+    private static let leading: CGFloat = 20
+    private static let fieldWidth: CGFloat = 160
+
     init(label: String?, draft: String?, isEditing: Bool, send: @escaping (TaskViewList.UserAction) -> Void) {
         self.label = label
         self.draft = draft
@@ -23,13 +31,13 @@ struct AreaLine: View {
     var body: some View {
         HStack(spacing: 10) {
             if let draft {
-                // The canvas's field on a line: 160 pt wide and 28 high, on the surface, with a 2 pt ring in the
-                // accent, and the canvas's placeholder, since a new area's field opens empty.
+                // The canvas's field on a line: 28 pt high, on the surface, with a 2 pt ring in the accent, and the
+                // canvas's placeholder, since a new area's field opens empty.
                 TitleField("Area name", draft: draft, send: send)
                     .font(Font(.areaLabel))
                     .foregroundStyle(Color(.ink))
                     .padding(.horizontal, 8)
-                    .frame(width: 160, height: 28)
+                    .frame(width: Self.fieldWidth, height: 28)
                     .background(Color(.surface), in: .rect(cornerRadius: 8))
                     .overlay { RoundedRectangle(cornerRadius: 8).stroke(Color(.accent), lineWidth: 2) }
             } else if let label {
@@ -43,11 +51,11 @@ struct AreaLine: View {
                 .fill(Color(.line))
                 .frame(height: 1)
             if isEditing {
-                RowGrip()
+                ListRowView.Grip()
                     .foregroundStyle(Color(.ink3))
             }
         }
-        .padding(.leading, 20)
+        .padding(.leading, Self.leading)
         // The canvas's 12 pt after the grip, and 20 after the line alone.
         .padding(.trailing, isEditing ? 12 : 20)
         .frame(height: label == nil && draft == nil ? 17 : 36)

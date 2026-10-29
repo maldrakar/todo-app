@@ -4,18 +4,18 @@ import FeatureModule
 import SwiftUI
 
 /// The root of the tree of views, and beside the window's view, which holds the window and its host, the one view that
-/// names the host: it hands the sidebar's view its model and a closure that wraps its actions in the root's, draws the
-/// layout the model gives it, binds each stack to the path of ids the layout carries, draws each element of the
-/// window's stack through one switch, and sends a pop back whole (navigation state spec, sections 3, 4 and 6), with
-/// the root's own sentence across the bottom of the window and quick entry as a sheet over all of it. A wide window,
-/// the Mac's and a wide iPad window, is a split view with the sidebar beside a stack whose root is the layout's column,
-/// the list of the chosen view's tasks, and the layout's path pushed in that stack. A narrow window, iPhone's and a
-/// narrow iPad window, is one stack with the views at its root and every screen of the layout's path pushed over them.
-/// The containers are the view's and the modules know nothing of them; which of the two a window has is the root
-/// module's, decided from the width the window's view reports, and this view switches over the layout once and
-/// chooses nothing by the width (`docs/style.md`, "Views"). Every binding is read from the model and set only by
-/// sending an action, and a stack's path only by `.wentBack(to:)`. It reads neither the window's route nor which
-/// screen opens which.
+/// names the host: it hands the list of views, the sidebar of a wide window or the Lists screen of a narrow one, its
+/// model and a closure that wraps its actions in the root's, draws the layout the model gives it, binds each stack to
+/// the path of ids the layout carries, draws each element of the window's stack through one switch, and sends a pop
+/// back whole (navigation state spec, sections 3, 4 and 6), with the root's own sentence across the bottom of the
+/// window and quick entry as a sheet over all of it. A wide window, the Mac's and a wide iPad window, is a split view
+/// with the sidebar beside a stack whose root is the layout's column, the list of the chosen view's tasks, and the
+/// layout's path pushed in that stack. A narrow window, iPhone's and a narrow iPad window, is one stack with the views
+/// at its root and every screen of the layout's path pushed over them. The containers are the view's and the modules
+/// know nothing of them; which of the two a window has is the root module's, decided from the width the window's view
+/// reports, and this view switches over the layout once and chooses nothing by the width (`docs/style.md`, "Views").
+/// Every binding is read from the model and set only by sending an action, and a stack's path only by `.wentBack(to:)`.
+/// It reads neither the window's route nor which screen opens which.
 struct RootView: View {
     private let host: ModuleHost<AppModule>
 
@@ -122,8 +122,9 @@ struct RootView: View {
             ListsScreen(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
                 .navigationDestination(for: StackElementID.self) { id in
                     screen(id)
-                        // The sidebar's sentence on every screen pushed over the sidebar's rows, which draw it when
-                        // they are on top, so it shows once on whichever screen is on top, a task's included (#110).
+                        // The sidebar's sentence on every screen pushed over the Lists screen, which draws it above its
+                        // bar when it is on top, so it shows once on whichever screen is on top, a task's included
+                        // (#110).
                         .safeAreaInset(edge: .bottom) { sidebarSentence }
                 }
         }

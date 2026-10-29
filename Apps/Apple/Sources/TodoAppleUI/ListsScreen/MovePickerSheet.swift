@@ -38,7 +38,7 @@ struct MovePickerSheet: View {
                     .background(Color(.paper))
             }
             .navigationTitle(model.title)
-            #if os(iOS)
+            #if !os(macOS)
             // The title in the bar beside Cancel, as the canvas's, where iOS would otherwise draw it large under the
             // bar; the modifier is unavailable on macOS.
             .navigationBarTitleDisplayMode(.inline)
