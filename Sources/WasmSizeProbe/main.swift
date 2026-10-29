@@ -17,24 +17,22 @@ import WASILibc
 
 /// What the wasm size job measures: the root module and the core a web client ships with it.
 ///
-/// It is not part of the product, nothing imports it and no platform ships it. The budget is about the web
-/// client, and the `todo` demo is the wrong stand-in for one: the demo carries an argument parser, a formatter
-/// and a usage text no browser will ever load, so its size says as much about `TodoCLI` as about the core. This
-/// executable does what a web entry point will: it builds the root module over a store in memory from a
-/// window's path, which is the web's address bar, and drives every module of the window — a selection, a rename,
-/// a new list, a list made inside it, a fold, a new area, Move to… into it, a drop back to the root and New task in
-/// the sidebar, a link applied as `.route`
-/// through the window's stack, quick entry creating a task, a tap in the list sent to its element of the stack,
-/// which pushes the task, the way back as the shorter path, the window narrowing, Cancel, and Open in New Window,
-/// whose path it writes down — with the change each write produced, and a path the routes refuse, and it reads
-/// the layout the root cuts for the window's width and the sidebar's rows, the tiles built for that width among
-/// them. Beside that it calls the core's public API directly, and each group of calls has a client
-/// that ships it. The writes, the reads, a page and search are what the modules M3 adds will call. The filter
-/// codec and the journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in
-/// them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the platform clock a
-/// web entry point passes. A group dropped because no module makes its calls would take out code the web client
-/// still ships. What a client calls is what the linker has to keep, so the number the job prints is the root
-/// module and the core a web client cannot dead-strip its way out of shipping.
+/// It is not part of the product, nothing imports it and no platform ships it. The budget is about the web client, and
+/// the `todo` demo is the wrong stand-in for one: the demo carries an argument parser, a formatter and a usage text no
+/// browser will ever load, so its size says as much about `TodoCLI` as about the core. This executable does what a web
+/// entry point will: it builds the root module over a store in memory from a window's path, which is the web's address
+/// bar, and drives every module of the window — a selection, a rename, a new list, a list made inside it, a fold, a new
+/// area, Move to… into it, a drop back to the root and New task in the sidebar, a link applied as `.route` through the
+/// window's stack, quick entry creating a task, a tap in the list sent to its element of the stack, which pushes the
+/// task, the way back as the shorter path, the window narrowing, Cancel, and Open in New Window, whose path it writes
+/// down — with the change each write produced, and a path the routes refuse, and it reads the layout the root cuts for
+/// the window's width and the sidebar's rows, the tiles built for that width among them. Beside that it calls the
+/// core's public API directly, and each group of calls has a client that ships it. The writes, the reads, a page and
+/// search are what the modules M3 adds will call. The filter codec and the journal exchange are the web host's own,
+/// which is where the spec leaves the gaps #23 found in them ("Goals and non-goals"). The snapshot is what a web page
+/// persists, reopened under the platform clock a web entry point passes. A group dropped because no module makes its
+/// calls would take out code the web client still ships. What a client calls is what the linker has to keep, so the
+/// number the job prints is the root module and the core a web client cannot dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.
