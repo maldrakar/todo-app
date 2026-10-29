@@ -123,7 +123,7 @@ struct TaskViewListView: View {
         }
         .sheet(isPresented: isMovePickerUp) {
             if let movePicker = model.movePicker {
-                MovePickerList(picker: movePicker, send: send)
+                MovePickerList(model: movePicker, send: send)
             }
         }
     }
@@ -173,7 +173,7 @@ struct TaskViewListView: View {
 /// rows in a plain list, each sending its tap, the present parent checked and the rows that cannot take the list
 /// disabled, and Cancel in the bar.
 private struct MovePickerList: View {
-    let picker: TaskViewList.Model.MovePicker
+    let model: TaskViewList.Model.MovePicker
     let send: (TaskViewList.UserAction) -> Void
 
     var body: some View {
@@ -182,10 +182,10 @@ private struct MovePickerList: View {
                 Button { send(.movePickerRowTapped(nil)) } label: {
                     HStack {
                         Text("Top level")
-                        if picker.isTopLevelCurrent { Image(systemName: "checkmark") }
+                        if model.isTopLevelCurrent { Image(systemName: "checkmark") }
                     }
                 }
-                ForEach(picker.rows) { pickerRow in
+                ForEach(model.rows) { pickerRow in
                     // The row's tap, which its button sends, and which a list's title sends too, since the title's
                     // own gesture is the one a tap on it reaches. A greyed-out row's, should that gesture still take
                     // one, moves nothing in the module.
@@ -200,7 +200,7 @@ private struct MovePickerList: View {
                     .disabled(pickerRow.isDisabled)
                 }
             }
-            .navigationTitle(picker.title)
+            .navigationTitle(model.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { send(.movePickerCancelled) }
