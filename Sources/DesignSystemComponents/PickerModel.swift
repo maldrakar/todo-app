@@ -10,8 +10,8 @@ import DesignSystem
 /// amendment of 2026-10-30).
 public struct PickerModel<Row: Equatable & Sendable, Action: Equatable & Sendable>: Equatable, Sendable {
     /// The top level, a row of its own: `height` high, `leading` in from either edge, a tile `tileSide` across with
-    /// corners of `tileCornerRadius` in `tileColor` with `icon` on it, then `tileToTitle` after it the title, in points;
-    /// checked where it is the present choice, and sending `action` when tapped.
+    /// corners of `tileCornerRadius` in `tileColor` with `icon` on it, then `tileToTitle` after it the title, in
+    /// points; checked where it is the present choice, and sending `action` when tapped.
     public struct TopLevel: Equatable, Sendable {
         public let icon: IconModel
         public let tileSide: Double

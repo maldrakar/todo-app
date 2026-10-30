@@ -6,10 +6,11 @@ import DesignSystem
 /// lift, the release and a move of the slot. The drag itself, which row lifts, where the slot stands and at which
 /// depth, is the platform's, since only the platform has the finger (the owner, 2026-10-30); this is its look.
 public struct DragModel: Equatable, Sendable {
-    /// The slot where the lifted row would land: `height` high, its frame drawn `verticalInset` in from its top and from
-    /// its bottom, from `inset` before the tile of the slot's depth to `trailingGap` short of the right edge of the tree
-    /// on screen, its corners of `cornerRadius`, filled with `fill` and edged with `stroke`, in points. Behind it run
-    /// the guides of the levels it would stand under, which are the row before it's `childGuides`, as many as its depth.
+    /// The slot where the lifted row would land: `height` high, its frame drawn `verticalInset` in from its top and
+    /// from its bottom, from `inset` before the tile of the slot's depth to `trailingGap` short of the right edge of
+    /// the tree on screen, its corners of `cornerRadius`, filled with `fill` and edged with `stroke`, in points. Behind
+    /// it run the guides of the levels it would stand under, which are the row before it's `childGuides`, as many as
+    /// its depth.
     public struct Slot: Equatable, Sendable {
         public let height: Double
         public let inset: Double
@@ -33,15 +34,15 @@ public struct DragModel: Equatable, Sendable {
         }
     }
 
-    /// The lifted row under the finger: standing `raise` above the row it lifts, grown to `scale` once lifted and turned
-    /// by `rotation` degrees, clockwise when positive, casting `shadow`, on `background`, in points.
+    /// The lifted row under the finger: standing `raise` above the row it lifts, grown to `scale` once lifted and
+    /// turned by `rotation` degrees, clockwise when positive, casting `shadow`, on `background`, in points.
     ///
     /// A list's card is `listHeight` high, from `listInset` before the tile of the slot's depth to `listTrailingGap`
     /// short of the right edge of the tree on screen and at least `minimumWidth` wide; on it, `listPadding` in, stand
     /// the lifted row's tile and title, its gap between them, and `grip` in a cell `gripCell` wide at its end; its
-    /// corners are of `listCornerRadius`. A line's card is `lineHeight` high, from `lineInset` to `lineTrailingGap` short
-    /// of the right edge of the tree on screen and at least `minimumWidth` wide, with the lifted line on it as the line
-    /// draws itself; its corners are of `lineCornerRadius`.
+    /// corners are of `listCornerRadius`. A line's card is `lineHeight` high, from `lineInset` to `lineTrailingGap`
+    /// short of the right edge of the tree on screen and at least `minimumWidth` wide, with the lifted line on it as
+    /// the line draws itself; its corners are of `lineCornerRadius`.
     public struct Card: Equatable, Sendable {
         public let raise: Double
         public let scale: Double

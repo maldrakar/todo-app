@@ -12,8 +12,8 @@ public struct ButtonModel<Action: Equatable & Sendable>: Equatable, Sendable {
     }
 
     /// What the button stands on: the container its platform puts it on, which is the platform's choice, the glass
-    /// under a bar's controls on iOS or a toolbar, with no fill of its own; or a fill of its own in a colour of the look,
-    /// on which its glyph stands.
+    /// under a bar's controls on iOS or a toolbar, with no fill of its own; or a fill of its own in a colour of the
+    /// look, on which its glyph stands.
     public enum Fill: Equatable, Sendable {
         case container
         case color(DesignSystem.Color)

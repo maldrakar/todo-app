@@ -3,9 +3,9 @@
 extension DesignSystem {
     /// The icons of the look: the ones a list can have, by the names the store keeps for them
     /// (`docs/specs/lists-screen.md`, section 9), so that `Icon(rawValue:)` reads the name a view holds and a name this
-    /// app does not know reads as `nil`, and the chrome's glyphs, which a component's model names for the bar, the menus,
-    /// a row and the picker (Lists screen plan, Task 8). The default glyph is a case of its own, so no icon of the look is
-    /// optional, and a platform maps every case to a glyph of its own.
+    /// app does not know reads as `nil`, and the chrome's glyphs, which a component's model names for the bar, the
+    /// menus, a row and the picker (Lists screen plan, Task 8). The default glyph is a case of its own, so no icon of
+    /// the look is optional, and a platform maps every case to a glyph of its own.
     ///
     /// A chrome glyph is an icon like any other, so its name read from the store reads as that glyph, as every icon's
     /// name reads as its own; nothing writes one.

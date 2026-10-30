@@ -3,8 +3,8 @@ import DesignSystem
 
 /// An area's line in a tree as every platform draws it (`Phone.dc.html`, the area's row): `height` high, from `leading`
 /// to `trailing` short of the right edge of the tree on screen, the label, or the field in its place while the area is
-/// being renamed, then the line across the rest, then the grip where there is one, `spacing` apart, in points. The model
-/// holds every value its platform needs to draw it, so a view decides nothing but what is the platform's
+/// being renamed, then the line across the rest, then the grip where there is one, `spacing` apart, in points. The
+/// model holds every value its platform needs to draw it, so a view decides nothing but what is the platform's
 /// (ADR-0007, amendment of 2026-10-30).
 public struct AreaLineModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let height: Double

@@ -85,8 +85,9 @@ public struct ListRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// `need` leaves it.
     public let field: FieldModel?
 
-    /// How wide the tree must be for the row, from the tree's leading edge, in points: the tile at its leading edge, the
-    /// gap, the least room its title takes, and the accessories. A tree too narrow for a row's need scrolls sideways.
+    /// How wide the tree must be for the row, from the tree's leading edge, in points: the tile at its leading edge,
+    /// the gap, the least room its title takes, and the accessories. A tree too narrow for a row's need scrolls
+    /// sideways.
     public let need: Double
 
     /// The colour under the whole row, its accessories included.

@@ -9,7 +9,9 @@ extension DesignSystem {
     public struct Animation: Equatable, Sendable {
         /// A spring, an ease-in, or the cubic Bézier curve with the control points (x1, y1) and (x2, y2), as CSS's
         /// `cubic-bezier` writes it.
-        public enum Curve: Equatable, Sendable { case spring, easeIn, bezier(x1: Double, y1: Double, x2: Double, y2: Double) }
+        public enum Curve: Equatable, Sendable {
+            case spring, easeIn, bezier(x1: Double, y1: Double, x2: Double, y2: Double)
+        }
 
         public let curve: Curve
         public let duration: Double
