@@ -1,6 +1,6 @@
 # Plan: The Lists screen
 
-- Status: Approved 2026-10-26, with the owner's word that a decision may move during implementation and be recorded in the task's pull request; Task 8 added on 2026-10-30 at the owner's word, the sidebar renumbered 9
+- Status: Approved 2026-10-26, with the owner's word that a decision may move during implementation and be recorded in the task's pull request; Task 8 added on 2026-10-30 at the owner's word, the sidebar renumbered 9; Task 9 fixed forward on 2026-10-30 against what Task 8 shipped (#161)
 - Spec: `docs/specs/lists-screen.md`, approved 2026-10-25
 - Epic: #138
 
@@ -67,12 +67,13 @@ from.
 | `Sources/DesignSystem/Icon.swift`, `Font.swift`, `Color.swift`, `Shadow.swift` | 8 | the chrome's glyphs as icons; the bold weight and three fonts; the colour on the accent; the lifted card's shadow |
 | `Sources/DesignSystemComponents/*Model.swift` | 8 | the models of the screen's components, from the icon, the text and the line up to the bar, the picker and the confirmation |
 | `Tests/DesignSystemComponentsTests/IndentModelTests.swift` | 8 | the indent |
+| `Sources/DesignSystemComponents/FillModel.swift`, `ListRowModel.swift`, `SearchFieldModel.swift`, `MenuModel.swift`, `DragModel.swift`, `ButtonModel.swift`; `Sources/FeatureModule/WindowCapabilities.swift` | 9 | the fill two models share, the row's radius, the search field's fill, a menu item's shortcut, the drop indicator; what the window's platform offers |
 | `Package.swift` | 5 | `TaskViewListFeature` depends on `DesignSystem` and `DesignSystemComponents`, and so do `TaskViewListFeatureTests`, which spell `TileModel(…)` and compare `DesignSystem.Font`, and `AppFeatureTests`, which compare the sidebar's tiles; the feature targets' comment says when a feature imports the two |
-| `Sources/Features/TaskViewList/TaskViewList.swift` | 5, 6, 8 | the module's events (5, 6); `supportsMultipleWindows` (8) |
+| `Sources/Features/TaskViewList/TaskViewList.swift` | 5, 6, 8, 9 | the module's events (5, 6); `supportsMultipleWindows` (8), which `WindowCapabilities` replaces (9) |
 | `Sources/Features/TaskViewList/TaskViewList+Model.swift` | 5, 6, 8 | `Model` and its nested types, whose rows, bar and dialogs are component models (8) |
-| `Sources/Features/TaskViewList/TaskViewList+Components.swift` | 8 | the phone's numbers and the builders of the component models |
+| `Sources/Features/TaskViewList/TaskViewList+Components.swift` | 8, 9 | the phone's numbers and the builders of the component models (8); the metrics of each width (9) |
 | `Sources/Features/TaskViewList/TaskViewList+Rows.swift` | 5, 6 | the walk from the store's tree to the drawn rows, and each list row's tile and title font (5); the root rule and the drop's reading (6) |
-| `Sources/Features/App/AppModule.swift` | 5, 8 | reacts to `newTaskRequested`; hands the sidebar the window's width class (5) and whether a window can open beside it (8) |
+| `Sources/Features/App/AppModule.swift` | 5, 8, 9 | reacts to `newTaskRequested`; hands the sidebar the window's width class (5), whether a window can open beside it (8), and then all the window's platform offers (9) |
 | `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, `TaskViewListRowsTests.swift`, `TaskViewListEditsTests.swift` | 5, 6, 8 | adapted; the rows; the edits |
 | `Tests/TaskViewListFeatureTests/TaskViewListComponentsTests.swift` | 8 | the component models the module builds |
 | `Tests/AppFeatureTests/AppModuleTests.swift` | 5, 6, 8 | quick entry from the sidebar and the sidebar's tiles following the width; the open list deleted |
@@ -554,34 +555,53 @@ AppModule.init(store: Store, route: Route = .default, width: WindowWidth, suppor
 
 ### Task 9: The sidebar on the Mac and the iPad
 
-**Goal.** The wide window's sidebar as the canvas's Mac board, with the phone's gestures on the iPad; the adapted `TaskViewListView` goes (spec section 8).
+**Goal.** The wide window's sidebar as the canvas's Mac board, with the phone's gestures on the iPad; the adapted `TaskViewListView` goes (spec section 8). It draws Task 8's component models, which the module builds for the wide window with the sidebar's numbers, so the sidebar decides nothing the phone's views do not.
 
-**Files.** New `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsSidebar.swift`; `RootView.swift`; `TaskViewListView.swift` deleted; `Sources/Features/TaskViewList/TaskViewList+Components.swift` and `TaskViewListComponentsTests.swift`, the sidebar's numbers; `README.md`; `CHANGELOG.md`.
+**Files.** In `Sources/DesignSystemComponents/`, `ListRowModel.swift`, `SearchFieldModel.swift`, `MenuModel.swift`, `DragModel.swift` and `ButtonModel.swift`, with a new `FillModel.swift`; new `Sources/FeatureModule/WindowCapabilities.swift`; `Sources/Features/TaskViewList/TaskViewList.swift`, `TaskViewList+Components.swift` and `TaskViewList+Rows.swift`; `Sources/Features/App/AppModule.swift`; their tests, `TaskViewListComponentsTests.swift` among them; `Sources/WasmSizeProbe/main.swift` and `scripts/wasm-size.sh`; new `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsSidebar.swift`; `RootView.swift`, `WindowView.swift` and `TodoApp.swift`; `TaskViewListView.swift`, deleted; `TodoAppTests.swift`; `README.md`; `CHANGELOG.md`.
 
-**Interface.** Consumes Task 7's views and Task 8's component models. Produces:
+**Interface.** Consumes Task 7's views and Task 8's component models as shipped (#161). Produces:
 
 ```swift
+// DesignSystemComponents: what the sidebar draws and the phone does not.
+struct ListRowModel { /* Task 8's */ cornerRadius: Double }          // the background's radius: 0 on the phone, 7 on the sidebar
+enum FillModel { case container, color(DesignSystem.Color) }        // ButtonModel.Fill of Task 8, lifted out so that two models share it
+struct ButtonModel { /* Task 8's, with */ fill: FillModel }
+struct SearchFieldModel { /* Task 8's */ fill: FillModel }          // .container on the phone (the glass), .color(.fill) on the sidebar
+struct MenuModel.Item { /* Task 8's */ shortcut: Shortcut? }
+struct MenuModel.Item.Shortcut { key: Character; modifiers: [Modifier]; enum Modifier { case command, shift } }
+struct DragModel { /* Task 8's */ indicator: Indicator }
+struct DragModel.Indicator { line: StrokeModel; circleDiameter: Double }   // the Finder's line and circle
+
+// FeatureModule: what the window's platform offers, read by the view once when the window is made.
+struct WindowCapabilities { opensWindowsBeside: Bool; hasEditMode: Bool }
+TaskViewList.init(store: Store, route: Route, width: WindowWidth, capabilities: WindowCapabilities) throws(StoreError)
+AppModule.init(store: Store, route: Route = .default, width: WindowWidth, capabilities: WindowCapabilities) throws(StoreError)
 struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) }
 // RootView.splitView draws ListsSidebar in the sidebar column.
 ```
 
+`WindowCapabilities` replaces Task 8's `supportsMultipleWindows: Bool` at both `init`s and `makeWindow`, so that the second fact the module builds by, edit mode, does not become a second `Bool` threaded the same way (the final review of #161). `opensWindowsBeside` is SwiftUI's `supportsMultipleWindows`; `hasEditMode` is false on the Mac alone, a platform condition in `WindowView`, named in a comment.
+
 **Rules.**
 
-- The sidebar's numbers below are the module's, built for the wide width into Task 8's models, and its views draw them and decide only what Task 8 leaves the platform. What the Mac lacks, edit mode, "…" and the edit items, reaches the module as `supportsMultipleWindows` does, so the menus and the bar come built for it.
-- The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile through `ListTile(row.tile)`, which the module built at the canvas's 20, 6 and 13, the title in `Font(row.titleFont)`, which the module chose for the wide window and which renders at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
-- At the bottom: the search field, 30 pt, in the fill colour, inert; a 30 pt round "+" in the accent, a `Menu` with New task, `⌘N`, New list, `⇧⌘N`, and New area, the shortcuts through `keyboardShortcut`. The toolbar's New Folder is gone; the list's Quick Entry button stays.
-- The drag at any time, with the line-and-circle indicator for a drop between rows and into a parent, sending the same `rowDropped`.
-- The one platform condition, `#if os(macOS)`: the Mac's right click opens the menus, Rename, New list, Open in New Window, Move to…, Delete on a list and Rename, New list, Delete area on a line, and the Mac has no edit mode, no "…" and no edit items; on the iPad the long press opens the menus, "…" holds Edit, and the bar of Tasks 7 and 8 stands at the bottom of the column with edit mode as on the phone (spec section 8). Open in New Window where `supportsMultipleWindows`.
-- A Plus or Max iPhone turned sideways reports the regular class and gets this sidebar, as it gets the split view today; nothing here reads the device.
-- The sidebar's sentence under the rows, and on the pane while the column is hidden, as today.
+- The sidebar's numbers are the module's, built for the wide width into Task 8's models: `TaskViewList+Components.swift`'s `Phone` becomes one value of metrics per width, picked once by `WindowWidth`, with `RowSize`'s choice of tile and title font folded into it, so that no builder branches on the width. The canvas's Mac board (`Mac.dc.html`): the column `navigationSplitViewColumnWidth(min: 280, ideal: 280)`, rows 30 pt with a background radius of 7, the tile at 20, 6 and 13, the title at the system's sidebar size, the count in ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt; an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover). The drag's indicator and the bar's sizes are read from the same board on the day and listed in the pull request.
+- The views draw what Task 8's draw: the title from `row.title` with the `Text` renderer, the tile with `ListTile(row.tile)`, each menu from `row.menu`, the bar from `model.bar`, the dialogs through `ListsDialogs`. A view switches over the six enums `docs/style.md` allows and over `FillModel`, which takes `ButtonModel.Fill`'s place there.
+- Without edit mode (the Mac) the module builds no "…", no edit items and no grips, and the drag runs at any time; with it (the iPad) the bar of Tasks 7 and 8 stands at the bottom of the column with edit mode as on the phone, and the long press opens the menus. Open in New Window where `opensWindowsBeside`.
+- At the bottom of the Mac's column: the search field, inert, on the fill colour; a 30 pt round "+" in the accent, a `Menu` with New Task `⌘N`, New List `⇧⌘N` and New Area, the shortcuts from the items' `shortcut` through `keyboardShortcut`. The toolbar's New Folder is gone; the list's Quick Entry button stays.
+- The words are Title Case, as the phone's: New List, Delete Area, New Task (Task 7's call, which Task 8's models carry); the spec writes them in sentence case in its prose.
+- The Mac's drag reuses `ListsDrag`'s reading of a slot's place and depth with the pointer, since a `List` with `onMove` offers no depth (spike #145, approach A), and draws `DragModel.Indicator` for a drop between rows and into a parent, sending the same `rowDropped`.
+- The one platform condition in the sidebar, `#if os(macOS)`, is the right click that opens a row's menu; the iPad's long press is the phone's. A Plus or Max iPhone turned sideways reports the regular class and gets this sidebar, as it gets the split view today; nothing here reads the device.
+- `ChoiceModel` gets one renderer once the sidebar draws the dialogs a third time (#161's review); the sidebar's sentence under the rows, and on the pane while the column is hidden, as today.
 
-**Tests.** `TodoAppTests` unchanged; checked by hand on the Mac in both appearances, on an iPad Pro 11-inch (M5) in both orientations, and on an iPhone 17 Pro Max turned sideways, with screenshots in the pull request.
+**Tests.** `TaskViewListComponentsTests`: the wide window's rows, lines, bar and drag whole with the sidebar's numbers, with and without edit mode; the menus with each capability. The other feature tests and `AppModuleTests` take `WindowCapabilities`. `TodoAppTests`: `makeWindow` passes both capabilities through, at one width. The probe drives the wide models; the budget is re-measured. By hand on the Mac in both appearances, on an iPad Pro 11-inch (M5) in both orientations, and on an iPhone 17 Pro Max turned sideways, with screenshots in the pull request; the phone's 34 shots retaken with Task 8's harness and compared.
 
 **Verified facts and traps.**
 
 - The Mac's `horizontalSizeClass` is nil and reads as wide; the iPad's regular class and a Plus or Max iPhone's sideways class read as wide (`WindowView`).
-- `supportsMultipleWindows` is true on the Mac and on the iPad with the multiple-scenes declaration (`TaskViewListView`, 2026-10-18).
+- `supportsMultipleWindows` is true on the Mac and on the iPad with the multiple-scenes declaration (`TaskViewListView`, 2026-10-18), and is available on watchOS from 9 in Xcode 27.1's SDK (#161).
 - Trap: a root whose body reads the split view's column visibility redraws the stack and loses the pushed task's background (`HiddenSidebarStrip`, #133); the sidebar reads nothing of the split view.
+- Trap: the Accessibility API's `AXShowMenu` is unsupported on a SwiftUI sidebar's outline rows (`-25206`, macOS, 2026-10-30), so a hand check of the Mac's menus needs a real right click, the owner's mouse: ask first.
+- `FillModel`, `WindowCapabilities` and `Shortcut`'s nesting: the two top-level names get the probe of Task 8's names before they are fixed.
 
 ## Self-review against the spec
 
