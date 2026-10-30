@@ -11,3 +11,19 @@ private typealias Font = DesignSystem.Font
     #expect(Font.nestedRowTitle == Font(style: .callout, weight: .regular, rounded: false))
     #expect(Font.nestedRowTitleEmphasized == Font(style: .callout, weight: .semibold, rounded: false))
 }
+
+/// The bar's words are the subheadline in semibold, the canvas's 15 pt; the picker's hint the footnote, 13 pt; and the
+/// search capsule's placeholder the body, 17 pt, each at the iPhone's default text size and none rounded.
+@Test func theBarsLabelTheHintAndTheSearchAreTheSubheadlineTheFootnoteAndTheBody() {
+    #expect(Font.barLabel == Font(style: .subheadline, weight: .semibold, rounded: false))
+    #expect(Font.hint == Font(style: .footnote, weight: .regular, rounded: false))
+    #expect(Font.search == Font(style: .body, weight: .regular, rounded: false))
+}
+
+/// Bold is a weight of its own, between semibold and heavy, which the bar's Done glyph is drawn in (Lists screen plan,
+/// Task 8): a font in bold is no font in any other weight.
+@Test func boldIsAWeightOfItsOwn() {
+    let weights: [Font.Weight] = [.regular, .medium, .semibold, .bold, .heavy]
+    #expect(Set(weights).count == weights.count)
+    #expect(Font(style: .body, weight: .bold, rounded: false) != Font(style: .body, weight: .semibold, rounded: false))
+}

@@ -21,3 +21,22 @@ import TodoCore
     #expect(DesignSystem.Icon(rawValue: "") == nil)
     #expect(DesignSystem.Icon(rawValue: "sun.max") == nil)
 }
+
+/// The lists' sixteen icons read the names the store keeps for them as they did before the chrome's glyphs joined them,
+/// and each of the chrome's ten reads its own name, as every icon does (Lists screen plan, Task 8).
+@Test func everyIconReadsItsOwnNameTheChromesTenAmongThem() {
+    let lists: [String: DesignSystem.Icon] = [
+        "tray": .tray, "sun": .sun, "calendar": .calendar, "week": .week, "logbook": .logbook, "trash": .trash,
+        "briefcase": .briefcase, "house": .house, "hourglass": .hourglass, "pen": .pen, "bag": .bag, "wrench": .wrench,
+        "book": .book, "folder": .folder, "list": .list, "bullets": .bullets,
+    ]
+    let chrome: [String: DesignSystem.Icon] = [
+        "ellipsis": .ellipsis, "plus": .plus, "check": .check, "chevron": .chevron, "grip": .grip,
+        "magnifier": .magnifier, "microphone": .microphone, "newWindow": .newWindow, "checkCircle": .checkCircle,
+        "divider": .divider,
+    ]
+    for (name, icon) in lists.merging(chrome, uniquingKeysWith: { first, _ in first }) {
+        #expect(DesignSystem.Icon(rawValue: name) == icon, "\(name)")
+    }
+    #expect(DesignSystem.Icon.allCases.count == lists.count + chrome.count)
+}
