@@ -1,6 +1,6 @@
 # Plan: The Lists screen
 
-- Status: Approved 2026-10-26, with the owner's word that a decision may move during implementation and be recorded in the task's pull request
+- Status: Approved 2026-10-26, with the owner's word that a decision may move during implementation and be recorded in the task's pull request; Task 8 added on 2026-10-30 at the owner's word, the sidebar renumbered 9
 - Spec: `docs/specs/lists-screen.md`, approved 2026-10-25
 - Epic: #138
 
@@ -39,7 +39,7 @@ from.
 - A user action names the control and the gesture, never what the module does about it (`docs/style.md`); events of the world are named for what happened.
 - Everything from the store is data from outside: no trap, no recursion over data-shaped depth (`docs/style.md`). Every walk over the rows is one pass carrying the depths it has passed, as `TaskViewList.rows(of:)` walks today; an id or a depth a view sends is clamped or ignored, never trusted.
 - The names the tasks add were probed on 2026-10-25 (Verified facts of Tasks 1 and 2); a name a task adds beyond these gets the same probe before it is fixed.
-- The look is the canvas's; where the canvas and the spec differ, the canvas is right about the look and the spec about the behaviour (spec, introduction). The sizes in Tasks 1, 5, 7 and 8 are the canvas's; the type is text styles, whose sizes at the iPhone's default text size are the canvas's but for the large title, 34 pt against 32, and the meta, 12 against 12.5, the owner's choice on #151.
+- The look is the canvas's; where the canvas and the spec differ, the canvas is right about the look and the spec about the behaviour (spec, introduction). The sizes in Tasks 1, 5, 7, 8 and 9 are the canvas's; the type is text styles, whose sizes at the iPhone's default text size are the canvas's but for the large title, 34 pt against 32, and the meta, 12 against 12.5, the owner's choice on #151.
 - Every merge leaves `main` working on every platform: a task that changes a module's model or actions adapts `Apps/Apple` in the same pull request, minimally where the look is a later task's (Tasks 5 and 6), and starts the macOS job from the Actions tab on its branch before asking for the merge (`docs/process.md`, section 10).
 - Tests are swift-testing. A module test opens `makeStore` with the test clock, sends events and compares the model whole. The root package's suite runs green on the host with `swift test` and on wasm32 with `swift test --swift-sdk swift-6.4.0-RELEASE_wasm --disable-xctest`, and `scripts/wasm-size.sh` passes, before every PR; the budget is re-measured where the probe's code moves (Tasks 5 and 6).
 - `Apps/Apple` is built and tested from its directory with the pinned toolchain, and each screen is checked by hand in the iOS 26.3 simulator on an iPhone 17, an iPhone 17 Pro Max turned sideways and an iPad Pro 11-inch (M5), and on the Mac, in both appearances, with screenshots in the pull request (spec, "Testing").
@@ -64,20 +64,28 @@ from.
 | `Sources/TodoCore/Query/Store+Counts.swift` | 3 | `taskCounts(today:)` and its statement |
 | `Tests/TodoCoreTests/ViewTests.swift`, `StoreOpenTests.swift`, `FieldMapTests.swift` | 2, 3 | the fields, the migration, the tree delete |
 | `Tests/TodoCoreTests/DeviceStateTests.swift`, `CountTests.swift` | 2, 3 | new |
+| `Sources/DesignSystem/Icon.swift`, `Font.swift`, `Color.swift`, `Shadow.swift` | 8 | the chrome's glyphs as icons; the bold weight and three fonts; the colour on the accent; the lifted card's shadow |
+| `Sources/DesignSystemComponents/*Model.swift` | 8 | the models of the screen's components, from the icon, the text and the line up to the bar, the picker and the confirmation |
+| `Tests/DesignSystemComponentsTests/IndentModelTests.swift` | 8 | the indent |
 | `Package.swift` | 5 | `TaskViewListFeature` depends on `DesignSystem` and `DesignSystemComponents`, and so do `TaskViewListFeatureTests`, which spell `TileModel(…)` and compare `DesignSystem.Font`, and `AppFeatureTests`, which compare the sidebar's tiles; the feature targets' comment says when a feature imports the two |
-| `Sources/Features/TaskViewList/TaskViewList.swift` | 5, 6 | the module's events |
-| `Sources/Features/TaskViewList/TaskViewList+Model.swift` | 5, 6 | `Model` and its nested types |
+| `Sources/Features/TaskViewList/TaskViewList.swift` | 5, 6, 8 | the module's events (5, 6); `supportsMultipleWindows` (8) |
+| `Sources/Features/TaskViewList/TaskViewList+Model.swift` | 5, 6, 8 | `Model` and its nested types, whose rows, bar and dialogs are component models (8) |
+| `Sources/Features/TaskViewList/TaskViewList+Components.swift` | 8 | the phone's numbers and the builders of the component models |
 | `Sources/Features/TaskViewList/TaskViewList+Rows.swift` | 5, 6 | the walk from the store's tree to the drawn rows, and each list row's tile and title font (5); the root rule and the drop's reading (6) |
-| `Sources/Features/App/AppModule.swift` | 5 | reacts to `newTaskRequested`; hands the sidebar the window's width class |
-| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, `TaskViewListRowsTests.swift`, `TaskViewListEditsTests.swift` | 5, 6 | adapted; the rows; the edits |
-| `Tests/AppFeatureTests/AppModuleTests.swift` | 5, 6 | quick entry from the sidebar and the sidebar's tiles following the width; the open list deleted |
-| `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh` | 5, 6 | the probe drives the new actions; the budget re-measured |
-| `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift` | 5, 6, 8 | adapted to the model (5, 6); deleted (8) |
-| `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsScreen.swift`, `ListRowView.swift`, `AreaLine.swift`, `ListsBottomBar.swift`, `MovePickerSheet.swift`, `ListsDragGesture.swift` | 7 | the phone's screen, rows, lines, bar, picker and drag |
-| `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsSidebar.swift` | 8 | the Mac's and the iPad's sidebar |
-| `Apps/Apple/Sources/TodoAppleUI/RootView.swift` | 7, 8 | the narrow tree draws the screen (7), the wide tree the sidebar (8) |
+| `Sources/Features/App/AppModule.swift` | 5, 8 | reacts to `newTaskRequested`; hands the sidebar the window's width class (5) and whether a window can open beside it (8) |
+| `Tests/TaskViewListFeatureTests/TaskViewListTests.swift`, `TaskViewListRowsTests.swift`, `TaskViewListEditsTests.swift` | 5, 6, 8 | adapted; the rows; the edits |
+| `Tests/TaskViewListFeatureTests/TaskViewListComponentsTests.swift` | 8 | the component models the module builds |
+| `Tests/AppFeatureTests/AppModuleTests.swift` | 5, 6, 8 | quick entry from the sidebar and the sidebar's tiles following the width; the open list deleted |
+| `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh` | 5, 6, 8 | the probe drives the new actions and models; the budget re-measured |
+| `Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift` | 5, 6, 8, 9 | adapted to the model (5, 6, 8); deleted (9) |
+| `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsScreen.swift`, `ListRowView.swift`, `AreaLine.swift`, `ListsBottomBar.swift`, `MovePickerSheet.swift`, `ListsDragGesture.swift` | 7, 8 | the phone's screen, rows, lines, bar, picker and drag (7), drawn from the component models (8) |
+| `Apps/Apple/Sources/TodoAppleUI/DesignSystem/Image+DesignSystem.swift`, `Font+DesignSystem.swift`, `Shadow+DesignSystem.swift`, `TodoApp.swift`, `WindowView.swift` | 8 | the new icons' symbols, the bold weight and the shadow; `supportsMultipleWindows` read and handed to the root |
+| `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsSidebar.swift` | 9 | the Mac's and the iPad's sidebar |
+| `Apps/Apple/Sources/TodoAppleUI/RootView.swift` | 7, 9 | the narrow tree draws the screen (7), the wide tree the sidebar (9) |
 | `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift` | 5, 6 | the model's new shape |
-| `README.md`, `CHANGELOG.md` | every task | the changelog line; the README where behaviour a person sees changes (7, 8) |
+| `Apps/Apple/Tests/TodoAppleUITests/DesignSystemRenderersTests.swift`, `ListsDragTests.swift` | 8 | the new icons' symbols; the drag over the new model |
+| `docs/style.md`, `docs/adr/0007-feature-modules-are-shared-code-and-hosts-live-under-apps.md` | 8 | a view may switch over a component model's enums; the amendment of 2026-10-30 |
+| `README.md`, `CHANGELOG.md` | every task | the changelog line; the README where behaviour a person sees changes (7, 9) |
 
 ## Tasks
 
@@ -90,17 +98,21 @@ from.
 | 5 | #146 | The module's rows: kinds, tiles, counts, folds, areas, new list and area | `feature`, `core`, `ui-apple` | 2, 3 |
 | 6 | #147 | The module's edits: edit mode, delete, Move to… and the drop | `feature`, `core`, `ui-apple` | 5 |
 | 7 | #148 | The Lists screen on iPhone | `feature`, `ui-apple` | 1, 4, 6 |
-| 8 | #149 | The sidebar on the Mac and the iPad | `feature`, `ui-apple` | 7 |
+| 8 | #161 | The Lists screen's component models | `arch`, `core`, `ui-apple` | 7 |
+| 9 | #149 | The sidebar on the Mac and the iPad | `feature`, `core`, `ui-apple` | 8 |
 
 The owner reviews this table and the interface of every task below.
+
+Task 8 was added on 2026-10-30, after Task 7 had shipped, at the owner's word: the design decisions Task 7's views hold move into component models before the sidebar draws them a second time. The sidebar, Task 8 when Tasks 1 to 7 were written, is Task 9; the shipped sections keep the old number.
 
 The split leaves `main` working after every merge. Tasks 1 to 4 touch no
 screen, and all but Task 1, whose test holds its tile colours to Task 2's
 `TaskViewColor`, can run beside each other. Tasks 5 and 6 change the module's
 model and actions, so each adapts `TaskViewListView` in the same pull
 request just far enough that the app compiles and works, with today's
-look; the look arrives in Task 7 for the phone and in Task 8 for the Mac
-and the iPad, where the adapted view goes. Task 4 answers the one
+look; the look arrives in Task 7 for the phone, moves into component
+models in Task 8, and arrives in Task 9 for the Mac and the iPad, where
+the adapted view goes. Task 4 answers the one
 question the spec names as a risk before Task 7 builds on it.
 
 ### Task 1: The design foundations in `TodoAppleUI`
@@ -440,13 +452,113 @@ struct ListsScreen: View { init(model: TaskViewList.Model, send: @escaping (Task
 - `supportsMultipleWindows` is false on iPhone with or without the multiple-scenes declaration (`TaskViewListView`, 2026-10-18).
 - Trap: a `List` cannot be the tree (Task 4); the screen is built on what the spike answered, and if the fallback was taken, the drag changes the order alone and the depth goes through Move to….
 
-### Task 8: The sidebar on the Mac and the iPad
+### Task 8: The Lists screen's component models
+
+**Goal.** Every design decision of the Lists screen moves out of the Apple views into component models in `DesignSystemComponents`, which `TaskViewList` builds, so that the sidebar of Task 9 and every later platform draw the same components and no decision stays behind on one platform (the owner, 2026-10-30). A model describes all its platform needs to render the component; the platform decides only its container, its gestures and the drag, scrolling, focus and Reduce Motion. The screen looks and behaves as Task 7 left it.
+
+**Files.** `Sources/DesignSystem/Icon.swift`, `Font.swift`, `Color.swift`, new `Shadow.swift`; new in `Sources/DesignSystemComponents/`: `IconModel.swift`, `TextModel.swift`, `StrokeModel.swift`, `IndentModel.swift`, `FieldModel.swift`, `ListRowModel.swift`, `AreaLineModel.swift`, `MenuModel.swift`, `ButtonModel.swift`, `SearchFieldModel.swift`, `BarModel.swift`, `DragModel.swift`, `ChoiceModel.swift`, `PickerModel.swift`, `ConfirmationModel.swift`; `Sources/Features/TaskViewList/TaskViewList.swift`, `TaskViewList+Model.swift`, `TaskViewList+Rows.swift`, new `TaskViewList+Components.swift`; `Sources/Features/App/AppModule.swift`; `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh`; the tests of `DesignSystem`, `DesignSystemComponents`, `TaskViewListFeature` (new `TaskViewListComponentsTests.swift`) and `AppFeature`; in `Apps/Apple`, `DesignSystem/Image+DesignSystem.swift`, `Font+DesignSystem.swift`, new `Shadow+DesignSystem.swift`, every file of `ListsScreen/`, `TaskViewListView.swift`, `TodoApp.swift`, `WindowView.swift`, `RootView.swift`, and `DesignSystemRenderersTests.swift`, `ListsDragTests.swift`, `TodoAppTests.swift`; `docs/style.md`; ADR-0007; `CHANGELOG.md`.
+
+**Interface.** Consumes Task 7's views as shipped (31b733c) and the module of Tasks 5 and 6. Every model is plain data, `Equatable` and `Sendable` with a public memberwise `init`, and generic over `Action: Equatable & Sendable` where it carries an action. Produces:
+
+```swift
+// DesignSystem: the chrome's glyphs join the lists' icons, named for what they draw.
+enum DesignSystem.Icon { /* the 16 of Task 1 */ case ellipsis, plus, check, chevron, grip, magnifier, microphone, newWindow, checkCircle, divider }
+enum DesignSystem.Font.Weight { /* … */ case bold }
+extension DesignSystem.Font { static let barLabel, hint, search }       // subheadline semibold, footnote, body
+extension DesignSystem.Color { static let onAccent }                     // white in both appearances
+struct DesignSystem.Shadow { let opacity, radius, y: Double; static let lifted }
+
+// DesignSystemComponents
+struct IconModel { icon: DesignSystem.Icon; size: Double; weight: DesignSystem.Font.Weight; color: DesignSystem.Color }
+struct TextModel { text: String; font: DesignSystem.Font; color: DesignSystem.Color }
+struct StrokeModel { color: DesignSystem.Color; width: Double; dash: [Double] }
+struct IndentModel { start, step: Double; func leading(atDepth depth: Int) -> Double }
+struct FieldModel { text, placeholder: String; font: DesignSystem.Font; color, background: DesignSystem.Color
+                    minimumWidth, height, padding, cornerRadius: Double; ring: StrokeModel }
+struct ListRowModel<Action> {
+    struct Chevron { icon: IconModel; rotation: Double; animation: DesignSystem.Animation; accessibilityLabel: String; action: Action }
+    struct Accessories { count: TextModel; countMinimumWidth: Double; chevron: Chevron?; grip: IconModel?
+                         cellWidth, fadeWidth, endGap, width: Double }
+    height, leading: Double; tile: TileModel; tileToTitle: Double; title: TextModel; field: FieldModel?; need: Double
+    background: DesignSystem.Color; guides, childGuides: [Double]; guide: StrokeModel; accessories: Accessories
+    tap: Action; menu: MenuModel<Action>?
+}
+struct AreaLineModel<Action> { height, leading, trailing, spacing: Double; label: TextModel?; field: FieldModel?
+                               line: StrokeModel; grip: IconModel?; tap: Action; menu: MenuModel<Action>? }
+struct MenuModel<Action> { struct Item { title: String; icon: DesignSystem.Icon; isDestructive: Bool; action: Action }
+                           struct Section { items: [Item] }; sections: [Section] }
+struct ButtonModel<Action> { enum Press { case action(Action), menu(MenuModel<Action>) }
+                             enum Fill { case container, color(DesignSystem.Color) }
+                             icon: IconModel; title: TextModel?; accessibilityLabel: String; fill: Fill; press: Press }
+struct SearchFieldModel { placeholder: TextModel; leadingIcon, trailingIcon: IconModel
+                          trailingCell, spacing, leadingPadding, trailingPadding: Double }
+struct BarModel<Action> { enum Item { case button(ButtonModel<Action>), search(SearchFieldModel), group([ButtonModel<Action>]) }
+                          items: [Item]; controlHeight, spacing, padding, groupButtonHeight, groupButtonSpacing, groupPadding, groupDividerHeight: Double
+                          groupDivider: StrokeModel }
+struct DragModel { struct Slot { height, inset, trailingGap, verticalInset, cornerRadius: Double; fill: DesignSystem.Color; stroke: StrokeModel }
+                   struct Card { raise, scale, rotation: Double; shadow: DesignSystem.Shadow; background: DesignSystem.Color
+                                 grip: IconModel; gripCell, minimumWidth: Double
+                                 listHeight, listInset, listPadding, listTrailingGap, listCornerRadius: Double
+                                 lineHeight, lineInset, lineTrailingGap, lineCornerRadius: Double }
+                   indent: IndentModel; animation: DesignSystem.Animation; slot: Slot; card: Card }
+struct ChoiceModel<Action> { title: String; isDestructive: Bool; action: Action }
+struct PickerModel<Row, Action> {
+    struct TopLevel { icon: IconModel; tileSide, tileCornerRadius: Double; tileColor: DesignSystem.Color; title: TextModel
+                      leading, height: Double; isChecked: Bool; action: Action }
+    struct Option { row: Row; isDisabled, isChecked: Bool }
+    title: String; hint: TextModel; cancel: ChoiceModel<Action>; topLevel: TopLevel; options: [Option]
+    check: IconModel; checkTrailing, hintGap, minimumOptionHeight, disabledOpacity: Double
+}
+struct ConfirmationModel<Action> { title, message: String; confirm, cancel: ChoiceModel<Action> }
+
+// TaskViewList: ListRow, Confirmation and MovePicker go; Row loses its draft, which is the kind's field's text.
+struct TaskViewList.Model { struct Row { id: ViewID; depth: Int; kind: Kind }
+                            enum Kind { case area(AreaLineModel<UserAction>), list(ListRowModel<UserAction>) }
+                            rows: [Row]; selection, renaming: ViewID?; isEditing: Bool; bar: BarModel<UserAction>; drag: DragModel
+                            confirmation: ConfirmationModel<UserAction>?; movePicker: PickerModel<Kind, UserAction>?; problem: String? }
+TaskViewList.init(store: Store, route: Route, width: WindowWidth, supportsMultipleWindows: Bool) throws(StoreError)
+AppModule.init(store: Store, route: Route = .default, width: WindowWidth, supportsMultipleWindows: Bool) throws(StoreError)
+```
+
+**Rules.**
+
+- A model holds every value its platform needs to draw its component: each size, gap, radius and line in points, each colour, font, icon, animation and shadow as a token of the design system, each word as finished text, and each control's action as a value. A view reads them and decides nothing but what is the platform's (the owner, 2026-10-30): on iOS the glass under the bar's controls with its hairline and shadow, the sheet and the alert, the fades under the status bar and over the bar, the long press and the drag, the sideways scroll with its pinned accessories and the scroll to an open field, focus, and Reduce Motion, which passes `nil` for every animation a model gives. The glass or a toolbar is the platform's choice, and `ButtonModel.Fill.container` says a control stands on it.
+- `DesignSystemComponents` knows no domain and no screen, and depends on `DesignSystem` alone. `TaskViewList` builds every model in `TaskViewList+Components.swift` with the numbers Task 7's views hold today (Verified facts); for a wide window it builds the same models with the sidebar's tiles and fonts, as now, and Task 9 gives them the sidebar's numbers.
+- Every word the screen shows or reads aloud is the model's, in English: the placeholders "Title", "Area name" and "Search", the menus' items, the bar's labels and accessibility labels, "Top level", "Choose where it goes.", "Cancel", "Delete", "Expand" and "Collapse".
+- The menus come from the module, one per row kind: a list's Rename, New List, Open in New Window, Move to… and, after a divider, Delete; a line's Rename, New List and, after a divider, Delete Area. In edit mode no row has a menu, every row and line has a grip, and the counts are empty; `isEditing` stays for the drag alone. Open in New Window is in the menu only where `supportsMultipleWindows`, which `WindowView` reads from SwiftUI's environment and hands `makeWindow`, the root and the module when the window is made; it does not change while the app runs.
+- The picker's options are the tree's rows of the same kinds, built as the screen's but with no menu, no count, no chevron, no grip and no highlight, and with `movePickerRowTapped` as their tap; "Top level" is its own model, as the canvas draws it apart.
+- `renaming` names the row whose field is open, and nil when none is, and the screen scrolls to it instead of searching the rows (the owner's 👍 on #160's thread r4415002151).
+- The drag stays the platform's (the owner, 2026-10-30): `ListsDrag`, with the lifted block, the slot's place and depth and an area's slots, stays in `TodoAppleUI`. It reads the indent from `model.drag.indent`, a slot's guides from the row before it (`childGuides`), and draws `DragModel.Slot` and `DragModel.Card`.
+- The field's four actions stay the field view's to send, as today: `titleFieldChanged` carries the typed text, and a closure that makes one is no value a model can hold.
+- A view may switch over a component model's enums too, every case drawn and no `default`: `ButtonModel.Press`, `ButtonModel.Fill` and `BarModel.Item`. `docs/style.md`, "Views", says so in this pull request, and ADR-0007 gains an amendment of 2026-10-30 for the rule of the first bullet.
+- No user action, event or route changes. A chrome icon's name read from the store reads as that glyph, as every icon's name reads as its own; nothing writes one. The sentence (`problem`) stays a string drawn in the strip that every module's sentence shares, whose look is out of this task.
+
+**Tests.**
+
+- `DesignSystemTests`: the new icons, with the lists' icons still reading the store's names as before; the bold weight; the three fonts; `onAccent`; `Shadow.lifted`. `IndentModelTests`: the leading at depths 0, 1 and 13.
+- `TaskViewListComponentsTests`: a root and a nested list's row whole with the phone's numbers; a branch folded and unfolded (the chevron's rotation and label); an area's line unnamed, named, renaming and in edit mode; the menus of a list and a line with and without `supportsMultipleWindows`, and none in edit mode; the bar in and out of edit mode; the picker and the confirmation whole; `renaming`. The other feature and app tests are adapted to the shape and assert what they asserted.
+- `DesignSystemRenderersTests`: every new icon's symbol exists and the bold weight renders. `ListsDragTests` over the new model; `TodoAppTests` as Task 7 left them unless the shape forces a change.
+- The probe drives the new models, and the budget is re-measured.
+- By hand: the states of Task 7's screenshots page retaken on an iPhone 17 in both appearances, compared with those of 31b733c; any difference is named in the pull request.
+
+**Verified facts and traps.**
+
+- The fifteen names of `DesignSystemComponents` above were probed free on 2026-10-30 against SwiftUI, Foundation and Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1.
+- The new icons' SF Symbols, found in `name_availability.plist` on 2026-10-30 from the 2019, 2020 and 2021 releases: `ellipsis`, `plus`, `checkmark`, `chevron.down`, `line.3.horizontal`, `magnifyingglass`, `mic`, `macwindow.badge.plus`, `checkmark.circle`, `rectangle.split.1x2`. Rename keeps `pen` ("pencil"), Move to… `folder`, Delete `trash` and the "+" menu's New List `list` ("checklist").
+- Task 7's numbers, read from its views on 2026-10-30: a row 46 high, its tile at 20 + 22 × depth, 12 to the title, its need 140 of title and 72 of accessories (a fade of 10, a count of at least 20, the chevron's cell of 36, 4 at the end and 2 to spare, and the grip's cell of 36 more in edit mode), the chevron 13 semibold in ink2 turned −90° when folded, the grip 18 in ink3, guides 1.5 in the line colour, the selected row on the fill colour; the row's field 34 high, padding 10, radius 10, the surface with a 2 pt accent ring; an area's line 17 alone and 36 labelled, 20 in, 12 after the grip or 20, 10 between its parts, its field 160 by 28, padding 8, radius 8; the bar's controls 48, 10 apart and 16 in, their glyphs 20 semibold (Done's bold) in ink or `onAccent`, the search's glyphs 17 with the microphone in a 36 cell and 15 and 6 of padding, the group's buttons 40 high, a plus 6 before the word in `barLabel` in the accent, with 4 of padding and a 1 by 22 divider; the slot 52 with 44 drawn, 6 before its tile, 12 short of the edge, radius 13, the accent's soft fill, a 1.5 accent stroke dashed 5 and 4; the card raised 6, scaled 1.03, turned −1.5°, the lifted shadow (22 %, 18, 10), a list's 50 high, 2 before its tile, 12 of padding, a 40 grip cell in ink2, 6 short of the edge, radius 14, at least 120 wide, a line's 36 high, 8 in, 16 short, radius 12; the picker's check 15 bold in the accent 20 from the edge, "Top level" a 15 divider glyph in ink2 on a 30 tile of the fill colour with radius 8, a line's option at least 36 high, a disabled option at 35 %, the hint in ink2 8 above the rows; the lift, the release and a move of the slot on the popover's motion.
+- The container's values stay in the views: the glass is the regular material with a hairline of ink at 8 % and 0.5 pt and a shadow of black at 12 %, radius 12 and 5 down, under every control of the bar; the fades are 4 pt under the status bar, paper to 55 %, and 52 pt over the bar, paper from 72 %.
+- `supportsMultipleWindows` is false on iPhone with or without multiple scenes, and true on the Mac and on the iPad with the declaration (`TaskViewListView`, 2026-10-18).
+- The wasm probe measured 6,605,560 bytes against a budget of 6,881,280 at Task 6.
+- Trap: the edit bar's plus is a glyph of 15 pt where Task 7 sized it by the label's text style; the two are the same at the default text size, and the plus no longer grows with a larger one. Named in the pull request.
+- Trap: `Color.resolve(in:)` on a dynamic `NSColor` hangs `swift test` off the main actor (Task 1); a renderer's test resolves on the main actor.
+
+### Task 9: The sidebar on the Mac and the iPad
 
 **Goal.** The wide window's sidebar as the canvas's Mac board, with the phone's gestures on the iPad; the adapted `TaskViewListView` goes (spec section 8).
 
-**Files.** New `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsSidebar.swift`; `RootView.swift`; `TaskViewListView.swift` deleted; `README.md`; `CHANGELOG.md`.
+**Files.** New `Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsSidebar.swift`; `RootView.swift`; `TaskViewListView.swift` deleted; `Sources/Features/TaskViewList/TaskViewList+Components.swift` and `TaskViewListComponentsTests.swift`, the sidebar's numbers; `README.md`; `CHANGELOG.md`.
 
-**Interface.** Consumes Task 7's views. Produces:
+**Interface.** Consumes Task 7's views and Task 8's component models. Produces:
 
 ```swift
 struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) }
@@ -455,10 +567,11 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
 
 **Rules.**
 
+- The sidebar's numbers below are the module's, built for the wide width into Task 8's models, and its views draw them and decide only what Task 8 leaves the platform. What the Mac lacks, edit mode, "…" and the edit items, reaches the module as `supportsMultipleWindows` does, so the menus and the bar come built for it.
 - The column: `navigationSplitViewColumnWidth(min: 280, ideal: 280)`; rows 30 pt, radius 7, the tile through `ListTile(row.tile)`, which the module built at the canvas's 20, 6 and 13, the title in `Font(row.titleFont)`, which the module chose for the wide window and which renders at the system's sidebar size, the count ink2 and the disclosure chevron at the right, pinned while the tree scrolls sideways past a title of 90 pt (`Mac.dc.html`); an area's line 15 pt alone and 28 pt while renaming, its name always on it when it has one (the spec over the Mac board's hover).
 - At the bottom: the search field, 30 pt, in the fill colour, inert; a 30 pt round "+" in the accent, a `Menu` with New task, `⌘N`, New list, `⇧⌘N`, and New area, the shortcuts through `keyboardShortcut`. The toolbar's New Folder is gone; the list's Quick Entry button stays.
 - The drag at any time, with the line-and-circle indicator for a drop between rows and into a parent, sending the same `rowDropped`.
-- The one platform condition, `#if os(macOS)`: the Mac's right click opens the menus, Rename, New list, Open in New Window, Move to…, Delete on a list and Rename, New list, Delete area on a line, and the Mac has no edit mode, no "…" and no edit items; on the iPad the long press opens the menus, "…" holds Edit, and the bar of Task 7 stands at the bottom of the column with edit mode as on the phone (spec section 8). Open in New Window where `supportsMultipleWindows`.
+- The one platform condition, `#if os(macOS)`: the Mac's right click opens the menus, Rename, New list, Open in New Window, Move to…, Delete on a list and Rename, New list, Delete area on a line, and the Mac has no edit mode, no "…" and no edit items; on the iPad the long press opens the menus, "…" holds Edit, and the bar of Tasks 7 and 8 stands at the bottom of the column with edit mode as on the phone (spec section 8). Open in New Window where `supportsMultipleWindows`.
 - A Plus or Max iPhone turned sideways reports the regular class and gets this sidebar, as it gets the split view today; nothing here reads the device.
 - The sidebar's sentence under the rows, and on the pane while the column is hidden, as today.
 
@@ -472,8 +585,8 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
 
 ## Self-review against the spec
 
-- Problem and goals: Tasks 5 to 8 replace the scaffold; the non-goals have no task, the badge included.
-- Section 1: Task 5 draws the rows and lines, Task 7 the screen, Task 8 the sidebar; Logbook and Trash stand where the seed ranks them, nothing names them. Section 2: Task 2. Section 3: Task 5's placements and the area's name, Task 6's root rule and the area's deletion. Section 4: Task 3's counts and Task 5's reread; the badge is out of the epic. Section 5: Task 5's model and Task 6's dialogs and drop; the route unchanged; the folds in Task 2's table through Task 5. Section 6: Tasks 5 and 6. Section 7: Task 4's spike, Task 6's edit mode and area drop, Task 7's screen. Section 8: Task 8. Section 9: Task 1, and Task 5's tiles and title fonts. Section 10: every row has a task. Testing: each task's tests and hand checks. Risks: the drag is Task 4; the wide tree is Task 7's sideways scroll; the counts' cost is Task 3's measurement; midnight is accepted; the area's two writes are Task 6; the marked text is the field's as today; a deleted Inbox leaves quick entry to say so, as today; the wasm budget is Tasks 5 and 6.
+- Problem and goals: Tasks 5 to 9 replace the scaffold; the non-goals have no task, the badge included.
+- Section 1: Task 5 draws the rows and lines, Task 7 the screen, Task 9 the sidebar; Logbook and Trash stand where the seed ranks them, nothing names them. Section 2: Task 2. Section 3: Task 5's placements and the area's name, Task 6's root rule and the area's deletion. Section 4: Task 3's counts and Task 5's reread; the badge is out of the epic. Section 5: Task 5's model and Task 6's dialogs and drop; the route unchanged; the folds in Task 2's table through Task 5. Section 6: Tasks 5 and 6. Section 7: Task 4's spike, Task 6's edit mode and area drop, Task 7's screen. Section 8: Task 9. Section 9: Task 1, Task 5's tiles and title fonts, and Task 8's component models. Section 10: every row has a task. Testing: each task's tests and hand checks. Risks: the drag is Task 4; the wide tree is Task 7's sideways scroll; the counts' cost is Task 3's measurement; midnight is accepted; the area's two writes are Task 6; the marked text is the field's as today; a deleted Inbox leaves quick entry to say so, as today; the wasm budget is Tasks 5 and 6.
 - Deviations, each the engineer's call, for the owner's review:
   - A new list is not declared over the sidebar when it is made: today's folder declares its list, and on a narrow window that would push the list over the sidebar while the name field is open. The field opens; the highlight stays.
   - `taskCounts(today:)` where the spec says `counts(today:)`, since the number is a count of tasks; `countStatement` beside `viewStatement` so that the plan test explains the statement itself.
@@ -481,5 +594,5 @@ struct ListsSidebar: View { init(model: TaskViewList.Model, send: @escaping (Tas
   - The drop's depth is clamped to what the rows allow, since the view's slot offers only those and the module trusts nothing a view sends.
   - A fold whose device-state write fails stays folded and says nothing: the fold is on screen, the next fold writes the set again, and the module's sentences stay for the data a person edits.
   - A list with no colour draws stone's tile colour; the canvas gives a new list blue, the spec gives it none, and the spec wins for the behaviour while the look of "none" is stone's, which the module picks as it picks the bullets glyph for no icon (Task 5).
-  - The foundations come before their callers, as the spec orders the epic; the pull request names Task 5, which builds the tiles and chooses the fonts, and Tasks 7 and 8, which draw them.
+  - The foundations come before their callers, as the spec orders the epic; the pull request names Task 5, which builds the tiles and chooses the fonts, and Tasks 7 and 9, which draw them.
   - `TaskViewListView` is adapted twice before the look arrives, as the navigation plan adapted the root view, so that every merge works.
