@@ -1,16 +1,75 @@
 import Testing
 import TestSupport
+import DesignSystem
+import DesignSystemComponents
 import SQLiteKit
 import TaskViewListFeature
 import TodoCore
+
+private typealias Option = PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>.Option
 
 /// The areas' labels a model draws, in order, read off its rows' kinds: a name, "Area" in edit mode for an unnamed
 /// area, and nil for an unnamed area's line outside it.
 private func areaLabels(in model: TaskViewList.Model) -> [String?] {
     model.rows.compactMap { row in
-        guard case .area(let label) = row.kind else { return nil }
-        return .some(label)
+        guard case .area(let line) = row.kind else { return nil }
+        return .some(line.label?.text)
     }
+}
+
+/// The id of the row an option of the picker offers, read off the tap it sends, which is all a view knows of it.
+private func id(of option: Option) -> ViewID? {
+    let tap = switch option.row {
+    case .area(let line): line.tap
+    case .list(let list): list.tap
+    }
+    guard case .movePickerRowTapped(let id) = tap else { return nil }
+    return id
+}
+
+/// How a row of the tree looks with no control on it and nothing of a person's session: its kind, its title or its
+/// label, its tile and title font, where it starts and what it stands on. The picker draws each row as the screen draws
+/// it, so an option looks as the screen's row of the same id does.
+private struct Look: Equatable {
+    let title: String?
+    let tile: TileModel?
+    let font: DesignSystem.Font?
+    let leading: Double
+    let background: DesignSystem.Color?
+
+    init(_ kind: TaskViewList.Model.Kind) {
+        switch kind {
+        case .area(let line):
+            title = line.label?.text
+            tile = nil
+            font = line.label?.font
+            leading = line.leading
+            background = nil
+        case .list(let list):
+            title = list.title.text
+            tile = list.tile
+            font = list.title.font
+            leading = list.leading
+            background = list.background
+        }
+    }
+}
+
+/// The picker's options as a view reads them, each the id it offers and how it looks, to hold beside the screen's rows.
+private func offered(_ options: [Option]?) -> [(ViewID?, Look)]? {
+    options?.map { (id(of: $0), Look($0.row)) }
+}
+
+/// The screen's rows as the picker offers them, each its id and how it looks.
+private func offered(_ rows: [TaskViewList.Model.Row]) -> [(ViewID?, Look)] {
+    rows.map { ($0.id, Look($0.kind)) }
+}
+
+/// Whether the picker offers the rows the screen draws, in the same order and looking the same.
+private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Row]) -> Bool {
+    guard let options = offered(options) else { return false }
+    let drawn = offered(rows)
+    return options.count == drawn.count && zip(options, drawn).allSatisfy { $0.0 == $1.0 && $0.1 == $1.1 }
 }
 
 /// Edit mode, from "…", takes the counts off the rows and shows a label on every area, "Area" standing in for a missing
@@ -23,24 +82,24 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let unnamed = try store.createView(NewTaskView(title: "", kind: .area))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
-    #expect(listRow(inbox, in: list.model)?.countText == "1", "the Inbox counts its task; this is the setup")
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    #expect(listRow(inbox, in: list.model)?.accessories.count.text == "1", "the Inbox counts its task; this is the setup")
     #expect(areaLabels(in: list.model) == ["Work", nil])
     #expect(list.send(.action(.editMenuItemChosen)) == nil)
     #expect(list.model.isEditing)
-    #expect(list.model.rows.compactMap { listRow($0)?.countText } == Array(repeating: "", count: 6))
+    #expect(list.model.rows.compactMap { listRow($0)?.accessories.count.text } == Array(repeating: "", count: 6))
     #expect(areaLabels(in: list.model) == ["Work", "Area"])
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, unnamed])
     #expect(list.send(.action(.rowSelected(clients))) == nil)
     #expect(list.destination.pushed == .init(head: inbox), "no list declared")
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = reference.send(.action(.editMenuItemChosen))
     _ = reference.send(.action(.renameMenuItemChosen(clients)))
     #expect(list.model == reference.model)
-    #expect(try rowBeingNamed(in: list.model).draft == "Clients")
+    #expect(draft(of: try rowBeingNamed(in: list.model)) == "Clients")
     #expect(list.send(.action(.rowSelected(unnamed))) == nil)
     #expect(try rowBeingNamed(in: list.model).id == unnamed, "an area's line opens its field too")
-    #expect(try rowBeingNamed(in: list.model).draft == "")
+    #expect(draft(of: try rowBeingNamed(in: list.model)) == "")
     #expect(list.destination.pushed == .init(head: inbox))
 }
 
@@ -50,7 +109,7 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
 @Test func doneKeepsTheOpenNameAndLeavesEditMode() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     let before = list.model
     #expect(list.send(.action(.editMenuItemChosen)) == nil)
     #expect(list.send(.action(.doneButtonTapped)) == nil)
@@ -62,14 +121,14 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
     #expect(try store.view(BuiltInTaskViews.today)?.title == "Tomorrow")
     #expect(list.model == (try sidebarOn(inbox, in: store)))
     #expect(!list.model.isEditing)
-    #expect(listRow(inbox, in: list.model)?.countText == "1")
+    #expect(listRow(inbox, in: list.model)?.accessories.count.text == "1")
 }
 
 /// A name refused by Done keeps the field open on what was typed, as Return's refusal does, and edit mode with it,
 /// since the person is mid-word; the next Done with a name settles both.
 @Test func aRefusedNameKeepsEditMode() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     let written = try store.journal(after: 0).count
     _ = list.send(.action(.editMenuItemChosen))
     _ = list.send(.action(.rowSelected(BuiltInTaskViews.today)))
@@ -77,9 +136,9 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
     #expect(list.send(.action(.doneButtonTapped)) == nil)
     #expect(list.model.isEditing)
     #expect(list.model.problem == "A title cannot be empty.")
-    #expect(try rowBeingNamed(in: list.model).draft == " ")
+    #expect(draft(of: try rowBeingNamed(in: list.model)) == " ")
     #expect(try store.journal(after: 0).count == written)
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = reference.send(.action(.editMenuItemChosen))
     _ = reference.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
     _ = reference.send(.action(.titleFieldChanged(" ")))
@@ -95,7 +154,7 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
 /// draft away for the stored title. A tap on another row moves the field, as the Rename menu item does.
 @Test func anEditModeTapOnTheRowBeingRenamedMovesNothing() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.editMenuItemChosen))
     _ = list.send(.action(.rowSelected(BuiltInTaskViews.today)))
     _ = list.send(.action(.titleFieldChanged("Tomor")))
@@ -110,7 +169,7 @@ private func areaLabels(in model: TaskViewList.Model) -> [String?] {
     #expect(list.model == refused)
     #expect(list.send(.action(.rowSelected(inbox))) == nil)
     #expect(try rowBeingNamed(in: list.model).id == inbox)
-    #expect(try rowBeingNamed(in: list.model).draft == "Inbox")
+    #expect(draft(of: try rowBeingNamed(in: list.model)) == "Inbox")
 }
 
 /// The sentence a write the store refuses reads as, the module's one sentence for every refusal of a write.
@@ -123,7 +182,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
     try store.createView(NewTaskView(title: "Home", parent: projects))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     let before = list.model
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.deleteMenuItemChosen(projects))) == nil)
@@ -149,7 +208,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     try store.createView(NewTaskView(title: "Contracts", parent: acme))
     try store.createView(NewTaskView(title: "Billing", parent: clients))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.disclosureTapped(acme)))
     let asked: [(ViewID, String, String)] = [
         (errands, "Delete “Errands”?", "No task is deleted."),
@@ -174,7 +233,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
     let errands = try store.createView(NewTaskView(title: "Errands"))
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.renameMenuItemChosen(garden)))
     _ = list.send(.action(.titleFieldChanged("Allotment")))
     #expect(list.send(.action(.deleteMenuItemChosen(projects))) == nil)
@@ -201,7 +260,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let chores = try store.createView(NewTaskView(title: "Chores", parent: unnamed))
     let later = try store.createView(NewTaskView(title: "Later", kind: .area))
     let someday = try store.createView(NewTaskView(title: "Someday", parent: later))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
 
     #expect(list.send(.action(.deleteMenuItemChosen(unnamed))) == nil)
     #expect(list.model.confirmation?.title == "Delete the area?")
@@ -233,7 +292,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let billing = try store.createView(NewTaskView(title: "Billing", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     #expect(list.send(.action(.deleteMenuItemChosen(errands))) == nil)
     try store.delete(view: errands)
     #expect(list.send(.action(.deleteConfirmed)) == nil)
@@ -264,7 +323,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     }
     let store = try makeStore()
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     refusingAName(list)
     #expect(list.send(.action(.deleteMenuItemChosen(errands))) == nil)
     let gone = try changeSet(of: store) { _ = try store.apply(deleted(errands, true, at: 1_800_000_000_000)) }
@@ -273,7 +332,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     #expect(list.send(.changed(back)) == nil)
     #expect(list.model.rows.map(\.id).contains(errands), "the list is back; without it this proves nothing")
     #expect(list.model.confirmation == nil)
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     refusingAName(reference)
     #expect(list.model == reference.model)
 
@@ -288,8 +347,10 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
 
 /// Move to… opens the picker over the whole tree in tree order, each row drawn as the screen draws it with nothing
 /// highlighted, the list being moved and every list inside it greyed out, and its present parent marked: a list, an
-/// area's line, or "Top level" for a list of the root (Lists screen spec, section 6). Its rows follow the width and
-/// edit mode as the screen's do. Asking writes nothing, and on an area or a row that is not there it opens nothing.
+/// area's line, or "Top level" for a list of the root (Lists screen spec, section 6). Its rows follow the width as the
+/// screen's do, and in edit mode an unnamed area's line stands alone in it, where the screen labels it (the owner's
+/// answer on #160, thread r4415002540). Asking writes nothing, and on an area or a row that is not there it opens
+/// nothing.
 @Test func movePickerShowsTheWholeTreeWithTheListAndItsSubtreeDisabledAndItsParentCurrent() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk"))
@@ -300,35 +361,37 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let errands = try store.createView(NewTaskView(title: "Errands"))
     let work = try store.createView(NewTaskView(title: "", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     let before = list.model
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.moveToMenuItemChosen(home))) == nil)
     let picker = try #require(list.model.movePicker)
     #expect(picker.title == "Move “Home” to…")
-    #expect(!picker.isTopLevelCurrent)
-    #expect(picker.rows.map(\.row) == (try sidebarOn(ViewID(), in: store)).rows, "the screen's rows, nothing lit")
-    #expect(picker.rows.filter(\.isDisabled).map(\.id) == [home, garden])
-    #expect(picker.rows.filter(\.isCurrent).map(\.id) == [projects])
+    #expect(!picker.topLevel.isChecked)
+    #expect(offersTheRows(picker.options, of: (try sidebarOn(ViewID(), in: store)).rows), "the screen's rows, nothing lit")
+    #expect(picker.options.filter(\.isDisabled).map(id(of:)) == [home, garden])
+    #expect(picker.options.filter(\.isChecked).map(id(of:)) == [projects])
     #expect(list.model.rows == before.rows)
     #expect(try store.journal(after: 0).count == written)
     #expect(list.send(.action(.movePickerCancelled)) == nil)
     #expect(list.model == before)
 
     _ = list.send(.action(.moveToMenuItemChosen(errands)))
-    #expect(list.model.movePicker?.isTopLevelCurrent == true)
-    #expect(list.model.movePicker?.rows.filter(\.isCurrent).isEmpty == true)
-    #expect(list.model.movePicker?.rows.filter(\.isDisabled).map(\.id) == [errands])
+    #expect(list.model.movePicker?.topLevel.isChecked == true)
+    #expect(list.model.movePicker?.options.filter(\.isChecked).isEmpty == true)
+    #expect(list.model.movePicker?.options.filter(\.isDisabled).map(id(of:)) == [errands])
     _ = list.send(.action(.movePickerCancelled))
     _ = list.send(.action(.moveToMenuItemChosen(clients)))
     #expect(list.model.movePicker?.title == "Move “Clients” to…")
-    #expect(list.model.movePicker?.isTopLevelCurrent == false)
-    #expect(list.model.movePicker?.rows.filter(\.isCurrent).map(\.id) == [work], "an area's line is a parent too")
+    #expect(list.model.movePicker?.topLevel.isChecked == false)
+    #expect(list.model.movePicker?.options.filter(\.isChecked).map(id(of:)) == [work], "an area's line is a parent too")
     _ = list.send(.widthChanged(.wide))
     _ = list.send(.action(.editMenuItemChosen))
-    let wide = try TaskViewList(store: store, route: .init(list: .init(head: ViewID())), width: .wide)
-    _ = wide.send(.action(.editMenuItemChosen))
-    #expect(list.model.movePicker?.rows.map(\.row) == wide.model.rows, "the sidebar's tiles, no counts and the area's label")
+    let wide = try TaskViewList(store: store, route: .init(list: .init(head: ViewID())), width: .wide, supportsMultipleWindows: false)
+    #expect(
+        offersTheRows(list.model.movePicker?.options, of: wide.model.rows),
+        "the sidebar's tiles, and the unnamed area's line alone, as the screen draws it outside edit mode"
+    )
     _ = list.send(.action(.movePickerCancelled))
 
     let shown = list.model
@@ -347,12 +410,12 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     try store.createView(NewTaskView(title: "Garden", parent: home))
     let errands = try store.createView(NewTaskView(title: "Errands"))
     let unfolded = try sidebarOn(ViewID(), in: store).rows
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.disclosureTapped(home)))
     _ = list.send(.action(.disclosureTapped(projects)))
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "both folded; this is the setup")
     #expect(list.send(.action(.moveToMenuItemChosen(errands))) == nil)
-    #expect(list.model.movePicker?.rows.map(\.row) == unfolded)
+    #expect(offersTheRows(list.model.movePicker?.options, of: unfolded))
 }
 
 /// A tap on a list in the picker moves the list being moved under it, last among the lists there, unfolds it so that
@@ -367,7 +430,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let errands = try store.createView(NewTaskView(title: "Errands"))
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.disclosureTapped(projects)))
     _ = list.send(.action(.moveToMenuItemChosen(errands)))
     #expect(list.send(.action(.movePickerRowTapped(projects))) == nil)
@@ -396,14 +459,14 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     let home = try store.createView(NewTaskView(title: "Home", kind: .area))
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.moveToMenuItemChosen(acme)))
     #expect(list.send(.action(.movePickerRowTapped(nil))) == nil)
     #expect(list.model.rows.map(\.id) == builtIns + [errands, acme, work, clients, home, garden])
     #expect(try store.view(acme)?.parent == nil)
     #expect(list.model == (try sidebarOn(inbox, in: store)))
     _ = list.send(.action(.moveToMenuItemChosen(acme)))
-    #expect(list.model.movePicker?.isTopLevelCurrent == true, "this is the setup")
+    #expect(list.model.movePicker?.topLevel.isChecked == true, "this is the setup")
     #expect(list.send(.action(.movePickerRowTapped(nil))) == nil)
     #expect(list.model == (try sidebarOn(inbox, in: store)), "where it was, and nothing said")
     #expect(list.model.rows.map(\.id) == builtIns + [errands, acme, work, clients, home, garden])
@@ -412,7 +475,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     for id in builtIns { try bare.delete(view: id) }
     let area = try bare.createView(NewTaskView(title: "Work", kind: .area))
     let inside = try bare.createView(NewTaskView(title: "Clients", parent: area))
-    let alone = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow)
+    let alone = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = alone.send(.action(.moveToMenuItemChosen(inside)))
     #expect(alone.send(.action(.movePickerRowTapped(nil))) == nil)
     #expect(alone.model.rows.map(\.id) == [inside, area])
@@ -426,7 +489,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.moveToMenuItemChosen(projects)))
     let picking = list.model
     let written = try store.journal(after: 0).count
@@ -442,7 +505,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
 @Test func aBuiltInMovesAndDeletesLikeAnyList() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.moveToMenuItemChosen(BuiltInTaskViews.logbook)))
     #expect(list.model.movePicker?.title == "Move “Logbook” to…")
     #expect(list.send(.action(.movePickerRowTapped(work))) == nil)
@@ -461,7 +524,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
 @Test func aDialogActionWithNoDialogUpMovesNothing() throws {
     let store = try makeStore()
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     refusingAName(list)
     let written = try store.journal(after: 0).count
     let confirmations: [TaskViewList.UserAction] = [.deleteConfirmed, .deleteCancelled]
@@ -494,7 +557,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     _ = list.send(.action(.moveToMenuItemChosen(errands)))
     try store.delete(view: projects)
     #expect(list.send(.action(.movePickerRowTapped(projects))) == nil)
@@ -537,7 +600,7 @@ private struct Tree {
 
     /// A sidebar made on the tree, on no list.
     func sidebar() throws -> TaskViewList {
-        try TaskViewList(store: store, route: .init(list: nil), width: .narrow)
+        try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     }
 
     /// The lists and areas a parent holds in the store, in rank order, nil for the root's.
@@ -572,7 +635,7 @@ private struct Tree {
     _ = list.send(.action(.disclosureTapped(tree.home)))
     #expect(list.send(.action(.rowDropped(tree.errands, after: tree.home, depth: 1))) == nil)
     #expect(try tree.children(of: tree.projects) == [tree.home, tree.errands, tree.office])
-    #expect(listRow(tree.home, in: list.model)?.isCollapsed == true, "the fold stays")
+    #expect(isFolded(tree.home, in: list.model) == true, "the fold stays")
     #expect(list.model == (try sidebarOn(inbox, in: tree.store)))
 }
 
