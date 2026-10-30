@@ -112,8 +112,9 @@ private func chevron(of id: ViewID, in model: TaskViewList.Model) -> ListRowMode
 }
 
 /// An area's line whole as the phone draws it, but for what a test spells: its height, how far short of the edge it
-/// ends, its label, the text of its field where one is open, whether it has the grip, 18 pt in ink3, and its menu. It starts 20 in, its parts 10 apart, the label in the area
-/// label's font in ink2, the line 1 pt in the line colour, and a tap on it is sent as the row's selection.
+/// ends, its label, the text of its field where one is open, whether it has the grip, 18 pt in ink3, and its menu. It
+/// starts 20 in, its parts 10 apart, the label in the area label's font in ink2, the line 1 pt in the line colour, and
+/// a tap on it is sent as the row's selection.
 private func phoneLine(
     _ id: ViewID, height: Double, trailing: Double, label: String?, fieldText: String?, hasGrip: Bool,
     menu: MenuModel<Action>?

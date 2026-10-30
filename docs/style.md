@@ -98,7 +98,9 @@ value a peer wrote is as arbitrary as one a person typed.
   nothing.** Every `if` in it is over a `Bool` or an optional of the
   model, and every string about the data arrives finished from its
   module. Its own labels, a button's title or an empty pane's
-  placeholder, are its vocabulary, localised by the platform. It keeps
+  placeholder, are its vocabulary, localised by the platform, where no
+  component's model gives them: a component's model carries its own
+  words (ADR-0007, amendment of 2026-10-30). It keeps
   only what only it can know, such as focus, scroll, hover, the
   window's width, which it reports (below), or a drag in progress.
   (ADR-0006, spec section 2)

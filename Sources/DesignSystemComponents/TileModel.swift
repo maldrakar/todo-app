@@ -9,7 +9,7 @@ import DesignSystem
 /// the glyph's weight is the tile's own style.
 ///
 /// `TileModel` was the module's first top-level name, probed free as `DesignSystem` was: unresolved in a file importing
-/// SwiftUI, Foundation and Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-10-26). The fourteen
+/// SwiftUI, Foundation and Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-10-26). The fifteen
 /// beside it were probed the same way on 2026-10-30.
 public struct TileModel: Equatable, Sendable {
     /// The glyph on the tile: its icon, size and weight.

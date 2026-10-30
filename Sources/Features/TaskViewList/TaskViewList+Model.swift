@@ -30,8 +30,8 @@ extension TaskViewList {
         ///
         /// Indirect, so that a row and an option of the picker hold a reference to the component's model, about a
         /// kilobyte on wasm32, and not the model itself, which every comparison and every copy of a row would put on
-        /// the stack: a debug build gives each copy a slot of its own, and the wasm32 stack is 64 KiB (Lists screen
-        /// plan, Task 8).
+        /// the stack: a debug build gives each copy a slot of its own, and a whole-model comparison overflowed the
+        /// wasm32 stack, 64 KiB, when measured (#161).
         public indirect enum Kind: Equatable, Sendable {
             /// An area's line, labelled with its name, and with none for an unnamed area, the line alone being the
             /// whole of how it looks (spec section 3), but in edit mode, where its label is "Area", the label a tap
@@ -76,7 +76,8 @@ extension TaskViewList {
 
         /// Whether the screen is in edit mode, entered from "…" and left with Done (spec section 7). What edit mode
         /// draws, every row and line with a grip, the counts empty, no menus, the labels it gives and its bar, is in
-        /// the rows' and the bar's models already, so a view reads this for the drag alone, which only edit mode has.
+        /// the rows' and the bar's models already, so a view reads this for the drag, which only edit mode has, and the
+        /// wide window's toolbar reads it for its Edit and Done until the sidebar's task deletes that view.
         /// It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
         public let isEditing: Bool
 

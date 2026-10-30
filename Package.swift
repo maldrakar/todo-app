@@ -127,7 +127,7 @@ let package = Package(
             name: "AppFeatureTests",
             dependencies: [
                 "AppFeature", "FeatureModule", "TaskViewListFeature", "TaskListFeature", "TaskScreenFeature",
-                "QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport", "DesignSystemComponents",
+                "QuickEntryFeature", "TodoCore", "SQLiteKit", "TestSupport", "DesignSystem", "DesignSystemComponents",
             ]
         ),
     ],

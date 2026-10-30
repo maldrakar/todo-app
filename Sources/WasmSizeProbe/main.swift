@@ -28,13 +28,13 @@ import WASILibc
 /// Cancel, and Open in New Window, whose path it writes down — with the change each write produced, and a path the
 /// routes refuse, and it reads the layout the root cuts for the window's width and the sidebar's component models,
 /// its rows with the tiles built for that width, its bar in and out of edit mode, the confirmation, the picker and the
-/// look of the drag, each through the switches their views have. Beside that it calls the
-/// core's public API directly, and each group of calls has a client that ships it. The writes, the reads, a page and
-/// search are what the modules M3 adds will call. The filter codec and the journal exchange are the web host's own,
-/// which is where the spec leaves the gaps #23 found in them ("Goals and non-goals"). The snapshot is what a web page
-/// persists, reopened under the platform clock a web entry point passes. A group dropped because no module makes its
-/// calls would take out code the web client still ships. What a client calls is what the linker has to keep, so the
-/// number the job prints is the root module and the core a web client cannot dead-strip its way out of shipping.
+/// look of the drag, each through the switches their views have. Beside that it calls the core's public API directly,
+/// and each group of calls has a client that ships it. The writes, the reads, a page and search are what the modules M3
+/// adds will call. The filter codec and the journal exchange are the web host's own, which is where the spec leaves the
+/// gaps #23 found in them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the
+/// platform clock a web entry point passes. A group dropped because no module makes its calls would take out code the
+/// web client still ships. What a client calls is what the linker has to keep, so the number the job prints is the root
+/// module and the core a web client cannot dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.

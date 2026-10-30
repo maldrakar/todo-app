@@ -1,9 +1,9 @@
 // Sources/DesignSystemComponents/SearchFieldModel.swift
 
-/// A search field as every platform draws it before search arrives: a capsule, `leadingPadding` in from its start to
-/// its leading glyph, then the placeholder, which takes the room left, then its trailing glyph in a cell `trailingCell`
-/// wide and high, and `trailingPadding` at its end, `spacing` apart, in points. It holds no action: a tap on it opens
-/// nothing yet (`docs/specs/lists-screen.md`, section 7).
+/// A search field as every platform draws it: a capsule, `leadingPadding` in from its start to its leading glyph, then
+/// the placeholder, which takes the room left, then its trailing glyph in a cell `trailingCell` wide and high, and
+/// `trailingPadding` at its end, `spacing` apart, in points. It holds no action, so a platform draws the field and
+/// sends nothing from it.
 public struct SearchFieldModel: Equatable, Sendable {
     public let placeholder: TextModel
     public let leadingIcon: IconModel
