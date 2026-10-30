@@ -41,7 +41,7 @@ struct TaskViewListView: View {
             List(model.rows, selection: selection) { row in
                 Group {
                     if let draft = row.draft {
-                        TitleField(draft: draft, send: send)
+                        TitleField("Title", draft: draft, send: send)
                     } else {
                         // A tap on the title is the row's choice, the highlighted row's too, which the List does not
                         // report: on the Mac a click on the highlighted row moves no highlight and writes no
@@ -115,39 +115,8 @@ struct TaskViewListView: View {
             }
         }
         #endif
-        .alert(model.confirmation?.title ?? "", isPresented: isConfirmationUp, presenting: model.confirmation) { _ in
-            Button("Delete", role: .destructive) { send(.deleteConfirmed) }
-            Button("Cancel", role: .cancel) { send(.deleteCancelled) }
-        } message: { confirmation in
-            Text(confirmation.message)
-        }
-        .sheet(isPresented: isMovePickerUp) {
-            if let movePicker = model.movePicker {
-                MovePickerList(model: movePicker, send: send)
-            }
-        }
-    }
-
-    /// Whether the confirmation is up, read from the model and moved only by an action, which a write of false is not.
-    /// Every dismissal of an alert is one of its own buttons: iOS has no tap outside one, and Esc on the Mac and an
-    /// iPad's keyboard press its Cancel. Each button sends its own action, Delete `deleteConfirmed` and Cancel
-    /// `deleteCancelled`, so the alert's dismissal is still its Cancel action, through the button, whichever SwiftUI
-    /// does first, the button's action or its write into this binding. A write sent as Cancel would take the
-    /// confirmation down before a Delete that ran after it. On the Mac on 2026-10-29, by hand, Delete deleted with a
-    /// binding that sent the write as Cancel, so there the action ran first. The sheet's binding below is the other
-    /// kind: a swipe down and Esc are writes of false with no button behind them.
-    private var isConfirmationUp: Binding<Bool> {
-        Binding(get: { model.confirmation != nil }, set: { _ in })
-    }
-
-    /// Whether the move picker is up, read from the model and moved only by an action. The swipe down, and Esc on the
-    /// Mac, are one write of false, which goes to the module as the picker's Cancel; the write that follows a close the
-    /// module drove, a row tapped or Cancel, reaches no picker and moves nothing.
-    private var isMovePickerUp: Binding<Bool> {
-        Binding(get: { model.movePicker != nil }, set: { isUp in
-            guard !isUp else { return }
-            send(.movePickerCancelled)
-        })
+        // The confirmation as an alert and the picker as a sheet of a plain list (`ListsDialogs`).
+        .modifier(ListsDialogs(model: model, send: send) { MovePickerList(model: $0, send: send) })
     }
 
     /// The highlight, read from the model and moved only by an action, the shape a text field's binding has
@@ -236,36 +205,5 @@ private struct MovePickerList: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
             .onTapGesture(perform: titleTapped)
-    }
-}
-
-/// The field a row draws while it is being renamed, a view of its own so that each field watches its own
-/// focus: `.titleFieldLostFocus` names no row, and one flag shared by every row could not tell the field that
-/// lost focus from the one a rename moved to.
-private struct TitleField: View {
-    let draft: String
-    let send: (TaskViewList.UserAction) -> Void
-
-    /// Whether the caret is in this field, which only the view can know (spec section 2).
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        TextField("Title", text: Binding(get: { draft }, set: { send(.titleFieldChanged($0)) }))
-            .focused($isFocused)
-            .onSubmit { send(.titleFieldSubmitted) }
-            #if os(macOS)
-            // Esc. iOS and watchOS lack the modifier; what cancels a rename there is decided when they arrive.
-            .onExitCommand { send(.titleFieldCancelled) }
-            #endif
-            // A field opens for a person to type in, whether the menu or the toolbar opened it.
-            .onAppear { isFocused = true }
-            .onChange(of: isFocused) { _, focused in
-                guard !focused else { return }
-                send(.titleFieldLostFocus)
-                // What this view holds is from before `send`, so whether the field stays is not known here,
-                // and the caret is asked back either way: a field still open after a lost focus is one whose
-                // name the module refused.
-                isFocused = true
-            }
     }
 }
