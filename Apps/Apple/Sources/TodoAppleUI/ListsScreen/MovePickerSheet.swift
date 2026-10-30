@@ -1,19 +1,28 @@
 // Apps/Apple/Sources/TodoAppleUI/ListsScreen/MovePickerSheet.swift
+import DesignSystemComponents
 import SwiftUI
 import TaskViewListFeature
 
-/// The picker of Move to…, as the canvas draws it (`Phone.dc.html`, the Move to… sheet): its title, which names the
-/// list being moved, and Cancel in its bar; "Top level" first, then the whole tree drawn with the screen's own rows,
-/// `ListRowView` and `AreaLine`, picked by the one switch over a row's kind (`docs/style.md`, "Views"); the rows that
-/// cannot take the list dimmed and disabled, and the list's present parent checked (Lists screen spec, section 6). A
-/// row's tap sends `movePickerRowTapped` and Cancel `movePickerCancelled`; what a tap moves, and that the picker
-/// closes, is the module's. The rows carry no count and no chevron here, as the canvas's picker has none: a list is
-/// picked here and not opened or folded.
+/// The picker of Move to… as its model describes it (`PickerModel`; `Phone.dc.html`, the Move to… sheet): its title,
+/// which names the list being moved, and Cancel in its bar; the hint under the title; "Top level" first, a row of its
+/// own; then the whole tree drawn with the screen's own rows, `ListRowView` and `AreaLine`, picked by the one switch
+/// over a row's kind (`docs/style.md`, "Views"), each at least as high as the model's least; the rows that cannot take
+/// the list dimmed as the model says and disabled, and the list's present parent checked (Lists screen spec,
+/// section 6). A row's tap sends the action its model holds, `movePickerRowTapped`, and Cancel its own,
+/// `movePickerCancelled`; what a tap moves, and that the picker closes, is the module's. The sheet is the platform's
+/// container, on the paper.
+///
+/// A row here is its tile and title, or its line, without the accessories, the guides or the background the tree
+/// gives it, as the canvas's picker has none: a list is picked here and not opened or folded, and the module builds
+/// the rows with no count, chevron, grip or guide (Task 7; the controller's ruling on #161).
 struct MovePickerSheet: View {
-    private let model: TaskViewList.Model.MovePicker
+    private let model: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>
     private let send: (TaskViewList.UserAction) -> Void
 
-    init(model: TaskViewList.Model.MovePicker, send: @escaping (TaskViewList.UserAction) -> Void) {
+    init(
+        model: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>,
+        send: @escaping (TaskViewList.UserAction) -> Void
+    ) {
         self.model = model
         self.send = send
     }
@@ -23,18 +32,16 @@ struct MovePickerSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     topLevelRow
-                    ForEach(model.rows) { pickerRow in
-                        row(pickerRow)
+                    ForEach(model.options.indices, id: \.self) { index in
+                        option(model.options[index])
                     }
                 }
             }
-            // The canvas's line under the title, the sheet's own words.
+            // The canvas's line under the title, on the sheet's paper.
             .safeAreaInset(edge: .top, spacing: 0) {
-                Text("Choose where it goes.")
-                    .font(.footnote)
-                    .foregroundStyle(Color(.ink2))
+                Text(model.hint)
                     .frame(maxWidth: .infinity)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, model.hintGap)
                     .background(Color(.paper))
             }
             .navigationTitle(model.title)
@@ -45,68 +52,73 @@ struct MovePickerSheet: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { send(.movePickerCancelled) }
+                    Button(model.cancel.title, role: model.cancel.isDestructive ? .destructive : nil) {
+                        send(model.cancel.action)
+                    }
                 }
             }
         }
         .presentationBackground(Color(.paper))
     }
 
-    /// "Top level", with the canvas's glyph of a line on a tile of the fill colour where a list has its own tile.
+    /// "Top level", with its glyph on a tile of its own where a list has its tile, as the model has them.
     private var topLevelRow: some View {
-        Button { send(.movePickerRowTapped(nil)) } label: {
-            HStack(spacing: ListRowView.tileToTitle) {
-                Image(systemName: "rectangle.split.1x2")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color(.ink2))
-                    .frame(width: 30, height: 30)
-                    .background(Color(.fill), in: .rect(cornerRadius: 8))
-                Text("Top level")
-                    .font(Font(.rowTitle))
-                    .foregroundStyle(Color(.ink))
+        let topLevel = model.topLevel
+        return Button { send(topLevel.action) } label: {
+            HStack(spacing: topLevel.tileToTitle) {
+                Glyph(topLevel.icon)
+                    .frame(width: topLevel.tileSide, height: topLevel.tileSide)
+                    .background(Color(topLevel.tileColor), in: .rect(cornerRadius: topLevel.tileCornerRadius))
+                Text(topLevel.title)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                checkmark(model.isTopLevelCurrent)
+                check(topLevel.isChecked)
             }
-            .padding(.horizontal, 20)
-            .frame(height: ListRowView.height)
+            .padding(.horizontal, topLevel.leading)
+            .frame(height: topLevel.height)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(model.isTopLevelCurrent ? .isSelected : [])
+        .accessibilityAddTraits(topLevel.isChecked ? .isSelected : [])
     }
 
-    /// A row of the tree, drawn by the screen's own row of its kind, with its check at the right. An area's line is at
-    /// least the canvas's 36 pt here, where a tap on it is a choice, so that an unnamed area, the line alone, is not a
-    /// 17 pt target.
-    private func row(_ pickerRow: TaskViewList.Model.MovePicker.Row) -> some View {
-        Button { send(.movePickerRowTapped(pickerRow.id)) } label: {
+    /// A row of the tree, drawn by the screen's own row of its kind, at least the model's least height, so that an
+    /// unnamed area, the line alone, is no 17 pt target, with its check at the right.
+    @ViewBuilder private func option(
+        _ option: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>.Option
+    ) -> some View {
+        switch option.row {
+        case .area(let line):
+            choice(option, tap: line.tap) { AreaLine(line, send: send) }
+        case .list(let list):
+            choice(option, tap: list.tap) { ListRowView(list, send: send) }
+        }
+    }
+
+    /// An option as a button that sends the row's tap, disabled and dimmed where it cannot be chosen.
+    private func choice(
+        _ option: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>.Option, tap: TaskViewList.UserAction,
+        @ViewBuilder row: () -> some View
+    ) -> some View {
+        Button { send(tap) } label: {
             HStack(spacing: 0) {
-                switch pickerRow.row.kind {
-                case .area(let label):
-                    AreaLine(label: label, draft: nil, isEditing: false, send: send)
-                        .frame(minHeight: 36)
-                case .list(let list):
-                    ListRowView(list, depth: pickerRow.row.depth, draft: nil, send: send)
-                }
-                checkmark(pickerRow.isCurrent)
-                    .padding(.trailing, 20)
+                row()
+                    .frame(minHeight: model.minimumOptionHeight)
+                check(option.isChecked)
+                    .padding(.trailing, model.checkTrailing)
             }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(pickerRow.isCurrent ? .isSelected : [])
-        .disabled(pickerRow.isDisabled)
-        // The canvas's dimming of a row that cannot take the list.
-        .opacity(pickerRow.isDisabled ? 0.35 : 1)
+        .accessibilityAddTraits(option.isChecked ? .isSelected : [])
+        .disabled(option.isDisabled)
+        .opacity(option.isDisabled ? model.disabledOpacity : 1)
     }
 
-    /// The check that marks the list's present parent, in the accent, and the room for it on every other row, so that
-    /// the rows end in one column. VoiceOver reads the mark as the row's selected trait instead.
-    private func checkmark(_ isCurrent: Bool) -> some View {
-        Image(systemName: "checkmark")
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(Color(.accent))
-            .opacity(isCurrent ? 1 : 0)
+    /// The check that marks the list's present parent, and the room for it on every other row, so that the rows end in
+    /// one column. VoiceOver reads the mark as the row's selected trait instead.
+    private func check(_ isChecked: Bool) -> some View {
+        Glyph(model.check)
+            .opacity(isChecked ? 1 : 0)
             .accessibilityHidden(true)
     }
 }

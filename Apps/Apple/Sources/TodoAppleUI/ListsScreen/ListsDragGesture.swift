@@ -1,4 +1,5 @@
 // Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsDragGesture.swift
+import DesignSystemComponents
 import SwiftUI
 import TaskViewListFeature
 import TodoCore
@@ -16,15 +17,16 @@ import UIKit
 ///
 /// The lifted block is a list with the rows after it that are deeper than it, or an area's line with every row up to
 /// the next line, so that the slot is offered among the rows the drop would land among. A list's slot goes where the
-/// finger is and its depth follows the finger's sideways travel, a level per 22 pt, bounded as the spike bounded it: no
-/// shallower than the row after the slot, or 0 at the end, and no deeper than one past the row before it, or 0 when
-/// there is none or it is an area's line, where a list goes into that area. An area's slot stands only where spec
-/// section 7 lets an area stand, right before another line, the first one included, or at the end of the tree, always
-/// at depth 0, and never among an area's lists or above the root's: elsewhere it stays where it was (the controller's
-/// ruling on #148).
+/// finger is and its depth follows the finger's sideways travel, a level per step of the tree's indent, which the
+/// model's look of the drag gives (`DragModel`), bounded as the spike bounded it: no shallower than the row after the
+/// slot, or 0 at the end, and no deeper than one past the row before it, or 0 when there is none or it is an area's
+/// line, where a list goes into that area. An area's slot stands only where spec section 7 lets an area stand, right
+/// before another line, the first one included, or at the end of the tree, always at depth 0, and never among an
+/// area's lists or above the root's: elsewhere it stays where it was (the controller's ruling on #148).
 ///
 /// It is top-level, and not the phone's screen's, because the iPad's sidebar drags with the phone's gestures in the
-/// plan's eighth task (Lists screen spec, section 8).
+/// plan's ninth task (Lists screen spec, section 8). The drag is the platform's, since only the platform has the
+/// finger, and its look is the model's (the owner, 2026-10-30).
 struct ListsDrag {
     /// A stage of the long press that drives the drag, with the finger's location in the tree's own coordinates where
     /// it has one: the press begins, moves, ends once, or is cancelled once.
@@ -45,7 +47,7 @@ struct ListsDrag {
     /// Where the finger lifted the row, in the tree's own coordinates.
     private let start: CGPoint
 
-    /// How far below the card's top the finger holds it.
+    /// How far below the lifted row's top the finger holds it, which the card keeps under the finger.
     let grabOffset: CGFloat
 
     /// Where the finger is now, in the tree's own coordinates.
@@ -56,17 +58,19 @@ struct ListsDrag {
     private(set) var depth: Int
 
     /// The drag after a stage of the press, among the items the tree draws with no row lifted and the frames their last
-    /// layout reported, and the drop that stage reports: the press lifts the row under the finger, or nothing where no
-    /// row is; a move moves the slot; the release reports the drop once and puts the row down; and a cancel puts it
-    /// down and reports nothing. A stage with no row lifted, after a press that began over no row, moves nothing.
+    /// layout reported, by the tree's indent, and the drop that stage reports: the press lifts the row under the
+    /// finger, or nothing where no row is; a move moves the slot; the release reports the drop once and puts the row
+    /// down; and a cancel puts it down and reports nothing. A stage with no row lifted, after a press that began over
+    /// no row, moves nothing.
     static func after(
-        _ phase: Phase, from drag: ListsDrag?, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect]
+        _ phase: Phase, from drag: ListsDrag?, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect],
+        indent: IndentModel
     ) -> (drag: ListsDrag?, drop: TaskViewList.UserAction?) {
         switch phase {
         case .began(let point):
             (ListsDrag(liftingAt: point, among: items, frames: frames), nil)
         case .changed(let point):
-            (drag?.moved(to: point, among: items, frames: frames), nil)
+            (drag?.moved(to: point, among: items, frames: frames, indent: indent), nil)
         case .ended:
             (nil, drag?.drop(among: items))
         case .cancelled:
@@ -75,12 +79,12 @@ struct ListsDrag {
     }
 
     /// What the tree draws while the row is lifted: every item but the lifted block, and the slot where the row would
-    /// land, with the guides of the levels it would stand under, which are those of the row before it.
+    /// land, under the list's row before it, whose guides it stands under as far as its depth, and under none after an
+    /// area's line or at the top.
     func drawn(_ items: [ListsTreeItem]) -> [ListsTreeItem] {
         var rest = Self.rest(of: items, without: id)
         let slot = min(self.slot, rest.count)
-        let guides = slot > 0 ? Array(rest[slot - 1].guidesBelow.prefix(depth)) : []
-        rest.insert(.slot(depth: depth, guides: guides), at: slot)
+        rest.insert(.slot(depth: depth, under: slot > 0 ? rest[slot - 1].listRow : nil), at: slot)
         return rest
     }
 
@@ -99,8 +103,7 @@ struct ListsDrag {
         isAreaLine = items[index].isAreaLine
         liftedDepth = items[index].depth
         start = point
-        // The card stands 6 pt above the row it lifts, as the canvas's card stands in its slot.
-        grabOffset = point.y - (frame.minY - 6)
+        grabOffset = point.y - frame.minY
         location = point
         slot = index
         depth = liftedDepth
@@ -111,7 +114,7 @@ struct ListsDrag {
     /// it in the lower; above the first row it goes to the top, and below the last to the end. The rule reads the
     /// frames the rows reported and counts no rows, so it holds in a lazy stack too (spike #145).
     private func moved(
-        to point: CGPoint, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect]
+        to point: CGPoint, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect], indent: IndentModel
     ) -> ListsDrag {
         let rest = Self.rest(of: items, without: id)
         let previous = min(slot, rest.count)
@@ -137,7 +140,7 @@ struct ListsDrag {
             let depths = Self.depths(
                 after: slot > 0 ? rest[slot - 1] : nil, next: rest.indices.contains(slot) ? rest[slot] : nil
             )
-            let levels = Int(((point.x - start.x) / ListRowView.indent).rounded())
+            let levels = Int(((point.x - start.x) / indent.step).rounded())
             moved.depth = min(max(liftedDepth + levels, depths.lowerBound), depths.upperBound)
         }
         return moved
@@ -189,70 +192,81 @@ extension ListsDrag {
         }
     }
 
-    /// The slot the canvas draws while a row is lifted (`Phone.dc.html`, the slot's row): 52 pt high, 6 pt more than a
-    /// row, so that it is steady under the finger, a frame dashed in the accent on the accent's soft fill, from 6 pt
-    /// before the tile of its depth to 12 pt short of the right edge of the screen, with the guides of the levels the
-    /// row would stand under. It is the view's own feedback and sends nothing.
+    /// The slot where the lifted row would land, as the model of the drag's look describes it (`DragModel.Slot`;
+    /// `Phone.dc.html`, the slot's row): taller than a row, so that it is steady under the finger, its frame drawn
+    /// within it from its inset before the tile of its depth to its gap short of the right edge of the screen, filled
+    /// and edged as the model says, and the guides of the levels the row would stand under behind it, the list's row
+    /// before it's own, as many as its depth. It is the view's own feedback and sends nothing.
     struct Slot: View {
-        private static let height: CGFloat = 52
-
+        private let model: DragModel
         private let depth: Int
-        private let guides: [CGFloat]
+        private let under: ListRowModel<TaskViewList.UserAction>?
         private let visibleRight: CGFloat
 
-        init(depth: Int, guides: [CGFloat], visibleRight: CGFloat) {
+        /// The slot at the depth, after the list's row it stands under, and nil after an area's line or at the top.
+        init(
+            _ model: DragModel, depth: Int, under: ListRowModel<TaskViewList.UserAction>?, visibleRight: CGFloat
+        ) {
+            self.model = model
             self.depth = depth
-            self.guides = guides
+            self.under = under
             self.visibleRight = visibleRight
         }
 
         var body: some View {
-            let leading = ListRowView.tileLeading(atDepth: depth) - 6
-            let shape = RoundedRectangle(cornerRadius: 13)
+            let slot = model.slot
+            let leading = model.indent.leading(atDepth: depth) - slot.inset
+            let shape = RoundedRectangle(cornerRadius: slot.cornerRadius)
             shape
-                .fill(Color(.accentSoft))
-                .overlay { shape.stroke(Color(.accent), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])) }
-                .frame(width: max(0, visibleRight - 12 - leading), height: Self.height - 8)
+                .fill(Color(slot.fill))
+                .overlay { shape.stroke(slot.stroke) }
+                .frame(
+                    width: max(0, visibleRight - slot.trailingGap - leading),
+                    height: slot.height - 2 * slot.verticalInset
+                )
                 .padding(.leading, leading)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .frame(height: Self.height)
-                .background { ListsTreeItem.Guides(guides) }
+                .frame(height: slot.height)
+                .background {
+                    if let under {
+                        ListsTreeItem.Guides(under.childGuides.prefix(depth), in: under.guide)
+                    }
+                }
                 .accessibilityHidden(true)
         }
     }
 
-    /// The lifted row, carried under the finger (`Phone.dc.html`, the drag's card): on the surface with the canvas's
-    /// large soft shadow, scaled to 1.03 on the popover's motion and tilted −1.5°. A list's card stands at the tile of
-    /// the slot's depth, its tile, its title and a grip on it, 50 pt high, out to 6 pt short of the right edge of the
-    /// screen; an area's is its line on a card 36 pt high across the screen. The canvas's overshoot to 1.045 and its
-    /// bob have no motion of the look and are left out; with Reduce Motion the card is at its scale at once.
+    /// The lifted row, carried under the finger, as the model of the drag's look describes it (`DragModel.Card`;
+    /// `Phone.dc.html`, the drag's card): on its background with its shadow, grown to its scale on the drag's motion
+    /// once it appears and turned by its rotation. A list's card stands at the tile of the slot's depth, the lifted
+    /// row's tile and title on it with the grip at its end, out to its gap short of the right edge of the screen; an
+    /// area's is the lifted line across the screen. The canvas's overshoot and bob have no motion of the look and are
+    /// left out; with Reduce Motion the card is at its scale at once.
     struct Card: View {
         private let item: ListsTreeItem
+        private let model: DragModel
         private let depth: Int
         private let visibleRight: CGFloat
-        private let send: (TaskViewList.UserAction) -> Void
 
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         /// Whether the card has grown to its lifted scale, which it does once it appears.
         @State private var isLifted = false
 
-        init(
-            _ item: ListsTreeItem, depth: Int, visibleRight: CGFloat, send: @escaping (TaskViewList.UserAction) -> Void
-        ) {
+        init(_ item: ListsTreeItem, _ model: DragModel, depth: Int, visibleRight: CGFloat) {
             self.item = item
+            self.model = model
             self.depth = depth
             self.visibleRight = visibleRight
-            self.send = send
         }
 
         var body: some View {
             card
-                .scaleEffect(isLifted ? 1.03 : 1)
-                .rotationEffect(.degrees(-1.5))
-                .shadow(color: .black.opacity(0.22), radius: 18, y: 10)
+                .scaleEffect(isLifted ? model.card.scale : 1)
+                .rotationEffect(.degrees(model.card.rotation))
+                .shadow(model.card.shadow)
                 .onAppear {
-                    withAnimation(reduceMotion ? nil : Animation(.popover)) { isLifted = true }
+                    withAnimation(reduceMotion ? nil : Animation(model.animation)) { isLifted = true }
                 }
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
@@ -260,29 +274,33 @@ extension ListsDrag {
 
         /// The card of the lifted row's kind. The slot is never lifted, so its case draws nothing.
         @ViewBuilder private var card: some View {
+            let card = model.card
             switch item {
-            case .list(_, let list, _):
-                let leading = ListRowView.tileLeading(atDepth: depth) - 2
-                HStack(spacing: ListRowView.tileToTitle) {
+            case .list(_, let list):
+                let leading = model.indent.leading(atDepth: depth) - card.listInset
+                HStack(spacing: list.tileToTitle) {
                     ListTile(list.tile)
                     Text(list.title)
-                        .font(Font(list.titleFont))
-                        .foregroundStyle(Color(.ink))
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    ListRowView.Grip()
-                        .foregroundStyle(Color(.ink2))
-                        .frame(width: 40, height: 50)
+                    Glyph(card.grip)
+                        .frame(width: card.gripCell, height: card.listHeight)
                 }
-                .padding(.leading, 12)
-                .frame(width: max(120, visibleRight - 6 - leading), height: 50)
-                .background(Color(.surface), in: .rect(cornerRadius: 14))
+                .padding(.leading, card.listPadding)
+                .frame(
+                    width: max(card.minimumWidth, visibleRight - card.listTrailingGap - leading),
+                    height: card.listHeight
+                )
+                .background(Color(card.background), in: .rect(cornerRadius: card.listCornerRadius))
                 .offset(x: leading)
-            case .area(_, let label):
-                AreaLine(label: label, draft: nil, isEditing: true, send: send)
-                    .frame(width: max(120, visibleRight - 16), height: 36)
-                    .background(Color(.surface), in: .rect(cornerRadius: 12))
-                    .offset(x: 8)
+            case .area(_, let line):
+                AreaLine(lifted: line)
+                    .frame(
+                        width: max(card.minimumWidth, visibleRight - card.lineInset - card.lineTrailingGap),
+                        height: card.lineHeight
+                    )
+                    .background(Color(card.background), in: .rect(cornerRadius: card.lineCornerRadius))
+                    .offset(x: card.lineInset)
             case .slot:
                 EmptyView()
             }

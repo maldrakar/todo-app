@@ -1,19 +1,22 @@
 // Apps/Apple/Sources/TodoAppleUI/TaskViewListView.swift
+import DesignSystemComponents
 import SwiftUI
 import TaskViewListFeature
 import TodoCore
 
-/// The list of views, drawn as the module assembled it, every gesture sent as the one action its control is
-/// named for (spec section 2). A deselect is no gesture here: the List cannot remove the highlight (`selection`). It
-/// knows nothing about renaming beyond what a row says: a row with a `draft` draws a field, and every other row
-/// what its kind is, through the one switch over it (`docs/style.md`, "Views"): an area's line with its label, and a
-/// list's title. It has no title of its own, so its row in the back button's menu over a screen pushed on it is empty,
-/// where the screens over it are named by theirs (the owner, 2026-10-25, #126).
+/// The list of views, drawn as the module assembled it, every gesture sent as the action its control's model holds
+/// (spec section 2). A deselect is no gesture here: the List cannot remove the highlight (`selection`). It knows
+/// nothing about renaming beyond what a row says: a row whose model has a field draws the field, and every other row
+/// what its kind is, through the one switch over it in the tree (`docs/style.md`, "Views"): an area's line with its
+/// label, and a list's title. It has no title of its own, so its row in the back button's menu over a screen pushed on
+/// it is empty, where the screens over it are named by theirs (the owner, 2026-10-25, #126).
 ///
-/// The Lists screen's look, the tiles, the counts, the chevrons and the bar, is the plan's seventh and eighth tasks':
-/// until then this view draws the model's new rows with the look it had (Lists screen plan, Task 5), and the edits as
-/// plainly: the confirmation as an alert, the move picker as a sheet of a plain list, and edit mode from a button on
-/// the toolbar (Task 6).
+/// The Lists screen's look, the tiles, the counts, the chevrons and the bar, is the plan's ninth task's here: until
+/// then this view draws the rows' words, their menus and the dialogs from the models of the screen's components, in
+/// the layout it had (Lists screen plan, Tasks 5 and 8), and the edits as plainly: the confirmation as an alert, the
+/// move picker as a sheet of a plain list, and edit mode from a button on the toolbar (Task 6). Each row has its
+/// model's menu, so none in edit mode, and an area's line its own, Rename, New List and Delete Area (the controller's
+/// ruling on #161).
 struct TaskViewListView: View {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
@@ -25,12 +28,6 @@ struct TaskViewListView: View {
     /// property while `body` runs, so that a change runs `body` again.
     @State private var emptiedHighlights = 0
 
-    /// Whether the app can open a window beside this one, which the platform reports (`docs/specs/navigation.md`,
-    /// sections 5 and 10). Read on 2026-10-18: true on the Mac; false on iPhone, its Info.plist declaring multiple
-    /// scenes or not; on the iPad true only with that declaration, which Task 9's Info.plist makes, and false without
-    /// it (the iOS 26.3 simulator).
-    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
-
     init(model: TaskViewList.Model, send: @escaping (TaskViewList.UserAction) -> Void) {
         self.model = model
         self.send = send
@@ -39,46 +36,23 @@ struct TaskViewListView: View {
     var body: some View {
         VStack(spacing: 0) {
             List(model.rows, selection: selection) { row in
-                Group {
-                    if let draft = row.draft {
-                        TitleField("Title", draft: draft, send: send)
-                    } else {
-                        // A tap on the title is the row's choice, the highlighted row's too, which the List does not
-                        // report: on the Mac a click on the highlighted row moves no highlight and writes no
-                        // selection, so the task open in its list stayed open, where a click on the highlighted view
-                        // closes it (`TaskViewList`). It replaces the List's own selection on the title, which fills
-                        // the row; the row's insets and a nested row's indent stay the List's, and the arrow keys
-                        // still go through `selection`. On 2026-10-18, on the Mac: a click on a view's title or on the
-                        // rest of its row chose it, one action each, and on the highlighted view closed its task; the
-                        // same day, a tap on the title's text alone, sent only for the highlighted row, left a click
-                        // on another view's title choosing nothing. On 2026-10-20, in the iOS 26.3 simulator, a tap on
-                        // another view's row pushed its list on iPhone, and on the iPad a tap on the highlighted view
-                        // closed its task.
-                        rowLabel(row.kind) { send(.rowSelected(row.id)) }
-                    }
+                // The one switch over a row's kind in the tree, every case drawn and no `default`.
+                switch row.kind {
+                case .area(let line):
+                    treeRow(depth: row.depth, field: line.field, menu: line.menu) { lineLabel(line) }
+                case .list(let list):
+                    // A tap on the title is the row's choice, the highlighted row's too, which the List does not
+                    // report: on the Mac a click on the highlighted row moves no highlight and writes no selection,
+                    // so the task open in its list stayed open, where a click on the highlighted view closes it
+                    // (`TaskViewList`). It replaces the List's own selection on the title, which fills the row; the
+                    // row's insets and a nested row's indent stay the List's, and the arrow keys still go through
+                    // `selection`. On 2026-10-18, on the Mac: a click on a view's title or on the rest of its row chose
+                    // it, one action each, and on the highlighted view closed its task; the same day, a tap on the
+                    // title's text alone, sent only for the highlighted row, left a click on another view's title
+                    // choosing nothing. On 2026-10-20, in the iOS 26.3 simulator, a tap on another view's row pushed
+                    // its list on iPhone, and on the iPad a tap on the highlighted view closed its task.
+                    treeRow(depth: row.depth, field: list.field, menu: list.menu) { titleLabel(list, send: send) }
                 }
-                // The tree as the flat rows carry it: a number to indent by, so that drawing it decides nothing
-                // (`TaskViewList`).
-                .padding(.leading, CGFloat(row.depth) * 16)
-                #if !os(watchOS)
-                // Not on the watch, where the modifier is deprecated since watchOS 7, so the watch's build, a compile
-                // check in this epic (`docs/specs/navigation.md`, section 8), leaves the whole menu out, Rename with
-                // it.
-                .contextMenu {
-                    Button("Rename") { send(.renameMenuItemChosen(row.id)) }
-                    Button("New List") { send(.newListMenuItemChosen(in: row.id)) }
-                    // Only where a window can open beside this one, which iPhone cannot (`docs/specs/navigation.md`,
-                    // section 5). It asks for the window, and the root passes the request on as its output, which
-                    // the window's view answers by opening the window (`WindowView`).
-                    if supportsMultipleWindows {
-                        Button("Open in New Window") { send(.openInNewWindowMenuItemChosen(row.id)) }
-                    }
-                    // On an area's line too, where the module moves nothing for Move to…, since an area moves along
-                    // the root alone; the menus of each kind are the plan's seventh and eighth tasks'.
-                    Button("Move to…") { send(.moveToMenuItemChosen(row.id)) }
-                    Button("Delete", role: .destructive) { send(.deleteMenuItemChosen(row.id)) }
-                }
-                #endif
             }
             .focused($isListFocused)
             // The list takes the keyboard when it appears, so that the arrow keys move the highlight from the
@@ -97,9 +71,11 @@ struct TaskViewListView: View {
         #if !os(watchOS)
         // The sidebar's "+", a menu with an item for each thing it makes, each sending the action its item is named for:
         // where a list or an area goes, and that New Task is quick entry, is the module's to decide (Lists screen spec,
-        // section 8). The look is the plan's Tasks 7 and 8. Not on the watch, where `Menu` is unavailable (a file
-        // typechecked against the watchOS 10 SDK with Xcode 27.1 on 2026-10-27), and whose build is a compile check in
-        // this epic, as it is for the row's menu above.
+        // section 8). The look is the plan's Task 9, which draws the bar's model here; until then the toolbar keeps its
+        // own layout and words, since the bar's model holds the phone's controls, Edit inside "…" and, in edit mode,
+        // + List and + Area in place of "+". Not on the watch, where `Menu` is unavailable (a file typechecked against
+        // the watchOS 10 SDK with Xcode 27.1 on 2026-10-27), and whose build is a compile check in this epic, as it is
+        // for the row's menu above.
         .toolbar {
             Menu("Add", systemImage: "plus") {
                 Button("New Task") { send(.newTaskMenuItemChosen) }
@@ -117,6 +93,35 @@ struct TaskViewListView: View {
         #endif
         // The confirmation as an alert and the picker as a sheet of a plain list (`ListsDialogs`).
         .modifier(ListsDialogs(model: model, send: send) { MovePickerList(model: $0, send: send) })
+    }
+
+    /// A row of the tree: the field while the row is being renamed, and its label otherwise, indented by its depth,
+    /// with its menu where its model has one.
+    private func treeRow(
+        depth: Int, field: FieldModel?, menu: MenuModel<TaskViewList.UserAction>?, @ViewBuilder label: () -> some View
+    ) -> some View {
+        Group {
+            if let field {
+                TitleField(field, send: send)
+            } else {
+                label()
+            }
+        }
+        // The tree as the flat rows carry it: a number to indent by, so that drawing it decides nothing
+        // (`TaskViewList`).
+        .padding(.leading, CGFloat(depth) * 16)
+        #if !os(watchOS)
+        // Not on the watch, where the modifier is deprecated since watchOS 7, so the watch's build, a compile check in
+        // this epic (`docs/specs/navigation.md`, section 8), leaves the whole menu out, Rename with it. A row with no
+        // menu, every row in edit mode, has an empty one, which opens as none. Open in New Window, where a list's menu
+        // has it, asks for the window, and the root passes the request on as its output, which the window's view
+        // answers by opening the window (`WindowView`).
+        .contextMenu {
+            if let menu {
+                MenuItems(menu, send: send)
+            }
+        }
+        #endif
     }
 
     /// The highlight, read from the model and moved only by an action, the shape a text field's binding has
@@ -138,72 +143,87 @@ struct TaskViewListView: View {
     }
 }
 
-/// The move picker, drawn from its model with no look of its own until the plan's seventh task: "Top level" and the
-/// rows in a plain list, each sending its tap, the present parent checked and the rows that cannot take the list
-/// disabled, and Cancel in the bar.
+/// The move picker, drawn from its model with no look of its own until the plan's ninth task: "Top level" and the rows
+/// in a plain list, each sending its tap, each row indented by its model's leading, the present parent checked and
+/// the rows that cannot take the list disabled, and Cancel in the bar, every word the model's.
 private struct MovePickerList: View {
-    let model: TaskViewList.Model.MovePicker
+    let model: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>
     let send: (TaskViewList.UserAction) -> Void
 
     var body: some View {
         NavigationStack {
             List {
-                Button { send(.movePickerRowTapped(nil)) } label: {
+                Button { send(model.topLevel.action) } label: {
                     HStack {
-                        Text("Top level")
-                        if model.isTopLevelCurrent { Image(systemName: "checkmark") }
+                        Text(model.topLevel.title.text)
+                        if model.topLevel.isChecked { Image(model.check.icon) }
                     }
                 }
-                ForEach(model.rows) { pickerRow in
-                    // The row's tap, which its button sends, and which a list's title sends too, since the title's
-                    // own gesture is the one a tap on it reaches. A greyed-out row's, should that gesture still take
-                    // one, moves nothing in the module.
-                    let tapped = { send(.movePickerRowTapped(pickerRow.id)) }
-                    Button(action: tapped) {
-                        HStack {
-                            rowLabel(pickerRow.row.kind, titleTapped: tapped)
-                            if pickerRow.isCurrent { Image(systemName: "checkmark") }
-                        }
-                        .padding(.leading, CGFloat(pickerRow.row.depth) * 16)
+                ForEach(model.options.indices, id: \.self) { index in
+                    let option = model.options[index]
+                    // The one switch over a row's kind in the picker, every case drawn and no `default`.
+                    switch option.row {
+                    case .area(let line):
+                        choice(option, tap: line.tap, leading: line.leading) { lineLabel(line) }
+                    case .list(let list):
+                        // The row's tap, which its button sends, and which a list's title sends too, since the
+                        // title's own gesture is the one a tap on it reaches. A greyed-out row's, should that gesture
+                        // still take one, moves nothing in the module.
+                        choice(option, tap: list.tap, leading: list.leading) { titleLabel(list, send: send) }
                     }
-                    .disabled(pickerRow.isDisabled)
                 }
             }
             .navigationTitle(model.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { send(.movePickerCancelled) }
+                    Button(model.cancel.title, role: model.cancel.isDestructive ? .destructive : nil) {
+                        send(model.cancel.action)
+                    }
                 }
             }
         }
         // A sheet on the Mac is as large as what it holds, and a list asks for no height of its own.
         .frame(minWidth: 320, minHeight: 400)
     }
+
+    /// An option as a button that sends the row's tap, with the check where it is the present choice, disabled where it
+    /// cannot be chosen.
+    private func choice(
+        _ option: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>.Option, tap: TaskViewList.UserAction,
+        leading: Double, @ViewBuilder label: () -> some View
+    ) -> some View {
+        Button { send(tap) } label: {
+            HStack {
+                label()
+                if option.isChecked { Image(model.check.icon) }
+            }
+            .padding(.leading, leading)
+        }
+        .disabled(option.isDisabled)
+    }
 }
 
-/// What a row draws as its label, through the one switch over a row's kind that the tree and the move picker share,
-/// every case drawn and no `default` (`docs/style.md`, "Views"), so that the picker draws the screen's own row: an
-/// area's line, with its name beside it when it has one, and a list's title, which fills the row to its trailing edge
-/// so that a tap on it covers the row past the title's text and sends `titleTapped`.
+/// An area's line as the tree and the move picker label it, with its name beside it when it has one.
 ///
 /// The line takes no highlight, so that a click on it puts none there: an area never opens, and the module moves
 /// nothing for `.rowSelected` on it, so a highlight the List put there would stay beside the list of the view chosen
 /// before. The picker's List keeps no selection, so it is nothing there. A function and not a view of its own, so that
 /// the line's selection trait reaches the List's row as it did when the switch stood in the row itself.
-@ViewBuilder private func rowLabel(
-    _ kind: TaskViewList.Model.Kind, titleTapped: @escaping () -> Void
-) -> some View {
-    switch kind {
-    case .area(let label):
-        HStack {
-            if let label { Text(label) }
-            VStack { Divider() }
-        }
-        .selectionDisabled()
-    case .list(let list):
-        Text(list.title)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
-            .onTapGesture(perform: titleTapped)
+private func lineLabel(_ line: AreaLineModel<TaskViewList.UserAction>) -> some View {
+    HStack {
+        if let label = line.label { Text(label.text) }
+        VStack { Divider() }
     }
+    .selectionDisabled()
+}
+
+/// A list's title as the tree and the move picker label it, which fills the row to its trailing edge so that a tap on
+/// it covers the row past the title's text and sends the row's tap.
+private func titleLabel(
+    _ list: ListRowModel<TaskViewList.UserAction>, send: @escaping (TaskViewList.UserAction) -> Void
+) -> some View {
+    Text(list.title.text)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+        .onTapGesture { send(list.tap) }
 }

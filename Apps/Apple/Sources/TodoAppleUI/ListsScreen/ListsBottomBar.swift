@@ -1,169 +1,168 @@
 // Apps/Apple/Sources/TodoAppleUI/ListsScreen/ListsBottomBar.swift
+import DesignSystemComponents
 import SwiftUI
 import TaskViewListFeature
 
-/// The bar at the bottom of the Lists screen, as the canvas draws it (`Phone.dc.html`, the bar), with no title above
-/// the tree, as the canvas has none (Lists screen spec, sections 1 and 7). Outside edit mode: "…" at the left, a menu
-/// holding Edit; the search capsule in the middle, which sends nothing until the search epic; and "+" at the right, a
-/// menu holding New Task, New List and New Area. In edit mode: a capsule holding "+ List" and "+ Area", and the Done
-/// check at the right. Every control sends the action its control is named for, and what follows is the module's.
+/// The bar at the bottom of the Lists screen as its model describes it (`BarModel`; `Phone.dc.html`, the bar), with no
+/// title above the tree, as the canvas has none (Lists screen spec, sections 1 and 7): its items in a row, a button
+/// alone round, the search capsule, and a group of buttons on one capsule with a divider between them, every size,
+/// glyph, word and colour the model's. Outside edit mode the model gives "…", the search capsule, which sends nothing
+/// until the search epic, and "+"; in edit mode "+ List" and "+ Area" in a group and Done. Every control sends the
+/// action its model holds, or puts up the menu its model holds, and what follows is the module's.
 ///
-/// The controls stand on glass, the canvas's blurred translucent fill with a hairline and a soft shadow, drawn here as
-/// the regular material, the hairline as the ink at 8 % and one shadow for both appearances, since the look has no
-/// token for any of the three; "+" and Done are filled with the accent instead, their glyphs white, as the canvas's.
+/// The controls stand on glass, the canvas's blurred translucent fill with a hairline and a soft shadow, which is the
+/// platform's container and no model's (Lists screen plan, Task 8): drawn here as the regular material, the hairline as
+/// the ink at 8 % and one shadow for both appearances, under every control, a control on a fill of its own among them.
+/// A button whose model puts it on the container stands on the glass; one with a fill of its own, "+" and Done, on
+/// that fill instead.
 struct ListsBottomBar: View {
-    private let isEditing: Bool
+    private let model: BarModel<TaskViewList.UserAction>
     private let send: (TaskViewList.UserAction) -> Void
 
-    init(isEditing: Bool, send: @escaping (TaskViewList.UserAction) -> Void) {
-        self.isEditing = isEditing
+    init(_ model: BarModel<TaskViewList.UserAction>, send: @escaping (TaskViewList.UserAction) -> Void) {
+        self.model = model
         self.send = send
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            if isEditing {
-                editCapsule
-                doneButton
-            } else {
-                #if !os(watchOS)
-                // Not on the watch, where `Menu` is unavailable (a file typechecked against the watchOS 10 SDK with
-                // Xcode 27.1 on 2026-10-27), and whose build is a compile check in this epic; "+" below is left out
-                // there for the same reason.
-                moreMenu
-                #endif
-                searchCapsule
-                #if !os(watchOS)
-                addMenu
-                #endif
+        HStack(spacing: model.spacing) {
+            ForEach(model.items.indices, id: \.self) { index in
+                item(model.items[index])
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, model.padding)
     }
 
-    #if !os(watchOS)
-    // The two menus, which the watch cannot build (`body`).
-
-    /// "…", which holds Edit alone for now (the owner, 2026-10-25).
-    private var moreMenu: some View {
-        Menu {
-            Button("Edit", systemImage: "line.3.horizontal") { send(.editMenuItemChosen) }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color(.ink))
-                .frame(width: Self.controlHeight, height: Self.controlHeight)
-                .glass(in: Circle())
+    /// One item of the bar, through the one switch over what stands on a bar, every case drawn and none by `default`
+    /// (`docs/style.md`, "Views").
+    @ViewBuilder private func item(_ item: BarModel<TaskViewList.UserAction>.Item) -> some View {
+        switch item {
+        case .button(let button):
+            pressing(button) {
+                standing(label(of: button).frame(width: model.controlHeight, height: model.controlHeight), on: button)
+            }
+        case .search(let search):
+            searchCapsule(search)
+        case .group(let buttons):
+            group(buttons)
         }
-        .accessibilityLabel("More")
     }
 
-    /// "+", which makes a task, a list or an area: where each goes, and that a task is quick entry's, is the module's
-    /// to decide (Lists screen spec, section 7). Its items stand in the order written, the canvas's, where iOS would
-    /// otherwise put the first nearest the button.
-    private var addMenu: some View {
-        Menu {
-            Button("New Task", systemImage: "checkmark.circle") { send(.newTaskMenuItemChosen) }
-            Button("New List", systemImage: "checklist") { send(.newListMenuItemChosen(in: nil)) }
-            Button("New Area", systemImage: "rectangle.split.1x2") { send(.newAreaMenuItemChosen) }
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: Self.controlHeight, height: Self.controlHeight)
-                .background(Color(.accent), in: Circle())
+    /// A button alone on what its model puts it on, a circle as high as the bar's controls: the glass of its container,
+    /// or a fill of its own with the bar's shadow under it.
+    @ViewBuilder private func standing(
+        _ label: some View, on button: ButtonModel<TaskViewList.UserAction>
+    ) -> some View {
+        switch button.fill {
+        case .container:
+            label.glass(in: Circle())
+        case .color(let color):
+            label
+                .background(Color(color), in: Circle())
                 .barShadow()
         }
-        .menuOrder(.fixed)
-        .accessibilityLabel("Add")
-    }
-    #endif
-
-    /// The search capsule, drawn as the canvas has it, its magnifier, "Search" and microphone in ink2, and a view and
-    /// not a control: a tap on it opens nothing in this epic (the owner, 2026-10-25), so it sends nothing.
-    private var searchCapsule: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 17))
-            Text("Search")
-                .font(.body)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Image(systemName: "mic")
-                .font(.system(size: 17))
-                .frame(width: 36, height: 36)
-        }
-        .foregroundStyle(Color(.ink2))
-        .padding(.leading, 15)
-        .padding(.trailing, 6)
-        .frame(maxWidth: .infinity)
-        .frame(height: Self.controlHeight)
-        .glass(in: Capsule())
     }
 
-    /// The edit bar's capsule: "+ List" and "+ Area" in the accent with a hairline between them, which make a list at
-    /// the end of the tree and an area at the end of the root, as "+" makes them.
-    private var editCapsule: some View {
-        HStack(spacing: 0) {
-            editButton("List", accessibilityLabel: "New List") { send(.newListMenuItemChosen(in: nil)) }
-            Rectangle()
-                .fill(Color(.line))
-                .frame(width: 1, height: 22)
-            editButton("Area", accessibilityLabel: "New Area") { send(.newAreaMenuItemChosen) }
-        }
-        .padding(.horizontal, 4)
-        .frame(maxWidth: .infinity)
-        .frame(height: Self.controlHeight)
-        .glass(in: Capsule())
-    }
-
-    /// One half of the edit bar's capsule: a plus and the word, the canvas's 15 pt semibold, which no font of the look
-    /// names, so it is the subheadline's size in semibold.
-    private func editButton(
-        _ title: LocalizedStringKey, accessibilityLabel: LocalizedStringKey, action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: "plus")
+    /// A button's glyph, and its word after it where it has one, the group's spacing apart.
+    private func label(of button: ButtonModel<TaskViewList.UserAction>) -> some View {
+        HStack(spacing: model.groupButtonSpacing) {
+            Glyph(button.icon)
+            if let title = button.title {
                 Text(title)
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Color(.accent))
-            .frame(maxWidth: .infinity)
-            .frame(height: 40)
-            .contentShape(.capsule)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
     }
 
-    /// Done, the check that ends edit mode.
-    private var doneButton: some View {
-        Button { send(.doneButtonTapped) } label: {
-            Image(systemName: "checkmark")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: Self.controlHeight, height: Self.controlHeight)
-                .background(Color(.accent), in: Circle())
-                .barShadow()
+    /// What a press of a button does, by its model: send its action, or put up its menu, whose items stand in the order
+    /// the model gives them, the canvas's, where iOS would otherwise put the first nearest the button. Either reads its
+    /// model's words aloud.
+    @ViewBuilder private func pressing(
+        _ button: ButtonModel<TaskViewList.UserAction>, @ViewBuilder label: () -> some View
+    ) -> some View {
+        switch button.press {
+        case .action(let action):
+            Button { send(action) } label: { label() }
+                .buttonStyle(.plain)
+                .accessibilityLabel(button.accessibilityLabel)
+        case .menu(let menu):
+            #if os(watchOS)
+            // Left out on the watch, where `Menu` is unavailable (a file typechecked against the watchOS 10 SDK with
+            // Xcode 27.1 on 2026-10-27), and whose build is a compile check in this epic.
+            EmptyView()
+            #else
+            Menu { MenuItems(menu, send: send) } label: { label() }
+                .menuOrder(.fixed)
+                .accessibilityLabel(button.accessibilityLabel)
+            #endif
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Done")
     }
 
-    /// The height of every control of the bar, and the side of its round ones (`Phone.dc.html`, the bar's 48 px).
-    private static let controlHeight: CGFloat = 48
+    /// The search capsule, its glyphs and its placeholder as its model has them, on the glass, and a view and not a
+    /// control: a tap on it opens nothing in this epic (the owner, 2026-10-25), so it sends nothing.
+    private func searchCapsule(_ search: SearchFieldModel) -> some View {
+        HStack(spacing: search.spacing) {
+            Glyph(search.leadingIcon)
+            Text(search.placeholder)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Glyph(search.trailingIcon)
+                .frame(width: search.trailingCell, height: search.trailingCell)
+        }
+        .padding(.leading, search.leadingPadding)
+        .padding(.trailing, search.trailingPadding)
+        .frame(maxWidth: .infinity)
+        .frame(height: model.controlHeight)
+        .glass(in: Capsule())
+    }
+
+    /// Buttons grouped on one capsule of glass, sharing its width, with the group's divider between each two of them.
+    private func group(_ buttons: [ButtonModel<TaskViewList.UserAction>]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(buttons.indices, id: \.self) { index in
+                if index > 0 {
+                    Rule(model.groupDivider, along: .vertical)
+                        .frame(height: model.groupDividerHeight)
+                }
+                pressing(buttons[index]) {
+                    standingInGroup(
+                        label(of: buttons[index])
+                            .frame(maxWidth: .infinity)
+                            .frame(height: model.groupButtonHeight),
+                        on: buttons[index]
+                    )
+                    .contentShape(.capsule)
+                }
+            }
+        }
+        .padding(.horizontal, model.groupPadding)
+        .frame(maxWidth: .infinity)
+        .frame(height: model.controlHeight)
+        .glass(in: Capsule())
+    }
+
+    /// A button of a group on what its model puts it on: the group's glass, which is under it already, or a fill of its
+    /// own in a capsule.
+    @ViewBuilder private func standingInGroup(
+        _ label: some View, on button: ButtonModel<TaskViewList.UserAction>
+    ) -> some View {
+        switch button.fill {
+        case .container:
+            label
+        case .color(let color):
+            label.background(Color(color), in: Capsule())
+        }
+    }
 }
 
 extension View {
-    /// The canvas's glass under a control of the bar, in its shape.
+    /// The canvas's glass under a control of the bar, in its shape: the platform's container.
     fileprivate func glass(in shape: some Shape) -> some View {
         background(.regularMaterial, in: shape)
             .overlay { shape.stroke(Color(.ink).opacity(0.08), lineWidth: 0.5) }
             .barShadow()
     }
 
-    /// The canvas's soft shadow under a control of the bar.
+    /// The canvas's soft shadow under a control of the bar, the platform's with the glass.
     fileprivate func barShadow() -> some View {
         shadow(color: .black.opacity(0.12), radius: 12, y: 5)
     }
