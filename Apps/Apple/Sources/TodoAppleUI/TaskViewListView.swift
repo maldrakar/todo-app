@@ -158,6 +158,7 @@ private struct MovePickerList: View {
                         Text(model.topLevel.title.text)
                         if model.topLevel.isChecked { Image(model.check.icon) }
                     }
+                    .padding(.leading, model.topLevel.leading)
                 }
                 ForEach(model.options.indices, id: \.self) { index in
                     let option = model.options[index]

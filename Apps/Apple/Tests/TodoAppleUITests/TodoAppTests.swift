@@ -225,15 +225,16 @@ import TodoCore
 
 /// A window is made with whether another can open beside it, which its view reads from the platform and the root hands
 /// to the sidebar, whose lists' menus offer Open in New Window only where one can (`docs/specs/navigation.md`,
-/// section 5): a window of the Mac's offers it on every list, and one of iPhone's on none.
+/// section 5): a window that can have another beside it offers it on every list, and one that cannot, on none, whatever
+/// the width of either.
 @Test @MainActor func aWindowIsMadeWithWhetherAnotherCanOpenBesideIt() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let mac = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
-        let phone = try app.makeWindow(path: nil, width: .narrow, supportsMultipleWindows: false).host
-        #expect(!mac.model.taskViewList.rows.isEmpty, "the built-in lists")
-        #expect(mac.model.taskViewList.rows.allSatisfy { offersANewWindow($0) })
-        #expect(!phone.model.taskViewList.rows.contains { offersANewWindow($0) })
+        let multiple = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let single = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: false).host
+        #expect(!multiple.model.taskViewList.rows.isEmpty, "the built-in lists")
+        #expect(multiple.model.taskViewList.rows.allSatisfy { offersANewWindow($0) })
+        #expect(!single.model.taskViewList.rows.contains { offersANewWindow($0) })
     }
 }
 
@@ -434,9 +435,6 @@ import TodoCore
     }
 }
 
-/// The titles of the list standing first over the sidebar in a window's model, read as the root view reads it, the
-/// first id of the layout, the narrow path's first or the wide column, and its screen's model, and nil when no list
-/// stands there.
 /// Whether a row of the sidebar is a list whose menu opens it in a new window.
 private func offersANewWindow(_ row: TaskViewList.Model.Row) -> Bool {
     guard case .list(let list) = row.kind, let menu = list.menu else { return false }
@@ -445,6 +443,9 @@ private func offersANewWindow(_ row: TaskViewList.Model.Row) -> Bool {
     }
 }
 
+/// The titles of the list standing first over the sidebar in a window's model, read as the root view reads it, the
+/// first id of the layout, the narrow path's first or the wide column, and its screen's model, and nil when no list
+/// stands there.
 private func listTitles(_ model: AppModule.Model) -> [String]? {
     let first = switch model.layout {
     case .narrow(let path): path.first
