@@ -59,7 +59,7 @@ private func accessories(
     count: String?, chevron: AccessoryModel<Action>.Chevron?, isEditing: Bool = false
 ) -> [AccessoryModel<Action>] {
     [
-        count.map { .count(TextModel(text: $0, font: .count, color: .ink2)) } ?? .space(20),
+        count.map { .text(TextModel(text: $0, font: .count, color: .ink2)) } ?? .space(20),
         chevron.map { .chevron($0) } ?? .space(36),
     ] + (isEditing ? [.grip(grip)] : [])
 }
@@ -109,7 +109,7 @@ private func phoneRow(
         height: 46, leading: leading, tile: tile, tileToTitle: 12,
         title: TextModel(text: title, font: font, color: .ink), field: nil, need: need, background: .paper,
         guides: guides, childGuides: childGuides, guide: guide,
-        accessories: accessories(count: count, chevron: chevron), fadeWidth: 10, countMinimumWidth: 20,
+        accessories: accessories(count: count, chevron: chevron), fadeWidth: 10, textMinimumWidth: 20,
         cellMinimumWidth: 36, endGap: 4, accessoriesWidth: 72,
         tap: .rowSelected(id), menu: listMenu(id, openInNewWindow: false)
     )
@@ -260,7 +260,7 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
         lists.map(\.need) == Array(repeating: 310, count: 6), "20 + 30 + 12 + 140 + 108, the grip's cell among them"
     )
     #expect(lists.map(\.fadeWidth) == Array(repeating: 10, count: 6), "the fade stays in edit mode")
-    #expect(lists.map(\.countMinimumWidth) == Array(repeating: 20, count: 6), "the empty count's cell holds the column")
+    #expect(lists.map(\.textMinimumWidth) == Array(repeating: 20, count: 6), "the empty count's cell holds the column")
     #expect(lists.map(\.cellMinimumWidth) == Array(repeating: 36, count: 6), "the grip's cell is a chevron's")
     #expect(lists.map(\.endGap) == Array(repeating: 4, count: 6), "4 at the end, after the grip")
     #expect(areaLine(work, in: editing.model)?.menu == nil)
@@ -454,7 +454,7 @@ private func homesPicker(
             height: 46, leading: leading, tile: tile, tileToTitle: 12,
             title: TextModel(text: title, font: font, color: .ink), field: nil,
             need: leading + tile.side + 12 + 140 + 38, background: .paper, guides: [], childGuides: [], guide: guide,
-            accessories: isChecked ? checked : unchecked, fadeWidth: 0, countMinimumWidth: 20, cellMinimumWidth: 0,
+            accessories: isChecked ? checked : unchecked, fadeWidth: 0, textMinimumWidth: 20, cellMinimumWidth: 0,
             endGap: 20, accessoriesWidth: 38, tap: .movePickerRowTapped(id), menu: nil
         ))
     }

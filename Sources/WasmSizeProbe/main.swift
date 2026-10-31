@@ -322,7 +322,7 @@ private enum WasmSizeProbe {
                 var isFolded = false
                 for accessory in list.accessories {
                     switch accessory {
-                    case .count(let text): count = text.text
+                    case .text(let text): count = text.text
                     case .chevron(let chevron): isFolded = chevron.rotation != 0
                     case .grip, .check, .space, .hidden: continue
                     }

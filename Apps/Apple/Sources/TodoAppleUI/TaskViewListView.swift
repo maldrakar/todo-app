@@ -218,7 +218,7 @@ private struct MovePickerList: View {
             switch accessories[index] {
             case .check(let check):
                 Image(check.icon)
-            case .count, .chevron, .grip, .space, .hidden:
+            case .text, .chevron, .grip, .space, .hidden:
                 EmptyView()
             }
         }

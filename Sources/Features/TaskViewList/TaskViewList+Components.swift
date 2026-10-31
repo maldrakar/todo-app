@@ -209,7 +209,7 @@ extension TaskViewList {
             background: isSelected ? .fill : .paper, guides: guides ?? [],
             childGuides: guides.map { $0 + [leading + tile.side / 2] } ?? [],
             guide: StrokeModel(color: .line, width: 1.5, dash: []), accessories: end.accessories,
-            fadeWidth: end.fadeWidth, countMinimumWidth: Phone.countWidth, cellMinimumWidth: end.cellMinimumWidth,
+            fadeWidth: end.fadeWidth, textMinimumWidth: Phone.countWidth, cellMinimumWidth: end.cellMinimumWidth,
             endGap: end.endGap, accessoriesWidth: end.accessoriesWidth, tap: tap, menu: menu
         )
     }
@@ -234,7 +234,7 @@ extension TaskViewList {
     /// on every platform, so that the column holds.
     private static func rowEnd(count: Int?, chevron: AccessoryModel<UserAction>.Chevron?, hasGrip: Bool) -> RowEnd {
         let counted: AccessoryModel<UserAction> = if let count {
-            .count(TextModel(text: String(count), font: .count, color: .ink2))
+            .text(TextModel(text: String(count), font: .count, color: .ink2))
         } else {
             .space(Phone.countWidth)
         }

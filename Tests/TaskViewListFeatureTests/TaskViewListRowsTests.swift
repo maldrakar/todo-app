@@ -71,7 +71,7 @@ func listRow(_ id: ViewID, in model: TaskViewList.Model) -> ListRowModel<TaskVie
 /// private, since the edits' and the components' tests read a count with it too.
 func drawnCount(of list: ListRowModel<TaskViewList.UserAction>) -> String {
     for accessory in list.accessories {
-        if case .count(let count) = accessory { return count.text }
+        if case .text(let count) = accessory { return count.text }
     }
     return ""
 }

@@ -77,7 +77,7 @@ struct MovePickerSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Accessories(
-                    topLevel.accessories, cellMinimumWidth: topLevel.cellMinimumWidth, countMinimumWidth: nil,
+                    topLevel.accessories, cellMinimumWidth: topLevel.cellMinimumWidth, textMinimumWidth: nil,
                     endGap: topLevel.endGap, height: topLevel.height, send: send
                 )
             }

@@ -61,7 +61,7 @@ extension ListRowView {
             let background = Color(model.background)
             Accessories(
                 model.accessories, cellMinimumWidth: model.cellMinimumWidth,
-                countMinimumWidth: model.countMinimumWidth, endGap: model.endGap, height: model.height, send: send
+                textMinimumWidth: model.textMinimumWidth, endGap: model.endGap, height: model.height, send: send
             )
             .padding(.leading, model.fadeWidth)
             .background {

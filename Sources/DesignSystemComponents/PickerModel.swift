@@ -15,7 +15,7 @@ import DesignSystem
 public final class PickerModel<Row: Equatable & Sendable, Action: Equatable & Sendable>: Equatable, Sendable {
     /// The top level, a row of its own: `height` high, a tile `tileSide` across at `leading` from its left edge with
     /// corners of `tileCornerRadius` in `tileColor` with `icon` on it, then `tileToTitle` after it the title, and at
-    /// its right its accessories in the order given, a count as wide as it reads, a chevron, a grip or a check each
+    /// its right its accessories in the order given, a text as wide as it reads, a chevron, a grip or a check each
     /// centred in a cell at least `cellMinimumWidth` wide and as wide as its glyph on its platform, a space as wide as
     /// it says and a hidden accessory's room empty, with `endGap` after them, in points; chosen where it is the present
     /// choice, which a view reads for what it says aloud, and sending `action` when tapped.

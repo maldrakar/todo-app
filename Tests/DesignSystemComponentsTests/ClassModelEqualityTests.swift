@@ -51,13 +51,13 @@ private func listRow(
     tileToTitle: Double = 12, title: TextModel = text, field: TextFieldModel<Action>? = nil, need: Double = 274,
     background: DesignSystem.Color = .paper, guides: [Double] = [], childGuides: [Double] = [35],
     guide: StrokeModel = stroke, accessories: [AccessoryModel<Action>] = [.space(20)], fadeWidth: Double = 10,
-    countMinimumWidth: Double = 20, cellMinimumWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72,
+    textMinimumWidth: Double = 20, cellMinimumWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72,
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> ListRowModel<Action> {
     ListRowModel(
         height: height, leading: leading, tile: tile, tileToTitle: tileToTitle, title: title, field: field, need: need,
         background: background, guides: guides, childGuides: childGuides, guide: guide, accessories: accessories,
-        fadeWidth: fadeWidth, countMinimumWidth: countMinimumWidth, cellMinimumWidth: cellMinimumWidth, endGap: endGap,
+        fadeWidth: fadeWidth, textMinimumWidth: textMinimumWidth, cellMinimumWidth: cellMinimumWidth, endGap: endGap,
         accessoriesWidth: accessoriesWidth, tap: tap, menu: menu
     )
 }
@@ -77,7 +77,7 @@ private func listRow(
         "guide": listRow(guide: StrokeModel(color: .line, width: 1.5, dash: [])),
         "accessories": listRow(accessories: [.space(20), .space(36)]),
         "fadeWidth": listRow(fadeWidth: 0),
-        "countMinimumWidth": listRow(countMinimumWidth: 22),
+        "textMinimumWidth": listRow(textMinimumWidth: 22),
         "cellMinimumWidth": listRow(cellMinimumWidth: 18),
         "endGap": listRow(endGap: 20),
         "accessoriesWidth": listRow(accessoriesWidth: 108),

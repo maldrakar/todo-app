@@ -3,8 +3,8 @@ import DesignSystemComponents
 import SwiftUI
 
 /// What stands at the right of a row or of a line as its models describe it (`AccessoryModel`), in the order given,
-/// each as high as what it stands on, and the gap after the last: a count set against the right of a cell at least the
-/// count's minimum width, or as wide as it reads where what it stands on gives none; a chevron, a grip or a check
+/// each as high as what it stands on, and the gap after the last: a text set against the right of a cell at least the
+/// text's minimum width, or as wide as it reads where what it stands on gives none; a chevron, a grip or a check
 /// centred in a cell at least the cell's minimum width and as wide as the glyph on this platform; a space as wide as it
 /// says; and an accessory hidden, its room kept and drawn empty. Every size is the model's of what the accessories
 /// stand on, a list's row (`ListRowView.End`), an area's line (`AreaLine`) or a picker's top level, so the view picks
@@ -16,7 +16,7 @@ import SwiftUI
 struct Accessories<Action: Equatable & Sendable>: View {
     private let models: [AccessoryModel<Action>]
     private let cellMinimumWidth: Double
-    private let countMinimumWidth: Double?
+    private let textMinimumWidth: Double?
     private let endGap: Double
     private let height: Double
     private let send: (Action) -> Void
@@ -25,15 +25,15 @@ struct Accessories<Action: Equatable & Sendable>: View {
     /// animation (`DesignSystem.Animation`).
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// The accessories in cells at least `cellMinimumWidth` wide and `height` high, a count's at least
-    /// `countMinimumWidth` wide where it is given, with `endGap` after them, in points.
+    /// The accessories in cells at least `cellMinimumWidth` wide and `height` high, a text's at least
+    /// `textMinimumWidth` wide where it is given, with `endGap` after them, in points.
     init(
-        _ models: [AccessoryModel<Action>], cellMinimumWidth: Double, countMinimumWidth: Double?, endGap: Double,
+        _ models: [AccessoryModel<Action>], cellMinimumWidth: Double, textMinimumWidth: Double?, endGap: Double,
         height: Double, send: @escaping (Action) -> Void
     ) {
         self.models = models
         self.cellMinimumWidth = cellMinimumWidth
-        self.countMinimumWidth = countMinimumWidth
+        self.textMinimumWidth = textMinimumWidth
         self.endGap = endGap
         self.height = height
         self.send = send
@@ -53,10 +53,10 @@ struct Accessories<Action: Equatable & Sendable>: View {
     /// motion.
     @ViewBuilder private func accessory(_ model: AccessoryModel<Action>, reduceMotion: Bool) -> some View {
         switch model {
-        case .count(let count):
-            Text(count)
+        case .text(let text):
+            Text(text)
                 .lineLimit(1)
-                .frame(minWidth: countMinimumWidth.map { CGFloat($0) }, alignment: .trailing)
+                .frame(minWidth: textMinimumWidth.map { CGFloat($0) }, alignment: .trailing)
         case .chevron(let chevron):
             Button { send(chevron.action) } label: {
                 Icon(chevron.icon)

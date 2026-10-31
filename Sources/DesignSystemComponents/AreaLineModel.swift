@@ -3,7 +3,7 @@ import DesignSystem
 
 /// An area's line in a tree as every platform draws it (`Phone.dc.html`, the area's row): `height` high, from `leading`
 /// the label, or the field in its place while the area is being renamed, then the line across the rest, `spacing`
-/// after them, then `lineToAccessories` after the line its accessories in the order given, a count as wide as it
+/// after them, then `lineToAccessories` after the line its accessories in the order given, a text as wide as it
 /// reads, a chevron, a grip or a check each centred in a cell at least `cellMinimumWidth` wide and as wide as its
 /// glyph on its platform, a space as wide as it says and a hidden accessory's room empty, and `endGap` after them
 /// short of the right edge of what it is laid out on, in points. The model holds every value its

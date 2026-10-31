@@ -47,14 +47,14 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     public let guide: StrokeModel
 
     /// What stands at the right of the row, in the order given (`Phone.dc.html`, the row's sticky end): over a fade
-    /// `fadeWidth` wide from clear to the row's background, so that a title running under them ends softly, a count set
-    /// against the right of a cell at least `countMinimumWidth` wide, a chevron, a grip or a check each centred in a
+    /// `fadeWidth` wide from clear to the row's background, so that a title running under them ends softly, a text set
+    /// against the right of a cell at least `textMinimumWidth` wide, a chevron, a grip or a check each centred in a
     /// cell at least `cellMinimumWidth` wide and as wide as its glyph on its platform, a space as wide as it says, a
     /// hidden accessory's room empty, and `endGap` at the end, all on the row's background and as high as the row, in
     /// points.
     public let accessories: [AccessoryModel<Action>]
     public let fadeWidth: Double
-    public let countMinimumWidth: Double
+    public let textMinimumWidth: Double
     public let cellMinimumWidth: Double
     public let endGap: Double
 
@@ -81,7 +81,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         guide: StrokeModel,
         accessories: [AccessoryModel<Action>],
         fadeWidth: Double,
-        countMinimumWidth: Double,
+        textMinimumWidth: Double,
         cellMinimumWidth: Double,
         endGap: Double,
         accessoriesWidth: Double,
@@ -101,7 +101,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         self.guide = guide
         self.accessories = accessories
         self.fadeWidth = fadeWidth
-        self.countMinimumWidth = countMinimumWidth
+        self.textMinimumWidth = textMinimumWidth
         self.cellMinimumWidth = cellMinimumWidth
         self.endGap = endGap
         self.accessoriesWidth = accessoriesWidth
@@ -124,7 +124,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
             && lhs.guide == rhs.guide
             && lhs.accessories == rhs.accessories
             && lhs.fadeWidth == rhs.fadeWidth
-            && lhs.countMinimumWidth == rhs.countMinimumWidth
+            && lhs.textMinimumWidth == rhs.textMinimumWidth
             && lhs.cellMinimumWidth == rhs.cellMinimumWidth
             && lhs.endGap == rhs.endGap
             && lhs.accessoriesWidth == rhs.accessoriesWidth
