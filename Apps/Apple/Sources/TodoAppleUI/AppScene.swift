@@ -64,7 +64,7 @@ extension AppScene {
     /// the system's New Window opened it. On iOS the commands are the iPad's menu bar and the list a held ⌘ shows: the
     /// bar with edit mode carries no keys, so New Task, New List and New Area stand there without them, and New Window
     /// where the iPad opens windows beside one another (`supportsMultipleWindows`), never on iPhone.
-    struct NewItemCommands: Commands {
+    private struct NewItemCommands: Commands {
         /// The focused window's "+" menu, and nil when no window is focused.
         @FocusedValue(\.addMenu) private var addMenu
 

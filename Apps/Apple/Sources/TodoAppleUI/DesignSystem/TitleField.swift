@@ -33,7 +33,7 @@ struct TitleField<Action: Equatable & Sendable>: View {
             // Esc. iOS and watchOS lack the modifier; what cancels a rename there is decided when they arrive.
             .onExitCommand { send(model.cancelled) }
             #endif
-            // A field opens for a person to type in, whether the menu or the toolbar opened it.
+            // A field opens for a person to type in, whether a row's menu, the bar's "+" or the File menu opened it.
             .onAppear { isFocused = true }
             .onChange(of: isFocused) { _, focused in
                 guard !focused else { return }
