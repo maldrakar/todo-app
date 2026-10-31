@@ -25,16 +25,16 @@ private func areaLine(_ id: ViewID, in model: TaskViewList.Model) -> AreaLineMod
 /// open beside this one, and Move to…, then, after a divider, Delete.
 private func listMenu(_ id: ViewID, openInNewWindow: Bool) -> MenuModel<Action> {
     let window: [MenuModel<Action>.Item] = openInNewWindow
-        ? [.init(title: "Open in New Window", icon: .newWindow, isDestructive: false, action: .openInNewWindowMenuItemChosen(id))]
+        ? [.init(title: "Open in New Window", icon: .newWindow, isDestructive: false, shortcut: nil, action: .openInNewWindowMenuItemChosen(id))]
         : []
     return MenuModel(sections: [
         .init(items: [
-            .init(title: "Rename", icon: .pen, isDestructive: false, action: .renameMenuItemChosen(id)),
-            .init(title: "New List", icon: .plus, isDestructive: false, action: .newListMenuItemChosen(in: id)),
+            .init(title: "Rename", icon: .pen, isDestructive: false, shortcut: nil, action: .renameMenuItemChosen(id)),
+            .init(title: "New List", icon: .plus, isDestructive: false, shortcut: nil, action: .newListMenuItemChosen(in: id)),
         ] + window + [
-            .init(title: "Move to…", icon: .folder, isDestructive: false, action: .moveToMenuItemChosen(id)),
+            .init(title: "Move to…", icon: .folder, isDestructive: false, shortcut: nil, action: .moveToMenuItemChosen(id)),
         ]),
-        .init(items: [.init(title: "Delete", icon: .trash, isDestructive: true, action: .deleteMenuItemChosen(id))]),
+        .init(items: [.init(title: "Delete", icon: .trash, isDestructive: true, shortcut: nil, action: .deleteMenuItemChosen(id))]),
     ])
 }
 
@@ -43,10 +43,10 @@ private func listMenu(_ id: ViewID, openInNewWindow: Bool) -> MenuModel<Action> 
 private func lineMenu(_ id: ViewID) -> MenuModel<Action> {
     MenuModel(sections: [
         .init(items: [
-            .init(title: "Rename", icon: .pen, isDestructive: false, action: .renameMenuItemChosen(id)),
-            .init(title: "New List", icon: .plus, isDestructive: false, action: .newListMenuItemChosen(in: id)),
+            .init(title: "Rename", icon: .pen, isDestructive: false, shortcut: nil, action: .renameMenuItemChosen(id)),
+            .init(title: "New List", icon: .plus, isDestructive: false, shortcut: nil, action: .newListMenuItemChosen(in: id)),
         ]),
-        .init(items: [.init(title: "Delete Area", icon: .trash, isDestructive: true, action: .deleteMenuItemChosen(id))]),
+        .init(items: [.init(title: "Delete Area", icon: .trash, isDestructive: true, shortcut: nil, action: .deleteMenuItemChosen(id))]),
     ])
 }
 
@@ -108,7 +108,7 @@ private func phoneRow(
     ListRowModel(
         height: 46, leading: leading, tile: tile, tileToTitle: 12,
         title: TextModel(text: title, font: font, color: .ink), field: nil, need: need, background: .paper,
-        guides: guides, childGuides: childGuides, guide: guide,
+        backgroundInset: 0, cornerRadius: 0, guides: guides, childGuides: childGuides, guide: guide,
         accessories: accessories(count: count, chevron: chevron), fadeWidth: 10, textMinimumWidth: 20,
         cellMinimumWidth: 36, endGap: 4, accessoriesWidth: 72,
         tap: .rowSelected(id), menu: listMenu(id, openInNewWindow: false)
@@ -291,14 +291,14 @@ private func barOutsideEditMode() -> BarModel<Action> {
             accessibilityLabel: "More", fill: .container
         ),
         menu: MenuModel(sections: [
-            .init(items: [.init(title: "Edit", icon: .grip, isDestructive: false, action: .editMenuItemChosen)]),
+            .init(items: [.init(title: "Edit", icon: .grip, isDestructive: false, shortcut: nil, action: .editMenuItemChosen)]),
         ])
     )
     let search = SearchFieldModel(
         placeholder: TextModel(text: "Search", font: .search, color: .ink2),
         leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
-        trailingIcon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), trailingCell: 36,
-        spacing: 8, leadingPadding: 15, trailingPadding: 6
+        trailingGlyph: .init(icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36),
+        spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container, cornerRadius: 24
     )
     let add = MenuButtonModel<Action>(
         label: ButtonLabelModel(
@@ -307,9 +307,9 @@ private func barOutsideEditMode() -> BarModel<Action> {
         ),
         menu: MenuModel(sections: [
             .init(items: [
-                .init(title: "New Task", icon: .checkCircle, isDestructive: false, action: .newTaskMenuItemChosen),
-                .init(title: "New List", icon: .list, isDestructive: false, action: .newListMenuItemChosen(in: nil)),
-                .init(title: "New Area", icon: .divider, isDestructive: false, action: .newAreaMenuItemChosen),
+                .init(title: "New Task", icon: .checkCircle, isDestructive: false, shortcut: nil, action: .newTaskMenuItemChosen),
+                .init(title: "New List", icon: .list, isDestructive: false, shortcut: nil, action: .newListMenuItemChosen(in: nil)),
+                .init(title: "New Area", icon: .divider, isDestructive: false, shortcut: nil, action: .newAreaMenuItemChosen),
             ]),
         ])
     )
@@ -349,8 +349,9 @@ private func barInEditMode() -> BarModel<Action> {
 /// glyph 6 before the word, 4 in from the group's ends, with a rule of the line colour 1 by 22 between two.
 private func phoneBar(_ items: [BarModel<Action>.Item]) -> BarModel<Action> {
     BarModel(
-        items: items, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40, groupButtonSpacing: 6,
-        groupPadding: 4, groupDividerHeight: 22, groupDivider: StrokeModel(color: .line, width: 1, dash: [])
+        items: items, height: 48, rule: nil, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40,
+        groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
+        groupDivider: StrokeModel(color: .line, width: 1, dash: []), buttonShadow: .raised
     )
 }
 
@@ -372,15 +373,17 @@ private func phoneBar(_ items: [BarModel<Action>.Item]) -> BarModel<Action> {
 private func phoneDrag() -> DragModel {
     DragModel(
         indent: IndentModel(start: 20, step: 22), animation: .popover,
-        slot: .init(
-            height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
-            stroke: StrokeModel(color: .accent, width: 1.5, dash: [5, 4])
-        ),
-        card: .init(
-            raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
-            grip: IconModel(icon: .grip, size: 18, weight: .regular, color: .ink2), gripCell: 40, minimumWidth: 120,
-            listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14, lineHeight: 36,
-            lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
+        look: .slot(
+            .init(
+                height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
+                stroke: StrokeModel(color: .accent, width: 1.5, dash: [5, 4])
+            ),
+            .init(
+                raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
+                grip: IconModel(icon: .grip, size: 18, weight: .regular, color: .ink2), gripCell: 40, minimumWidth: 120,
+                listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14, lineHeight: 36,
+                lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
+            )
         )
     )
 }
@@ -453,7 +456,8 @@ private func homesPicker(
         return .list(ListRowModel(
             height: 46, leading: leading, tile: tile, tileToTitle: 12,
             title: TextModel(text: title, font: font, color: .ink), field: nil,
-            need: leading + tile.side + 12 + 140 + 38, background: .paper, guides: [], childGuides: [], guide: guide,
+            need: leading + tile.side + 12 + 140 + 38, background: .paper, backgroundInset: 0, cornerRadius: 0,
+            guides: [], childGuides: [], guide: guide,
             accessories: isChecked ? checked : unchecked, fadeWidth: 0, textMinimumWidth: 20, cellMinimumWidth: 0,
             endGap: 20, accessoriesWidth: 38, tap: .movePickerRowTapped(id), menu: nil
         ))

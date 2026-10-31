@@ -74,8 +74,9 @@ extension TaskViewList {
             [.menuButton(moreButton), .search(searchField), .menuButton(addButton)]
         }
         return BarModel(
-            items: items, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40, groupButtonSpacing: 6,
-            groupPadding: 4, groupDividerHeight: 22, groupDivider: StrokeModel(color: .line, width: 1, dash: [])
+            items: items, height: 48, rule: nil, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40,
+            groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
+            groupDivider: StrokeModel(color: .line, width: 1, dash: []), buttonShadow: .raised
         )
     }
 
@@ -93,15 +94,17 @@ extension TaskViewList {
     /// as much as the line card's.
     static let drag = DragModel(
         indent: Phone.indent, animation: .popover,
-        slot: DragModel.Slot(
-            height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
-            stroke: StrokeModel(color: .accent, width: 1.5, dash: [5, 4])
-        ),
-        card: DragModel.Card(
-            raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
-            grip: IconModel(icon: .grip, size: Phone.gripSize, weight: .regular, color: .ink2), gripCell: 40,
-            minimumWidth: 120, listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14,
-            lineHeight: 36, lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
+        look: .slot(
+            DragModel.Slot(
+                height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
+                stroke: StrokeModel(color: .accent, width: 1.5, dash: [5, 4])
+            ),
+            DragModel.Card(
+                raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
+                grip: IconModel(icon: .grip, size: Phone.gripSize, weight: .regular, color: .ink2), gripCell: 40,
+                minimumWidth: 120, listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6,
+                listCornerRadius: 14, lineHeight: 36, lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
+            )
         )
     )
 
@@ -206,7 +209,7 @@ extension TaskViewList {
                 )
             },
             need: leading + tile.side + Phone.tileToTitle + Phone.titleWidth + end.accessoriesWidth,
-            background: isSelected ? .fill : .paper, guides: guides ?? [],
+            background: isSelected ? .fill : .paper, backgroundInset: 0, cornerRadius: 0, guides: guides ?? [],
             childGuides: guides.map { $0 + [leading + tile.side / 2] } ?? [],
             guide: StrokeModel(color: .line, width: 1.5, dash: []), accessories: end.accessories,
             fadeWidth: end.fadeWidth, textMinimumWidth: Phone.countWidth, cellMinimumWidth: end.cellMinimumWidth,
@@ -322,7 +325,7 @@ extension TaskViewList {
         let window: [MenuModel<UserAction>.Item] = if supportsMultipleWindows {
             [
                 .init(
-                    title: "Open in New Window", icon: .newWindow, isDestructive: false,
+                    title: "Open in New Window", icon: .newWindow, isDestructive: false, shortcut: nil,
                     action: .openInNewWindowMenuItemChosen(id)
                 ),
             ]
@@ -331,10 +334,16 @@ extension TaskViewList {
         }
         return MenuModel(sections: [
             .init(items: renameAndNewList(id) + window + [
-                .init(title: "Move to…", icon: .folder, isDestructive: false, action: .moveToMenuItemChosen(id)),
+                .init(
+                    title: "Move to…", icon: .folder, isDestructive: false, shortcut: nil,
+                    action: .moveToMenuItemChosen(id)
+                ),
             ]),
             .init(items: [
-                .init(title: Words.delete, icon: .trash, isDestructive: true, action: .deleteMenuItemChosen(id)),
+                .init(
+                    title: Words.delete, icon: .trash, isDestructive: true, shortcut: nil,
+                    action: .deleteMenuItemChosen(id)
+                ),
             ]),
         ])
     }
@@ -346,7 +355,10 @@ extension TaskViewList {
         MenuModel(sections: [
             .init(items: renameAndNewList(id)),
             .init(items: [
-                .init(title: "Delete Area", icon: .trash, isDestructive: true, action: .deleteMenuItemChosen(id)),
+                .init(
+                    title: "Delete Area", icon: .trash, isDestructive: true, shortcut: nil,
+                    action: .deleteMenuItemChosen(id)
+                ),
             ]),
         ])
     }
@@ -355,8 +367,11 @@ extension TaskViewList {
     /// area.
     private static func renameAndNewList(_ id: ViewID) -> [MenuModel<UserAction>.Item] {
         [
-            .init(title: "Rename", icon: .pen, isDestructive: false, action: .renameMenuItemChosen(id)),
-            .init(title: Words.newList, icon: .plus, isDestructive: false, action: .newListMenuItemChosen(in: id)),
+            .init(title: "Rename", icon: .pen, isDestructive: false, shortcut: nil, action: .renameMenuItemChosen(id)),
+            .init(
+                title: Words.newList, icon: .plus, isDestructive: false, shortcut: nil,
+                action: .newListMenuItemChosen(in: id)
+            ),
         ]
     }
 
@@ -368,7 +383,9 @@ extension TaskViewList {
             accessibilityLabel: "More", fill: .container
         ),
         menu: MenuModel(sections: [
-            .init(items: [.init(title: "Edit", icon: .grip, isDestructive: false, action: .editMenuItemChosen)]),
+            .init(items: [
+                .init(title: "Edit", icon: .grip, isDestructive: false, shortcut: nil, action: .editMenuItemChosen),
+            ]),
         ])
     )
 
@@ -378,8 +395,8 @@ extension TaskViewList {
     private static let searchField = SearchFieldModel(
         placeholder: TextModel(text: "Search", font: .search, color: .ink2),
         leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
-        trailingIcon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), trailingCell: 36,
-        spacing: 8, leadingPadding: 15, trailingPadding: 6
+        trailingGlyph: .init(icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36),
+        spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container, cornerRadius: 24
     )
 
     /// "+", on the accent, a menu that makes a task, a list or an area: where each goes, and that a task is quick
@@ -391,9 +408,18 @@ extension TaskViewList {
         ),
         menu: MenuModel(sections: [
             .init(items: [
-                .init(title: "New Task", icon: .checkCircle, isDestructive: false, action: .newTaskMenuItemChosen),
-                .init(title: Words.newList, icon: .list, isDestructive: false, action: .newListMenuItemChosen(in: nil)),
-                .init(title: Words.newArea, icon: .divider, isDestructive: false, action: .newAreaMenuItemChosen),
+                .init(
+                    title: "New Task", icon: .checkCircle, isDestructive: false, shortcut: nil,
+                    action: .newTaskMenuItemChosen
+                ),
+                .init(
+                    title: Words.newList, icon: .list, isDestructive: false, shortcut: nil,
+                    action: .newListMenuItemChosen(in: nil)
+                ),
+                .init(
+                    title: Words.newArea, icon: .divider, isDestructive: false, shortcut: nil,
+                    action: .newAreaMenuItemChosen
+                ),
             ]),
         ])
     )

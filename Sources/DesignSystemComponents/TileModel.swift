@@ -11,7 +11,7 @@ import DesignSystem
 /// `TileModel` was the module's first top-level name, probed free as `DesignSystem` was: unresolved in a file importing
 /// SwiftUI, Foundation and Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-10-26). The names
 /// beside it were probed the same way, fifteen on 2026-10-30, and `ButtonLabelModel`, `MenuButtonModel`,
-/// `AccessoryModel` and `TextFieldModel`, the name `FieldModel` took, on 2026-10-31.
+/// `AccessoryModel` and `TextFieldModel`, the name `FieldModel` took, and later `FillModel`, on 2026-10-31.
 public struct TileModel: Equatable, Sendable {
     /// The glyph on the tile: its icon, size and weight.
     public struct Glyph: Equatable, Sendable {

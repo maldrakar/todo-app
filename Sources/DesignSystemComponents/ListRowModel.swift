@@ -1,12 +1,12 @@
 // Sources/DesignSystemComponents/ListRowModel.swift
 import DesignSystem
 
-/// A list's row in a tree as every platform draws it (`Phone.dc.html`, `.vrow`): `height` high on its background, its
-/// tile at `leading`, the title `tileToTitle` after the tile, or the field in its place while the row is being renamed,
-/// the guides of the levels it stands under behind it, and its accessories at its right. The model holds every value
-/// its platform needs to draw it, so a view decides nothing but what is the platform's: the gestures, the sideways
-/// scroll that keeps the accessories at the right edge of the screen, focus and Reduce Motion (ADR-0007, amendment of
-/// 2026-10-30).
+/// A list's row in a tree as every platform draws it (`Phone.dc.html`, `.vrow`; `Mac.dc.html`, a list's row): `height`
+/// high on its background, its tile at `leading`, the title `tileToTitle` after the tile, or the field in its place
+/// while the row is being renamed, the guides of the levels it stands under behind it, and its accessories at its
+/// right. The model holds every value its platform needs to draw it, so a view decides nothing but what is the
+/// platform's: the gestures, the sideways scroll that keeps the accessories at the right edge of the screen, focus and
+/// Reduce Motion (ADR-0007, amendment of 2026-10-30).
 ///
 /// A class, so that a row's kind, an option of a picker and every copy of either hold a reference to the row and not
 /// the row, some 750 bytes on wasm32, which a debug build puts on the stack at every copy and every comparison (the
@@ -35,8 +35,11 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     /// sideways.
     public let need: Double
 
-    /// The colour under the whole row, its accessories included.
+    /// The colour under the whole row, its accessories included, `backgroundInset` in from either side of the tree, so
+    /// that the accessories end that far short of its right edge too, with corners of `cornerRadius`, in points.
     public let background: DesignSystem.Color
+    public let backgroundInset: Double
+    public let cornerRadius: Double
 
     /// Where the guides of the levels the row stands under run, one under the centre of each ancestor's tile, from the
     /// tree's leading edge, in points, drawn the whole height of the row in `guide`, so that the rows of a branch join
@@ -76,6 +79,8 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         field: TextFieldModel<Action>?,
         need: Double,
         background: DesignSystem.Color,
+        backgroundInset: Double,
+        cornerRadius: Double,
         guides: [Double],
         childGuides: [Double],
         guide: StrokeModel,
@@ -96,6 +101,8 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         self.field = field
         self.need = need
         self.background = background
+        self.backgroundInset = backgroundInset
+        self.cornerRadius = cornerRadius
         self.guides = guides
         self.childGuides = childGuides
         self.guide = guide
@@ -119,6 +126,8 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
             && lhs.field == rhs.field
             && lhs.need == rhs.need
             && lhs.background == rhs.background
+            && lhs.backgroundInset == rhs.backgroundInset
+            && lhs.cornerRadius == rhs.cornerRadius
             && lhs.guides == rhs.guides
             && lhs.childGuides == rhs.childGuides
             && lhs.guide == rhs.guide

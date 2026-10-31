@@ -182,7 +182,7 @@ private enum WasmSizeProbe {
         perform(.action(.taskViewList(.deleteMenuItemChosen(BuiltInTaskViews.trash))))
         let asked = app.model.taskViewList.confirmation.map { "\($0.title) \($0.confirm.title) or \($0.cancel.title)" }
         perform(.action(.taskViewList(.deleteCancelled)))
-        let drag = app.model.taskViewList.drag
+        let drag = dragLine(of: app.model)
         perform(.action(.taskViewList(.newTaskMenuItemChosen)))
         let askedForQuickEntry = app.model.quickEntry != nil
         let wideSidebar = sidebarLine(of: app.model)
@@ -232,7 +232,7 @@ private enum WasmSizeProbe {
         print("root \(root.taskViewList.rows.count) rows, renamed \(renamed), new list \(newListDraft), quick entry from the sidebar \(askedForQuickEntry), problem \(root.taskViewList.problem != nil)")
         print("sidebar wide \(wideSidebar); narrow \(narrowSidebar)")
         print("picker \(picker), then dropped \(dropped)")
-        print("bar \(bar); in edit mode \(editBar); asked \(asked ?? "nothing"); drag's slot \(drag.slot.height) pt at depth 2 from \(drag.indent.leading(atDepth: 2)), its card at \(drag.card.scale)")
+        print("bar \(bar); in edit mode \(editBar); asked \(asked ?? "nothing"); drag \(drag)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
@@ -380,6 +380,19 @@ private enum WasmSizeProbe {
             return "\(label.accessibilityLabel) \(press) \(fill)"
         }
         return "\(labels.joined(separator: ", ")), search \(search)"
+    }
+
+    /// The look of the sidebar's drag as a line: what marks a drop at depth 2, where it starts, and the card, through
+    /// one switch over the drag's looks, as the drag's view has.
+    private static func dragLine(of model: AppModule.Model) -> String {
+        let drag = model.taskViewList.drag
+        let tile = drag.indent.leading(atDepth: 2)
+        switch drag.look {
+        case .slot(let slot, let card):
+            return "a slot \(slot.height) pt from \(tile - slot.inset), its card at \(card.scale)"
+        case .indicator(let indicator):
+            return "a line \(indicator.line.width) pt from \(tile + indicator.lineOffset), its card \(indicator.card.width) wide"
+        }
     }
 
     /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.
