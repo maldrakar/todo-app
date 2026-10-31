@@ -16,8 +16,9 @@ public final class PickerModel<Row: Equatable & Sendable, Action: Equatable & Se
     /// The top level, a row of its own: `height` high, a tile `tileSide` across at `leading` from its left edge with
     /// corners of `tileCornerRadius` in `tileColor` with `icon` on it, then `tileToTitle` after it the title, and at
     /// its right its accessories in the order given, a count as wide as it reads, a chevron, a grip or a check each
-    /// centred in a cell `cellWidth` wide and a space as wide as it says, with `endGap` after them, in points; chosen
-    /// where it is the present choice, which a view reads for what it says aloud, and sending `action` when tapped.
+    /// centred in a cell at least `cellMinimumWidth` wide and as wide as its glyph on its platform, a space as wide as
+    /// it says and a hidden accessory's room empty, with `endGap` after them, in points; chosen where it is the present
+    /// choice, which a view reads for what it says aloud, and sending `action` when tapped.
     public struct TopLevel: Equatable, Sendable {
         public let icon: IconModel
         public let tileSide: Double
@@ -28,7 +29,7 @@ public final class PickerModel<Row: Equatable & Sendable, Action: Equatable & Se
         public let leading: Double
         public let height: Double
         public let accessories: [AccessoryModel<Action>]
-        public let cellWidth: Double
+        public let cellMinimumWidth: Double
         public let endGap: Double
         public let isChecked: Bool
         public let action: Action
@@ -43,7 +44,7 @@ public final class PickerModel<Row: Equatable & Sendable, Action: Equatable & Se
             leading: Double,
             height: Double,
             accessories: [AccessoryModel<Action>],
-            cellWidth: Double,
+            cellMinimumWidth: Double,
             endGap: Double,
             isChecked: Bool,
             action: Action
@@ -57,7 +58,7 @@ public final class PickerModel<Row: Equatable & Sendable, Action: Equatable & Se
             self.leading = leading
             self.height = height
             self.accessories = accessories
-            self.cellWidth = cellWidth
+            self.cellMinimumWidth = cellMinimumWidth
             self.endGap = endGap
             self.isChecked = isChecked
             self.action = action

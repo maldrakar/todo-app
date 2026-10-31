@@ -8,7 +8,7 @@ import DesignSystem
 ///
 /// The action that carries the typed text is not here: it is made from that text, and the function that makes it is
 /// no value a model can hold, since a function has no `==`. A field's view takes that function beside the model and
-/// sends what it makes on every keystroke (the owner's 👍 on #163's thread r4431104202).
+/// sends what it makes on every keystroke (the owner, on #163's thread r4431104202).
 public struct TextFieldModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// What the field holds, as the person typed it, down to the spaces at its ends.
     public let text: String

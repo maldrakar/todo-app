@@ -310,7 +310,10 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     _ = try store.apply([parent(of: work, .text(projects.rawValue), at: 1_800_000_000_000)])
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
-    #expect(listRow(work, in: list.model).flatMap(drawnChevron) != nil, "nested, the area reads as a list; this is the setup")
+    #expect(
+        listRow(work, in: list.model).flatMap(drawnChevron) != nil,
+        "nested, the area reads as a list; this is the setup"
+    )
     #expect(list.send(.action(.disclosureTapped(work))) == nil)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work], "folded as a list")
     let moved = try changeSet(of: store) { _ = try store.apply([parent(of: work, .null, at: 1_800_000_000_001)]) }

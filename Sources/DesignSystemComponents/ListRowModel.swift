@@ -49,12 +49,13 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     /// What stands at the right of the row, in the order given (`Phone.dc.html`, the row's sticky end): over a fade
     /// `fadeWidth` wide from clear to the row's background, so that a title running under them ends softly, a count set
     /// against the right of a cell at least `countMinimumWidth` wide, a chevron, a grip or a check each centred in a
-    /// cell `cellWidth` wide, a space as wide as it says, and `endGap` at the end, all on the row's background and as
-    /// high as the row, in points.
+    /// cell at least `cellMinimumWidth` wide and as wide as its glyph on its platform, a space as wide as it says, a
+    /// hidden accessory's room empty, and `endGap` at the end, all on the row's background and as high as the row, in
+    /// points.
     public let accessories: [AccessoryModel<Action>]
     public let fadeWidth: Double
     public let countMinimumWidth: Double
-    public let cellWidth: Double
+    public let cellMinimumWidth: Double
     public let endGap: Double
 
     /// How much of the row the accessories take, which the title leaves them: what they draw, with room to spare.
@@ -81,7 +82,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         accessories: [AccessoryModel<Action>],
         fadeWidth: Double,
         countMinimumWidth: Double,
-        cellWidth: Double,
+        cellMinimumWidth: Double,
         endGap: Double,
         accessoriesWidth: Double,
         tap: Action,
@@ -101,7 +102,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         self.accessories = accessories
         self.fadeWidth = fadeWidth
         self.countMinimumWidth = countMinimumWidth
-        self.cellWidth = cellWidth
+        self.cellMinimumWidth = cellMinimumWidth
         self.endGap = endGap
         self.accessoriesWidth = accessoriesWidth
         self.tap = tap
@@ -124,7 +125,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
             && lhs.accessories == rhs.accessories
             && lhs.fadeWidth == rhs.fadeWidth
             && lhs.countMinimumWidth == rhs.countMinimumWidth
-            && lhs.cellWidth == rhs.cellWidth
+            && lhs.cellMinimumWidth == rhs.cellMinimumWidth
             && lhs.endGap == rhs.endGap
             && lhs.accessoriesWidth == rhs.accessoriesWidth
             && lhs.tap == rhs.tap

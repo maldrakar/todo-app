@@ -51,13 +51,13 @@ private func listRow(
     tileToTitle: Double = 12, title: TextModel = text, field: TextFieldModel<Action>? = nil, need: Double = 274,
     background: DesignSystem.Color = .paper, guides: [Double] = [], childGuides: [Double] = [35],
     guide: StrokeModel = stroke, accessories: [AccessoryModel<Action>] = [.space(20)], fadeWidth: Double = 10,
-    countMinimumWidth: Double = 20, cellWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72,
+    countMinimumWidth: Double = 20, cellMinimumWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72,
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> ListRowModel<Action> {
     ListRowModel(
         height: height, leading: leading, tile: tile, tileToTitle: tileToTitle, title: title, field: field, need: need,
         background: background, guides: guides, childGuides: childGuides, guide: guide, accessories: accessories,
-        fadeWidth: fadeWidth, countMinimumWidth: countMinimumWidth, cellWidth: cellWidth, endGap: endGap,
+        fadeWidth: fadeWidth, countMinimumWidth: countMinimumWidth, cellMinimumWidth: cellMinimumWidth, endGap: endGap,
         accessoriesWidth: accessoriesWidth, tap: tap, menu: menu
     )
 }
@@ -78,7 +78,7 @@ private func listRow(
         "accessories": listRow(accessories: [.space(20), .space(36)]),
         "fadeWidth": listRow(fadeWidth: 0),
         "countMinimumWidth": listRow(countMinimumWidth: 22),
-        "cellWidth": listRow(cellWidth: 18),
+        "cellMinimumWidth": listRow(cellMinimumWidth: 18),
         "endGap": listRow(endGap: 20),
         "accessoriesWidth": listRow(accessoriesWidth: 108),
         "tap": listRow(tap: .second),
@@ -89,13 +89,13 @@ private func listRow(
 private func areaLine(
     height: Double = 36, leading: Double = 20, spacing: Double = 10, label: TextModel? = text,
     field: TextFieldModel<Action>? = nil, line: StrokeModel = stroke, lineToAccessories: Double = 20,
-    accessories: [AccessoryModel<Action>] = [], cellWidth: Double = 22, endGap: Double = 0, tap: Action = .first,
+    accessories: [AccessoryModel<Action>] = [], cellMinimumWidth: Double = 22, endGap: Double = 0, tap: Action = .first,
     menu: MenuModel<Action>? = nil
 ) -> AreaLineModel<Action> {
     AreaLineModel(
         height: height, leading: leading, spacing: spacing, label: label, field: field, line: line,
-        lineToAccessories: lineToAccessories, accessories: accessories, cellWidth: cellWidth, endGap: endGap, tap: tap,
-        menu: menu
+        lineToAccessories: lineToAccessories, accessories: accessories, cellMinimumWidth: cellMinimumWidth,
+        endGap: endGap, tap: tap, menu: menu
     )
 }
 
@@ -109,7 +109,7 @@ private func areaLine(
         "line": areaLine(line: StrokeModel(color: .line, width: 2, dash: [])),
         "lineToAccessories": areaLine(lineToAccessories: 10),
         "accessories": areaLine(accessories: [.grip(icon)]),
-        "cellWidth": areaLine(cellWidth: 18),
+        "cellMinimumWidth": areaLine(cellMinimumWidth: 18),
         "endGap": areaLine(endGap: 12),
         "tap": areaLine(tap: .second),
         "menu": areaLine(menu: menu),
@@ -150,7 +150,7 @@ private func drag(
 
 private let topLevel = PickerModel<Int, Action>.TopLevel(
     icon: icon, tileSide: 30, tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12, title: text, leading: 20,
-    height: 46, accessories: [.space(18)], cellWidth: 18, endGap: 20, isChecked: false, action: .first
+    height: 46, accessories: [.space(18)], cellMinimumWidth: 18, endGap: 20, isChecked: false, action: .first
 )
 
 private let cancel = ChoiceModel<Action>(title: "Cancel", isDestructive: false, action: .second)
@@ -174,7 +174,7 @@ private func picker(
         "cancel": picker(cancel: ChoiceModel(title: "Cancel", isDestructive: false, action: .first)),
         "topLevel": picker(topLevel: .init(
             icon: icon, tileSide: 30, tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12, title: text, leading: 20,
-            height: 46, accessories: [.check(icon)], cellWidth: 18, endGap: 20, isChecked: true, action: .first
+            height: 46, accessories: [.check(icon)], cellMinimumWidth: 18, endGap: 20, isChecked: true, action: .first
         )),
         "options": picker(options: [.init(row: 1, isDisabled: true, isChecked: true)]),
         "hintGap": picker(hintGap: 10),

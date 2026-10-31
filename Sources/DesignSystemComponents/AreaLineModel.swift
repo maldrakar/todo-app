@@ -4,8 +4,9 @@ import DesignSystem
 /// An area's line in a tree as every platform draws it (`Phone.dc.html`, the area's row): `height` high, from `leading`
 /// the label, or the field in its place while the area is being renamed, then the line across the rest, `spacing`
 /// after them, then `lineToAccessories` after the line its accessories in the order given, a count as wide as it
-/// reads, a chevron, a grip or a check each centred in a cell `cellWidth` wide and a space as wide as it says, and
-/// `endGap` after them short of the right edge of what it is laid out on, in points. The model holds every value its
+/// reads, a chevron, a grip or a check each centred in a cell at least `cellMinimumWidth` wide and as wide as its
+/// glyph on its platform, a space as wide as it says and a hidden accessory's room empty, and `endGap` after them
+/// short of the right edge of what it is laid out on, in points. The model holds every value its
 /// platform needs to draw it, so a view decides nothing but what is the platform's (ADR-0007, amendment of
 /// 2026-10-30).
 ///
@@ -32,7 +33,7 @@ public final class AreaLineModel<Action: Equatable & Sendable>: Equatable, Senda
     /// What stands at the right of the line, after it, in the order given.
     public let accessories: [AccessoryModel<Action>]
 
-    public let cellWidth: Double
+    public let cellMinimumWidth: Double
     public let endGap: Double
 
     /// What a tap on the line sends.
@@ -50,7 +51,7 @@ public final class AreaLineModel<Action: Equatable & Sendable>: Equatable, Senda
         line: StrokeModel,
         lineToAccessories: Double,
         accessories: [AccessoryModel<Action>],
-        cellWidth: Double,
+        cellMinimumWidth: Double,
         endGap: Double,
         tap: Action,
         menu: MenuModel<Action>?
@@ -63,7 +64,7 @@ public final class AreaLineModel<Action: Equatable & Sendable>: Equatable, Senda
         self.line = line
         self.lineToAccessories = lineToAccessories
         self.accessories = accessories
-        self.cellWidth = cellWidth
+        self.cellMinimumWidth = cellMinimumWidth
         self.endGap = endGap
         self.tap = tap
         self.menu = menu
@@ -79,7 +80,7 @@ public final class AreaLineModel<Action: Equatable & Sendable>: Equatable, Senda
             && lhs.line == rhs.line
             && lhs.lineToAccessories == rhs.lineToAccessories
             && lhs.accessories == rhs.accessories
-            && lhs.cellWidth == rhs.cellWidth
+            && lhs.cellMinimumWidth == rhs.cellMinimumWidth
             && lhs.endGap == rhs.endGap
             && lhs.tap == rhs.tap
             && lhs.menu == rhs.menu

@@ -3,11 +3,13 @@ import DesignSystem
 
 /// What may stand at the right of a list's row or of an area's line, each as high as what it stands on: the count; the
 /// chevron, which folds and unfolds the rows inside; the grip, which says the row drags; the check, which marks a
-/// choice; and a space, a cell of its width kept empty, so that a column holds on a row with nothing to put in it.
-/// A component lists the accessories its row needs in the order they stand, and lays them out by its own sizes
-/// (`ListRowModel`, `AreaLineModel`), so that one row serves every screen with the accessories that screen gives it
-/// (the owner's 👍 on #163's thread r4431052930). A view switches over it, every case drawn and no `default`
-/// (`docs/style.md`, "Views").
+/// choice; a space, a cell of its width kept empty, so that a column holds on a row with nothing to put in it; and an
+/// accessory hidden, whose room is kept and drawn empty, as the room for a check on a choice not marked. A component
+/// lists the accessories its row needs in the order they stand, and lays them out by its own sizes (`ListRowModel`,
+/// `AreaLineModel`), so that one row serves every screen with the accessories that screen gives it (the owner, on
+/// #163's thread r4431052930). A glyph's own width is its platform's, so a component gives its glyphs a cell they are
+/// at least as wide as, never a width a glyph has on one platform. A view switches over it, every case drawn and no
+/// `default` (`docs/style.md`, "Views").
 public enum AccessoryModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// The chevron of a row with rows inside it, which folds and unfolds them: its glyph, turned by `rotation` degrees,
     /// clockwise when positive, as CSS and SwiftUI turn, moving to a new turn on `animation`, the words it reads aloud,
@@ -44,4 +46,8 @@ public enum AccessoryModel<Action: Equatable & Sendable>: Equatable, Sendable {
 
     /// A cell kept empty, as wide as it says, in points.
     case space(Double)
+
+    /// An accessory's room, kept as its platform draws it and left empty, so that a column holds by the accessory's
+    /// own width, which only the platform knows: the check's room on a choice not marked. It takes no touch.
+    indirect case hidden(AccessoryModel)
 }

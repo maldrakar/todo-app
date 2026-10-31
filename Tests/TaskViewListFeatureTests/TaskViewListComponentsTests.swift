@@ -99,17 +99,19 @@ private func titleField(_ text: String, font: DesignSystem.Font) -> TextFieldMod
 /// A list's row whole as the phone draws it outside edit mode, but for what a test spells: its title and title font,
 /// its tile, where it starts, its need, its guides, its count and its chevron. It is 46 high with the title 12 after
 /// the tile in the ink, on the paper with no field, under guides 1.5 pt in the line colour, its accessories over a fade
-/// of 10, the count's cell at least 20 wide and the others 36, with 4 at the end, in the 72 of its need, and a tap
-/// selects it; its menu is a list's on a phone.
+/// of 10, the count's cell at least 20 wide and the others at least 36, with 4 at the end, in the 72 of its need, and a
+/// tap selects it; its menu is a list's on a phone.
 private func phoneRow(
     _ id: ViewID, title: String, font: DesignSystem.Font, tile: TileModel, leading: Double, need: Double,
     guides: [Double], childGuides: [Double], count: String?, chevron: AccessoryModel<Action>.Chevron?
 ) -> ListRowModel<Action> {
     ListRowModel(
-        height: 46, leading: leading, tile: tile, tileToTitle: 12, title: TextModel(text: title, font: font, color: .ink),
-        field: nil, need: need, background: .paper, guides: guides, childGuides: childGuides, guide: guide,
-        accessories: accessories(count: count, chevron: chevron), fadeWidth: 10, countMinimumWidth: 20, cellWidth: 36,
-        endGap: 4, accessoriesWidth: 72, tap: .rowSelected(id), menu: listMenu(id, openInNewWindow: false)
+        height: 46, leading: leading, tile: tile, tileToTitle: 12,
+        title: TextModel(text: title, font: font, color: .ink), field: nil, need: need, background: .paper,
+        guides: guides, childGuides: childGuides, guide: guide,
+        accessories: accessories(count: count, chevron: chevron), fadeWidth: 10, countMinimumWidth: 20,
+        cellMinimumWidth: 36, endGap: 4, accessoriesWidth: 72,
+        tap: .rowSelected(id), menu: listMenu(id, openInNewWindow: false)
     )
 }
 
@@ -121,16 +123,17 @@ private func chevron(of id: ViewID, in model: TaskViewList.Model) -> AccessoryMo
 /// An area's line whole as the phone draws it, but for what a test spells: its height, its label, the text of its
 /// field where one is open, whether it has the grip, and its menu. It starts 20 in, the label in the area label's font
 /// in ink2 10 before the line, 1 pt in the line colour, and a tap on it is sent as the row's selection; the line ends
-/// 20 short of the edge, and with the grip 10 before it, in a cell of 22⅔, the glyph's width on an iPhone, 12 short of
-/// the edge.
+/// 20 short of the edge, and with the grip 10 before it, at the glyph's own width in a cell of no least width, 12 short
+/// of the edge.
 private func phoneLine(
     _ id: ViewID, height: Double, label: String?, fieldText: String?, hasGrip: Bool, menu: MenuModel<Action>?
 ) -> AreaLineModel<Action> {
     AreaLineModel(
         height: height, leading: 20, spacing: 10,
-        label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: fieldText.map(areaField), line: StrokeModel(color: .line, width: 1, dash: []),
-        lineToAccessories: hasGrip ? 10 : 20, accessories: hasGrip ? [.grip(grip)] : [], cellWidth: 68.0 / 3,
-        endGap: hasGrip ? 12 : 0, tap: .rowSelected(id), menu: menu
+        label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: fieldText.map(areaField),
+        line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: hasGrip ? 10 : 20,
+        accessories: hasGrip ? [.grip(grip)] : [], cellMinimumWidth: 0, endGap: hasGrip ? 12 : 0, tap: .rowSelected(id),
+        menu: menu
     )
 }
 
@@ -253,7 +256,13 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
     let gripped = accessories(count: nil, chevron: nil, isEditing: true)
     #expect(lists.map(\.accessories) == Array(repeating: gripped, count: 6), "no count, no chevron, and the grip")
     #expect(lists.map(\.accessoriesWidth) == Array(repeating: 108, count: 6), "72 and the grip's cell of 36")
-    #expect(lists.map(\.need) == Array(repeating: 310, count: 6), "20 + 30 + 12 + 140 + 108, the grip's cell among them")
+    #expect(
+        lists.map(\.need) == Array(repeating: 310, count: 6), "20 + 30 + 12 + 140 + 108, the grip's cell among them"
+    )
+    #expect(lists.map(\.fadeWidth) == Array(repeating: 10, count: 6), "the fade stays in edit mode")
+    #expect(lists.map(\.countMinimumWidth) == Array(repeating: 20, count: 6), "the empty count's cell holds the column")
+    #expect(lists.map(\.cellMinimumWidth) == Array(repeating: 36, count: 6), "the grip's cell is a chevron's")
+    #expect(lists.map(\.endGap) == Array(repeating: 4, count: 6), "4 at the end, after the grip")
     #expect(areaLine(work, in: editing.model)?.menu == nil)
     #expect(areaLine(work, in: editing.model)?.accessories == [.grip(grip)])
 }
@@ -273,8 +282,8 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
 }
 
 /// The bar outside edit mode: "…" on the platform's container, a menu button holding Edit; the search capsule, its
-/// magnifier, "Search" and microphone in ink2, the glyphs 17 pt and the microphone in a 36 cell, 8 apart, 15 in and 6 at the end;
-/// and "+" on the accent, a menu button holding New Task, New List and New Area.
+/// magnifier, "Search" and microphone in ink2, the glyphs 17 pt and the microphone in a 36 cell, 8 apart, 15 in and 6
+/// at the end; and "+" on the accent, a menu button holding New Task, New List and New Area.
 private func barOutsideEditMode() -> BarModel<Action> {
     let more = MenuButtonModel<Action>(
         label: ButtonLabelModel(
@@ -429,13 +438,14 @@ private func phoneDrag() -> DragModel {
 
 /// The picker of Move to… on Home, in the tree of the test above: Projects checked, Home disabled, Errands, the
 /// unnamed area's line alone and Clients under it, each a row of the screen's with nothing of the session on it, and at
-/// its right the check or the cell kept for it, 17⅔ wide, the check's width on an iPhone, and 20 short of the edge,
-/// which a row's need counts.
+/// its right the check, or the check hidden in its room, at the glyph's own width in a cell of no least width and 20
+/// short of the edge; a row's need counts the canvas's check, 18, for it.
 private func homesPicker(
     projects: ViewID, home: ViewID, errands: ViewID, area: ViewID, clients: ViewID
 ) -> PickerModel<TaskViewList.Model.Kind, Action> {
     let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
-    let checkCell = 53.0 / 3
+    let checked: [AccessoryModel<Action>] = [.check(check)]
+    let unchecked: [AccessoryModel<Action>] = [.hidden(.check(check))]
     func option(
         _ id: ViewID, _ title: String, font: DesignSystem.Font, tile: TileModel, depth: Int, isChecked: Bool = false
     ) -> TaskViewList.Model.Kind {
@@ -443,10 +453,9 @@ private func homesPicker(
         return .list(ListRowModel(
             height: 46, leading: leading, tile: tile, tileToTitle: 12,
             title: TextModel(text: title, font: font, color: .ink), field: nil,
-            need: leading + tile.side + 12 + 140 + (checkCell + 20), background: .paper, guides: [], childGuides: [],
-            guide: guide, accessories: [isChecked ? .check(check) : .space(checkCell)], fadeWidth: 0,
-            countMinimumWidth: 20, cellWidth: checkCell, endGap: 20, accessoriesWidth: checkCell + 20,
-            tap: .movePickerRowTapped(id), menu: nil
+            need: leading + tile.side + 12 + 140 + 38, background: .paper, guides: [], childGuides: [], guide: guide,
+            accessories: isChecked ? checked : unchecked, fadeWidth: 0, countMinimumWidth: 20, cellMinimumWidth: 0,
+            endGap: 20, accessoriesWidth: 38, tap: .movePickerRowTapped(id), menu: nil
         ))
     }
     let rootTile = { (color: DesignSystem.Color.Components.Tile, icon: DesignSystem.Icon) in
@@ -456,10 +465,10 @@ private func homesPicker(
         title: "Move “Home” to…", hint: TextModel(text: "Choose where it goes.", font: .hint, color: .ink2),
         cancel: ChoiceModel(title: "Cancel", isDestructive: false, action: .movePickerCancelled),
         topLevel: .init(
-            icon: IconModel(icon: .divider, size: 15, weight: .regular, color: .ink2), tileSide: 30, tileCornerRadius: 8,
-            tileColor: .fill, tileToTitle: 12, title: TextModel(text: "Top level", font: .rowTitle, color: .ink),
-            leading: 20, height: 46, accessories: [.space(checkCell)], cellWidth: checkCell, endGap: 20,
-            isChecked: false, action: .movePickerRowTapped(nil)
+            icon: IconModel(icon: .divider, size: 15, weight: .regular, color: .ink2), tileSide: 30,
+            tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12,
+            title: TextModel(text: "Top level", font: .rowTitle, color: .ink), leading: 20, height: 46,
+            accessories: unchecked, cellMinimumWidth: 0, endGap: 20, isChecked: false, action: .movePickerRowTapped(nil)
         ),
         options: [
             .init(
@@ -484,8 +493,7 @@ private func homesPicker(
                 row: .area(AreaLineModel(
                     height: 17, leading: 20, spacing: 10, label: nil, field: nil,
                     line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20,
-                    accessories: [.space(checkCell)], cellWidth: checkCell, endGap: 20, tap: .movePickerRowTapped(area),
-                    menu: nil
+                    accessories: unchecked, cellMinimumWidth: 0, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
                 )),
                 isDisabled: false, isChecked: false
             ),

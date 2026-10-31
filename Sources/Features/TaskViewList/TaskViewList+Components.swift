@@ -174,8 +174,9 @@ extension TaskViewList {
                 icon: IconModel(icon: .divider, size: 15, weight: .regular, color: .ink2), tileSide: 30,
                 tileCornerRadius: 8, tileColor: .fill, tileToTitle: Phone.tileToTitle,
                 title: TextModel(text: "Top level", font: .rowTitle, color: .ink), leading: 20, height: Phone.rowHeight,
-                accessories: Picker.accessories(isChecked: list.parent == nil), cellWidth: Picker.checkCell,
-                endGap: Picker.endGap, isChecked: list.parent == nil, action: .movePickerRowTapped(nil)
+                accessories: Picker.accessories(isChecked: list.parent == nil),
+                cellMinimumWidth: Picker.cellMinimumWidth, endGap: Picker.endGap, isChecked: list.parent == nil,
+                action: .movePickerRowTapped(nil)
             ),
             options: options, hintGap: 8, minimumOptionHeight: 36, disabledOpacity: 0.35
         )
@@ -204,12 +205,12 @@ extension TaskViewList {
                     cornerRadius: 10
                 )
             },
-            need: leading + tile.side + Phone.tileToTitle + Phone.titleWidth + end.width,
+            need: leading + tile.side + Phone.tileToTitle + Phone.titleWidth + end.accessoriesWidth,
             background: isSelected ? .fill : .paper, guides: guides ?? [],
             childGuides: guides.map { $0 + [leading + tile.side / 2] } ?? [],
             guide: StrokeModel(color: .line, width: 1.5, dash: []), accessories: end.accessories,
-            fadeWidth: end.fadeWidth, countMinimumWidth: Phone.countWidth, cellWidth: end.cellWidth, endGap: end.endGap,
-            accessoriesWidth: end.width, tap: tap, menu: menu
+            fadeWidth: end.fadeWidth, countMinimumWidth: Phone.countWidth, cellMinimumWidth: end.cellMinimumWidth,
+            endGap: end.endGap, accessoriesWidth: end.accessoriesWidth, tap: tap, menu: menu
         )
     }
 
@@ -218,18 +219,19 @@ extension TaskViewList {
     private struct RowEnd {
         let accessories: [AccessoryModel<UserAction>]
         let fadeWidth: Double
-        let cellWidth: Double
+        let cellMinimumWidth: Double
         let endGap: Double
 
         /// How much of the row they take, which its need counts.
-        let width: Double
+        let accessoriesWidth: Double
     }
 
     /// What stands at a list's row's right in the tree (`Phone.dc.html`, the row's sticky end): over a fade of 10, the
     /// count in ink2 against the right of a cell at least 20 wide, or the cell kept empty where the row has no count;
     /// the chevron in a cell of 36, or the cell kept empty on a list with no lists inside it, so that the counts stand
     /// in one column; the grip in a cell of 36 more where the row drags; and 4 at the end, in the 72 pt of the row's
-    /// need, which leaves 2 to spare, and 36 more with the grip.
+    /// need, which leaves 2 to spare, and 36 more with the grip. Each glyph's cell is 36 at least, wider than the glyph
+    /// on every platform, so that the column holds.
     private static func rowEnd(count: Int?, chevron: AccessoryModel<UserAction>.Chevron?, hasGrip: Bool) -> RowEnd {
         let counted: AccessoryModel<UserAction> = if let count {
             .count(TextModel(text: String(count), font: .count, color: .ink2))
@@ -239,7 +241,7 @@ extension TaskViewList {
         let folds: AccessoryModel<UserAction> = if let chevron { .chevron(chevron) } else { .space(Phone.cellWidth) }
         return RowEnd(
             accessories: [counted, folds] + (hasGrip ? [.grip(Phone.grip)] : []), fadeWidth: 10,
-            cellWidth: Phone.cellWidth, endGap: 4, width: 72 + (hasGrip ? Phone.cellWidth : 0)
+            cellMinimumWidth: Phone.cellWidth, endGap: 4, accessoriesWidth: 72 + (hasGrip ? Phone.cellWidth : 0)
         )
     }
 
@@ -272,7 +274,8 @@ extension TaskViewList {
             height: label == nil && field == nil ? 17 : 36, leading: 20, spacing: 10,
             label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: field,
             line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: end.lineToAccessories,
-            accessories: end.accessories, cellWidth: end.cellWidth, endGap: end.endGap, tap: tap, menu: menu
+            accessories: end.accessories, cellMinimumWidth: end.cellMinimumWidth, endGap: end.endGap, tap: tap,
+            menu: menu
         )
     }
 
@@ -281,20 +284,18 @@ extension TaskViewList {
     private struct LineEnd {
         let lineToAccessories: Double
         let accessories: [AccessoryModel<UserAction>]
-        let cellWidth: Double
+        let cellMinimumWidth: Double
         let endGap: Double
     }
 
     /// What stands at an area's line's right in the tree: nothing, the line ending 20 short of the edge, and in edit
-    /// mode the grip, 10 after the line in a cell of 22⅔, and 12 short of the edge. The cell is as wide as Task 7 drew
-    /// the 18 pt glyph, its own width on an iPhone, 68 pixels at 3x: a cell of 22, its width on the Mac, moved the
-    /// line's end 2 pixels right and the grip 1 (the iOS 26.3 simulator, 2026-10-31).
+    /// mode the grip, 10 after the line at the glyph's own width, as Task 7 drew it, in a cell of no least width, and
+    /// 12 short of the edge.
     private static func lineEnd(isEditing: Bool) -> LineEnd {
-        let gripCell: Double = 68.0 / 3
-        return if isEditing {
-            LineEnd(lineToAccessories: 10, accessories: [.grip(Phone.grip)], cellWidth: gripCell, endGap: 12)
+        if isEditing {
+            LineEnd(lineToAccessories: 10, accessories: [.grip(Phone.grip)], cellMinimumWidth: 0, endGap: 12)
         } else {
-            LineEnd(lineToAccessories: 20, accessories: [], cellWidth: gripCell, endGap: 0)
+            LineEnd(lineToAccessories: 20, accessories: [], cellMinimumWidth: 0, endGap: 0)
         }
     }
 
@@ -441,7 +442,8 @@ extension TaskViewList {
         /// The least width of a row's count's cell, which a row with no count keeps empty.
         static let countWidth: Double = 20
 
-        /// The width of a row's chevron's cell and of its grip's.
+        /// The width of a row's chevron's cell and of its grip's: the least a glyph's cell takes, and what an empty
+        /// chevron's cell keeps.
         static let cellWidth: Double = 36
 
         /// The size of the grip's glyph, a row's, a line's and a lifted row's card's.
@@ -451,35 +453,38 @@ extension TaskViewList {
         static let grip = IconModel(icon: .grip, size: gripSize, weight: .regular, color: .ink3)
     }
 
-    /// The picker's check (`Phone.dc.html`, the Move to… sheet): 15 pt bold in the accent, in a cell of 17⅔, 20 short
-    /// of the right edge, at the right of the present choice, and the cell kept empty at the right of every other row,
-    /// so that the rows end in one column: "Top level", a list's row, whose need counts the two, and an area's line,
-    /// which ends 20 before them as Task 7 drew it. The cell is as wide as Task 7 drew the glyph where the canvas has
-    /// an 18 px check, its own width on an iPhone, 53 pixels at 3x: a cell of 18, its width on the Mac, moved the end
-    /// of an area's line 1 pixel left (the iOS 26.3 simulator, 2026-10-31).
+    /// The picker's check (`Phone.dc.html`, the Move to… sheet): 15 pt bold in the accent at the glyph's own width, in
+    /// a cell of no least width, 20 short of the right edge, at the right of the present choice, and hidden in its room
+    /// at the right of every other row, so that the rows end in one column, as Task 7 drew it: "Top level", a list's
+    /// row and an area's line, which ends 20 before it.
     private enum Picker {
-        static let checkCell: Double = 53.0 / 3
+        static let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
+        static let cellMinimumWidth: Double = 0
         static let endGap: Double = 20
 
-        /// The check where a row is the present choice, and the room for it where it is not.
+        /// The room a list's row's need counts for the check, the canvas's 18 px check: the glyph's own width is its
+        /// platform's, and no view reads a need in the picker, where the rows are drawn whole.
+        static let checkInNeed: Double = 18
+
+        /// The check where a row is the present choice, and the check hidden in its room where it is not.
         static func accessories(isChecked: Bool) -> [AccessoryModel<UserAction>] {
-            [isChecked ? .check(IconModel(icon: .check, size: 15, weight: .bold, color: .accent)) : .space(checkCell)]
+            [isChecked ? .check(check) : .hidden(.check(check))]
         }
 
         /// What stands at a list's row's right in the picker: the check or its room, with no fade, since the row is
         /// drawn whole and nothing runs under it.
         static func rowEnd(isChecked: Bool) -> RowEnd {
             RowEnd(
-                accessories: accessories(isChecked: isChecked), fadeWidth: 0, cellWidth: checkCell, endGap: endGap,
-                width: checkCell + endGap
+                accessories: accessories(isChecked: isChecked), fadeWidth: 0, cellMinimumWidth: cellMinimumWidth,
+                endGap: endGap, accessoriesWidth: checkInNeed + endGap
             )
         }
 
         /// What stands at an area's line's right in the picker: the check or its room, 20 after the line.
         static func lineEnd(isChecked: Bool) -> LineEnd {
             LineEnd(
-                lineToAccessories: 20, accessories: accessories(isChecked: isChecked), cellWidth: checkCell,
-                endGap: endGap
+                lineToAccessories: 20, accessories: accessories(isChecked: isChecked),
+                cellMinimumWidth: cellMinimumWidth, endGap: endGap
             )
         }
     }
