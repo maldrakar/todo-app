@@ -481,7 +481,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 @Test func aTapOrOpenInNewWindowOnAnAreasLineMovesNothing() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
-    let list = try TaskViewList(store: store, route: .init(list: .init(head: BuiltInTaskViews.upcoming)), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: .init(list: .init(head: BuiltInTaskViews.upcoming)), width: .narrow, capabilities: iPhone
+    )
     refusingAName(list)
     let before = list.model
     #expect(list.send(.action(.rowSelected(work))) == nil)
@@ -520,7 +522,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(isFolded(projects, in: second.model) == false, "a change to a task reads the counts alone")
     let created = try changeSet(of: store) { try store.createView(NewTaskView(title: "Docs")) }
     #expect(second.send(.changed(created)) == nil)
-    #expect(second.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)).model)
+    #expect(
+        second.model == (
+            try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+        ).model
+    )
     #expect(isFolded(projects, in: second.model) == true)
     #expect(second.send(.action(.disclosureTapped(errands))) == nil)
     #expect(try store.deviceState(collapsedViewsKey, as: [String].self).map(Set.init) == [projects.rawValue, errands.rawValue])
@@ -543,7 +549,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(viaReturn.send(.action(.titleFieldSubmitted)) == nil)
     #expect(viaChange.model.problem == "The area is no longer there, so the new name was not saved.")
     #expect(viaChange.model == viaReturn.model)
-    #expect(viaChange.model.rows == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)).model.rows)
+    #expect(
+        viaChange.model.rows == (
+            try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+        ).model.rows
+    )
 }
 
 /// A fold is drawn only on a list with lists inside it, where a chevron can take it back: a leaf whose id the device's
@@ -565,7 +575,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.send(.changed(garden)) == nil)
     #expect(isFolded(projects, in: list.model) == true)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "the list that came back inside it is folded")
-    #expect(list.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)).model)
+    #expect(
+        list.model == (
+            try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+        ).model
+    )
 }
 
 /// A fold that hides the open list's row lights the row that hides it, the folded list a person can still see, as the
@@ -608,7 +622,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     let contracts = try store.createView(NewTaskView(title: "Contracts", parent: acme))
     try store.createView(NewTaskView(title: "Billing", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: .init(head: contracts)), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: .init(list: .init(head: contracts)), width: .narrow, capabilities: iPhone
+    )
     let open = list.model
     #expect(open.selection == contracts, "the open list's row is lit; this is the setup")
     #expect(list.send(.action(.disclosureTapped(acme))) == nil)
@@ -628,7 +644,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
-    let list = try TaskViewList(store: store, route: .init(list: .init(head: home)), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: .init(list: .init(head: home)), width: .narrow, capabilities: iPhone
+    )
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
     #expect(list.model.selection == projects, "the fold lit Projects; this is the setup")
     #expect(list.send(.action(.rowSelected(projects))) == nil)

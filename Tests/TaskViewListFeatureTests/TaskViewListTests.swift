@@ -40,7 +40,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
 }
 
 @Test func initialModelListsTheBuiltInViewsInRankOrderWithInboxSelected() throws {
-    let model = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone).model
+    let model = try TaskViewList(
+        store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone
+    ).model
     #expect(model.rows.map(title(of:)) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash"])
     #expect(model.rows.allSatisfy { $0.depth == 0 })
     #expect(model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.inbox])
@@ -53,7 +55,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let reviews = try store.createView(NewTaskView(title: "Reviews", parent: folder))
     try store.createView(NewTaskView(title: "Notes", parent: folder))
     try store.createView(NewTaskView(title: "Deep", parent: reviews))
-    let rows = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model.rows.dropFirst(5)
+    let rows = try TaskViewList(
+        store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone
+    ).model.rows.dropFirst(5)
     #expect(rows.map(title(of:)) == ["Work", "Reviews", "Deep", "Notes"], "past the five built-in views, depth first and siblings by rank")
     #expect(rows.map(\.depth) == [0, 1, 2, 1])
 }
@@ -85,7 +89,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
 @Test func aClickOnTheHighlightedViewDeclaresItsListAgain() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskViewList(store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+    )
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox, task: id).list, "the task is declared with the list; this is the setup")
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.inbox))) == nil)
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list)
@@ -115,7 +121,10 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
 
     let made = try TaskViewList(store: store, route: on(gone), width: .narrow, capabilities: iPhone)
     #expect(made.destination.pushed == on(gone).list, "a link to a view that is gone declares its list all the same")
-    #expect(made.model == (try TaskViewList(store: store, route: on(ViewID()), width: .narrow, capabilities: iPhone)).model, "on no row, so nothing is highlighted")
+    #expect(
+        made.model == (try TaskViewList(store: store, route: on(ViewID()), width: .narrow, capabilities: iPhone)).model,
+        "on no row, so nothing is highlighted"
+    )
     #expect(made.model.selection == nil)
     #expect(made.send(.notOpened(.notFound(gone), stillOpen: nil)) == nil)
     #expect(made.destination.pushed == nil)
@@ -135,7 +144,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
-    let list = try TaskViewList(store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+    )
     try store.delete(view: gone)
     _ = list.send(.action(.rowSelected(gone)))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: on(BuiltInTaskViews.inbox, task: id).list))
@@ -213,7 +224,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.model == before)
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list)
     // Sent after a refusal, which is not where a parent sends it, so that there is a sentence to lose.
-    let refused = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let refused = try TaskViewList(
+        store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone
+    )
     _ = refused.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = refused.send(.action(.titleFieldChanged(" ")))
     _ = refused.send(.action(.titleFieldSubmitted))
@@ -279,7 +292,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
         ids.append(id)
     }
     try store.apply(ops)
-    let chain = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model.rows.filter { $0.id.rawValue.hasPrefix("view-") }
+    let chain = try TaskViewList(
+        store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone
+    ).model.rows.filter { $0.id.rawValue.hasPrefix("view-") }
     #expect(chain.map(\.id.rawValue) == ids, "parents before children, however deep the chain")
     #expect(chain.map(\.depth) == Array(0..<1_000))
 }
@@ -482,7 +497,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.model.rows.map(draft(of:)) == ["", nil, nil, nil, nil])
     // The same state reached in the other order, the highlight moved before the refusal, compares the model
     // whole: nothing else moved.
-    let reference = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let reference = try TaskViewList(
+        store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone
+    )
     _ = reference.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = reference.send(.action(.rowSelected(BuiltInTaskViews.today)))
     _ = reference.send(.action(.titleFieldChanged("")))
@@ -541,7 +558,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
     #expect(list.model.selection == BuiltInTaskViews.today)
     #expect(list.model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.today])
-    let linked = try TaskViewList(store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone)
+    let linked = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+    )
     #expect(linked.destination.pushed == on(BuiltInTaskViews.inbox, task: id).list)
     #expect(linked.model == (try sidebarOn(BuiltInTaskViews.inbox, in: store)), "the task is the list's to declare, and draws nothing here")
     #expect(linked.route == on(BuiltInTaskViews.inbox, task: id))
@@ -640,7 +659,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.send(.route(on(BuiltInTaskViews.upcoming))) == nil)
     #expect(list.model.selection == BuiltInTaskViews.upcoming)
     // The same state reached with the highlight on Upcoming before the refusal compares the model whole.
-    let reference = try TaskViewList(store: store, route: on(BuiltInTaskViews.upcoming), width: .narrow, capabilities: iPhone)
+    let reference = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.upcoming), width: .narrow, capabilities: iPhone
+    )
     _ = reference.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = reference.send(.action(.titleFieldChanged(" ")))
     _ = reference.send(.action(.titleFieldSubmitted))
@@ -697,7 +718,9 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
 @Test func aRouteThatNamesNoListLeavesTheDestination() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskViewList(store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+    )
     let before = list.model
     #expect(list.send(.route(.init(list: nil))) == nil)
     #expect(list.model == before)

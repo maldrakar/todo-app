@@ -28,16 +28,28 @@ private func areaLine(_ id: ViewID, in model: TaskViewList.Model) -> AreaLineMod
 /// open beside this one, and Move to…, then, after a divider, Delete.
 private func listMenu(_ id: ViewID, openInNewWindow: Bool) -> MenuModel<Action> {
     let window: [MenuModel<Action>.Item] = openInNewWindow
-        ? [.init(title: "Open in New Window", icon: .newWindow, isDestructive: false, shortcut: nil, action: .openInNewWindowMenuItemChosen(id))]
+        ? [
+            .init(
+                title: "Open in New Window", icon: .newWindow, isDestructive: false, shortcut: nil,
+                action: .openInNewWindowMenuItemChosen(id)
+            ),
+        ]
         : []
     return MenuModel(sections: [
         .init(items: [
             .init(title: "Rename", icon: .pen, isDestructive: false, shortcut: nil, action: .renameMenuItemChosen(id)),
-            .init(title: "New List", icon: .plus, isDestructive: false, shortcut: nil, action: .newListMenuItemChosen(in: id)),
+            .init(
+                title: "New List", icon: .plus, isDestructive: false, shortcut: nil,
+                action: .newListMenuItemChosen(in: id)
+            ),
         ] + window + [
-            .init(title: "Move to…", icon: .folder, isDestructive: false, shortcut: nil, action: .moveToMenuItemChosen(id)),
+            .init(
+                title: "Move to…", icon: .folder, isDestructive: false, shortcut: nil, action: .moveToMenuItemChosen(id)
+            ),
         ]),
-        .init(items: [.init(title: "Delete", icon: .trash, isDestructive: true, shortcut: nil, action: .deleteMenuItemChosen(id))]),
+        .init(items: [
+            .init(title: "Delete", icon: .trash, isDestructive: true, shortcut: nil, action: .deleteMenuItemChosen(id)),
+        ]),
     ])
 }
 
@@ -47,9 +59,17 @@ private func lineMenu(_ id: ViewID) -> MenuModel<Action> {
     MenuModel(sections: [
         .init(items: [
             .init(title: "Rename", icon: .pen, isDestructive: false, shortcut: nil, action: .renameMenuItemChosen(id)),
-            .init(title: "New List", icon: .plus, isDestructive: false, shortcut: nil, action: .newListMenuItemChosen(in: id)),
+            .init(
+                title: "New List", icon: .plus, isDestructive: false, shortcut: nil,
+                action: .newListMenuItemChosen(in: id)
+            ),
         ]),
-        .init(items: [.init(title: "Delete Area", icon: .trash, isDestructive: true, shortcut: nil, action: .deleteMenuItemChosen(id))]),
+        .init(items: [
+            .init(
+                title: "Delete Area", icon: .trash, isDestructive: true, shortcut: nil,
+                action: .deleteMenuItemChosen(id)
+            ),
+        ]),
     ])
 }
 
@@ -146,8 +166,8 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
     field(text, placeholder: "Area name", font: .areaLabel, minimumWidth: 160, height: 28, padding: 8, cornerRadius: 8)
 }
 
-/// A root list's row and a nested one's carry the phone's numbers whole (`Phone.dc.html`; Task 7's views): 46 high,
-/// the tile at 20 + 22 × depth with the title 12 after it, a need of the tile, the gap, a title of 140 and the 72 of the
+/// A root list's row and a nested one's carry the phone's numbers whole (`Phone.dc.html`; Task 7's views): 46 high, the
+/// tile at 20 + 22 × depth with the title 12 after it, a need of the tile, the gap, a title of 140 and the 72 of the
 /// accessories, the guides of the levels it stands under, the count, a list with no rule counting the lists inside it,
 /// the chevron where the list has lists inside it, and the menu of a list, with no Open in New Window on a phone. A tap
 /// on the row sends its selection.
@@ -245,12 +265,12 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let phone = try sidebar(store).model
-    let mac = try sidebar(store, capabilities: iPad).model
+    let opensWindows = try sidebar(store, capabilities: iPad).model
     #expect(listRow(clients, in: phone)?.menu == listMenu(clients, openInNewWindow: false))
-    #expect(listRow(clients, in: mac)?.menu == listMenu(clients, openInNewWindow: true))
+    #expect(listRow(clients, in: opensWindows)?.menu == listMenu(clients, openInNewWindow: true))
     #expect(areaLine(work, in: phone)?.menu == lineMenu(work))
-    #expect(areaLine(work, in: mac)?.menu == lineMenu(work))
-    #expect(listRow(inbox, in: mac).map(drawnCount) == "1", "the Inbox counts its task; this is the setup")
+    #expect(areaLine(work, in: opensWindows)?.menu == lineMenu(work))
+    #expect(listRow(inbox, in: opensWindows).map(drawnCount) == "1", "the Inbox counts its task; this is the setup")
 
     let editing = try sidebar(store, capabilities: iPad)
     _ = editing.send(.action(.editMenuItemChosen))
@@ -294,7 +314,9 @@ private func barOutsideEditMode(microphone: Bool = true) -> BarModel<Action> {
             accessibilityLabel: "More", fill: .container
         ),
         menu: MenuModel(sections: [
-            .init(items: [.init(title: "Edit", icon: .grip, isDestructive: false, shortcut: nil, action: .editMenuItemChosen)]),
+            .init(items: [
+                .init(title: "Edit", icon: .grip, isDestructive: false, shortcut: nil, action: .editMenuItemChosen),
+            ]),
         ])
     )
     let search = SearchFieldModel(
@@ -374,12 +396,12 @@ private func phoneBar(_ items: [BarModel<Action>.Item]) -> BarModel<Action> {
     )
 }
 
-/// The drag's look on the phone (`Phone.dc.html`, the drag's slot and card), the same in and out of edit mode: the tree's
-/// indent of 20 and 22; the slot 52 high with 44 drawn, from 6 before its tile to 12 short of the edge, rounded 13, on
-/// the accent's soft fill with a 1.5 accent stroke dashed 5 and 4; the card raised 6, grown to 1.03 and turned −1.5°
-/// with the lifted shadow on the surface, a list's 50 high from 2 before its tile, its tile 12 in, its grip 18 in ink2
-/// in a 40 cell, 6 short of the edge, rounded 14, and a line's 36 high from 8 in to 8 short of the edge, rounded 12, each
-/// at least 120 wide; all of it on the popover's motion.
+/// The drag's look on the phone (`Phone.dc.html`, the drag's slot and card), the same in and out of edit mode: the
+/// tree's indent of 20 and 22; the slot 52 high with 44 drawn, from 6 before its tile to 12 short of the edge, rounded
+/// 13, on the accent's soft fill with a 1.5 accent stroke dashed 5 and 4; the card raised 6, grown to 1.03 and turned
+/// −1.5° with the lifted shadow on the surface, a list's 50 high from 2 before its tile, its tile 12 in, its grip 18 in
+/// ink2 in a 40 cell, 6 short of the edge, rounded 14, and a line's 36 high from 8 in to 8 short of the edge, rounded
+/// 12, each at least 120 wide; all of it on the popover's motion.
 @Test func theDragsLook() throws {
     let list = try sidebar(try makeStore())
     #expect(list.model.drag == phoneDrag())
@@ -433,10 +455,11 @@ private func phoneDrag() -> DragModel {
 
 /// The picker of Move to… whole (`Phone.dc.html`, the Move to… sheet): its title naming the list, the hint, Cancel,
 /// "Top level" on a tile of the fill colour with the divider glyph, and the whole tree, each row drawn as the screen's
-/// with no menu, no count, no chevron, no grip, no highlight and no guides, sending `movePickerRowTapped`; the list moved
-/// and the lists inside it disabled, and its parent checked, the check 15 pt bold in the accent in a cell of 18, 20
-/// short of the edge, and the cell kept empty on every other row, "Top level" among them. An unnamed area's line stands
-/// alone in the picker, in edit mode too, where the screen labels it (the owner's answer on #160, thread r4415002540).
+/// with no menu, no count, no chevron, no grip, no highlight and no guides, sending `movePickerRowTapped`; the list
+/// moved and the lists inside it disabled, and its parent checked, the check 15 pt bold in the accent in a cell of 18,
+/// 20 short of the edge, and the cell kept empty on every other row, "Top level" among them. An unnamed area's line
+/// stands alone in the picker, in edit mode too, where the screen labels it (the owner's answer on #160, thread
+/// r4415002540).
 @Test func thePickerWhole() throws {
     let store = try makeStore()
     for id in builtIns { try store.delete(view: id) }
@@ -614,7 +637,9 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk"))
     let projects = try store.createView(NewTaskView(title: "Projects", color: .teal, icon: "folder"))
-    let home = try store.createView(NewTaskView(title: "Home", parent: projects, icon: "house", filter: .status([.open])))
+    let home = try store.createView(
+        NewTaskView(title: "Home", parent: projects, icon: "house", filter: .status([.open]))
+    )
     let model = try sidebar(store, width: .wide, capabilities: mac).model
     #expect(listRow(inbox, in: model) == sidebarRow(
         inbox, title: "Inbox", font: .rowTitleEmphasized, tile: rootTile(.blue, .tray), leading: 18, need: 208,
@@ -636,7 +661,7 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
 
 /// The highlight moves the sidebar's emphasis with it: a row chosen takes the emphasized title and the selection, and
 /// the Inbox it leaves goes back to the plain title on the sidebar colour; a fold that hides the chosen row lights the
-/// folded list, emphasized as a list with lists inside it is.
+/// folded list, emphasized as a list with lists inside it is, with the sidebar's chevron turned while folded.
 @Test func theHighlightCarriesTheEmphasisInTheSidebar() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
@@ -650,14 +675,16 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
     _ = list.send(.action(.disclosureTapped(projects)))
     #expect(listRow(projects, in: list.model)?.background == .selection)
     #expect(listRow(projects, in: list.model)?.title.font == .rowTitleEmphasized)
+    let folded = AccessoryModel<Action>.chevron(sidebarChevron(projects, folded: true))
+    #expect(listRow(projects, in: list.model)?.accessories.contains(folded) == true, "its chevron turned while folded")
 }
 
 /// An area's line in the sidebar (`Mac.dc.html`, an area's line): 15 high, its name always on it where it has one, 18
 /// in, in capitals in the area's caption in ink3, the line 6 after it, 1 pt in the line colour, ending 18 short of the
 /// edge, which is 8 short of the tree's content inset 10, and the line alone where it has no name; each with the menu
 /// of a line. Renamed, it is 28 high, the field 16 in, 160 by 22, padded 6, rounded 6, in the canvas's 12.5 pt
-/// semibold, the callout's. In edit mode, on the iPad, the grip comes, 8 after the line in a cell of 20, 14 short of the
-/// edge, in the column of the rows' grips, no menu, and an unnamed area is labelled "AREA".
+/// semibold, the callout's. In edit mode, on the iPad, the grip comes, 8 after the line in a cell of 20, 14 short of
+/// the edge, in the column of the rows' grips, no menu, and an unnamed area is labelled "AREA".
 @Test func aWideWindowsAreaLines() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
@@ -806,22 +833,22 @@ private func barWithoutEditMode() -> BarModel<Action> {
 /// Mac board's indicator and card in a wide one, on the Mac and the iPad alike, in and out of edit mode, and a window
 /// that narrows takes the phone's.
 @Test func theDragsLookFollowsTheWidth() throws {
-    let mac = try sidebar(try makeStore(), width: .wide, capabilities: mac)
-    #expect(mac.model.drag == sidebarDrag())
-    let iPad = try sidebar(try makeStore(), width: .wide, capabilities: iPad)
-    #expect(iPad.model.drag == sidebarDrag())
-    _ = iPad.send(.action(.editMenuItemChosen))
-    #expect(iPad.model.drag == sidebarDrag())
-    _ = iPad.send(.widthChanged(.narrow))
-    #expect(iPad.model.drag == phoneDrag())
+    let macSidebar = try sidebar(try makeStore(), width: .wide, capabilities: mac)
+    #expect(macSidebar.model.drag == sidebarDrag())
+    let iPadSidebar = try sidebar(try makeStore(), width: .wide, capabilities: iPad)
+    #expect(iPadSidebar.model.drag == sidebarDrag())
+    _ = iPadSidebar.send(.action(.editMenuItemChosen))
+    #expect(iPadSidebar.model.drag == sidebarDrag())
+    _ = iPadSidebar.send(.widthChanged(.narrow))
+    #expect(iPadSidebar.model.drag == phoneDrag())
 }
 
 /// The sidebar's drag (`Mac.dc.html`, the drag's slot row and card): the tree's indent of 18 and 16; a gap of 12
 /// between the rows, holding the line, 2 pt in the accent with its ends rounded 1, from 2 after the tile of the drop's
 /// depth to 18 short of the edge, 8 short of the tree's content, and the circle, 10 across, ringed 2 pt in the accent
-/// and filled with the sidebar colour, 6 before that tile; and the card 170 by 30, 14 after that tile, rounded 7, on the
-/// surface with the lifted shadow, turned −1.2° at 95 %, a list's tile on it 18 across, rounded 5 with its glyph 12, 10
-/// in, and its title 8 after it in the sidebar's body; all of it on the popover's motion.
+/// and filled with the sidebar colour, 6 before that tile; and the card 170 by 30, 14 after that tile, rounded 7, on
+/// the surface with the lifted shadow, turned −1.2° at 95 %, a list's tile on it 18 across, rounded 5 with its glyph
+/// 12, 10 in, and its title 8 after it in the sidebar's body; all of it on the popover's motion.
 private func sidebarDrag() -> DragModel {
     DragModel(
         indent: IndentModel(start: 18, step: 16), animation: .popover,
@@ -888,7 +915,8 @@ private func sidebarDrag() -> DragModel {
             ),
             .init(
                 row: .area(AreaLineModel(
-                    height: 15, leading: 18, spacing: 6, label: TextModel(text: "WORK", font: .areaCaption, color: .ink3),
+                    height: 15, leading: 18, spacing: 6,
+                    label: TextModel(text: "WORK", font: .areaCaption, color: .ink3),
                     field: nil, line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20,
                     accessories: unchecked, cellMinimumWidth: 0, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
                 )),

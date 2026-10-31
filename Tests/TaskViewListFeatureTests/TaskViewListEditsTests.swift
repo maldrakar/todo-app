@@ -406,10 +406,15 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     #expect(list.model.movePicker?.options.filter(\.isChecked).map(id(of:)) == [work], "an area's line is a parent too")
     _ = list.send(.widthChanged(.wide))
     _ = list.send(.action(.editMenuItemChosen))
-    let wide = try TaskViewList(store: store, route: .init(list: .init(head: ViewID())), width: .wide, capabilities: iPhone)
+    let wide = try TaskViewList(
+        store: store, route: .init(list: .init(head: ViewID())), width: .wide, capabilities: iPhone
+    )
     #expect(
         offersTheRows(list.model.movePicker?.options, of: wide.model.rows),
-        "the sidebar's tiles on the sheet's paper, and the unnamed area's line alone, as the screen draws it outside edit mode"
+        """
+        the sidebar's tiles on the sheet's paper, and the unnamed area's line alone, as the screen draws it outside \
+        edit mode
+        """
     )
     _ = list.send(.action(.movePickerCancelled))
 

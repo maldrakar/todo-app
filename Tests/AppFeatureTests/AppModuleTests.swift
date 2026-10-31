@@ -151,7 +151,8 @@ private struct FirstScreenIsNoList: Error {}
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let app = try AppModule(
-        store: store, route: try Route(path: "/view/\(inbox)/task/\(open)?quick-entry"), width: .wide, capabilities: iPhone
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(open)?quick-entry"), width: .wide,
+        capabilities: iPhone
     )
     let model = app.model
     let route = app.route
@@ -166,7 +167,9 @@ private struct FirstScreenIsNoList: Error {}
     let store = try makeStore()
     let today = BuiltInTaskViews.today
     let id = try store.createTask(NewTask(title: "Call the bank", when: Day(millisSinceEpoch: Store.systemNow())))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(today)/task/\(id)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(today)/task/\(id)"), width: .wide, capabilities: iPhone
+    )
     #expect(app.model.taskViewList == (try sidebarOn(today, in: store, width: .wide)))
     #expect(try standing(in: app) == [listOn(today, in: store), taskOn(id, in: store)])
     #expect(app.route.path == "/view/\(today)/task/\(id)")
@@ -179,7 +182,9 @@ private struct FirstScreenIsNoList: Error {}
     let store = try makeStore()
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(gone.view)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(gone.view)"), width: .wide, capabilities: iPhone
+    )
     #expect(app.send(.created) == nil)
     #expect(app.model.taskViewList.rows == (try sidebarOn(gone.view, in: store, width: .wide)).rows, "the views, none highlighted")
     #expect(app.model.taskViewList.selection == nil)
@@ -215,7 +220,9 @@ private struct FirstScreenIsNoList: Error {}
 @Test func backTwiceClosesTheTaskThenTheListAndTheHighlight() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .narrow, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .narrow, capabilities: iPhone
+    )
     let path = idsOverTheSidebar(in: app.model)
     try #require(path.count == 2)
     #expect(app.send(.action(.wentBack(to: [path[0]]))) == nil)
@@ -231,7 +238,9 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.model.taskViewList.selection == nil)
     #expect(app.model.taskViewList.problem == nil)
     #expect(app.route.path == "/")
-    let relaunched = try AppModule(store: store, route: try Route(path: app.route.path), width: .narrow, capabilities: iPhone)
+    let relaunched = try AppModule(
+        store: store, route: try Route(path: app.route.path), width: .narrow, capabilities: iPhone
+    )
     #expect(relaunched.route.path == "/view/\(inbox)")
 }
 
@@ -241,7 +250,9 @@ private struct FirstScreenIsNoList: Error {}
 @Test func wentBackFromTheTaskToTheViewsClosesBothAtOnce() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(open)"), width: .narrow, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(open)"), width: .narrow, capabilities: iPhone
+    )
     try #require(idsOverTheSidebar(in: app.model).count == 2)
     #expect(app.send(.action(.wentBack(to: []))) == nil)
     #expect(idsOverTheSidebar(in: app.model).isEmpty)
@@ -260,7 +271,9 @@ private struct FirstScreenIsNoList: Error {}
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let kept = try store.createTask(NewTask(title: "Call the bank"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .wide, capabilities: iPhone
+    )
     let path = idsOverTheSidebar(in: app.model)
     try #require(path.count == 2)
     let deleted = try changeSet(of: store) { try store.delete(task: id) }
@@ -283,7 +296,9 @@ private struct FirstScreenIsNoList: Error {}
 @Test func aNarrowWindowPutsEveryScreenInOnePath() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .narrow, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .narrow, capabilities: iPhone
+    )
     guard case .narrow(let path) = app.model.layout else {
         Issue.record("a window made narrow is laid out narrow, and is \(app.model.layout)")
         return
@@ -298,7 +313,9 @@ private struct FirstScreenIsNoList: Error {}
 @Test func aWideWindowPutsTheFirstScreenInTheColumn() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .wide, capabilities: iPhone
+    )
     guard case .wide(let column?, let path) = app.model.layout else {
         Issue.record("a window made wide with a list open has the list in the column, and is \(app.model.layout)")
         return
@@ -327,7 +344,10 @@ private struct FirstScreenIsNoList: Error {}
 @Test func aWindowThatNarrowsOrWidensKeepsItsScreensAndTheirState() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)?quick-entry"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)?quick-entry"), width: .wide,
+        capabilities: iPhone
+    )
     #expect(app.send(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today)))) == nil)
     #expect(app.send(.action(.taskViewList(.titleFieldChanged("Soon")))) == nil)
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Call the")))) == nil)
@@ -336,7 +356,9 @@ private struct FirstScreenIsNoList: Error {}
     let route = app.route
     let ids = idsOverTheSidebar(in: wide)
     try #require(ids.count == 2, "the list and the task over it are the setup")
-    let narrowSidebar = try TaskViewList(store: store, route: .init(list: .init(head: inbox)), width: .narrow, capabilities: iPhone)
+    let narrowSidebar = try TaskViewList(
+        store: store, route: .init(list: .init(head: inbox)), width: .narrow, capabilities: iPhone
+    )
     _ = narrowSidebar.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
     _ = narrowSidebar.send(.action(.titleFieldChanged("Soon")))
     #expect(app.send(.widthChanged(.narrow)) == nil)
@@ -358,7 +380,9 @@ private struct FirstScreenIsNoList: Error {}
 @Test func backInAWideWindowNeverPopsTheColumn() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .wide, capabilities: iPhone
+    )
     guard case .wide(let column?, let path) = app.model.layout, path.count == 1 else {
         Issue.record("the list in the column and the task over it are the setup, and the layout is \(app.model.layout)")
         return
@@ -412,7 +436,9 @@ private struct FirstScreenIsNoList: Error {}
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     for width in [WindowWidth.narrow, .wide] {
-        let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: width, capabilities: iPhone)
+        let app = try AppModule(
+            store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: width, capabilities: iPhone
+        )
         let model = app.model
         let route = app.route
         #expect(app.send(.widthChanged(width)) == nil)
@@ -435,7 +461,10 @@ private struct FirstScreenIsNoList: Error {}
     #expect(inboxTile(app.model.taskViewList) == TileModel(color: .blue, icon: .tray, side: 30, cornerRadius: 8, glyphSize: 19))
     #expect(app.send(.widthChanged(.wide)) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
-    #expect(inboxTile(app.model.taskViewList) == TileModel(color: .blue, icon: .tray, side: 22, cornerRadius: 6, glyphSize: 14))
+    #expect(
+        inboxTile(app.model.taskViewList)
+            == TileModel(color: .blue, icon: .tray, side: 22, cornerRadius: 6, glyphSize: 14)
+    )
 }
 
 /// What the window's platform offers reaches the sidebar as the platform said it when the window was made (Lists
@@ -473,7 +502,9 @@ private struct FirstScreenIsNoList: Error {}
     let home = try taggedView("Home", in: store)
     let report = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
     let milk = try store.createTask(NewTask(title: "Buy milk", tags: [home.tag]))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)/task/\(report)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(work.view)/task/\(report)"), width: .wide, capabilities: iPhone
+    )
     let replaced = idsOverTheSidebar(in: app.model)
     try #require(replaced.count == 2, "the task of the third view is the setup")
     #expect(app.send(.route(try Route(path: "/view/\(home.view)/task/\(milk)"))) == nil)
@@ -526,7 +557,9 @@ private struct FirstScreenIsNoList: Error {}
 @Test func aViewDeletedUnderTheListClosesItThroughItsAnswer() throws {
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone
+    )
     try #require(idsOverTheSidebar(in: app.model).count == 1, "the list is open on the view before it goes")
     let deleted = try changeSet(of: store) { try store.delete(view: work.view) }
     #expect(app.send(.changed(deleted)) == nil)
@@ -542,7 +575,10 @@ private struct FirstScreenIsNoList: Error {}
 @Test func aChangeReachesEveryModuleInTheWindow() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)?quick-entry"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)?quick-entry"), width: .wide,
+        capabilities: iPhone
+    )
     let path = idsOverTheSidebar(in: app.model)
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Call the")))) == nil)
     let changes = try [
@@ -567,7 +603,8 @@ private struct FirstScreenIsNoList: Error {}
     let work = try taggedView("Work", in: store)
     let id = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
     let app = try AppModule(
-        store: store, route: try Route(path: "/view/\(work.view)/task/\(id)?quick-entry"), width: .wide, capabilities: iPhone
+        store: store, route: try Route(path: "/view/\(work.view)/task/\(id)?quick-entry"), width: .wide,
+        capabilities: iPhone
     )
     let changes = try [
         changeSet(of: store) { try store.createTask(NewTask(title: "File the expenses", tags: [work.tag])) },
@@ -613,7 +650,9 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.send(.action(.taskViewList(.newTaskMenuItemChosen))) == nil)
     #expect(app.model.quickEntry?.draft == "")
     #expect(app.model.problem == "The link could not be opened.")
-    let reference = try AppModule(store: store, route: try Route(path: "/view/\(inbox)?quick-entry"), width: .wide, capabilities: iPhone)
+    let reference = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)?quick-entry"), width: .wide, capabilities: iPhone
+    )
     #expect(reference.send(.unreadableLink) == nil)
     #expect(app.model == reference.model)
     #expect(app.route == reference.route)
@@ -675,7 +714,9 @@ private struct FirstScreenIsNoList: Error {}
     let report = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)?quick-entry"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(work.view)?quick-entry"), width: .wide, capabilities: iPhone
+    )
     let list = try #require(idsOverTheSidebar(in: app.model).first)
     #expect(app.send(.route(try Route(path: "/view/\(gone.view)?quick-entry"))) == nil)
     let sentence = try #require(app.model.taskViewList.problem, "the sentence is the setup; without it this proves nothing")
@@ -729,7 +770,8 @@ private struct FirstScreenIsNoList: Error {}
     let work = try taggedView("Work", in: store)
     let report = try store.createTask(NewTask(title: "Write the report", tags: [work.tag]))
     let app = try AppModule(
-        store: store, route: try Route(path: "/view/\(work.view)/task/\(report)?quick-entry"), width: .narrow, capabilities: iPhone
+        store: store, route: try Route(path: "/view/\(work.view)/task/\(report)?quick-entry"), width: .narrow,
+        capabilities: iPhone
     )
     let path = idsOverTheSidebar(in: app.model)
     try #require(path.count == 2)
@@ -756,7 +798,9 @@ private struct FirstScreenIsNoList: Error {}
 @Test func aClickOnTheHighlightedViewReturnsToItsList() throws {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(open)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(open)"), width: .wide, capabilities: iPhone
+    )
     let path = idsOverTheSidebar(in: app.model)
     try #require(path.count == 2)
     #expect(app.send(.action(.taskViewList(.rowSelected(inbox)))) == nil)
@@ -773,7 +817,9 @@ private struct FirstScreenIsNoList: Error {}
     let work = try taggedView("Work", in: store)
     let gone = try taggedView("Errands", in: store)
     try store.delete(view: gone.view)
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone
+    )
     let path = idsOverTheSidebar(in: app.model)
     let before = app.model.taskViewList
     #expect(app.send(.route(try Route(path: "/view/\(gone.view)"))) == nil)
@@ -793,8 +839,12 @@ private struct FirstScreenIsNoList: Error {}
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
     let gone = try taggedView("Errands", in: store)
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone)
-    let twin = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone
+    )
+    let twin = try AppModule(
+        store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone
+    )
     let list = try #require(idsOverTheSidebar(in: app.model).first)
     try store.delete(view: gone.view)
     #expect(app.send(.action(.taskViewList(.rowSelected(gone.view)))) == nil)
@@ -859,12 +909,16 @@ private struct FirstScreenIsNoList: Error {}
 @Test func theRouteIsWrittenFromWhatStands() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .narrow, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(id)"), width: .narrow, capabilities: iPhone
+    )
     let path = idsOverTheSidebar(in: app.model)
     try #require(path.count == 2)
     #expect(app.send(.action(.wentBack(to: [path[0]]))) == nil)
     #expect(app.route.path == "/view/\(inbox)")
-    let relaunched = try AppModule(store: store, route: try Route(path: app.route.path), width: .narrow, capabilities: iPhone)
+    let relaunched = try AppModule(
+        store: store, route: try Route(path: app.route.path), width: .narrow, capabilities: iPhone
+    )
     #expect(relaunched.model == app.model, "a relaunch opens what stood")
     #expect(relaunched.route == app.route)
 }
@@ -880,7 +934,8 @@ private let linkSentence = "The link could not be opened."
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let app = try AppModule(
-        store: store, route: try Route(path: "/view/\(inbox)/task/\(open)?quick-entry"), width: .wide, capabilities: iPhone
+        store: store, route: try Route(path: "/view/\(inbox)/task/\(open)?quick-entry"), width: .wide,
+        capabilities: iPhone
     )
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Call the")))) == nil)
     let before = app.model
@@ -963,7 +1018,9 @@ private let linkSentence = "The link could not be opened."
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let app = try AppModule(store: store, route: try Route(path: "/?quick-entry"), width: .narrow, capabilities: iPhone)
-    let twin = try AppModule(store: store, route: try Route(path: "/?quick-entry"), width: .narrow, capabilities: iPhone)
+    let twin = try AppModule(
+        store: store, route: try Route(path: "/?quick-entry"), width: .narrow, capabilities: iPhone
+    )
     #expect(app.send(.unreadableLink) == nil)
     let choices: [AppModule.UserAction] = [
         .taskViewList(.rowSelected(BuiltInTaskViews.today)),
@@ -1015,7 +1072,9 @@ private let linkSentence = "The link could not be opened."
     let store = try makeStore()
     let work = try taggedView("Work", in: store)
     let reviews = try store.createView(NewTaskView(title: "Reviews", parent: work.view))
-    let app = try AppModule(store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone)
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(work.view)"), width: .wide, capabilities: iPhone
+    )
     try #require(idsOverTheSidebar(in: app.model).count == 1, "the list is open on the view before it goes")
     #expect(app.send(.action(.taskViewList(.deleteMenuItemChosen(work.view)))) == nil)
     #expect(app.model.taskViewList.confirmation?.title == "Delete “Work”?")
