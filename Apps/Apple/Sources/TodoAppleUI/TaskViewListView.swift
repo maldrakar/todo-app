@@ -98,11 +98,12 @@ struct TaskViewListView: View {
     /// A row of the tree: the field while the row is being renamed, and its label otherwise, indented by its depth,
     /// with its menu where its model has one.
     private func treeRow(
-        depth: Int, field: FieldModel?, menu: MenuModel<TaskViewList.UserAction>?, @ViewBuilder label: () -> some View
+        depth: Int, field: TextFieldModel<TaskViewList.UserAction>?, menu: MenuModel<TaskViewList.UserAction>?,
+        @ViewBuilder label: () -> some View
     ) -> some View {
         Group {
             if let field {
-                TitleField(field, send: send)
+                TitleField(field, changed: TaskViewList.UserAction.titleFieldChanged, send: send)
             } else {
                 label()
             }
@@ -156,7 +157,7 @@ private struct MovePickerList: View {
                 Button { send(model.topLevel.action) } label: {
                     HStack {
                         Text(model.topLevel.title.text)
-                        if model.topLevel.isChecked { Image(model.check.icon) }
+                        check(model.topLevel.accessories)
                     }
                     .padding(.leading, model.topLevel.leading)
                 }
@@ -165,12 +166,16 @@ private struct MovePickerList: View {
                     // The one switch over a row's kind in the picker, every case drawn and no `default`.
                     switch option.row {
                     case .area(let line):
-                        choice(option, tap: line.tap, leading: line.leading) { lineLabel(line) }
+                        choice(option, tap: line.tap, leading: line.leading, accessories: line.accessories) {
+                            lineLabel(line)
+                        }
                     case .list(let list):
                         // The row's tap, which its button sends, and which a list's title sends too, since the
                         // title's own gesture is the one a tap on it reaches. A greyed-out row's, should that gesture
                         // still take one, moves nothing in the module.
-                        choice(option, tap: list.tap, leading: list.leading) { titleLabel(list, send: send) }
+                        choice(option, tap: list.tap, leading: list.leading, accessories: list.accessories) {
+                            titleLabel(list, send: send)
+                        }
                     }
                 }
             }
@@ -191,16 +196,31 @@ private struct MovePickerList: View {
     /// cannot be chosen.
     private func choice(
         _ option: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>.Option, tap: TaskViewList.UserAction,
-        leading: Double, @ViewBuilder label: () -> some View
+        leading: Double, accessories: [AccessoryModel<TaskViewList.UserAction>], @ViewBuilder label: () -> some View
     ) -> some View {
         Button { send(tap) } label: {
             HStack {
                 label()
-                if option.isChecked { Image(model.check.icon) }
+                check(accessories)
             }
             .padding(.leading, leading)
         }
         .disabled(option.isDisabled)
+    }
+
+    /// The check where the model puts one at a row's right, its symbol alone, as this picker drew it before the
+    /// components' models (Task 6). The rest of what stands there, the room for the check on every other row, is the
+    /// phone's look, which this plain list leaves out until the plan's ninth task.
+    private func check(_ accessories: [AccessoryModel<TaskViewList.UserAction>]) -> some View {
+        ForEach(accessories.indices, id: \.self) { index in
+            // The one switch over what stands at a row's right in this picker, every case drawn and no `default`.
+            switch accessories[index] {
+            case .check(let check):
+                Image(check.icon)
+            case .count, .chevron, .grip, .space:
+                EmptyView()
+            }
+        }
     }
 }
 

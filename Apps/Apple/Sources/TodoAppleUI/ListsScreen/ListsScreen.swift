@@ -6,13 +6,12 @@ import TodoCore
 
 /// The Lists screen on a phone, at the root of a narrow window's stack, as the canvas draws it (`Phone.dc.html`; Lists
 /// screen spec, sections 1, 6 and 7): one scrolling tree with no title and no navigation bar, the bar at the bottom
-/// (`ListsBottomBar`), the confirmation of a delete as an alert and Move to… as a sheet (`MovePickerSheet`). Everything
-/// it draws arrives finished in the model, each part of it the model of the component that draws it, with every size,
-/// colour, font, glyph and word (ADR-0007, amendment of 2026-10-30), and each gesture is sent as the action its
-/// control's model holds: what follows is the module's. It decides only what is the platform's: its containers, the
-/// fades and the sheet and the alert; its gestures and the drag; scrolling, focus and Reduce Motion. It keeps only what
-/// only it can know, the size of its viewport, how far the tree is scrolled sideways, and a drag in progress
-/// (`docs/style.md`, "Views").
+/// (`Bar`), the confirmation of a delete as an alert and Move to… as a sheet (`MovePickerSheet`). Everything it draws
+/// arrives finished in the model, each part of it the model of the component that draws it, with every size, colour,
+/// font, glyph and word (ADR-0007, amendment of 2026-10-30), and each gesture is sent as the action its control's model
+/// holds: what follows is the module's. It decides only what is the platform's: its containers, the fades and the sheet
+/// and the alert; its gestures and the drag; scrolling, focus and Reduce Motion. It keeps only what only it can know,
+/// the size of its viewport, how far the tree is scrolled sideways, and a drag in progress (`docs/style.md`, "Views").
 ///
 /// The tree is a `ScrollView` over both axes and not a `List`, which moves a row up and down a flat list and knows
 /// nothing of depth (spike #145). A tree narrower than a row's need, the room its tile, its title's least width and its
@@ -146,11 +145,11 @@ struct ListsScreen: View {
         }
     }
 
-    /// A list's row in the tree: the row, the guides under it, and its accessories pinned at the right edge of the
-    /// screen, whose room the title leaves them, all on the row's background. The highlighted row, the list declared
-    /// over the screen, stands on its highlight while that list is pushed and as it slides away, which the canvas's
-    /// press on a row is; Back takes the highlight away (`TaskViewList`, `.uncovered`). A tap on the row is its choice
-    /// outside edit mode and its rename in it.
+    /// A list's row in the tree: the row, the guides under it, and its end, its accessories, pinned at the right edge
+    /// of the screen, whose room the title leaves them, all on the row's background. The highlighted row, the list
+    /// declared over the screen, stands on its highlight while that list is pushed and as it slides away, which the
+    /// canvas's press on a row is; Back takes the highlight away (`TaskViewList`, `.uncovered`). A tap on the row is
+    /// its choice outside edit mode and its rename in it.
     ///
     /// A title runs on under the accessories, to be read when the tree is scrolled sideways, and so does the canvas's
     /// field, across the whole tree. This field stops where the accessories start on screen instead, so that its end
@@ -159,14 +158,13 @@ struct ListsScreen: View {
     private func listRow(
         _ list: ListRowModel<TaskViewList.UserAction>, width: CGFloat, visibleRight: CGFloat
     ) -> some View {
-        let background = Color(list.background)
-        return ListRowView(list, send: send)
-            .padding(.trailing, list.accessories.width)
+        ListRowView(list, changed: TaskViewList.UserAction.titleFieldChanged, send: send)
+            .padding(.trailing, list.accessoriesWidth)
             .frame(width: list.field == nil ? width : min(width, max(visibleRight, list.need)), alignment: .leading)
             .frame(width: width, alignment: .leading)
             .background { ListsTreeItem.Guides(list.guides, in: list.guide) }
             .overlay(alignment: .leading) {
-                ListRowView.Accessories(list.accessories, background: background, height: list.height, send: send)
+                ListRowView.End(list, send: send)
                     .frame(width: visibleRight, alignment: .trailing)
             }
             .overlay(alignment: .leading) {
@@ -174,7 +172,7 @@ struct ListsScreen: View {
                     fieldSpan(from: list.leading + list.tile.side + list.tileToTitle, to: list.need)
                 }
             }
-            .background(background)
+            .background(Color(list.background))
             .contentShape(.rect)
             .rowTap(list.tap, hasField: list.field != nil, send: send)
             #if !os(watchOS)
@@ -190,11 +188,11 @@ struct ListsScreen: View {
     }
 
     /// An area's line in the tree, as wide as the part of the tree on screen, so that its line reaches the right edge
-    /// of the screen and its grip stands there. A tap on it is sent in edit mode and out of it alike, and the module
-    /// decides what it means: in edit mode it opens the area's field, and outside it nothing (the controller's ruling
-    /// on #148).
+    /// of the screen and its accessories, the grip in edit mode, stand there. A tap on it is sent in edit mode and out
+    /// of it alike, and the module decides what it means: in edit mode it opens the area's field, and outside it
+    /// nothing (the controller's ruling on #148).
     private func areaLine(_ line: AreaLineModel<TaskViewList.UserAction>, visibleRight: CGFloat) -> some View {
-        AreaLine(line, send: send)
+        AreaLine(line, changed: TaskViewList.UserAction.titleFieldChanged, send: send)
             .frame(width: visibleRight, alignment: .leading)
             .overlay(alignment: .leading) {
                 if let field = line.field {
@@ -307,7 +305,7 @@ struct ListsScreen: View {
                     .frame(maxWidth: .infinity)
                     .background(Color(.paper))
             }
-            ListsBottomBar(model.bar, send: send)
+            Bar(model.bar, send: send)
         }
         .padding(.top, 52)
         .background {

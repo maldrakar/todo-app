@@ -283,7 +283,7 @@ extension ListsDrag {
                     Text(list.title)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Glyph(card.grip)
+                    Icon(card.grip)
                         .frame(width: card.gripCell, height: card.listHeight)
                 }
                 .padding(.leading, card.listPadding)
