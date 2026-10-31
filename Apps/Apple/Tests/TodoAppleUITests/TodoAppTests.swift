@@ -118,7 +118,7 @@ import TodoCore
 }
 
 /// `TODO_ROUTE` goes to the first window made with no path of its own and is spent there: every later window made with
-/// none, Cmd-N's, opens the default window (the owner, 2026-10-20).
+/// none, New Window's, opens the default window (the owner, 2026-10-20).
 @Test @MainActor func theFirstWindowMadeWithNoPathOpensTheLaunchRoute() throws {
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
@@ -243,6 +243,29 @@ import TodoCore
                 host.send(.taskViewList(.editMenuItemChosen))
                 #expect(host.model.taskViewList.isEditing == hasEditMode, "\(capabilities)")
             }
+        }
+    }
+}
+
+/// A window publishes the menu of its sidebar's "+" for the app's menu bar, which draws its items in the File menu
+/// (`AppScene.NewItemCommands`): the module's menu as the window's platform has it, with ⌘N and ⇧⌘N on the Mac and
+/// none where the platform has edit mode, the same in edit mode, and an item chosen there goes to that window's
+/// sidebar as the "+"'s does (the controller's ruling on #149's hand check, 2026-10-31).
+@Test @MainActor func aWindowPublishesItsAddMenuForTheMenuBar() throws {
+    try withFreshDatabase { database in
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        for capabilities in [mac, iPhone] {
+            let host = try app.makeWindow(path: nil, width: .wide, capabilities: capabilities).host
+            let published = AppScene.AddMenu(of: host)
+            #expect(published.menu == host.model.taskViewList.addMenu)
+            let shortcuts = published.menu.sections.flatMap(\.items).map(\.shortcut)
+            #expect(shortcuts.contains { $0 != nil } == !capabilities.hasEditMode, "\(capabilities)")
+            host.send(.taskViewList(.editMenuItemChosen))
+            #expect(AppScene.AddMenu(of: host).menu == published.menu, "in edit mode too")
+            let before = host.model.taskViewList.rows.count
+            published.send(.newListMenuItemChosen(in: nil))
+            #expect(host.model.taskViewList.rows.count == before + 1, "New List made a list in this window")
+            #expect(host.model.taskViewList.renaming != nil, "with its field open")
         }
     }
 }

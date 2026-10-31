@@ -44,9 +44,9 @@ struct WindowView: View {
     private let app: TodoApp
 
     /// The window's value in its group, the window's route in its text form beside an identity of the window's own
-    /// (`Value`): nil for a window opened with none, the first of a launch, every Cmd-N and the window a link opens at
-    /// a launch, which gets one at its first write. Its text is read once, when the window is made, and written after
-    /// every change of the route. It is what a relaunch restores the window from, on the Mac
+    /// (`Value`): nil for a window opened with none, the first of a launch, every New Window and the window a link
+    /// opens at a launch, which gets one at its first write. Its text is read once, when the window is made, and
+    /// written after every change of the route. It is what a relaunch restores the window from, on the Mac
     /// (`docs/specs/navigation.md`, section 7) and on iOS: on 2026-10-20, in the iOS 26.3 simulator, the scene's saved
     /// state held this value, and a scene the system had ended in the background was made again from it.
     ///

@@ -65,6 +65,10 @@ struct RootView: View {
                 QuickEntryView(model: quickEntry) { host.send(.quickEntry($0)) }
             }
         }
+        // The sidebar's "+" menu for the menu bar while this window is focused (`AppScene.NewItemCommands`), from the
+        // root and not the sidebar, so that the sidebar's column hidden by its button and a narrow window's stack keep
+        // it.
+        .focusedSceneValue(\.addMenu, AppScene.AddMenu(of: host))
     }
 
     /// The wide window's tree: the sidebar beside the detail column, whose stack has the layout's column at its root,

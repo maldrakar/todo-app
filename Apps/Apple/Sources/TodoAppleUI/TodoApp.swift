@@ -47,8 +47,8 @@ final class TodoApp {
     /// section 7).
     ///
     /// It is the first window's, and only when that window has no path of its own; every later window made with none,
-    /// Cmd-N's, opens the default window (the owner, 2026-10-20). One that does not read opens the default window and
-    /// says nothing, as a path a window was restored from does: it is the developer's stand-in for a link on the
+    /// New Window's, opens the default window (the owner, 2026-10-20). One that does not read opens the default window
+    /// and says nothing, as a path a window was restored from does: it is the developer's stand-in for a link on the
     /// executable that has no bundle, and the owner kept an unreadable one silent, as the plan's rule has it
     /// (2026-10-20).
     let launchRoute: AppModule.Route?
