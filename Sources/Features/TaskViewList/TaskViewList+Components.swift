@@ -423,7 +423,7 @@ extension TaskViewList {
     /// sends nothing until the search epic (the owner, 2026-10-25).
     private static func searchCapsule(ending trailingGlyph: SearchFieldModel.TrailingGlyph?) -> SearchFieldModel {
         SearchFieldModel(
-            placeholder: TextModel(text: "Search", font: .search, color: .ink2),
+            placeholder: TextModel(text: Words.search, font: .search, color: .ink2),
             leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
             trailingGlyph: trailingGlyph, spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container,
             cornerRadius: 24
@@ -435,7 +435,7 @@ extension TaskViewList {
     /// its end. It has no trailing glyph and no hint of ⌘F, since no command answers ⌘F until the search epic, and
     /// sends nothing until then.
     private static let filledSearchField = SearchFieldModel(
-        placeholder: TextModel(text: "Search", font: .search, color: .ink2),
+        placeholder: TextModel(text: Words.search, font: .search, color: .ink2),
         leadingIcon: IconModel(icon: .magnifier, size: 15, weight: .regular, color: .ink2), trailingGlyph: nil,
         spacing: 6, leadingPadding: 9, trailingPadding: 4, fill: .color(.fill), cornerRadius: 8
     )
@@ -444,9 +444,9 @@ extension TaskViewList {
     private static let addButton = MenuButtonModel<UserAction>(
         label: ButtonLabelModel(
             icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
-            accessibilityLabel: "Add", fill: .color(.accent)
+            accessibilityLabel: Words.add, fill: .color(.accent)
         ),
-        menu: addMenu(newTask: nil, newList: nil)
+        menu: makeAddMenu(newTask: nil, newList: nil)
     )
 
     /// "+" on the accent with its menu's shortcuts (`Mac.dc.html`, the "+" and its menu): its plus 16 pt bold, the
@@ -454,17 +454,18 @@ extension TaskViewList {
     private static let addButtonWithShortcuts = MenuButtonModel<UserAction>(
         label: ButtonLabelModel(
             icon: IconModel(icon: .plus, size: 16, weight: .bold, color: .onAccent), title: nil,
-            accessibilityLabel: "Add", fill: .color(.accent)
+            accessibilityLabel: Words.add, fill: .color(.accent)
         ),
-        menu: addMenu(
+        menu: makeAddMenu(
             newTask: .init(key: "n", modifiers: [.command]), newList: .init(key: "n", modifiers: [.shift, .command])
         )
     )
 
-    /// The menu of "+", which makes a task, a list or an area, in the canvas's order, New Task and New List with the
-    /// shortcuts they are given and New Area with none: where each goes, and that a task is quick entry's, is the
-    /// module's to decide (Lists screen spec, section 7).
-    private static func addMenu(
+    /// Builds the menu of "+", which makes a task, a list or an area, in the canvas's order, New Task and New List with
+    /// the shortcuts they are given and New Area with none: where each goes, and that a task is quick entry's, is the
+    /// module's to decide (Lists screen spec, section 7). The platform's menu is picked from the two built
+    /// (`addMenu(hasEditMode:)`).
+    private static func makeAddMenu(
         newTask: MenuModel<UserAction>.Item.Shortcut?, newList: MenuModel<UserAction>.Item.Shortcut?
     ) -> MenuModel<UserAction> {
         MenuModel(sections: [
@@ -825,12 +826,15 @@ extension TaskViewList {
         }
     }
 
-    /// The words of the commands more than one control gives: New List and New Area, a menu's items and the edit
-    /// bar's buttons, a menu's Delete and the confirmation's, and the Cancel of both dialogs.
+    /// The words more than one control gives: New List and New Area, a menu's items and the edit bar's buttons, a
+    /// menu's Delete and the confirmation's, and the Cancel of both dialogs; and those both bars give, the search
+    /// field's "Search" and the words "+" reads aloud, "Add".
     private enum Words {
         static let newList = "New List"
         static let newArea = "New Area"
         static let delete = "Delete"
         static let cancel = "Cancel"
+        static let search = "Search"
+        static let add = "Add"
     }
 }

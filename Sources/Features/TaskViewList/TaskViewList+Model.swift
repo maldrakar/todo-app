@@ -4,11 +4,11 @@ import TodoCore
 
 extension TaskViewList {
     /// What a view draws: the rows of the tree, the highlighted one and the one being renamed named once more for a
-    /// view that reads them as one value, whether the screen is in edit mode, the bar, the look of the drag, the dialog
-    /// up over the rows, and the sentence. The rows, the bar, the drag and the dialogs are the models of the components
-    /// that draw them, built for the screen in `TaskViewList+Components.swift` with every value a platform needs to
-    /// draw them, so that every platform draws the same components and no decision stays behind on one (ADR-0007,
-    /// amendment of 2026-10-30).
+    /// view that reads them as one value, whether the screen is in edit mode, the bar and its "+" menu named once more
+    /// for the app's menu bar, the look of the drag, the dialog up over the rows, and the sentence. The rows, the bar,
+    /// the drag and the dialogs are the models of the components that draw them, built for the screen in
+    /// `TaskViewList+Components.swift` with every value a platform needs to draw them, so that every platform draws the
+    /// same components and no decision stays behind on one (ADR-0007, amendment of 2026-10-30).
     public struct Model: Equatable, Sendable {
         /// One row of the tree, an area's line or a list's row (spec section 5).
         public struct Row: Equatable, Sendable, Identifiable {
@@ -39,13 +39,12 @@ extension TaskViewList {
 
         public let rows: [Row]
 
-        /// The id of the highlighted row, and nil when no row is highlighted: what a list that keeps its
-        /// selection as one value is bound to, as the Mac's `List(selection:)` is, so that the binding reads a
-        /// field instead of searching the rows for one (spec section 4).
+        /// The id of the highlighted row, and nil when no row is highlighted: the highlight as one value, so that a
+        /// reader that wants it reads a field instead of searching the rows for one (spec section 4).
         ///
-        /// It is the highlight a list's row draws as its background, held a second way because it is read a second
-        /// way: a list bound to one value reads this, and a client that draws row by row reads the row. Both come
-        /// off the same drawn rows when the model is assembled, so they name the same row or none.
+        /// It is the highlight a list's row draws as its background, held a second way: a client that draws row by
+        /// row reads the row. Both come off the same drawn rows when the model is assembled, so they name the same row
+        /// or none.
         ///
         /// The highlight is the view of the list this module declared, where a list's row holds it (navigation state
         /// spec, "Open questions"): nil when it declared nothing, and when the view it declared has no such row, a

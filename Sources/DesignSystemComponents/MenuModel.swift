@@ -8,9 +8,12 @@ public struct MenuModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// An item of the menu: its title, its icon, whether it destroys something, which a platform draws as such, the
     /// keys that choose it, and the action choosing it sends.
     public struct Item: Equatable, Sendable {
-        /// The keys that choose an item from anywhere in its window on a platform with a keyboard, which shows them
-        /// beside the item: a key pressed with the modifiers held, ⇧⌘N as `n` with the shift and command keys. The key
-        /// is the one its cap names, in lower case, whatever modifier the shortcut holds.
+        /// The keys of an item on a platform with a keyboard, which shows them beside the item: a key pressed with the
+        /// modifiers held, ⇧⌘N as `n` with the shift and command keys. They choose the item where the platform answers
+        /// them, as an app's menu bar answers its items' keys with the menu closed; the items of a closed menu in a
+        /// window answer none on the Mac, so a platform that should answer them there draws the same menu in its menu
+        /// bar (#149's hand check, 2026-10-31). The key is the one its cap names, in lower case, whatever modifier
+        /// the shortcut holds.
         public struct Shortcut: Equatable, Sendable {
             /// A key held while the shortcut's key is pressed.
             public enum Modifier: Equatable, Sendable {
