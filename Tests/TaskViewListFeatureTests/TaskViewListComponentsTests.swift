@@ -121,14 +121,15 @@ private func chevron(of id: ViewID, in model: TaskViewList.Model) -> AccessoryMo
 /// An area's line whole as the phone draws it, but for what a test spells: its height, its label, the text of its
 /// field where one is open, whether it has the grip, and its menu. It starts 20 in, the label in the area label's font
 /// in ink2 10 before the line, 1 pt in the line colour, and a tap on it is sent as the row's selection; the line ends
-/// 20 short of the edge, and with the grip 10 before it, in a cell of 22, 12 short of the edge.
+/// 20 short of the edge, and with the grip 10 before it, in a cell of 22⅔, the glyph's width on an iPhone, 12 short of
+/// the edge.
 private func phoneLine(
     _ id: ViewID, height: Double, label: String?, fieldText: String?, hasGrip: Bool, menu: MenuModel<Action>?
 ) -> AreaLineModel<Action> {
     AreaLineModel(
         height: height, leading: 20, spacing: 10,
         label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: fieldText.map(areaField), line: StrokeModel(color: .line, width: 1, dash: []),
-        lineToAccessories: hasGrip ? 10 : 20, accessories: hasGrip ? [.grip(grip)] : [], cellWidth: 22,
+        lineToAccessories: hasGrip ? 10 : 20, accessories: hasGrip ? [.grip(grip)] : [], cellWidth: 68.0 / 3,
         endGap: hasGrip ? 12 : 0, tap: .rowSelected(id), menu: menu
     )
 }
@@ -428,21 +429,24 @@ private func phoneDrag() -> DragModel {
 
 /// The picker of Move to… on Home, in the tree of the test above: Projects checked, Home disabled, Errands, the
 /// unnamed area's line alone and Clients under it, each a row of the screen's with nothing of the session on it, and at
-/// its right the check or the cell kept for it, 18 wide and 20 short of the edge, which a row's need counts.
+/// its right the check or the cell kept for it, 17⅔ wide, the check's width on an iPhone, and 20 short of the edge,
+/// which a row's need counts.
 private func homesPicker(
     projects: ViewID, home: ViewID, errands: ViewID, area: ViewID, clients: ViewID
 ) -> PickerModel<TaskViewList.Model.Kind, Action> {
     let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
+    let checkCell = 53.0 / 3
     func option(
         _ id: ViewID, _ title: String, font: DesignSystem.Font, tile: TileModel, depth: Int, isChecked: Bool = false
     ) -> TaskViewList.Model.Kind {
         let leading = 20 + 22 * Double(depth)
         return .list(ListRowModel(
             height: 46, leading: leading, tile: tile, tileToTitle: 12,
-            title: TextModel(text: title, font: font, color: .ink), field: nil, need: leading + tile.side + 12 + 140 + 38,
-            background: .paper, guides: [], childGuides: [], guide: guide,
-            accessories: [isChecked ? .check(check) : .space(18)], fadeWidth: 0, countMinimumWidth: 20, cellWidth: 18,
-            endGap: 20, accessoriesWidth: 38, tap: .movePickerRowTapped(id), menu: nil
+            title: TextModel(text: title, font: font, color: .ink), field: nil,
+            need: leading + tile.side + 12 + 140 + (checkCell + 20), background: .paper, guides: [], childGuides: [],
+            guide: guide, accessories: [isChecked ? .check(check) : .space(checkCell)], fadeWidth: 0,
+            countMinimumWidth: 20, cellWidth: checkCell, endGap: 20, accessoriesWidth: checkCell + 20,
+            tap: .movePickerRowTapped(id), menu: nil
         ))
     }
     let rootTile = { (color: DesignSystem.Color.Components.Tile, icon: DesignSystem.Icon) in
@@ -454,8 +458,8 @@ private func homesPicker(
         topLevel: .init(
             icon: IconModel(icon: .divider, size: 15, weight: .regular, color: .ink2), tileSide: 30, tileCornerRadius: 8,
             tileColor: .fill, tileToTitle: 12, title: TextModel(text: "Top level", font: .rowTitle, color: .ink),
-            leading: 20, height: 46, accessories: [.space(18)], cellWidth: 18, endGap: 20, isChecked: false,
-            action: .movePickerRowTapped(nil)
+            leading: 20, height: 46, accessories: [.space(checkCell)], cellWidth: checkCell, endGap: 20,
+            isChecked: false, action: .movePickerRowTapped(nil)
         ),
         options: [
             .init(
@@ -479,8 +483,9 @@ private func homesPicker(
             .init(
                 row: .area(AreaLineModel(
                     height: 17, leading: 20, spacing: 10, label: nil, field: nil,
-                    line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20, accessories: [.space(18)],
-                    cellWidth: 18, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
+                    line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20,
+                    accessories: [.space(checkCell)], cellWidth: checkCell, endGap: 20, tap: .movePickerRowTapped(area),
+                    menu: nil
                 )),
                 isDisabled: false, isChecked: false
             ),

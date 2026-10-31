@@ -286,13 +286,15 @@ extension TaskViewList {
     }
 
     /// What stands at an area's line's right in the tree: nothing, the line ending 20 short of the edge, and in edit
-    /// mode the grip, 10 after the line in a cell of 22, as wide as Task 7 drew its 18 pt glyph, and 12 short of the
-    /// edge.
+    /// mode the grip, 10 after the line in a cell of 22⅔, and 12 short of the edge. The cell is as wide as Task 7 drew
+    /// the 18 pt glyph, its own width on an iPhone, 68 pixels at 3x: a cell of 22, its width on the Mac, moved the
+    /// line's end 2 pixels right and the grip 1 (the iOS 26.3 simulator, 2026-10-31).
     private static func lineEnd(isEditing: Bool) -> LineEnd {
-        if isEditing {
-            LineEnd(lineToAccessories: 10, accessories: [.grip(Phone.grip)], cellWidth: 22, endGap: 12)
+        let gripCell: Double = 68.0 / 3
+        return if isEditing {
+            LineEnd(lineToAccessories: 10, accessories: [.grip(Phone.grip)], cellWidth: gripCell, endGap: 12)
         } else {
-            LineEnd(lineToAccessories: 20, accessories: [], cellWidth: 22, endGap: 0)
+            LineEnd(lineToAccessories: 20, accessories: [], cellWidth: gripCell, endGap: 0)
         }
     }
 
@@ -449,12 +451,14 @@ extension TaskViewList {
         static let grip = IconModel(icon: .grip, size: gripSize, weight: .regular, color: .ink3)
     }
 
-    /// The picker's check (`Phone.dc.html`, the Move to… sheet): 15 pt bold in the accent, in a cell of 18, the
-    /// canvas's check, which its glyph fills, 20 short of the right edge, at the right of the present choice, and the
-    /// cell kept empty at the right of every other row, so that the rows end in one column: "Top level", a list's row,
-    /// whose need counts the two, and an area's line, which ends 20 before them as Task 7 drew it.
+    /// The picker's check (`Phone.dc.html`, the Move to… sheet): 15 pt bold in the accent, in a cell of 17⅔, 20 short
+    /// of the right edge, at the right of the present choice, and the cell kept empty at the right of every other row,
+    /// so that the rows end in one column: "Top level", a list's row, whose need counts the two, and an area's line,
+    /// which ends 20 before them as Task 7 drew it. The cell is as wide as Task 7 drew the glyph where the canvas has
+    /// an 18 px check, its own width on an iPhone, 53 pixels at 3x: a cell of 18, its width on the Mac, moved the end
+    /// of an area's line 1 pixel left (the iOS 26.3 simulator, 2026-10-31).
     private enum Picker {
-        static let checkCell: Double = 18
+        static let checkCell: Double = 53.0 / 3
         static let endGap: Double = 20
 
         /// The check where a row is the present choice, and the room for it where it is not.
