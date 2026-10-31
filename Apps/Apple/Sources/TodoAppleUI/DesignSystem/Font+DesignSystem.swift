@@ -34,6 +34,7 @@ extension Font.Weight {
         case .regular: .regular
         case .medium: .medium
         case .semibold: .semibold
+        case .bold: .bold
         case .heavy: .heavy
         }
     }

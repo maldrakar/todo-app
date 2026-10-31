@@ -3,10 +3,11 @@ import AppFeature
 import FeatureModule
 import SwiftUI
 
-/// The view of one window: it makes the window from the window's path and its width class once, when the window first
-/// appears, holds it for as long as the window lives, draws the root over its host, hands it the links the system
-/// opens in it and the window's width class as it changes, writes its route back after every change, and opens the
-/// windows the root asks for (`docs/specs/navigation.md`, sections 5 and 7; navigation state spec, section 4).
+/// The view of one window: it makes the window from the window's path, its width class and whether another window can
+/// open beside it, once, when the window first appears, holds it for as long as the window lives, draws the root over
+/// its host, hands it the links the system opens in it and the window's width class as it changes, writes its route
+/// back after every change, and opens the windows the root asks for (`docs/specs/navigation.md`, sections 5 and 7;
+/// navigation state spec, section 4).
 ///
 /// The window is kept in the view's state, which SwiftUI keeps for the life of the window, and is made when the view
 /// drawn while that state is empty appears. A scene's content closure runs more than once for a window and hands
@@ -77,6 +78,14 @@ struct WindowView: View {
         horizontalSizeClass == .compact ? .narrow : .wide
     }
 
+    /// Whether the app can open a window beside this one, which only the platform can say (`docs/specs/navigation.md`,
+    /// sections 5 and 10), read when the window is made and handed to the root, which hands it to the sidebar for the
+    /// lists' menus: it does not change while the app runs, so nothing reports it again. Read on 2026-10-18: true on
+    /// the Mac; false on iPhone, its Info.plist declaring multiple scenes or not; on the iPad true only with that
+    /// declaration, which the app's Info.plist makes (navigation plan, Task 9), and false without it (the iOS 26.3
+    /// simulator). The watch has the value too, from watchOS 9 (Xcode 27.1's watchOS SDK, 2026-10-30).
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
+
     init(app: TodoApp, value: Binding<Value?>) {
         self.app = app
         self._value = value
@@ -101,7 +110,9 @@ struct WindowView: View {
 
     private func makeWindow() {
         do {
-            let window = try app.makeWindow(path: value?.path ?? storedPath, width: width)
+            let window = try app.makeWindow(
+                path: value?.path ?? storedPath, width: width, supportsMultipleWindows: supportsMultipleWindows
+            )
             answerTheRoot(of: window.host)
             self.window = window
             keep(window.host.route.path)

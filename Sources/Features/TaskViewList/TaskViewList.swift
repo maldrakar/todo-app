@@ -1,4 +1,5 @@
 // Sources/Features/TaskViewList/TaskViewList.swift
+import DesignSystemComponents
 import FeatureModule
 import TaskListFeature
 import TodoCore
@@ -13,10 +14,12 @@ import TodoCore
 /// number and decides nothing, and the walk that builds them never recurses over a chain that arrived from
 /// sync (`docs/style.md`).
 ///
-/// A row is an area's line or a list's row, and a list's row arrives with everything it draws finished: its tile and
-/// its title's font, built for the width class of the window, which the root hands the module as it hands it to its
-/// own layout, and the count of its open tasks as text (Lists screen spec, sections 1, 4 and 5; ADR-0007, amendment
-/// of 2026-10-26). The module reads the counts beside the rows, and the width moves the tiles with no read at all.
+/// A row is an area's line or a list's row, each the model of the component that draws it, with everything it draws
+/// finished: a list's tile and title font, built for the width class of the window, which the root hands the module as
+/// it hands it to its own layout, the count of its open tasks as text, its chevron, its menu and every size, colour and
+/// word it is drawn with; the bar, the look of the drag and the dialogs are component models too (Lists screen spec,
+/// sections 1, 4 and 5; ADR-0007, amendments of 2026-10-26 and 2026-10-30). The module reads the counts beside the
+/// rows, and the width moves the tiles with no read at all.
 ///
 /// It edits the tree too (Lists screen spec, sections 6 and 7): edit mode, a delete it asks about first, Move to… and
 /// the drag's drop, which it reads into a parent and a place. The confirmation and the picker are its state and not
@@ -197,17 +200,24 @@ public final class TaskViewList: Routable {
     /// default, as the root's has none, so that the class a window is made with is always its host's to say
     /// (`docs/style.md`, "A lower layer holds no policy of its client").
     ///
+    /// Whether a window can open beside this one is the platform's to say when the window is made, which the root hands
+    /// on as it hands the width, and it does not change while the app runs: Open in New Window is in a list's menu only
+    /// where one can (`docs/specs/navigation.md`, section 5). It has no default either, for the same reason.
+    ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
     /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own reads
     /// throw, the rows, their counts and the folds.
-    public init(store: Store, route: Route, width: WindowWidth) throws(StoreError) {
+    public init(
+        store: Store, route: Route, width: WindowWidth, supportsMultipleWindows: Bool
+    ) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
         let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
         self.state = State(
-            rows: rows, counts: counts, collapsedViews: collapsedViews, width: width, destination: Destination()
+            rows: rows, counts: counts, collapsedViews: collapsedViews, width: width,
+            supportsMultipleWindows: supportsMultipleWindows, destination: Destination()
         )
         setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
@@ -528,9 +538,9 @@ public final class TaskViewList: Routable {
     /// The folded lists as the device's state holds them, of the lists the rows hold: what was written is the device's
     /// and may be stale or wrong (`docs/style.md`, "Data from outside"), so a text that does not read as an id, an id
     /// no row holds, a view deleted since, and an area's, whose line never folds, are dropped, and the next fold writes
-    /// the set back without them. A list with no lists inside keeps its fold, which it does not draw
-    /// (`ReadRow.drawnKind`), so lists that come back inside it come back folded. A value that does not decode as a
-    /// list of texts reads as nothing folded, which the store decides.
+    /// the set back without them. A list with no lists inside keeps its fold, which it does not draw (`drawnRows`), so
+    /// lists that come back inside it come back folded. A value that does not decode as a list of texts reads as
+    /// nothing folded, which the store decides.
     private static func collapsedViews(in store: Store, among rows: [ReadRow]) throws(StoreError) -> Set<ViewID> {
         let held = Set(rows.filter { $0.kind == .list }.map(\.id))
         let kept = try store.deviceState(collapsedViewsKey, as: [String].self) ?? []
@@ -799,21 +809,22 @@ public final class TaskViewList: Routable {
     private static let newListTitle = "New list"
 
     /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
-    /// lists folded on this device, the width class of the window, the rename a person has open, whether they are in
-    /// edit mode, the dialog up over the rows, the list declared over the module, and the sentence they were last told.
-    /// One entity, moved field by field, from which the model is computed on every read, so that nothing on screen is
-    /// state in its own right and there is no second copy to keep in step (owner's reviews of #77 and #101): the
-    /// highlight is read off the destination, and is not kept beside it.
+    /// lists folded on this device, the width class of the window and whether a window can open beside it, the rename a
+    /// person has open, whether they are in edit mode, the dialog up over the rows, the list declared over the module,
+    /// and the sentence they were last told. One entity, moved field by field, from which the model is computed on
+    /// every read, so that nothing on screen is state in its own right and there is no second copy to keep in step
+    /// (owner's reviews of #77 and #101): the highlight is read off the destination, and is not kept beside it.
     ///
-    /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the
-    /// array inside it is copy-on-write, so a class buys nothing here and would put a second reference type
-    /// into a module that is already one. The destination is a field of the state because what a screen declared
-    /// over it is the navigation state, which the window's stack follows (ADR-0009, amendment of 2026-10-22).
+    /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the array inside
+    /// it is copy-on-write, so a class buys nothing here and would put a second reference type into a module that is
+    /// already one. The destination is a field of the state because what a screen declared over it is the navigation
+    /// state, which the window's stack follows (ADR-0009, amendment of 2026-10-22).
     private struct State {
         var rows: [ReadRow]
         var counts: [ViewID: Int]
         var collapsedViews: Set<ViewID>
         var width: WindowWidth
+        let supportsMultipleWindows: Bool
         var rename: Rename?
         var isEditing = false
         var dialog: Dialog?
@@ -821,71 +832,48 @@ public final class TaskViewList: Routable {
         var problem: String?
 
         /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
-        /// this person's session projected onto them — the tiles and fonts for the width, the counts and the labels as
-        /// edit mode shows them, the folds, the highlight on the list's row of the view whose list is declared, or on
-        /// the folded list that hides that row, the draft on the row they are renaming — the highlighted row's id,
-        /// whether they are in edit mode, and the sentence, if any.
+        /// this person's session projected onto them (`drawnRows`); the highlighted row's id, on the list's row of the
+        /// view whose list is declared, or on the folded list that hides that row; the id of the row being renamed;
+        /// whether they are in edit mode; the bar as edit mode has it; the look of the drag; the dialog up, if any; and
+        /// the sentence, if any.
         var model: Model {
             let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
-            let drawn = shown.rows.map {
-                Model.Row(
-                    id: $0.id, depth: $0.depth,
-                    kind: $0.drawnKind(
-                        in: width, isEditing: isEditing, count: counts[$0.id], isFolded: collapsedViews.contains($0.id),
-                        isSelected: $0.id == shown.highlighted
-                    ),
-                    draft: rename?.text(on: $0.id)
-                )
-            }
             // Read off the drawn rows and not copied from the destination or the walk: `.rowSelected` and `.route`
             // declare the list of an id without asking the rows, and an id no list's row carries, an area's line's
-            // among them, highlights nothing, so the model names no row for it either.
-            let selection = drawn.first { row in
-                guard case .list(let list) = row.kind else { return false }
-                return list.isSelected
-            }?.id
+            // among them, highlights nothing, so the model names no row for it either. A rename on a row a fold hides
+            // has no field drawn, so it names no row either.
+            let selection = shown.highlighted.flatMap { id in
+                shown.rows.contains { $0.id == id && $0.kind == .list } ? id : nil
+            }
+            let renaming = rename.flatMap { rename in shown.rows.contains { $0.id == rename.id } ? rename.id : nil }
+            let drawn = TaskViewList.drawnRows(
+                shown.rows, in: width, isEditing: isEditing, counts: counts, collapsedViews: collapsedViews,
+                selection: selection, rename: rename.map { ($0.id, $0.draft) },
+                supportsMultipleWindows: supportsMultipleWindows
+            )
             return Model(
-                rows: drawn, selection: selection, isEditing: isEditing, confirmation: confirmation,
+                rows: drawn, selection: selection, renaming: renaming, isEditing: isEditing,
+                bar: TaskViewList.bar(isEditing: isEditing), drag: TaskViewList.drag, confirmation: confirmation,
                 movePicker: movePicker, problem: problem
             )
         }
 
-        /// The confirmation up over the rows, nil when none is, its question and what it says the delete takes computed
-        /// from the rows on every read, so that a list a peer puts under the one being deleted is counted among those
-        /// that go with it (Lists screen spec, section 6).
-        private var confirmation: Model.Confirmation? {
+        /// The confirmation up over the rows, nil when none is, computed from the rows on every read
+        /// (`confirmation(deleting:among:)`).
+        private var confirmation: ConfirmationModel<UserAction>? {
             guard case .deleteConfirmation(let id)? = dialog, let row = rows.first(where: { $0.id == id }) else {
                 return nil
             }
-            switch row.kind {
-            case .area:
-                // An unnamed area has no name to put in the question, and an invented one is worse than none.
-                let title = row.title.isEmpty ? "Delete the area?" : "Delete the “\(row.title)” area?"
-                return Model.Confirmation(title: title, message: "Its lists stay.")
-            case .list:
-                let inside = TaskViewList.subtree(of: id, in: rows).count - 1
-                let going = switch inside {
-                case 0: ""
-                case 1: "One list inside it goes with it. "
-                default: "\(inside) lists inside it go with it. "
-                }
-                return Model.Confirmation(title: "Delete “\(row.title)”?", message: going + "No task is deleted.")
-            }
+            return TaskViewList.confirmation(deleting: row, among: rows)
         }
 
-        /// The picker up over the rows, nil when none is: its title names the list being moved, "Top level" is marked
-        /// when the list stands at the root, and its rows are the whole tree as `pickerRows` reads it (Lists screen
-        /// spec, section 6).
-        private var movePicker: Model.MovePicker? {
+        /// The picker up over the rows, nil when none is, its options the whole tree as the window's width draws it
+        /// (`movePicker(moving:among:in:)`).
+        private var movePicker: PickerModel<Model.Kind, UserAction>? {
             guard case .movePicker(let id)? = dialog, let moving = rows.first(where: { $0.id == id }) else {
                 return nil
             }
-            return Model.MovePicker(
-                title: "Move “\(moving.title)” to…", isTopLevelCurrent: moving.parent == nil,
-                rows: TaskViewList.pickerRows(
-                    moving: moving, among: rows, in: width, isEditing: isEditing, counts: counts
-                )
-            )
+            return TaskViewList.movePicker(moving: moving, among: rows, in: width)
         }
 
         /// The dialog up over the rows, one at a time, which holds the id of the row it is up for and nothing of what
@@ -904,13 +892,11 @@ public final class TaskViewList: Routable {
             }
         }
 
-        /// The rename a person has open: the row the field is on, and the text in it.
+        /// The rename a person has open: the row the field is on, and the text in it, which the row's field carries
+        /// (`Model.renaming`).
         struct Rename {
             let id: ViewID
             let draft: String
-
-            /// The draft as a row carries it, which is the projection `Model.Row.draft` is documented as.
-            func text(on row: ViewID) -> String? { row == id ? draft : nil }
         }
     }
 

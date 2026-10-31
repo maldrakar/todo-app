@@ -1,122 +1,50 @@
 // Sources/Features/TaskViewList/TaskViewList+Model.swift
-import DesignSystem
 import DesignSystemComponents
 import TodoCore
 
 extension TaskViewList {
-    /// What a view draws: the rows of the tree, the highlighted one named once more for a list bound to one value,
-    /// whether the screen is in edit mode, the dialog up over the rows, and the sentence.
+    /// What a view draws: the rows of the tree, the highlighted one and the one being renamed named once more for a
+    /// view that reads them as one value, whether the screen is in edit mode, the bar, the look of the drag, the dialog
+    /// up over the rows, and the sentence. The rows, the bar, the drag and the dialogs are the models of the components
+    /// that draw them, built for the screen in `TaskViewList+Components.swift` with every value a platform needs to
+    /// draw them, so that every platform draws the same components and no decision stays behind on one (ADR-0007,
+    /// amendment of 2026-10-30).
     public struct Model: Equatable, Sendable {
         /// One row of the tree, an area's line or a list's row (spec section 5).
         public struct Row: Equatable, Sendable, Identifiable {
             public let id: ViewID
 
-            /// The depth the row is drawn at, which a view indents by and decides nothing with: a list of the root at
-            /// 0 and its lists at 1, and an area's line at 0 with the lists under it at 0 too and theirs at 1, since
-            /// the line, and not an indent, says which area a list belongs to (spec section 3).
+            /// The depth the row is drawn at, which its model is placed by already and the drag reads to find the
+            /// block it lifts and the depths its slot can take: a list of the root at 0 and its lists at 1, and an
+            /// area's line at 0 with the lists under it at 0 too and theirs at 1, since the line, and not an indent,
+            /// says which area a list belongs to (spec section 3).
             public let depth: Int
 
             /// What the row is, which a view switches over once to pick the row it draws, every case drawn and no
             /// `default` (`docs/style.md`, "Views").
             public let kind: Kind
-
-            /// The text of the rename in progress on this row, and nil on every other row and whenever no
-            /// field is open at all: a view puts a text field where this is not nil, draws the title or the
-            /// label everywhere else, and that is the whole of what it knows about renaming. It is what the
-            /// person typed, down to the spaces at its ends; what the store keeps is that text trimmed
-            /// (`commit`), since a caret is no place for the module to be moving text about.
-            ///
-            /// The draft is the module's, put on the row when the model is assembled and never kept in one.
-            /// A read replaces every row, so a draft that lived in a row would be emptied by a peer's edit
-            /// arriving while a person was typing. What ends it is its row going, which `reread` decides.
-            public let draft: String?
         }
 
         /// A row's kind, an enum so that a row is one of the two explicitly and never both or neither (the owner,
-        /// 2026-10-25, on the spec's first revision).
+        /// 2026-10-25, on the spec's first revision), each the model of the component that draws it, which is a class,
+        /// so that a row and an option of the picker hold a reference to it and not the model itself (`ListRowModel`).
         public enum Kind: Equatable, Sendable {
-            /// An area's line, with its name as its label, and nil for an area that has none: the line alone is the
-            /// whole of how an unnamed area looks (spec section 3). In edit mode an unnamed area's label is "Area", the
-            /// label a tap renames it by (spec section 1).
-            case area(label: String?)
+            /// An area's line, labelled with its name, and with none for an unnamed area, the line alone being the
+            /// whole of how it looks (spec section 3), but in edit mode, where its label is "Area", the label a tap
+            /// renames it by (spec section 1).
+            case area(AreaLineModel<UserAction>)
             /// A list's row, with everything it draws.
-            case list(ListRow)
-        }
-
-        /// What a list's row draws, every value finished, so that a view formats nothing and chooses nothing
-        /// (`docs/style.md`, "Views").
-        public struct ListRow: Equatable, Sendable {
-            public let title: String
-
-            /// The list's tile, in its colour and with its icon, at the sizes the Lists screen gives a row of its
-            /// drawn depth in a window of the module's width class (`TaskViewList+Rows.swift`).
-            public let tile: TileModel
-
-            /// The title's font, one of the design system's four row titles, chosen by the same width class, the
-            /// drawn depth and whether the row has lists inside it.
-            public let titleFont: DesignSystem.Font
-
-            /// The number of the list's open tasks as text, and the empty string for a count of zero, for a list
-            /// that has no count and in edit mode, where counts leave the rows: a view draws it as it is, and a zero is
-            /// drawn as nothing on every list (spec sections 1 and 4).
-            public let countText: String
-
-            /// Whether the list has lists inside it, which a chevron folds.
-            public let hasChildren: Bool
-
-            /// Whether the list's branch is folded on this device, the lists inside it left out of `rows` (Lists
-            /// screen spec, section 5); never on a list with no lists inside.
-            public let isCollapsed: Bool
-
-            /// Whether this row is the highlighted one, which `selection` names too: the row of the view whose list is
-            /// declared, or the folded list whose branch hides that row.
-            public let isSelected: Bool
-        }
-
-        /// What the confirmation of a delete asks, finished: the question, which names the list or the area, and what
-        /// the delete takes with it and what it leaves (spec section 6).
-        public struct Confirmation: Equatable, Sendable {
-            public let title: String
-            public let message: String
-        }
-
-        /// What the picker of Move to… draws (spec section 6).
-        public struct MovePicker: Equatable, Sendable {
-            /// A row of the picker: the row the screen draws, and what the picker says about it.
-            public struct Row: Equatable, Sendable, Identifiable {
-                public var id: ViewID { row.id }
-
-                /// The row as the screen draws it, of the same kind, at the same depth and with the same tile and
-                /// title font, so that a view draws it with the screen's own row; it carries no draft, no fold and no
-                /// highlight.
-                public let row: Model.Row
-
-                /// Whether the row cannot take the list, being the list itself or a list inside it, which a view
-                /// greys out.
-                public let isDisabled: Bool
-
-                /// Whether the row is the list's present parent, a list or an area's line, which a view marks.
-                public let isCurrent: Bool
-            }
-
-            /// The title, which names the list being moved.
-            public let title: String
-
-            /// Whether the list being moved stands at the root, which marks "Top level" as its present parent.
-            public let isTopLevelCurrent: Bool
-
-            /// The whole tree in tree order, every level of it and the folds ignored.
-            public let rows: [Row]
+            case list(ListRowModel<UserAction>)
         }
 
         public let rows: [Row]
 
         /// The id of the highlighted row, and nil when no row is highlighted: what a list that keeps its
         /// selection as one value is bound to, as the Mac's `List(selection:)` is, so that the binding reads a
-        /// field the way a text field's reads `draft`, instead of searching the rows for one (spec section 4).
+        /// field instead of searching the rows for one (spec section 4).
         ///
-        /// It is the highlight `ListRow.isSelected` carries, held a second way because it is read a second way: a
-        /// list bound to one value reads this, and a client that draws row by row reads the row. Both come
+        /// It is the highlight a list's row draws as its background, held a second way because it is read a second
+        /// way: a list bound to one value reads this, and a client that draws row by row reads the row. Both come
         /// off the same drawn rows when the model is assembled, so they name the same row or none.
         ///
         /// The highlight is the view of the list this module declared, where a list's row holds it (navigation state
@@ -130,22 +58,44 @@ extension TaskViewList {
         /// row's own list as a click on any row does, and the row lights up again once no fold hides it.
         public let selection: ViewID?
 
-        /// Whether the screen is in edit mode, entered from "…" and left with Done: every row then takes a grip and a
-        /// tap renames it, and the counts and an unnamed area's missing label are drawn as `rows` gives them in it
-        /// (spec section 7). It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
+        /// The id of the row whose field is open, and nil when no row drawn has one: what a view reads to show the
+        /// field as it opens, the phone's screen scrolling to it, instead of searching the rows for it (the owner's 👍
+        /// on #160's thread r4415002151). It comes off the same drawn rows as the field, so the two name the same row
+        /// or none, and a row a fold hides has no field drawn.
+        ///
+        /// The field's text is the draft, what the person typed, down to the spaces at its ends; what the store keeps
+        /// is that text trimmed (`commit`), since a caret is no place for the module to be moving text about. The draft
+        /// is the module's, put on the row's field when the model is assembled and never kept in one. A read replaces
+        /// every row, so a draft that lived in a row would be emptied by a peer's edit arriving while a person was
+        /// typing. What ends it is its row going, which `reread` decides.
+        public let renaming: ViewID?
+
+        /// Whether the screen is in edit mode, entered from "…" and left with Done (spec section 7). What edit mode
+        /// draws, every row and line with a grip, the counts empty, no menus, the labels it gives and its bar, is in
+        /// the rows' and the bar's models already, so a view reads this for the drag, which only edit mode has, and the
+        /// wide window's toolbar reads it for its Edit and Done until the sidebar's task deletes that view.
+        /// It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
         public let isEditing: Bool
 
+        /// The bar at the bottom of the screen, its controls as edit mode has them or not (spec sections 1 and 7).
+        public let bar: BarModel<UserAction>
+
+        /// The look of the drag, whose gesture, lifted block, slot and depth are the platform's (the owner,
+        /// 2026-10-30).
+        public let drag: DragModel
+
         /// The confirmation of a delete while it is up, and nil when none is: a view draws it as an alert, its title
-        /// and message with two buttons of the view's own, Delete and Cancel, which send `deleteConfirmed` and
-        /// `deleteCancelled` (spec section 6). It is the module's state and not a screen, and no relaunch restores it
-        /// (ADR-0009, amendment of 2026-10-25).
-        public let confirmation: Confirmation?
+        /// and message with its two choices, which send `deleteConfirmed` and `deleteCancelled` (spec section 6). It
+        /// is the module's state and not a screen, and no relaunch restores it (ADR-0009, amendment of 2026-10-25).
+        public let confirmation: ConfirmationModel<UserAction>?
 
         /// The picker of Move to… while it is open, and nil when it is closed: a view draws it as a sheet, "Top level"
-        /// first and then its rows, which send `movePickerRowTapped`, with a Cancel of the view's own that sends
-        /// `movePickerCancelled` (spec section 6). It is the module's state and not a screen, and no relaunch restores
-        /// it (ADR-0009, amendment of 2026-10-25).
-        public let movePicker: MovePicker?
+        /// first and then its options, which send `movePickerRowTapped`, with its Cancel, which sends
+        /// `movePickerCancelled` (spec section 6). Each option is a row of the tree of the kind the screen draws it
+        /// as, so that a view draws it with the screen's own row, with the check at its right where it is the present
+        /// choice and the room for one where it is not. It is the module's state and not a screen, and no relaunch
+        /// restores it (ADR-0009, amendment of 2026-10-25).
+        public let movePicker: PickerModel<Kind, UserAction>?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one
