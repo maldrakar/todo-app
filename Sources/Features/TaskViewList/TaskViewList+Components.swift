@@ -59,15 +59,16 @@ extension TaskViewList {
         }
     }
 
-    /// The bar at the bottom of the screen, chosen by whether the platform has edit mode, and the same on every width
-    /// (Lists screen plan, Task 9). Where it has edit mode (`Phone.dc.html`, the bar; Lists screen spec, sections 1 and
-    /// 7): outside edit mode "…" on the platform's container, a menu holding Edit, the search capsule, and "+" on the
-    /// accent, a menu holding New Task, New List and New Area in the canvas's order; in edit mode "+ List" and "+ Area"
-    /// on one container, and Done, the check that ends edit mode, on the accent. The controls are 48 high, 10 apart and
-    /// 16 in from the edges, on a bar as high as they are with no rule, their glyphs 20 pt semibold, Done's bold, in
-    /// the ink on the container and white on the accent; the group's plus is 15 pt and in the accent. Where the
-    /// platform has no edit mode, on the Mac, it is the bar without it, which nothing changes (`barWithoutEditMode`).
-    static func bar(isEditing: Bool, hasEditMode: Bool) -> BarModel<UserAction> {
+    /// The bar at the bottom of the screen, chosen by whether the platform has edit mode (Lists screen plan, Task 9),
+    /// with the search capsule's end the width's (`Metrics.searchTrailingGlyph`). Where it has edit mode
+    /// (`Phone.dc.html`, the bar; Lists screen spec, sections 1 and 7): outside edit mode "…" on the platform's
+    /// container, a menu holding Edit, the search capsule, and "+" on the accent, a menu holding New Task, New List and
+    /// New Area in the canvas's order; in edit mode "+ List" and "+ Area" on one container, and Done, the check that
+    /// ends edit mode, on the accent. The controls are 48 high, 10 apart and 16 in from the edges, on a bar as high as
+    /// they are with no rule, their glyphs 20 pt semibold, Done's bold, in the ink on the container and white on the
+    /// accent; the group's plus is 15 pt and in the accent. Where the platform has no edit mode, on the Mac, it is the
+    /// bar without it, which nothing changes (`barWithoutEditMode`).
+    static func bar(isEditing: Bool, hasEditMode: Bool, in width: WindowWidth) -> BarModel<UserAction> {
         guard hasEditMode else { return barWithoutEditMode }
         let items: [BarModel<UserAction>.Item] = if isEditing {
             [
@@ -78,7 +79,10 @@ extension TaskViewList {
                 .button(doneButton),
             ]
         } else {
-            [.menuButton(moreButton), .search(searchCapsule), .menuButton(addButton)]
+            [
+                .menuButton(moreButton), .search(searchCapsule(ending: Metrics.of(width).searchTrailingGlyph)),
+                .menuButton(addButton),
+            ]
         }
         return bar(items, height: 48, rule: nil, controlHeight: 48, spacing: 10, padding: 16)
     }
@@ -91,6 +95,12 @@ extension TaskViewList {
         [.search(filledSearchField), .menuButton(addButtonWithShortcuts)], height: 48,
         rule: StrokeModel(color: .line, width: 1, dash: []), controlHeight: 30, spacing: 8, padding: 10
     )
+
+    /// The menu of the platform's "+" (`bar(isEditing:hasEditMode:in:)`), in and out of edit mode alike: with its
+    /// shortcuts where the platform has no edit mode, and without them where it has, as the bar's "+" holds it.
+    static func addMenu(hasEditMode: Bool) -> MenuModel<UserAction> {
+        hasEditMode ? addButton.menu : addButtonWithShortcuts.menu
+    }
 
     /// A bar of the items at its sizes, under its rule where it has one, with what every bar shares: a group's buttons
     /// 40 high, their glyph 6 before the word, 4 in from the group's ends, with a rule of the line colour 1 by 22
@@ -408,15 +418,17 @@ extension TaskViewList {
         ])
     )
 
-    /// The search capsule, on the platform's container: its magnifier, "Search" and the microphone in ink2, the glyphs
-    /// 17 pt and the microphone in a cell of 36, 8 apart, 15 in from its start and 6 from its end, its corners half the
-    /// bar's 48. It sends nothing until the search epic (the owner, 2026-10-25).
-    private static let searchCapsule = SearchFieldModel(
-        placeholder: TextModel(text: "Search", font: .search, color: .ink2),
-        leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
-        trailingGlyph: .init(icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36),
-        spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container, cornerRadius: 24
-    )
+    /// The search capsule, on the platform's container: its magnifier and "Search" in ink2, the glyph 17 pt, 8 apart,
+    /// 15 in from its start and 6 from its end, its corners half the bar's 48, and the width's glyph at its end. It
+    /// sends nothing until the search epic (the owner, 2026-10-25).
+    private static func searchCapsule(ending trailingGlyph: SearchFieldModel.TrailingGlyph?) -> SearchFieldModel {
+        SearchFieldModel(
+            placeholder: TextModel(text: "Search", font: .search, color: .ink2),
+            leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
+            trailingGlyph: trailingGlyph, spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container,
+            cornerRadius: 24
+        )
+    }
 
     /// The search field on the fill colour (`Mac.dc.html`, the bottom of the column): rounded 8, its magnifier 15 pt in
     /// ink2 9 in from its start, then 6 after it "Search" in ink2, the canvas's 13.5 pt, the body on the Mac, and 4 at
@@ -599,6 +611,9 @@ extension TaskViewList {
 
         let line: Line
 
+        /// The glyph at the end of the bar's search capsule, where the bar with edit mode stands, and nil for none.
+        let searchTrailingGlyph: SearchFieldModel.TrailingGlyph?
+
         /// The size of the divider glyph on "Top level"'s tile, and how high a picker's option is at least.
         let topLevelGlyphSize: Double
         let minimumOptionHeight: Double
@@ -636,8 +651,9 @@ extension TaskViewList {
         /// line 20 in with its field, its label in the area label's font in ink2 10 before the line, 36 high with a
         /// label or a field and 17 alone, ending 20 short of the edge, and in edit mode with the grip 10 after the line
         /// at the glyph's own width, 12 short of the edge, as Task 7 drew it; its field 160 by 28, padded 8 and rounded
-        /// 8, in the area label's font. "Top level"'s divider glyph 15, and an option at least 36 high, so that an
-        /// unnamed area's line is no 17 pt target. The drag's slot and card (`phoneDrag`).
+        /// 8, in the area label's font. The search capsule ends in the microphone, 17 pt in ink2 in a cell of 36.
+        /// "Top level"'s divider glyph 15, and an option at least 36 high, so that an unnamed area's line is no 17 pt
+        /// target. The drag's slot and card (`phoneDrag`).
         static let phone = Metrics(
             indent: phoneIndent, rowHeight: 46,
             root: Level(
@@ -658,6 +674,9 @@ extension TaskViewList {
                 editingEnd: LineEnd(lineToAccessories: 10, accessories: [.grip(grip)], cellMinimumWidth: 0, endGap: 12),
                 fieldWidth: 160, field: FieldSize(height: 28, padding: 8, cornerRadius: 8), fieldFont: .areaLabel
             ),
+            searchTrailingGlyph: .init(
+                icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36
+            ),
             topLevelGlyphSize: 15, minimumOptionHeight: 36, drag: phoneDrag
         )
 
@@ -677,9 +696,11 @@ extension TaskViewList {
         /// mode, which the iPad has, the grip 8 after the line in a glyph's cell, 14 short of the edge, the column of
         /// the rows' grips, since the canvas has none; its field 16 in, the canvas's 6 in the content, 160 by 22,
         /// padded 6 and rounded 6, in the canvas's 12.5 pt semibold, which the Mac's callout and body are as near to,
-        /// the callout, 12 pt, keeping it below the rows' 13. "Top level"'s divider glyph 11, the phone's 15 to a
-        /// list's 19 on the root's tile of 22 with its glyph of 14, and an option at least a row's 30 high. The drag's
-        /// indicator and card (`sidebarDrag`).
+        /// the callout, 12 pt, keeping it below the rows' 13. Where the bar with edit mode stands in the column, the
+        /// iPad's, the search capsule ends in no glyph, so that "Search" reads whole between "…" and "+" in the 280 pt
+        /// column, where the microphone left it "Se…" (the controller's ruling on #149's hand check, 2026-10-31).
+        /// "Top level"'s divider glyph 11, the phone's 15 to a list's 19 on the root's tile of 22 with its glyph of 14,
+        /// and an option at least a row's 30 high. The drag's indicator and card (`sidebarDrag`).
         static let sidebar = Metrics(
             indent: sidebarIndent, rowHeight: 30,
             root: Level(
@@ -700,7 +721,7 @@ extension TaskViewList {
                 fieldWidth: 160, field: FieldSize(height: 22, padding: 6, cornerRadius: 6),
                 fieldFont: .nestedRowTitleEmphasized
             ),
-            topLevelGlyphSize: 11, minimumOptionHeight: 30, drag: sidebarDrag
+            searchTrailingGlyph: nil, topLevelGlyphSize: 11, minimumOptionHeight: 30, drag: sidebarDrag
         )
 
         /// The phone's indent, a tile of the root at 20 and each level 22 further, which its rows and its drag share.

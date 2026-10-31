@@ -838,8 +838,8 @@ public final class TaskViewList: Routable {
         /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
         /// this person's session projected onto them (`drawnRows`); the highlighted row's id, on the list's row of the
         /// view whose list is declared, or on the folded list that hides that row; the id of the row being renamed;
-        /// whether they are in edit mode; the bar for the platform's edit mode, as edit mode has it; the look of the
-        /// drag for the width; the dialog up, if any; and the sentence, if any.
+        /// whether they are in edit mode; the bar for the platform's edit mode, as edit mode has it, and its "+" menu;
+        /// the look of the drag for the width; the dialog up, if any; and the sentence, if any.
         var model: Model {
             let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
             // Read off the drawn rows and not copied from the destination or the walk: `.rowSelected` and `.route`
@@ -857,7 +857,8 @@ public final class TaskViewList: Routable {
             )
             return Model(
                 rows: drawn, selection: selection, renaming: renaming, isEditing: isEditing,
-                bar: TaskViewList.bar(isEditing: isEditing, hasEditMode: capabilities.hasEditMode),
+                bar: TaskViewList.bar(isEditing: isEditing, hasEditMode: capabilities.hasEditMode, in: width),
+                addMenu: TaskViewList.addMenu(hasEditMode: capabilities.hasEditMode),
                 drag: TaskViewList.drag(in: width), confirmation: confirmation, movePicker: movePicker,
                 problem: problem
             )

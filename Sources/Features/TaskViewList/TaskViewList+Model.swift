@@ -81,6 +81,12 @@ extension TaskViewList {
         /// the Mac board's where the platform has no edit mode (Lists screen plan, Task 9).
         public let bar: BarModel<UserAction>
 
+        /// The menu of the bar's "+", which makes a task, a list or an area, as the platform's bar holds it, with its
+        /// shortcuts where the platform has no edit mode, and named once more for the app's menu bar, which draws its
+        /// items wherever the bar is, in edit mode and with the sidebar hidden too: on the Mac a closed menu's items
+        /// answer no key, so ⌘N and ⇧⌘N are the menu bar's (the controller's ruling on #149's hand check, 2026-10-31).
+        public let addMenu: MenuModel<UserAction>
+
         /// The look of the drag for the window's width, whose gesture, lifted block, place and depth are the platform's
         /// (the owner, 2026-10-30).
         public let drag: DragModel

@@ -285,9 +285,9 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
 }
 
 /// The bar outside edit mode: "…" on the platform's container, a menu button holding Edit; the search capsule, its
-/// magnifier, "Search" and microphone in ink2, the glyphs 17 pt and the microphone in a 36 cell, 8 apart, 15 in and 6
-/// at the end; and "+" on the accent, a menu button holding New Task, New List and New Area.
-private func barOutsideEditMode() -> BarModel<Action> {
+/// magnifier, "Search" and, on the phone, the microphone in ink2, the glyphs 17 pt and the microphone in a 36 cell, 8
+/// apart, 15 in and 6 at the end; and "+" on the accent, a menu button holding New Task, New List and New Area.
+private func barOutsideEditMode(microphone: Bool = true) -> BarModel<Action> {
     let more = MenuButtonModel<Action>(
         label: ButtonLabelModel(
             icon: IconModel(icon: .ellipsis, size: 20, weight: .semibold, color: .ink), title: nil,
@@ -300,7 +300,8 @@ private func barOutsideEditMode() -> BarModel<Action> {
     let search = SearchFieldModel(
         placeholder: TextModel(text: "Search", font: .search, color: .ink2),
         leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
-        trailingGlyph: .init(icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36),
+        trailingGlyph: microphone
+            ? .init(icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36) : nil,
         spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container, cornerRadius: 24
     )
     let add = MenuButtonModel<Action>(
@@ -308,15 +309,30 @@ private func barOutsideEditMode() -> BarModel<Action> {
             icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
             accessibilityLabel: "Add", fill: .color(.accent)
         ),
-        menu: MenuModel(sections: [
-            .init(items: [
-                .init(title: "New Task", icon: .checkCircle, isDestructive: false, shortcut: nil, action: .newTaskMenuItemChosen),
-                .init(title: "New List", icon: .list, isDestructive: false, shortcut: nil, action: .newListMenuItemChosen(in: nil)),
-                .init(title: "New Area", icon: .divider, isDestructive: false, shortcut: nil, action: .newAreaMenuItemChosen),
-            ]),
-        ])
+        menu: addMenu(withShortcuts: false)
     )
     return phoneBar([.menuButton(more), .search(search), .menuButton(add)])
+}
+
+/// The menu of "+", New Task, New List and New Area, with ⌘N and ⇧⌘N on the first two where the bar has the
+/// shortcuts, the Mac's, and with none on the bar with edit mode.
+private func addMenu(withShortcuts: Bool) -> MenuModel<Action> {
+    MenuModel(sections: [
+        .init(items: [
+            .init(
+                title: "New Task", icon: .checkCircle, isDestructive: false,
+                shortcut: withShortcuts ? .init(key: "n", modifiers: [.command]) : nil, action: .newTaskMenuItemChosen
+            ),
+            .init(
+                title: "New List", icon: .list, isDestructive: false,
+                shortcut: withShortcuts ? .init(key: "n", modifiers: [.shift, .command]) : nil,
+                action: .newListMenuItemChosen(in: nil)
+            ),
+            .init(
+                title: "New Area", icon: .divider, isDestructive: false, shortcut: nil, action: .newAreaMenuItemChosen
+            ),
+        ]),
+    ])
 }
 
 /// The bar in edit mode: "+ List" and "+ Area" on one container, each a 15 pt plus in the accent 6 before its word,
@@ -726,14 +742,16 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
     }
 }
 
-/// The bar is chosen by whether the platform has edit mode and not by the width: with it, the phone's bar of Task 8 in
-/// a narrow and a wide window alike, its edit bar in edit mode; without it, on the Mac, the canvas's bar
-/// (`Mac.dc.html`, the bottom of the column), which Edit sent all the same leaves as it is.
-@Test func theBarFollowsEditModeAndNotTheWidth() throws {
-    for width in [WindowWidth.narrow, .wide] {
+/// The bar is chosen by whether the platform has edit mode: with it, the phone's bar of Task 8, its edit bar in edit
+/// mode, in a narrow and a wide window alike but for the search capsule's microphone, which a wide window leaves out,
+/// so that "Search" reads whole in the sidebar's column (the controller's ruling on #149's hand check, 2026-10-31);
+/// without it, on the Mac, the canvas's bar (`Mac.dc.html`, the bottom of the column), which Edit sent all the same
+/// leaves as it is.
+@Test func theBarFollowsEditModeAndItsCapsuleTheWidth() throws {
+    for (width, microphone) in [(WindowWidth.narrow, true), (.wide, false)] {
         for capabilities in [iPhone, iPad] {
             let list = try sidebar(try makeStore(), width: width, capabilities: capabilities)
-            #expect(list.model.bar == barOutsideEditMode())
+            #expect(list.model.bar == barOutsideEditMode(microphone: microphone), "\(width)")
             _ = list.send(.action(.editMenuItemChosen))
             #expect(list.model.bar == barInEditMode())
         }
@@ -742,6 +760,21 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
     #expect(list.model.bar == barWithoutEditMode())
     _ = list.send(.action(.editMenuItemChosen))
     #expect(list.model.bar == barWithoutEditMode())
+}
+
+/// The menu the bar's "+" holds is the model's too, for the app's menu bar, the same in and out of edit mode and on
+/// every width: with the shortcuts where the platform has no edit mode, the Mac's, whose bar's "+" carries them, and
+/// without them where it has (the controller's ruling on #149's hand check: a closed menu's items answer no key on the
+/// Mac, so the menu bar draws them).
+@Test func theAddMenuIsThePlatformsPlusMenu() throws {
+    for width in [WindowWidth.narrow, .wide] {
+        for (capabilities, shortcuts) in [(iPhone, false), (iPad, false), (mac, true)] {
+            let list = try sidebar(try makeStore(), width: width, capabilities: capabilities)
+            #expect(list.model.addMenu == addMenu(withShortcuts: shortcuts), "\(width) \(capabilities)")
+            _ = list.send(.action(.editMenuItemChosen))
+            #expect(list.model.addMenu == addMenu(withShortcuts: shortcuts), "in edit mode, \(width) \(capabilities)")
+        }
+    }
 }
 
 /// The bar without edit mode (`Mac.dc.html`, the bottom of the column): 48 high under a rule 1 pt in the line colour,
@@ -760,19 +793,7 @@ private func barWithoutEditMode() -> BarModel<Action> {
             icon: IconModel(icon: .plus, size: 16, weight: .bold, color: .onAccent), title: nil,
             accessibilityLabel: "Add", fill: .color(.accent)
         ),
-        menu: MenuModel(sections: [
-            .init(items: [
-                .init(
-                    title: "New Task", icon: .checkCircle, isDestructive: false,
-                    shortcut: .init(key: "n", modifiers: [.command]), action: .newTaskMenuItemChosen
-                ),
-                .init(
-                    title: "New List", icon: .list, isDestructive: false,
-                    shortcut: .init(key: "n", modifiers: [.shift, .command]), action: .newListMenuItemChosen(in: nil)
-                ),
-                .init(title: "New Area", icon: .divider, isDestructive: false, shortcut: nil, action: .newAreaMenuItemChosen),
-            ]),
-        ])
+        menu: addMenu(withShortcuts: true)
     )
     return BarModel(
         items: [.search(search), .menuButton(add)], height: 48, rule: StrokeModel(color: .line, width: 1, dash: []),
