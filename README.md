@@ -100,15 +100,17 @@ the new title, a blank one is refused with a sentence under the rows, and Esc ke
 sheet of the whole tree to choose the new parent from, and Delete always asks. A row can be dragged at any time, a list
 with the lists inside it or an area with its lists, to a new place, and sideways for a new level, a line with a circle
 marking where it lands; the Mac has no edit mode. At the bottom of the sidebar the search field does nothing yet, and
-the + holds New Task, ⌘N, which opens quick entry, New List, ⇧⌘N, which adds a list at the end of the last area, or of
-the tree when there is no area, with its field open and the highlight where it was, and New Area, which adds an
-unnamed area at the end, a line with its name field open. A click on a task pushes its screen, which shows its title,
+the + holds New Task, which opens quick entry, New List, which adds a list at the end of the last area, or of the tree
+when there is no area, with its field open and the highlight where it was, and New Area, which adds an unnamed area at
+the end, a line with its name field open. The File menu holds the same three for the window in front, New Task on ⌘N
+and New List on ⇧⌘N, the keys the + shows beside them, and New Window on ⌥⌘N, which opens another window on the Inbox.
+A click on a task pushes its screen, which shows its title,
 over the list, and the back button returns to the list. Quick Entry, the + on the list's toolbar, opens a sheet with
 a title field: Return or Add puts the task in the Inbox and closes the sheet, a blank title is refused with a
 sentence in the sheet, and Cancel or Esc closes it and writes nothing.
 
-File > New Window opens another window on the Inbox, and Open in New Window, in a list's context menu, opens that view
-in a window of its own, every time, on the view a window shows too; every window shows what the others write.
+Open in New Window, in a list's context menu, opens that view in a window of its own, every time, on the view a window
+shows too; every window shows what the others write.
 `TODO_ROUTE` is the route the first window opens, in the text form a link carries after `todo://`: a path,
 `/view/<id>` or `/view/<id>/task/<id>`, with `?quick-entry` after it to open quick entry too. One that does not
 read opens the Inbox, as no `TODO_ROUTE` does, and one naming a view that is gone opens no list and says so under
