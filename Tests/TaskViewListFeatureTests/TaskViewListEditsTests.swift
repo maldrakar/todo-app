@@ -2,6 +2,7 @@ import Testing
 import TestSupport
 import DesignSystem
 import DesignSystemComponents
+import FeatureModule
 import SQLiteKit
 import TaskViewListFeature
 import TodoCore
@@ -82,7 +83,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let unnamed = try store.createView(NewTaskView(title: "", kind: .area))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(listRow(inbox, in: list.model).map(drawnCount) == "1", "the Inbox counts its task; this is the setup")
     #expect(areaLabels(in: list.model) == ["Work", nil])
     #expect(list.send(.action(.editMenuItemChosen)) == nil)
@@ -92,7 +93,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, unnamed])
     #expect(list.send(.action(.rowSelected(clients))) == nil)
     #expect(list.destination.pushed == .init(head: inbox), "no list declared")
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = reference.send(.action(.editMenuItemChosen))
     _ = reference.send(.action(.renameMenuItemChosen(clients)))
     #expect(list.model == reference.model)
@@ -109,7 +110,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
 @Test func doneKeepsTheOpenNameAndLeavesEditMode() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     let before = list.model
     #expect(list.send(.action(.editMenuItemChosen)) == nil)
     #expect(list.send(.action(.doneButtonTapped)) == nil)
@@ -124,11 +125,23 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     #expect(listRow(inbox, in: list.model).map(drawnCount) == "1")
 }
 
+/// Where the platform has no edit mode, as on the Mac, nothing offers Edit, and Edit sent all the same moves nothing:
+/// the module stays out of edit mode and its model is the one it had (Lists screen plan, Task 9).
+@Test func editIsIgnoredWhereThePlatformHasNoEditMode() throws {
+    let store = try makeStore()
+    let mac = WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .wide, capabilities: mac)
+    let before = list.model
+    #expect(list.send(.action(.editMenuItemChosen)) == nil)
+    #expect(!list.model.isEditing)
+    #expect(list.model == before)
+}
+
 /// A name refused by Done keeps the field open on what was typed, as Return's refusal does, and edit mode with it,
 /// since the person is mid-word; the next Done with a name settles both.
 @Test func aRefusedNameKeepsEditMode() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     let written = try store.journal(after: 0).count
     _ = list.send(.action(.editMenuItemChosen))
     _ = list.send(.action(.rowSelected(BuiltInTaskViews.today)))
@@ -138,7 +151,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     #expect(list.model.problem == "A title cannot be empty.")
     #expect(draft(of: try rowBeingNamed(in: list.model)) == " ")
     #expect(try store.journal(after: 0).count == written)
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = reference.send(.action(.editMenuItemChosen))
     _ = reference.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
     _ = reference.send(.action(.titleFieldChanged(" ")))
@@ -154,7 +167,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
 /// draft away for the stored title. A tap on another row moves the field, as the Rename menu item does.
 @Test func anEditModeTapOnTheRowBeingRenamedMovesNothing() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.editMenuItemChosen))
     _ = list.send(.action(.rowSelected(BuiltInTaskViews.today)))
     _ = list.send(.action(.titleFieldChanged("Tomor")))
@@ -182,7 +195,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
     try store.createView(NewTaskView(title: "Home", parent: projects))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     let before = list.model
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.deleteMenuItemChosen(projects))) == nil)
@@ -208,7 +221,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     try store.createView(NewTaskView(title: "Contracts", parent: acme))
     try store.createView(NewTaskView(title: "Billing", parent: clients))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.disclosureTapped(acme)))
     let asked: [(ViewID, String, String)] = [
         (errands, "Delete “Errands”?", "No task is deleted."),
@@ -233,7 +246,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
     let errands = try store.createView(NewTaskView(title: "Errands"))
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.renameMenuItemChosen(garden)))
     _ = list.send(.action(.titleFieldChanged("Allotment")))
     #expect(list.send(.action(.deleteMenuItemChosen(projects))) == nil)
@@ -260,7 +273,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let chores = try store.createView(NewTaskView(title: "Chores", parent: unnamed))
     let later = try store.createView(NewTaskView(title: "Later", kind: .area))
     let someday = try store.createView(NewTaskView(title: "Someday", parent: later))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
 
     #expect(list.send(.action(.deleteMenuItemChosen(unnamed))) == nil)
     #expect(list.model.confirmation?.title == "Delete the area?")
@@ -292,7 +305,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let billing = try store.createView(NewTaskView(title: "Billing", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.send(.action(.deleteMenuItemChosen(errands))) == nil)
     try store.delete(view: errands)
     #expect(list.send(.action(.deleteConfirmed)) == nil)
@@ -323,7 +336,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     }
     let store = try makeStore()
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(list)
     #expect(list.send(.action(.deleteMenuItemChosen(errands))) == nil)
     let gone = try changeSet(of: store) { _ = try store.apply(deleted(errands, true, at: 1_800_000_000_000)) }
@@ -332,7 +345,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     #expect(list.send(.changed(back)) == nil)
     #expect(list.model.rows.map(\.id).contains(errands), "the list is back; without it this proves nothing")
     #expect(list.model.confirmation == nil)
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(reference)
     #expect(list.model == reference.model)
 
@@ -361,7 +374,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let errands = try store.createView(NewTaskView(title: "Errands"))
     let work = try store.createView(NewTaskView(title: "", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     let before = list.model
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.moveToMenuItemChosen(home))) == nil)
@@ -387,7 +400,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     #expect(list.model.movePicker?.options.filter(\.isChecked).map(id(of:)) == [work], "an area's line is a parent too")
     _ = list.send(.widthChanged(.wide))
     _ = list.send(.action(.editMenuItemChosen))
-    let wide = try TaskViewList(store: store, route: .init(list: .init(head: ViewID())), width: .wide, supportsMultipleWindows: false)
+    let wide = try TaskViewList(store: store, route: .init(list: .init(head: ViewID())), width: .wide, capabilities: iPhone)
     #expect(
         offersTheRows(list.model.movePicker?.options, of: wide.model.rows),
         "the sidebar's tiles, and the unnamed area's line alone, as the screen draws it outside edit mode"
@@ -410,7 +423,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     try store.createView(NewTaskView(title: "Garden", parent: home))
     let errands = try store.createView(NewTaskView(title: "Errands"))
     let unfolded = try sidebarOn(ViewID(), in: store).rows
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.disclosureTapped(home)))
     _ = list.send(.action(.disclosureTapped(projects)))
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "both folded; this is the setup")
@@ -430,7 +443,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let errands = try store.createView(NewTaskView(title: "Errands"))
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.disclosureTapped(projects)))
     _ = list.send(.action(.moveToMenuItemChosen(errands)))
     #expect(list.send(.action(.movePickerRowTapped(projects))) == nil)
@@ -459,7 +472,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     let home = try store.createView(NewTaskView(title: "Home", kind: .area))
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.moveToMenuItemChosen(acme)))
     #expect(list.send(.action(.movePickerRowTapped(nil))) == nil)
     #expect(list.model.rows.map(\.id) == builtIns + [errands, acme, work, clients, home, garden])
@@ -475,7 +488,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     for id in builtIns { try bare.delete(view: id) }
     let area = try bare.createView(NewTaskView(title: "Work", kind: .area))
     let inside = try bare.createView(NewTaskView(title: "Clients", parent: area))
-    let alone = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let alone = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = alone.send(.action(.moveToMenuItemChosen(inside)))
     #expect(alone.send(.action(.movePickerRowTapped(nil))) == nil)
     #expect(alone.model.rows.map(\.id) == [inside, area])
@@ -489,7 +502,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.moveToMenuItemChosen(projects)))
     let picking = list.model
     let written = try store.journal(after: 0).count
@@ -505,7 +518,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
 @Test func aBuiltInMovesAndDeletesLikeAnyList() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.moveToMenuItemChosen(BuiltInTaskViews.logbook)))
     #expect(list.model.movePicker?.title == "Move “Logbook” to…")
     #expect(list.send(.action(.movePickerRowTapped(work))) == nil)
@@ -524,7 +537,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
 @Test func aDialogActionWithNoDialogUpMovesNothing() throws {
     let store = try makeStore()
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(list)
     let written = try store.journal(after: 0).count
     let confirmations: [TaskViewList.UserAction] = [.deleteConfirmed, .deleteCancelled]
@@ -557,7 +570,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.moveToMenuItemChosen(errands)))
     try store.delete(view: projects)
     #expect(list.send(.action(.movePickerRowTapped(projects))) == nil)
@@ -600,7 +613,7 @@ private struct Tree {
 
     /// A sidebar made on the tree, on no list.
     func sidebar() throws -> TaskViewList {
-        try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+        try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     }
 
     /// The lists and areas a parent holds in the store, in rank order, nil for the root's.

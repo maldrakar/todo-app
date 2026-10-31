@@ -133,7 +133,8 @@ private enum WasmSizeProbe {
         // width, and the sidebar's tiles, are in the measurement in both their shapes; told a window can open beside
         // it, so that the menus are in it with every item they can hold.
         let app = try AppModule(
-            store: appStore, route: try AppModule.Route(path: "/"), width: .wide, supportsMultipleWindows: true
+            store: appStore, route: try AppModule.Route(path: "/"), width: .wide,
+            capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: true)
         )
         @discardableResult
         func perform(_ event: AppModule.Event) -> AppModule.Output? {

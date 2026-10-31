@@ -72,9 +72,9 @@ extension TaskViewList {
 
         /// Whether the screen is in edit mode, entered from "…" and left with Done (spec section 7). What edit mode
         /// draws, every row and line with a grip, the counts empty, no menus, the labels it gives and its bar, is in
-        /// the rows' and the bar's models already, so a view reads this for the drag, which only edit mode has, and the
-        /// wide window's toolbar reads it for its Edit and Done until the sidebar's task deletes that view.
-        /// It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
+        /// the rows' and the bar's models already, so a view reads this for the drag, which only edit mode has where
+        /// the platform has edit mode; one without it, the Mac, never enters it and drags its rows at any time (Lists
+        /// screen plan, Task 9). It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
         public let isEditing: Bool
 
         /// The bar at the bottom of the screen, its controls as edit mode has them or not (spec sections 1 and 7).

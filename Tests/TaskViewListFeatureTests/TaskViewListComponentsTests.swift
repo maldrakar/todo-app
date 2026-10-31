@@ -8,11 +8,14 @@ import TodoCore
 
 private typealias Action = TaskViewList.UserAction
 
-/// A sidebar made on no list in a window of the width, on the phone unless it is told a window can open beside it.
+/// What the iPad's window offers: a window beside it, and edit mode.
+private let iPad = WindowCapabilities(opensWindowsBeside: true, hasEditMode: true)
+
+/// A sidebar made on no list in a window of the width, on iPhone unless it is told what else its window offers.
 private func sidebar(
-    _ store: Store, width: WindowWidth = .narrow, supportsMultipleWindows: Bool = false
+    _ store: Store, width: WindowWidth = .narrow, capabilities: WindowCapabilities = iPhone
 ) throws -> TaskViewList {
-    try TaskViewList(store: store, route: .init(list: nil), width: width, supportsMultipleWindows: supportsMultipleWindows)
+    try TaskViewList(store: store, route: .init(list: nil), width: width, capabilities: capabilities)
 }
 
 /// The area's line the model draws for a view, and nil when no row holds the view or its row is a list's.
@@ -242,14 +245,14 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let phone = try sidebar(store).model
-    let mac = try sidebar(store, supportsMultipleWindows: true).model
+    let mac = try sidebar(store, capabilities: iPad).model
     #expect(listRow(clients, in: phone)?.menu == listMenu(clients, openInNewWindow: false))
     #expect(listRow(clients, in: mac)?.menu == listMenu(clients, openInNewWindow: true))
     #expect(areaLine(work, in: phone)?.menu == lineMenu(work))
     #expect(areaLine(work, in: mac)?.menu == lineMenu(work))
     #expect(listRow(inbox, in: mac).map(drawnCount) == "1", "the Inbox counts its task; this is the setup")
 
-    let editing = try sidebar(store, supportsMultipleWindows: true)
+    let editing = try sidebar(store, capabilities: iPad)
     _ = editing.send(.action(.editMenuItemChosen))
     let lists = editing.model.rows.compactMap(listRow)
     #expect(lists.map(\.menu) == Array(repeating: nil, count: 6))

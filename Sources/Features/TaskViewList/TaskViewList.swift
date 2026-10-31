@@ -200,15 +200,17 @@ public final class TaskViewList: Routable {
     /// default, as the root's has none, so that the class a window is made with is always its host's to say
     /// (`docs/style.md`, "A lower layer holds no policy of its client").
     ///
-    /// Whether a window can open beside this one is the platform's to say when the window is made, which the root hands
-    /// on as it hands the width, and it does not change while the app runs: Open in New Window is in a list's menu only
-    /// where one can (`docs/specs/navigation.md`, section 5). It has no default either, for the same reason.
+    /// What the window's platform offers is the platform's to say when the window is made, which the root hands on as
+    /// it hands the width, and it does not change while the app runs: Open in New Window is in a list's menu only where
+    /// a window can open beside this one (`docs/specs/navigation.md`, section 5), and edit mode, with what offers it,
+    /// only where the platform has it (Lists screen spec, sections 7 and 8). It has no default either, for the same
+    /// reason.
     ///
     /// Throws, because a store that cannot be read at launch is the composition root's to refuse: a list that
     /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own reads
     /// throw, the rows, their counts and the folds.
     public init(
-        store: Store, route: Route, width: WindowWidth, supportsMultipleWindows: Bool
+        store: Store, route: Route, width: WindowWidth, capabilities: WindowCapabilities
     ) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
         let counts = try TaskViewList.counts(of: store)
@@ -216,8 +218,8 @@ public final class TaskViewList: Routable {
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
         self.state = State(
-            rows: rows, counts: counts, collapsedViews: collapsedViews, width: width,
-            supportsMultipleWindows: supportsMultipleWindows, destination: Destination()
+            rows: rows, counts: counts, collapsedViews: collapsedViews, width: width, capabilities: capabilities,
+            destination: Destination()
         )
         setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
@@ -338,7 +340,9 @@ public final class TaskViewList: Routable {
             return nil
         case .action(.editMenuItemChosen):
             // Edit mode is session state (ADR-0009, amendment of 2026-10-25), and entering it answers nothing a person
-            // was told, so an open field and the sentence stay where they are.
+            // was told, so an open field and the sentence stay where they are. A platform with no edit mode offers no
+            // Edit, and one sent all the same moves nothing (Lists screen plan, Task 9).
+            guard state.capabilities.hasEditMode else { return nil }
             state.isEditing = true
             return nil
         case .action(.doneButtonTapped):
@@ -809,8 +813,8 @@ public final class TaskViewList: Routable {
     private static let newListTitle = "New list"
 
     /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
-    /// lists folded on this device, the width class of the window and whether a window can open beside it, the rename a
-    /// person has open, whether they are in edit mode, the dialog up over the rows, the list declared over the module,
+    /// lists folded on this device, the width class of the window and what its platform offers, the rename a person has
+    /// open, whether they are in edit mode, the dialog up over the rows, the list declared over the module,
     /// and the sentence they were last told. One entity, moved field by field, from which the model is computed on
     /// every read, so that nothing on screen is state in its own right and there is no second copy to keep in step
     /// (owner's reviews of #77 and #101): the highlight is read off the destination, and is not kept beside it.
@@ -824,7 +828,7 @@ public final class TaskViewList: Routable {
         var counts: [ViewID: Int]
         var collapsedViews: Set<ViewID>
         var width: WindowWidth
-        let supportsMultipleWindows: Bool
+        let capabilities: WindowCapabilities
         var rename: Rename?
         var isEditing = false
         var dialog: Dialog?
@@ -849,7 +853,7 @@ public final class TaskViewList: Routable {
             let drawn = TaskViewList.drawnRows(
                 shown.rows, in: width, isEditing: isEditing, counts: counts, collapsedViews: collapsedViews,
                 selection: selection, rename: rename.map { ($0.id, $0.draft) },
-                supportsMultipleWindows: supportsMultipleWindows
+                opensWindowsBeside: capabilities.opensWindowsBeside
             )
             return Model(
                 rows: drawn, selection: selection, renaming: renaming, isEditing: isEditing,

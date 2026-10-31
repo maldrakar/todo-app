@@ -24,7 +24,7 @@ extension TaskViewList {
     /// line's own depth, so the line takes no guide and its lists stand under none.
     static func drawnRows(
         _ rows: [ReadRow], in width: WindowWidth, isEditing: Bool, counts: [ViewID: Int], collapsedViews: Set<ViewID>,
-        selection: ViewID?, rename: (id: ViewID, draft: String)?, supportsMultipleWindows: Bool
+        selection: ViewID?, rename: (id: ViewID, draft: String)?, opensWindowsBeside: Bool
     ) -> [Model.Row] {
         var centres: [Double] = []
         return rows.map { row in
@@ -46,7 +46,7 @@ extension TaskViewList {
                     row, in: width, guides: Array(centres.prefix(row.depth)),
                     end: rowEnd(count: count, chevron: fold, hasGrip: isEditing), draft: draft,
                     isSelected: row.id == selection, tap: .rowSelected(row.id),
-                    menu: isEditing ? nil : listMenu(row.id, supportsMultipleWindows: supportsMultipleWindows)
+                    menu: isEditing ? nil : listMenu(row.id, opensWindowsBeside: opensWindowsBeside)
                 )
                 centres = list.childGuides
                 return Model.Row(id: row.id, depth: row.depth, kind: .list(list))
@@ -321,8 +321,8 @@ extension TaskViewList {
     /// The menu of a list's row (Lists screen spec, section 6): Rename, New List, Open in New Window only where a
     /// window can open beside this one, which iPhone cannot (`docs/specs/navigation.md`, section 5), and Move to…,
     /// then, after a divider, Delete.
-    private static func listMenu(_ id: ViewID, supportsMultipleWindows: Bool) -> MenuModel<UserAction> {
-        let window: [MenuModel<UserAction>.Item] = if supportsMultipleWindows {
+    private static func listMenu(_ id: ViewID, opensWindowsBeside: Bool) -> MenuModel<UserAction> {
+        let window: [MenuModel<UserAction>.Item] = if opensWindowsBeside {
             [
                 .init(
                     title: "Open in New Window", icon: .newWindow, isDestructive: false, shortcut: nil,
