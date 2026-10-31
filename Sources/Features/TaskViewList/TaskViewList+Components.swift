@@ -49,7 +49,8 @@ extension TaskViewList {
                 let list = listRow(
                     row, metrics, guides: Array(centres.prefix(row.depth)),
                     end: rowEnd(count: count, chevron: fold, hasGrip: isEditing, metrics), draft: draft,
-                    isHighlighted: row.id == selection, tap: .rowSelected(row.id),
+                    isHighlighted: row.id == selection,
+                    background: metrics.rowBackground(isHighlighted: row.id == selection), tap: .rowSelected(row.id),
                     menu: isEditing ? nil : listMenu(row.id, opensWindowsBeside: opensWindowsBeside)
                 )
                 centres = list.childGuides
@@ -146,10 +147,11 @@ extension TaskViewList {
     /// stands and as high as a row, checked when the list stands at the root. Its options are the whole tree in tree
     /// order with the folds ignored, each drawn by the screen's rules for the width with none of this person's session
     /// on it, since nothing in the picker is hidden, highlighted or renamed: no menu, no count, no chevron, no grip, no
-    /// guides, and an unnamed area's line alone, as outside edit mode (the owner's answer on #160, thread
-    /// r4415002540); each sends `movePickerRowTapped`. The list being moved and every list inside it cannot take it,
-    /// and are drawn at 35 %; its present parent, a list, an area's line or the top level, has the check at its right
-    /// and every other row the room for it (`Picker`); and an option is at least the width's least option height.
+    /// guides, and an unnamed area's line alone, as outside edit mode (the owner's answer on #160, thread r4415002540),
+    /// and each list's row on the sheet's paper in every width (`Picker.background`); each sends `movePickerRowTapped`.
+    /// The list being moved and every list inside it cannot take it, and are drawn at 35 %; its present parent, a list,
+    /// an area's line or the top level, has the check at its right and every other row the room for it (`Picker`); and
+    /// an option is at least the width's least option height.
     static func movePicker(
         moving list: ReadRow, among rows: [ReadRow], in width: WindowWidth
     ) -> PickerModel<Model.Kind, UserAction> {
@@ -161,13 +163,14 @@ extension TaskViewList {
             case .area:
                 .area(areaLine(
                     row, metrics, isEditing: false, draft: nil,
-                    end: Picker.lineEnd(isChecked: isChecked, inset: metrics.backgroundInset),
+                    end: Picker.lineEnd(isChecked: isChecked),
                     tap: .movePickerRowTapped(row.id), menu: nil
                 ))
             case .list:
                 .list(listRow(
                     row, metrics, guides: nil, end: Picker.rowEnd(isChecked: isChecked), draft: nil,
-                    isHighlighted: false, tap: .movePickerRowTapped(row.id), menu: nil
+                    isHighlighted: false, background: Picker.background, tap: .movePickerRowTapped(row.id),
+                    menu: nil
                 ))
             }
             return PickerModel<Model.Kind, UserAction>.Option(
@@ -185,7 +188,7 @@ extension TaskViewList {
                 title: TextModel(text: "Top level", font: metrics.root.title, color: .ink),
                 leading: metrics.indent.start, height: metrics.rowHeight,
                 accessories: Picker.accessories(isChecked: list.parent == nil),
-                cellMinimumWidth: Picker.cellMinimumWidth, endGap: Picker.endGap + metrics.backgroundInset,
+                cellMinimumWidth: Picker.cellMinimumWidth, endGap: Picker.endGap,
                 isChecked: list.parent == nil, action: .movePickerRowTapped(nil)
             ),
             options: options, hintGap: 8, minimumOptionHeight: metrics.minimumOptionHeight, disabledOpacity: 0.35
@@ -196,14 +199,14 @@ extension TaskViewList {
     /// the indent of its drawn depth, at the sizes of that depth, with the title in the ink after it, in the title font
     /// of that depth, emphasized where the list has lists inside it, and in the sidebar where it is highlighted too, or
     /// the field in the title's place, at least the title's least width; a need of the tile, the gap, that width and
-    /// the accessories (`Phone.dc.html` and `Mac.dc.html`, a row's `need`), from the tree's leading edge; its own
-    /// background where it is highlighted and the tree's otherwise, inset and rounded as the width's are; the guides it
-    /// stands under, with those a row one level deeper stands under, its own and one under the centre of its tile; and
-    /// what stands at its right, the tree's or the picker's. The picker draws no guides, so there `guides` is nil and
-    /// the row and a row under it stand under none.
+    /// the accessories (`Phone.dc.html` and `Mac.dc.html`, a row's `need`), from the tree's leading edge; on the
+    /// background it is given, the tree's or the picker's; the guides it stands under, with those a row one level
+    /// deeper stands under, its own and one under the centre of its tile; and what stands at its right, the tree's or
+    /// the picker's. The picker draws no guides, so there `guides` is nil and the row and a row under it stand under
+    /// none.
     private static func listRow(
         _ row: ReadRow, _ metrics: Metrics, guides: [Double]?, end: RowEnd, draft: String?, isHighlighted: Bool,
-        tap: UserAction, menu: MenuModel<UserAction>?
+        background: RowBackground, tap: UserAction, menu: MenuModel<UserAction>?
     ) -> ListRowModel<UserAction> {
         let level = metrics.level(atDepth: row.depth)
         let leading = metrics.indent.leading(atDepth: row.depth)
@@ -217,13 +220,21 @@ extension TaskViewList {
                 titleField($0, placeholder: "Title", font: font, minimumWidth: metrics.titleWidth, metrics.rowField)
             },
             need: leading + tile.side + metrics.tileToTitle + metrics.titleWidth + end.accessoriesWidth,
-            background: isHighlighted ? metrics.highlight : metrics.background,
-            backgroundInset: metrics.backgroundInset, cornerRadius: metrics.rowCornerRadius, guides: guides ?? [],
+            background: background.color, backgroundInset: background.inset, cornerRadius: background.cornerRadius,
+            guides: guides ?? [],
             childGuides: guides.map { $0 + [leading + tile.side / 2] } ?? [], guide: metrics.guide,
             accessories: end.accessories, fadeWidth: end.fadeWidth, textMinimumWidth: metrics.countWidth,
             cellMinimumWidth: end.cellMinimumWidth, endGap: end.endGap, accessoriesWidth: end.accessoriesWidth,
             tap: tap, menu: menu
         )
+    }
+
+    /// What a list's row stands on (`ListRowModel`): its colour, how far in from either side of the tree it stands,
+    /// and its corners' radius, the tree's (`Metrics.rowBackground`) or the picker's (`Picker.background`).
+    private struct RowBackground {
+        let color: DesignSystem.Color
+        let inset: Double
+        let cornerRadius: Double
     }
 
     /// What stands at a list's row's right, and the sizes it stands by (`ListRowModel`): the tree's (`rowEnd`) or the
@@ -607,6 +618,14 @@ extension TaskViewList {
             depth == 0 ? root : nested
         }
 
+        /// What a row of the tree stands on: the highlight's colour where it is highlighted and the tree's otherwise,
+        /// at the width's inset and corners.
+        func rowBackground(isHighlighted: Bool) -> RowBackground {
+            RowBackground(
+                color: isHighlighted ? highlight : background, inset: backgroundInset, cornerRadius: rowCornerRadius
+            )
+        }
+
         /// The phone's numbers, as Task 7's views drew them (`Phone.dc.html`). A tile of the root at 20 and each level
         /// 22 further (`tileLeft`); rows 46 high; a tile 30 across, rounded 8, its glyph 19 at the root's drawn depth,
         /// and 26, 7 and 16 deeper (`tileSize`), the title 12 after it, the row title at the root's depth and the
@@ -744,10 +763,9 @@ extension TaskViewList {
     }
 
     /// The picker's check (`Phone.dc.html`, the Move to… sheet): 15 pt bold in the accent at the glyph's own width, in
-    /// a cell of no least width, 20 short of the right end of a row's background, at the right of the present choice,
-    /// and hidden in its room at the right of every other row, so that the rows end in one column, as Task 7 drew it:
-    /// "Top level", a list's row and an area's line, which ends 20 before it. "Top level" and a line have no background
-    /// of their own, so theirs stands the rows' inset further from the edge.
+    /// a cell of no least width, 20 short of the right edge, at the right of the present choice, and hidden in its room
+    /// at the right of every other row, so that the rows end in one column, as Task 7 drew it: "Top level", a list's
+    /// row and an area's line, which ends 20 before it.
     private enum Picker {
         static let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
         static let cellMinimumWidth: Double = 0
@@ -756,6 +774,12 @@ extension TaskViewList {
         /// The room a list's row's need counts for the check, the canvas's 18 px check: the glyph's own width is its
         /// platform's, and no view reads a need in the picker, where the rows are drawn whole.
         static let checkInNeed: Double = 18
+
+        /// What a list's row stands on in the picker, in every width: the sheet's paper, the whole width and square, as
+        /// the phone's sheet draws its rows, since the sheet stands on the paper and the sidebar's colour, inset and
+        /// rounded, would stand on it as a stripe (the review of #149, 2026-10-31). The rows keep the width's tiles,
+        /// indent, titles and ends.
+        static let background = RowBackground(color: .paper, inset: 0, cornerRadius: 0)
 
         /// The check where a row is the present choice, and the check hidden in its room where it is not.
         static func accessories(isChecked: Bool) -> [AccessoryModel<UserAction>] {
@@ -771,12 +795,11 @@ extension TaskViewList {
             )
         }
 
-        /// What stands at an area's line's right in the picker: the check or its room, 20 after the line, and the rows'
-        /// `inset` further from the edge than a row's.
-        static func lineEnd(isChecked: Bool, inset: Double) -> LineEnd {
+        /// What stands at an area's line's right in the picker: the check or its room, 20 after the line.
+        static func lineEnd(isChecked: Bool) -> LineEnd {
             LineEnd(
                 lineToAccessories: 20, accessories: accessories(isChecked: isChecked),
-                cellMinimumWidth: cellMinimumWidth, endGap: endGap + inset
+                cellMinimumWidth: cellMinimumWidth, endGap: endGap
             )
         }
     }

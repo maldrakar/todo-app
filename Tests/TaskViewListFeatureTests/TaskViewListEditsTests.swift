@@ -29,14 +29,13 @@ private func id(of option: Option) -> ViewID? {
 }
 
 /// How a row of the tree looks with no control on it and nothing of a person's session: its kind, its title or its
-/// label, its tile and title font, where it starts and what it stands on. The picker draws each row as the screen draws
-/// it, so an option looks as the screen's row of the same id does.
+/// label, its tile and title font, and where it starts. The picker draws each row as the screen draws it, so an option
+/// looks as the screen's row of the same id does, but for what it stands on, the sheet's paper (`standsOnTheSheet`).
 private struct Look: Equatable {
     let title: String?
     let tile: TileModel?
     let font: DesignSystem.Font?
     let leading: Double
-    let background: DesignSystem.Color?
 
     init(_ kind: TaskViewList.Model.Kind) {
         switch kind {
@@ -45,15 +44,20 @@ private struct Look: Equatable {
             tile = nil
             font = line.label?.font
             leading = line.leading
-            background = nil
         case .list(let list):
             title = list.title.text
             tile = list.tile
             font = list.title.font
             leading = list.leading
-            background = list.background
         }
     }
+}
+
+/// Whether an option stands on the sheet, as a view draws it: a list's option on the paper, the whole width and
+/// square, in every width, and an area's line, which has no background, on whatever the sheet is.
+private func standsOnTheSheet(_ option: Option) -> Bool {
+    guard case .list(let list) = option.row else { return true }
+    return list.background == .paper && list.backgroundInset == 0 && list.cornerRadius == 0
 }
 
 /// The picker's options as a view reads them, each the id it offers and how it looks, to hold beside the screen's rows.
@@ -66,11 +70,13 @@ private func offered(_ rows: [TaskViewList.Model.Row]) -> [(ViewID?, Look)] {
     rows.map { ($0.id, Look($0.kind)) }
 }
 
-/// Whether the picker offers the rows the screen draws, in the same order and looking the same.
+/// Whether the picker offers the rows the screen draws, in the same order and looking the same, each standing on the
+/// sheet.
 private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Row]) -> Bool {
-    guard let options = offered(options) else { return false }
+    guard let options, let looks = offered(options) else { return false }
     let drawn = offered(rows)
-    return options.count == drawn.count && zip(options, drawn).allSatisfy { $0.0 == $1.0 && $0.1 == $1.1 }
+    return looks.count == drawn.count && zip(looks, drawn).allSatisfy { $0.0 == $1.0 && $0.1 == $1.1 }
+        && options.allSatisfy(standsOnTheSheet)
 }
 
 /// Edit mode, from "…", takes the counts off the rows and shows a label on every area, "Area" standing in for a missing
@@ -403,7 +409,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     let wide = try TaskViewList(store: store, route: .init(list: .init(head: ViewID())), width: .wide, capabilities: iPhone)
     #expect(
         offersTheRows(list.model.movePicker?.options, of: wide.model.rows),
-        "the sidebar's tiles, and the unnamed area's line alone, as the screen draws it outside edit mode"
+        "the sidebar's tiles on the sheet's paper, and the unnamed area's line alone, as the screen draws it outside edit mode"
     )
     _ = list.send(.action(.movePickerCancelled))
 

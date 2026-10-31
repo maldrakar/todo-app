@@ -818,10 +818,10 @@ private func sidebarDrag() -> DragModel {
 }
 
 /// The picker of Move to… in a wide window draws the sidebar's rows (Lists screen spec, section 6): each option the
-/// screen's row for the width with nothing of the session on it, on the sidebar colour, and "Top level" a row of the
-/// sidebar's too, 30 high, its tile the root's, 22 across and rounded 6, the divider glyph 11 on it, 18 in and the title
-/// 8 after it; an option is at least a row's 30 high. The check stands 20 short of a row's background, which is 10 in,
-/// so a line's and "Top level"'s stand 30 short of the edge, in the same column.
+/// screen's row for the width with nothing of the session on it, but standing on the sheet's paper, the whole width
+/// and square, as on the phone, and "Top level" a row of the sidebar's too, 30 high, its tile the root's, 22 across
+/// and rounded 6, the divider glyph 11 on it, 18 in and the title 8 after it; an option is at least a row's 30 high.
+/// The check stands 20 short of the edge on every row, in one column.
 @Test func thePickerInAWideWindow() throws {
     let store = try makeStore()
     for id in builtIns { try store.delete(view: id) }
@@ -840,14 +840,14 @@ private func sidebarDrag() -> DragModel {
             icon: IconModel(icon: .divider, size: 11, weight: .regular, color: .ink2), tileSide: 22,
             tileCornerRadius: 6, tileColor: .fill, tileToTitle: 8,
             title: TextModel(text: "Top level", font: .rowTitle, color: .ink), leading: 18, height: 30,
-            accessories: unchecked, cellMinimumWidth: 0, endGap: 30, isChecked: false, action: .movePickerRowTapped(nil)
+            accessories: unchecked, cellMinimumWidth: 0, endGap: 20, isChecked: false, action: .movePickerRowTapped(nil)
         ),
         options: [
             .init(
                 row: .list(ListRowModel(
                     height: 30, leading: 18, tile: rootTile(.teal, .folder), tileToTitle: 8,
                     title: TextModel(text: "Projects", font: .rowTitleEmphasized, color: .ink), field: nil,
-                    need: 18 + 22 + 8 + 90 + 38, background: .sidebar, backgroundInset: 10, cornerRadius: 7,
+                    need: 18 + 22 + 8 + 90 + 38, background: .paper, backgroundInset: 0, cornerRadius: 0,
                     guides: [], childGuides: [], guide: sidebarGuide, accessories: checked, fadeWidth: 0,
                     textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38,
                     tap: .movePickerRowTapped(projects), menu: nil
@@ -858,7 +858,7 @@ private func sidebarDrag() -> DragModel {
                 row: .list(ListRowModel(
                     height: 30, leading: 34, tile: nestedTile(.stone, .bullets), tileToTitle: 8,
                     title: TextModel(text: "Home", font: .rowTitle, color: .ink), field: nil,
-                    need: 34 + 18 + 8 + 90 + 38, background: .sidebar, backgroundInset: 10, cornerRadius: 7,
+                    need: 34 + 18 + 8 + 90 + 38, background: .paper, backgroundInset: 0, cornerRadius: 0,
                     guides: [], childGuides: [], guide: sidebarGuide, accessories: unchecked, fadeWidth: 0,
                     textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38,
                     tap: .movePickerRowTapped(home), menu: nil
@@ -869,7 +869,7 @@ private func sidebarDrag() -> DragModel {
                 row: .area(AreaLineModel(
                     height: 15, leading: 18, spacing: 6, label: TextModel(text: "WORK", font: .areaCaption, color: .ink3),
                     field: nil, line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20,
-                    accessories: unchecked, cellMinimumWidth: 0, endGap: 30, tap: .movePickerRowTapped(area), menu: nil
+                    accessories: unchecked, cellMinimumWidth: 0, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
                 )),
                 isDisabled: false, isChecked: false
             ),
