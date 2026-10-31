@@ -23,6 +23,11 @@ extension DesignSystem {
         /// An area's name on its line, the canvas's 13 pt medium at the iPhone's default text size.
         public static let areaLabel = Font(style: .footnote, weight: .medium, rounded: false)
 
+        /// An area's name on its line in the sidebar, which the feature module writes in capitals: the caption in heavy
+        /// and the rounded face, the canvas's 10.5 pt 800 in `ui-rounded` (`Mac.dc.html`, `.an`), 10 pt on the Mac.
+        /// The canvas spaces its letters 0.07 em apart, which a font of the look does not say.
+        public static let areaCaption = Font(style: .caption, weight: .heavy, rounded: true)
+
         /// A row's title, 17 pt at the iPhone's default text size. Which of the four row titles a row takes is the
         /// choice of the feature module that builds its screen's model.
         public static let rowTitle = Font(style: .body, weight: .regular, rounded: false)
