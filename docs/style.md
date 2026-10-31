@@ -114,15 +114,16 @@ value a peer wrote is as arbitrary as one a person typed.
   components' models, and no others.** The shape of its layout; the
   screens of a stack, in one place per stack, to pick a view per case;
   and the kind of a row, to pick the row to draw. Of a component's
-  model: what a button's press does, `ButtonModel.Press`; what the
-  button stands on, `ButtonModel.Fill`; and what stands on a bar,
-  `BarModel.Item`. It is dispatch and not a condition over data: every
+  model: what a button stands on, `ButtonLabelModel.Fill`; what stands
+  on a bar, `BarModel.Item`; and what stands at a row's right,
+  `AccessoryModel`. It is dispatch and not a condition over data: every
   case is drawn, with no `default`, so a screen added to a stack and
   not drawn stops the view compiling. (Navigation state spec, sections
   4 and 6, #117; ADR-0006, amendments of 2026-10-22 and 2026-10-25;
   the row's kind is the owner's call on the Lists screen spec, #138;
-  the components' enums are the Lists screen plan's Task 8, #161, and
-  ADR-0007, amendment of 2026-10-30)
+  the components' enums are the Lists screen plan's Task 8, #161, as
+  the owner's review of #163 shaped them, and ADR-0007, amendment of
+  2026-10-30)
 
 ## In a review thread
 
