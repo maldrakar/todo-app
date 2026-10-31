@@ -88,8 +88,8 @@ final class TodoApp {
     }
 
     /// A window: a host around a root made from the path, or from the default route when there is none or it does not
-    /// read, with the width class the window opens with and whether another can open beside it, and the window's ways
-    /// in for a link and for its width.
+    /// read, with the width class the window opens with and what its platform offers, and the window's ways in for a
+    /// link and for its width.
     ///
     /// A path is the window's route in its one text form, kept by the window to be restored from
     /// (`docs/specs/navigation.md`, section 7). One that does not read, written by another version of the app or by
@@ -103,21 +103,21 @@ final class TodoApp {
     /// The width is the class the window's view reads when the window first appears, so the window's first frame
     /// already has the shape of its layout (navigation state spec, section 4). It has no default, as the root's has
     /// none: the one caller in the product, the window's view, always has one, and a test spells the width it means.
-    /// Whether a window can open beside this one is the platform's answer, which the window's view reads when the
-    /// window first appears and the root hands to the sidebar, whose lists' menus offer Open in New Window only where
-    /// one can (`docs/specs/navigation.md`, section 5); it has no default, for the width's reason.
+    /// What the window's platform offers is the platform's answer (`WindowCapabilities`), which the window's view reads
+    /// when the window first appears and the root hands to the sidebar: whether a window can open beside this one, so
+    /// that the lists' menus offer Open in New Window only where one can (`docs/specs/navigation.md`, section 5), and
+    /// whether the platform has edit mode, which the sidebar's bar and rows are built by (Lists screen spec, sections 7
+    /// and 8); it has no default, for the width's reason.
     ///
     /// The host's world entrance is kept for the fan-out and handed to the window inside `open` and `widthChanged`, and
     /// the host itself is not kept: its caller, the window's view, holds the window for as long as the window lives
     /// (`WindowView`), and once the caller lets go the host is released and the next fan-out passes it by. It throws
     /// what the root's `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the
     /// throw.
-    func makeWindow(path: String?, width: WindowWidth, supportsMultipleWindows: Bool) throws -> Window {
+    func makeWindow(path: String?, width: WindowWidth, capabilities: WindowCapabilities) throws -> Window {
         let unspentLaunchRoute = hostsMade == 0 ? launchRoute : nil
         let route = path.map { (try? AppModule.Route(path: $0)) ?? .default } ?? unspentLaunchRoute ?? .default
-        let root = try AppModule(
-            store: store, route: route, width: width, supportsMultipleWindows: supportsMultipleWindows
-        )
+        let root = try AppModule(store: store, route: route, width: width, capabilities: capabilities)
         // Replaced before `init` returns, since `init` hands the host's entrance over as its last step, so the
         // placeholder is never what is kept.
         var entrance: @MainActor (AppModule.Event) -> Void = { _ in }

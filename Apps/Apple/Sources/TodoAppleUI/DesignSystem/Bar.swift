@@ -2,15 +2,18 @@
 import DesignSystemComponents
 import SwiftUI
 
-/// A bar of controls as its model describes it (`BarModel`; `Phone.dc.html`, the bar): its items in a row, a button or
-/// a menu button alone round, the search capsule, and a group of buttons on one capsule with a divider between them,
-/// every size, glyph, word and colour the model's. A button sends the action its model holds, a menu button puts up the
-/// menu its model holds, and the search capsule sends nothing; what follows is the module's that built the model.
+/// A bar of controls as its model describes it (`BarModel`; `Phone.dc.html`, the bar; `Mac.dc.html`, the bottom of the
+/// column): as high as the model says, under its rule where it has one, its items in a row, a button or a menu button
+/// alone round, the search field, and a group of buttons on one capsule with a divider between them, every size, glyph,
+/// word and colour the model's. A button sends the action its model holds, a menu button puts up the menu its model
+/// holds, with the keys of each item that has them (`MenuItems`), and the search field sends nothing; what follows is
+/// the module's that built the model.
 ///
-/// The controls stand on glass, the canvas's blurred translucent fill with a hairline and a soft shadow, which is the
-/// platform's container and no model's (Lists screen plan, Task 8): drawn here as the regular material, the hairline as
-/// the ink at 8 % and one shadow for both appearances, under every control, a control on a fill of its own among them.
-/// A button whose label puts it on the container stands on the glass; one with a fill of its own on that fill instead.
+/// A control stands on what its model says (`FillModel`): on the platform's container, or on a fill of its own. The
+/// container is glass, the canvas's blurred translucent fill with a hairline and a soft shadow, which is the platform's
+/// and no model's (Lists screen plan, Task 8): drawn here as the regular material, the hairline as the ink at 8 % and
+/// the look's raised shadow for both appearances. A button alone on a fill of its own casts the model's shadow instead
+/// (`BarModel.buttonShadow`), and a search field on one casts none.
 ///
 /// `Bar` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and Observation for
 /// macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-10-31).
@@ -30,6 +33,12 @@ struct Bar<Action: Equatable & Sendable>: View {
             }
         }
         .padding(.horizontal, model.padding)
+        .frame(height: model.height)
+        .overlay(alignment: .top) {
+            if let rule = model.rule {
+                Rule(rule, along: .horizontal)
+            }
+        }
     }
 
     /// One item of the bar, through the one switch over what stands on a bar, every case drawn and none by `default`
@@ -45,12 +54,17 @@ struct Bar<Action: Equatable & Sendable>: View {
             // Xcode 27.1 on 2026-10-27), and whose build is a compile check in this epic.
             EmptyView()
             #else
+            // Its label alone, as a plain button draws it, with no indicator of its own: the Mac's default style puts
+            // the label in a pull-down button's bezel beside its arrow, where iOS's draws the label as it is.
             Menu { MenuItems(button.menu, send: send) } label: { alone(button.label) }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
                 .menuOrder(.fixed)
                 .accessibilityLabel(button.label.accessibilityLabel)
             #endif
         case .search(let search):
-            searchCapsule(search)
+            searchField(search)
         case .group(let buttons):
             group(buttons)
         }
@@ -68,16 +82,16 @@ struct Bar<Action: Equatable & Sendable>: View {
         standing(content(of: label).frame(width: model.controlHeight, height: model.controlHeight), on: label.fill)
     }
 
-    /// A button alone on what its label puts it on: the glass of its container, or a fill of its own with the bar's
+    /// A button alone on what its label puts it on: the glass of its container, or a fill of its own with the model's
     /// shadow under it.
-    @ViewBuilder private func standing(_ label: some View, on fill: ButtonLabelModel.Fill) -> some View {
+    @ViewBuilder private func standing(_ label: some View, on fill: FillModel) -> some View {
         switch fill {
         case .container:
             label.glass(in: Circle())
         case .color(let color):
             label
                 .background(Color(color), in: Circle())
-                .barShadow()
+                .shadow(model.buttonShadow)
         }
     }
 
@@ -91,22 +105,26 @@ struct Bar<Action: Equatable & Sendable>: View {
         }
     }
 
-    /// The search capsule, its glyphs and its placeholder as its model has them, on the glass, and a view and not a
-    /// control, since its model holds no action.
-    private func searchCapsule(_ search: SearchFieldModel) -> some View {
+    /// The search field, its glyphs and its placeholder as its model has them, as high as the bar's controls, its
+    /// corners as its model rounds them, on what its model puts it on, and a view and not a control, since its model
+    /// holds no action. Its corners are SwiftUI's default style, the one its `Capsule` drew the phone's in, which a
+    /// rounded rectangle of half the height draws to the same pixels (ImageRenderer on macOS 26, 2026-10-31).
+    private func searchField(_ search: SearchFieldModel) -> some View {
         HStack(spacing: search.spacing) {
             Icon(search.leadingIcon)
             Text(search.placeholder)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Icon(search.trailingIcon)
-                .frame(width: search.trailingCell, height: search.trailingCell)
+            if let trailing = search.trailingGlyph {
+                Icon(trailing.icon)
+                    .frame(width: trailing.cell, height: trailing.cell)
+            }
         }
         .padding(.leading, search.leadingPadding)
         .padding(.trailing, search.trailingPadding)
         .frame(maxWidth: .infinity)
         .frame(height: model.controlHeight)
-        .glass(in: Capsule())
+        .standing(on: search.fill, in: RoundedRectangle(cornerRadius: search.cornerRadius))
     }
 
     /// Buttons grouped on one capsule of glass, sharing its width, with the group's divider between each two of them.
@@ -136,7 +154,7 @@ struct Bar<Action: Equatable & Sendable>: View {
 
     /// A button of a group on what its label puts it on: the group's glass, which is under it already, or a fill of its
     /// own in a capsule.
-    @ViewBuilder private func standingInGroup(_ label: some View, on fill: ButtonLabelModel.Fill) -> some View {
+    @ViewBuilder private func standingInGroup(_ label: some View, on fill: FillModel) -> some View {
         switch fill {
         case .container:
             label
@@ -147,15 +165,22 @@ struct Bar<Action: Equatable & Sendable>: View {
 }
 
 extension View {
-    /// The canvas's glass under a control of the bar, in its shape: the platform's container.
+    /// The canvas's glass under a control of the bar, in its shape: the platform's container, with the look's raised
+    /// shadow, the canvas's small one, which is the container's and no model's.
     fileprivate func glass(in shape: some Shape) -> some View {
         background(.regularMaterial, in: shape)
             .overlay { shape.stroke(Color(.ink).opacity(0.08), lineWidth: 0.5) }
-            .barShadow()
+            .shadow(.raised)
     }
 
-    /// The canvas's soft shadow under a control of the bar, the platform's with the glass.
-    fileprivate func barShadow() -> some View {
-        shadow(color: .black.opacity(0.12), radius: 12, y: 5)
+    /// A search field in its shape on what its model puts it on, every case drawn and none by `default`
+    /// (`docs/style.md`, "Views"): the glass of its container, or a fill of its own with no shadow.
+    @ViewBuilder fileprivate func standing(on fill: FillModel, in shape: some Shape) -> some View {
+        switch fill {
+        case .container:
+            glass(in: shape)
+        case .color(let color):
+            background(Color(color), in: shape)
+        }
     }
 }

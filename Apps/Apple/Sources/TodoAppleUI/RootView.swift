@@ -139,10 +139,13 @@ struct RootView: View {
         }
     }
 
-    /// The list of views beside the pane of the wide tree, in the look it had until the plan's ninth task draws the
-    /// canvas's sidebar there.
+    /// The list of views beside the pane of the wide tree, the canvas's sidebar (`ListsSidebar`), as wide as the Mac
+    /// board's column at least and at first, 280 pt (`Mac.dc.html`, the column). A minimum and not only an ideal,
+    /// because the column opens at the width AppKit saved for it (`NSSplitView Subview Frames` in the app's defaults):
+    /// with a saved width, an ideal of 220 opened the column at 180, the minimum it had then (2026-10-12).
     private var sidebar: some View {
-        TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
+        ListsSidebar(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
+            .navigationSplitViewColumnWidth(min: 280, ideal: 280)
     }
 
     /// One switch over the screens the window's stack can hold, the one place they are drawn: it picks a view per
