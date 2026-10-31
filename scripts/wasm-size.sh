@@ -6,11 +6,12 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.75 MiB. The probe measures 6,749,460 bytes with Swift 6.4.0 as this is written, so the budget is that with four
+# 6.75 MiB. The probe measures 6,752,734 bytes with Swift 6.4.0 as this is written, so the budget is that with four
 # percent to spare, rounded up to a whole 64 KiB. What has moved the reading since is the code: 6,711,593 bytes on the
-# `main` this was measured beside, 9e279c5, and the other 37,867 once the sidebar built the wide window's rows, lines,
-# bar and drag from the Mac board's numbers, one value of them per width, and the probe read both looks of the drag and
-# the bar of a root made with no edit mode (#149). The binary carries the path of the directory it was built in, so a
+# `main` this was measured beside, 9e279c5, and the other 41,141 once the sidebar built the wide window's rows, lines,
+# bar and drag from the Mac board's numbers, one value of them per width, and named the bar's "+" menu once more for
+# the menu bar, and the probe read both looks of the drag and the bar of a root made with no edit mode (#149). The
+# binary carries the path of the directory it was built in, so a
 # reading moves by a few hundred bytes with the checkout's path, and the two above were taken in one. In #161 it was
 # 6.6875 MiB over the 6,711,728 bytes the probe measured then, and the code moved the reading then too: 6,605,543 bytes
 # on the `main` that was measured beside, 023eeb2, and the other 106,185 once the sidebar built its screen's component
