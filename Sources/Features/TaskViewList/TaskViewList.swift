@@ -148,9 +148,9 @@ public final class TaskViewList: Routable {
 
         /// The width class of the window, which the root hands the module when its window's view reports it: an
         /// event of the world and not a `UserAction`, since nobody pressed anything, as it is for the root (navigation
-        /// state spec, section 4). It moves the width alone, which the tiles and the title fonts are computed from, so
-        /// they follow it with no read of the store; the sentence and an open field stay, and the width the module
-        /// already has moves nothing.
+        /// state spec, section 4). It moves the width alone, which the components' numbers are computed from, so they
+        /// follow it with no read of the store; the sentence and an open field stay, and the width the module already
+        /// has moves nothing.
         case widthChanged(WindowWidth)
     }
 
@@ -523,8 +523,8 @@ public final class TaskViewList: Routable {
             // goes by computation. Nothing is written in answer (spec section 5).
             return nil
         case .widthChanged(let width):
-            // The tiles and the title fonts are computed from the width on every read of the model, so this moves
-            // them alone, and the same width again moves nothing.
+            // The components' numbers are computed from the width on every read of the model, so this moves them
+            // alone, and the same width again moves nothing.
             state.width = width
             return nil
         }
@@ -838,8 +838,8 @@ public final class TaskViewList: Routable {
         /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
         /// this person's session projected onto them (`drawnRows`); the highlighted row's id, on the list's row of the
         /// view whose list is declared, or on the folded list that hides that row; the id of the row being renamed;
-        /// whether they are in edit mode; the bar as edit mode has it; the look of the drag; the dialog up, if any; and
-        /// the sentence, if any.
+        /// whether they are in edit mode; the bar for the platform's edit mode, as edit mode has it; the look of the
+        /// drag for the width; the dialog up, if any; and the sentence, if any.
         var model: Model {
             let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
             // Read off the drawn rows and not copied from the destination or the walk: `.rowSelected` and `.route`
@@ -857,8 +857,9 @@ public final class TaskViewList: Routable {
             )
             return Model(
                 rows: drawn, selection: selection, renaming: renaming, isEditing: isEditing,
-                bar: TaskViewList.bar(isEditing: isEditing), drag: TaskViewList.drag, confirmation: confirmation,
-                movePicker: movePicker, problem: problem
+                bar: TaskViewList.bar(isEditing: isEditing, hasEditMode: capabilities.hasEditMode),
+                drag: TaskViewList.drag(in: width), confirmation: confirmation, movePicker: movePicker,
+                problem: problem
             )
         }
 

@@ -48,11 +48,12 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 }
 
 /// Whether a sidebar's row carries the highlight, read over its kind as a view drawing row by row reads it, a list's
-/// row on the fill colour: an area's line never does.
+/// row on the highlight's colour, the fill colour in a narrow window and the selection in a wide one: an area's line
+/// never does.
 private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     switch row.kind {
     case .area: false
-    case .list(let list): list.background == .fill
+    case .list(let list): list.background == .fill || list.background == .selection
     }
 }
 
@@ -421,7 +422,7 @@ private struct FirstScreenIsNoList: Error {}
 }
 
 /// The window's width reaches the sidebar as well as the layout: a root made narrow draws the phone's tiles, 30 pt at
-/// the root's depth, and told the window widened, the sidebar's 20 pt tiles, the rows otherwise those a sidebar made
+/// the root's depth, and told the window widened, the sidebar's, 22 pt there, the rows otherwise those a sidebar made
 /// wide has (Lists screen spec, sections 8 and 9).
 @Test func theSidebarsTilesFollowTheWindowsWidth() throws {
     let store = try makeStore()
@@ -434,7 +435,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(inboxTile(app.model.taskViewList) == TileModel(color: .blue, icon: .tray, side: 30, cornerRadius: 8, glyphSize: 19))
     #expect(app.send(.widthChanged(.wide)) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
-    #expect(inboxTile(app.model.taskViewList) == TileModel(color: .blue, icon: .tray, side: 20, cornerRadius: 6, glyphSize: 13))
+    #expect(inboxTile(app.model.taskViewList) == TileModel(color: .blue, icon: .tray, side: 22, cornerRadius: 6, glyphSize: 14))
 }
 
 /// What the window's platform offers reaches the sidebar as the platform said it when the window was made (Lists

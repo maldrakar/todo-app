@@ -143,7 +143,8 @@ private let indicator = DragModel.Indicator(
     circleFill: .sidebar,
     card: .init(
         width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted, rotation: -1.2,
-        opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5, glyphSize: 12, titleFont: .rowTitle
+        opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5, glyphSize: 12,
+        titleFont: .rowTitle
     )
 )
 

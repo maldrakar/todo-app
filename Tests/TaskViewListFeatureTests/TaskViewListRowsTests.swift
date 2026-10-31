@@ -136,11 +136,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(model.rows.map { listRow($0).map(drawnCount) } == ["2", "", "", "", "", "", ""])
 }
 
-/// Made wide, every row takes the sidebar's 20 pt tile, at any depth (`Mac.dc.html`, the 30 pt row). Told the window
-/// narrowed, the rows take the phone's tiles by their drawn depth, 30 pt at the root's depth, an area's lists among
-/// them, and 26 deeper (`Phone.dc.html`, `tileSize`), from what the module holds: a view written since, with no change
-/// sent, is not among the rows, so the width moved the tiles with no read of the store. Widened again, it is the
-/// model it was made with.
+/// Made wide, the rows take the sidebar's tiles by their drawn depth, 22 pt at the root's depth, an area's lists among
+/// them, and 18 deeper (`Mac.dc.html`, `tileSize`). Told the window narrowed, the rows take the phone's tiles by their
+/// drawn depth, 30 pt at the root's depth and 26 deeper (`Phone.dc.html`, `tileSize`), from what the module holds: a
+/// view written since, with no change sent, is not among the rows, so the width moved the tiles with no read of the
+/// store. Widened again, it is the model it was made with.
 @Test func aWideWindowsRowsCarryTheSidebarsTiles() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", color: .indigo, icon: "briefcase"))
@@ -150,7 +150,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .wide, capabilities: iPhone)
     let wide = list.model
     let narrow = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model
-    #expect(wide.rows.map(sizes(of:)) == Array(repeating: [20, 6, 13], count: 7) + [nil, [20, 6, 13]])
+    #expect(wide.rows.map(sizes(of:)) == Array(repeating: [22, 6, 14], count: 6) + [[18, 5, 12], nil, [22, 6, 14]])
     try store.createView(NewTaskView(title: "Unseen"))
     #expect(list.send(.widthChanged(.narrow)) == nil)
     #expect(list.model == narrow, "the narrow tiles, and no read: the view written since is not among the rows")
@@ -162,7 +162,8 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 /// A row's title is one of the design system's four, chosen by the module (ADR-0007, amendment of 2026-10-26): in a
 /// narrow window the row title at the root's drawn depth, an area's lists among them, and the nested row title deeper,
 /// each emphasized when the row has lists inside it; in a wide window the row title at every depth, which a platform
-/// draws at its sidebar's size, emphasized the same way.
+/// draws at its sidebar's size, emphasized where the row has lists inside it or is highlighted, as the Inbox is here
+/// (`Mac.dc.html`, the title's weight).
 @Test func aRowsTitleFontFollowsItsDepthAndChildren() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
@@ -183,7 +184,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(wide.rows.dropFirst(5).map { listRow($0)?.title.font } == [
         .rowTitleEmphasized, .rowTitleEmphasized, .rowTitle, .rowTitle, nil, .rowTitleEmphasized, .rowTitle,
     ])
-    #expect(wide.rows.prefix(5).map { listRow($0)?.title.font } == builtIns)
+    #expect(wide.rows.prefix(5).map { listRow($0)?.title.font } == [.rowTitleEmphasized] + builtIns.dropFirst())
 }
 
 /// An area is a line across the tree, and the lists under it stand at the root's drawn depth, their own lists one

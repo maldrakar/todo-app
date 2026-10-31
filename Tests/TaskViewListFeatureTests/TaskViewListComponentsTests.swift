@@ -529,22 +529,352 @@ private func homesPicker(
     #expect(list.model.confirmation == confirmation)
 }
 
-/// A wide window builds the same models with the sidebar's tiles and title fonts, 20 pt at every depth and the row title
-/// at every depth, emphasized over lists, and the phone's other numbers until the sidebar's own arrive (Lists screen
-/// plan, Task 9): the need and the guides follow the tile.
-@Test func aWideWindowsRowsAreThePhonesWithTheSidebarsTilesAndFonts() throws {
+/// What the Mac's window offers: a window beside it, and no edit mode.
+private let mac = WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
+
+/// The sidebar's accessories in the tree (`Mac.dc.html`, the row's sticky end), in their order: the count in ink2, or
+/// its cell kept empty, 18 wide, where the row has none; the chevron, or its cell kept empty, 20 wide; and the grip in
+/// edit mode.
+private func sidebarAccessories(
+    count: String?, chevron: AccessoryModel<Action>.Chevron?, isEditing: Bool = false
+) -> [AccessoryModel<Action>] {
+    [
+        count.map { .text(TextModel(text: $0, font: .count, color: .ink2)) } ?? .space(18),
+        chevron.map { .chevron($0) } ?? .space(20),
+    ] + (isEditing ? [.grip(grip)] : [])
+}
+
+/// The sidebar's chevron, 12 pt semibold in ink2, down while its branch is open and a quarter turned left while it is
+/// folded, saying what a tap will do.
+private func sidebarChevron(_ id: ViewID, folded: Bool) -> AccessoryModel<Action>.Chevron {
+    .init(
+        icon: IconModel(icon: .chevron, size: 12, weight: .semibold, color: .ink2), rotation: folded ? -90 : 0,
+        animation: .popover, accessibilityLabel: folded ? "Expand" : "Collapse", action: .disclosureTapped(id)
+    )
+}
+
+/// The guides under every row of the sidebar, 1 pt in the guide colour.
+private let sidebarGuide = StrokeModel(color: .guide, width: 1, dash: [])
+
+/// A list's row whole as the sidebar draws it (`Mac.dc.html`, a list's row), but for what a test spells: its title and
+/// title font, its tile, where it starts, its need, whether it is highlighted, its guides, its count, its chevron,
+/// whether it is in edit mode and its menu. It is 30 high with the title 8 after the tile in the ink and no field, on
+/// the sidebar colour, or the selection where it is highlighted, inset 10 from the tree's sides and rounded 7, under
+/// guides 1 pt in the guide colour, its accessories over a fade of 8, the count's cell at least 18 and the others at
+/// least 20, with 4 at the end, in the 70 of its need, 90 with the grip, and a tap selects it.
+private func sidebarRow(
+    _ id: ViewID, title: String, font: DesignSystem.Font, tile: TileModel, leading: Double, need: Double,
+    isHighlighted: Bool = false, guides: [Double], childGuides: [Double], count: String?,
+    chevron: AccessoryModel<Action>.Chevron?, isEditing: Bool = false, menu: MenuModel<Action>?
+) -> ListRowModel<Action> {
+    ListRowModel(
+        height: 30, leading: leading, tile: tile, tileToTitle: 8,
+        title: TextModel(text: title, font: font, color: .ink), field: nil, need: need,
+        background: isHighlighted ? .selection : .sidebar, backgroundInset: 10, cornerRadius: 7, guides: guides,
+        childGuides: childGuides, guide: sidebarGuide,
+        accessories: sidebarAccessories(count: count, chevron: chevron, isEditing: isEditing), fadeWidth: 8,
+        textMinimumWidth: 18, cellMinimumWidth: 20, endGap: 4, accessoriesWidth: isEditing ? 90 : 70,
+        tap: .rowSelected(id), menu: menu
+    )
+}
+
+/// A tile of the sidebar's root depth, 22 across, rounded 6, its glyph 14 (`Mac.dc.html`, `tileSize`).
+private func rootTile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
+    TileModel(color: color, icon: icon, side: 22, cornerRadius: 6, glyphSize: 14)
+}
+
+/// A tile of the sidebar deeper than its root, 18 across, rounded 5, its glyph 12.
+private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
+    TileModel(color: color, icon: icon, side: 18, cornerRadius: 5, glyphSize: 12)
+}
+
+/// A wide window's rows carry the sidebar's numbers whole (`Mac.dc.html`, a list's row): 30 high, the tile at 18 + 16
+/// × depth, 22 across at the root's depth and 18 deeper, the title 8 after it in the sidebar's body, emphasized where
+/// the list has lists inside it or is highlighted, a need of the tile's leading edge, the tile, 8, a title of 90 and
+/// the accessories' 70, the guides at the centres of the ancestors' tiles, the Inbox, which the sidebar declares, on
+/// the selection and every other row on the sidebar colour, each inset 10 and rounded 7, with the count and the
+/// chevron, and the menu of a list with Open in New Window, on the Mac.
+@Test func aWideWindowsRowsCarryTheSidebarsNumbers() throws {
     let store = try makeStore()
+    try store.createTask(NewTask(title: "Buy milk"))
     let projects = try store.createView(NewTaskView(title: "Projects", color: .teal, icon: "folder"))
-    let home = try store.createView(NewTaskView(title: "Home", parent: projects, icon: "house"))
-    let model = try sidebar(store, width: .wide).model
-    #expect(listRow(projects, in: model) == phoneRow(
-        projects, title: "Projects", font: .rowTitleEmphasized,
-        tile: TileModel(color: .teal, icon: .folder, side: 20, cornerRadius: 6, glyphSize: 13), leading: 20, need: 264,
-        guides: [], childGuides: [30], count: nil, chevron: chevron(projects, folded: false)
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects, icon: "house", filter: .status([.open])))
+    let model = try sidebar(store, width: .wide, capabilities: mac).model
+    #expect(listRow(inbox, in: model) == sidebarRow(
+        inbox, title: "Inbox", font: .rowTitleEmphasized, tile: rootTile(.blue, .tray), leading: 18, need: 208,
+        isHighlighted: true, guides: [], childGuides: [29], count: "1", chevron: nil,
+        menu: listMenu(inbox, openInNewWindow: true)
     ))
-    #expect(listRow(home, in: model) == phoneRow(
-        home, title: "Home", font: .rowTitle,
-        tile: TileModel(color: .stone, icon: .house, side: 20, cornerRadius: 6, glyphSize: 13), leading: 42, need: 286,
-        guides: [30], childGuides: [30, 52], count: nil, chevron: nil
+    #expect(listRow(BuiltInTaskViews.today, in: model)?.background == .sidebar)
+    #expect(listRow(BuiltInTaskViews.today, in: model)?.title.font == .rowTitle)
+    #expect(listRow(projects, in: model) == sidebarRow(
+        projects, title: "Projects", font: .rowTitleEmphasized, tile: rootTile(.teal, .folder), leading: 18, need: 208,
+        guides: [], childGuides: [29], count: "1", chevron: sidebarChevron(projects, folded: false),
+        menu: listMenu(projects, openInNewWindow: true)
     ))
+    #expect(listRow(home, in: model) == sidebarRow(
+        home, title: "Home", font: .rowTitle, tile: nestedTile(.stone, .house), leading: 34, need: 220,
+        guides: [29], childGuides: [29, 43], count: "1", chevron: nil, menu: listMenu(home, openInNewWindow: true)
+    ))
+}
+
+/// The highlight moves the sidebar's emphasis with it: a row chosen takes the emphasized title and the selection, and
+/// the Inbox it leaves goes back to the plain title on the sidebar colour; a fold that hides the chosen row lights the
+/// folded list, emphasized as a list with lists inside it is.
+@Test func theHighlightCarriesTheEmphasisInTheSidebar() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let list = try sidebar(store, width: .wide, capabilities: mac)
+    _ = list.send(.action(.rowSelected(home)))
+    #expect(listRow(home, in: list.model)?.title.font == .rowTitleEmphasized)
+    #expect(listRow(home, in: list.model)?.background == .selection)
+    #expect(listRow(inbox, in: list.model)?.title.font == .rowTitle)
+    #expect(listRow(inbox, in: list.model)?.background == .sidebar)
+    _ = list.send(.action(.disclosureTapped(projects)))
+    #expect(listRow(projects, in: list.model)?.background == .selection)
+    #expect(listRow(projects, in: list.model)?.title.font == .rowTitleEmphasized)
+}
+
+/// An area's line in the sidebar (`Mac.dc.html`, an area's line): 15 high, its name always on it where it has one, 18
+/// in, in capitals in the area's caption in ink3, the line 6 after it, 1 pt in the line colour, ending 18 short of the
+/// edge, which is 8 short of the tree's content inset 10, and the line alone where it has no name; each with the menu
+/// of a line. Renamed, it is 28 high, the field 16 in, 160 by 22, padded 6, rounded 6, in the canvas's 12.5 pt
+/// semibold, the callout's. In edit mode, on the iPad, the grip comes, 8 after the line in a cell of 20, 14 short of the
+/// edge, in the column of the rows' grips, no menu, and an unnamed area is labelled "AREA".
+@Test func aWideWindowsAreaLines() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let unnamed = try store.createView(NewTaskView(title: "", kind: .area))
+    func sidebarLine(
+        _ id: ViewID, height: Double, leading: Double = 18, label: String?, field: TextFieldModel<Action>? = nil,
+        isEditing: Bool = false, menu: MenuModel<Action>?
+    ) -> AreaLineModel<Action> {
+        AreaLineModel(
+            height: height, leading: leading, spacing: 6,
+            label: label.map { TextModel(text: $0, font: .areaCaption, color: .ink3) }, field: field,
+            line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: isEditing ? 8 : 18,
+            accessories: isEditing ? [.grip(grip)] : [], cellMinimumWidth: isEditing ? 20 : 0,
+            endGap: isEditing ? 14 : 0, tap: .rowSelected(id), menu: menu
+        )
+    }
+    let list = try sidebar(store, width: .wide, capabilities: mac)
+    #expect(areaLine(work, in: list.model) == sidebarLine(work, height: 15, label: "WORK", menu: lineMenu(work)))
+    #expect(areaLine(unnamed, in: list.model) == sidebarLine(unnamed, height: 15, label: nil, menu: lineMenu(unnamed)))
+    _ = list.send(.action(.renameMenuItemChosen(work)))
+    let nameField = field(
+        "Work", placeholder: "Area name", font: .nestedRowTitleEmphasized, minimumWidth: 160, height: 22, padding: 6,
+        cornerRadius: 6
+    )
+    #expect(areaLine(work, in: list.model) == sidebarLine(
+        work, height: 28, leading: 16, label: "WORK", field: nameField, menu: lineMenu(work)
+    ))
+
+    let iPadList = try sidebar(store, width: .wide, capabilities: iPad)
+    _ = iPadList.send(.action(.editMenuItemChosen))
+    #expect(areaLine(work, in: iPadList.model) == sidebarLine(
+        work, height: 15, label: "WORK", isEditing: true, menu: nil
+    ))
+    #expect(areaLine(unnamed, in: iPadList.model) == sidebarLine(
+        unnamed, height: 15, label: "AREA", isEditing: true, menu: nil
+    ))
+}
+
+/// A list's field in the sidebar: in the row's title font, at least the title's 90 wide, 24 high, padded 6 and rounded
+/// 6, with the canvas's placeholder; the row keeps the rest of its look.
+@Test func aWideWindowsListFieldIsTheSidebars() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects"))
+    try store.createView(NewTaskView(title: "Home", parent: projects))
+    let list = try sidebar(store, width: .wide, capabilities: mac)
+    _ = list.send(.action(.renameMenuItemChosen(projects)))
+    #expect(listRow(projects, in: list.model)?.field == field(
+        "Projects", placeholder: "Title", font: .rowTitleEmphasized, minimumWidth: 90, height: 24, padding: 6,
+        cornerRadius: 6
+    ))
+    #expect(listRow(projects, in: list.model)?.height == 30)
+}
+
+/// In edit mode, on the iPad's wide window, the sidebar's rows take the grip in a cell of 20 after the chevron's, the
+/// counts go and no row has a menu; the need grows by the grip's cell (Lists screen spec, sections 7 and 8).
+@Test func aWideWindowsRowsInEditMode() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Buy milk"))
+    let list = try sidebar(store, width: .wide, capabilities: iPad)
+    _ = list.send(.action(.editMenuItemChosen))
+    #expect(listRow(inbox, in: list.model) == sidebarRow(
+        inbox, title: "Inbox", font: .rowTitleEmphasized, tile: rootTile(.blue, .tray), leading: 18, need: 228,
+        isHighlighted: true, guides: [], childGuides: [29], count: nil, chevron: nil, isEditing: true, menu: nil
+    ))
+}
+
+/// The menus are the module's on every width and with every capability (Lists screen spec, section 6): a list's with
+/// Open in New Window only where a window can open beside this one, the built-ins' among them, and a line's, the same
+/// in a narrow and a wide window, with and without edit mode.
+@Test func theMenusFollowWhetherAWindowCanOpenOnEveryWidth() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
+    for width in [WindowWidth.narrow, .wide] {
+        for capabilities in [iPhone, iPad, mac] {
+            let model = try sidebar(store, width: width, capabilities: capabilities).model
+            let opens = capabilities.opensWindowsBeside
+            #expect(listRow(inbox, in: model)?.menu == listMenu(inbox, openInNewWindow: opens), "\(width) \(opens)")
+            #expect(listRow(clients, in: model)?.menu == listMenu(clients, openInNewWindow: opens))
+            #expect(areaLine(work, in: model)?.menu == lineMenu(work))
+        }
+    }
+}
+
+/// The bar is chosen by whether the platform has edit mode and not by the width: with it, the phone's bar of Task 8 in
+/// a narrow and a wide window alike, its edit bar in edit mode; without it, on the Mac, the canvas's bar
+/// (`Mac.dc.html`, the bottom of the column), which Edit sent all the same leaves as it is.
+@Test func theBarFollowsEditModeAndNotTheWidth() throws {
+    for width in [WindowWidth.narrow, .wide] {
+        for capabilities in [iPhone, iPad] {
+            let list = try sidebar(try makeStore(), width: width, capabilities: capabilities)
+            #expect(list.model.bar == barOutsideEditMode())
+            _ = list.send(.action(.editMenuItemChosen))
+            #expect(list.model.bar == barInEditMode())
+        }
+    }
+    let list = try sidebar(try makeStore(), width: .wide, capabilities: mac)
+    #expect(list.model.bar == barWithoutEditMode())
+    _ = list.send(.action(.editMenuItemChosen))
+    #expect(list.model.bar == barWithoutEditMode())
+}
+
+/// The bar without edit mode (`Mac.dc.html`, the bottom of the column): 48 high under a rule 1 pt in the line colour,
+/// its controls 30 high, 8 apart and 10 in from the column's edges; the search field on the fill colour, rounded 8, its
+/// magnifier 15 pt in ink2 9 in from its start and 6 before "Search" in ink2, 4 at its end, with no trailing glyph; and
+/// "+" on the accent, its plus 16 pt bold in white, casting the raised shadow, a menu of New Task ⌘N, New List ⇧⌘N and
+/// New Area. The group's numbers, which no item of this bar uses, are the edit bar's.
+private func barWithoutEditMode() -> BarModel<Action> {
+    let search = SearchFieldModel(
+        placeholder: TextModel(text: "Search", font: .search, color: .ink2),
+        leadingIcon: IconModel(icon: .magnifier, size: 15, weight: .regular, color: .ink2), trailingGlyph: nil,
+        spacing: 6, leadingPadding: 9, trailingPadding: 4, fill: .color(.fill), cornerRadius: 8
+    )
+    let add = MenuButtonModel<Action>(
+        label: ButtonLabelModel(
+            icon: IconModel(icon: .plus, size: 16, weight: .bold, color: .onAccent), title: nil,
+            accessibilityLabel: "Add", fill: .color(.accent)
+        ),
+        menu: MenuModel(sections: [
+            .init(items: [
+                .init(
+                    title: "New Task", icon: .checkCircle, isDestructive: false,
+                    shortcut: .init(key: "n", modifiers: [.command]), action: .newTaskMenuItemChosen
+                ),
+                .init(
+                    title: "New List", icon: .list, isDestructive: false,
+                    shortcut: .init(key: "n", modifiers: [.shift, .command]), action: .newListMenuItemChosen(in: nil)
+                ),
+                .init(title: "New Area", icon: .divider, isDestructive: false, shortcut: nil, action: .newAreaMenuItemChosen),
+            ]),
+        ])
+    )
+    return BarModel(
+        items: [.search(search), .menuButton(add)], height: 48, rule: StrokeModel(color: .line, width: 1, dash: []),
+        controlHeight: 30, spacing: 8, padding: 10, groupButtonHeight: 40, groupButtonSpacing: 6, groupPadding: 4,
+        groupDividerHeight: 22, groupDivider: StrokeModel(color: .line, width: 1, dash: []), buttonShadow: .raised
+    )
+}
+
+/// The drag's look follows the width (Lists screen plan, Task 9): the phone's slot and card in a narrow window, and the
+/// Mac board's indicator and card in a wide one, on the Mac and the iPad alike, in and out of edit mode, and a window
+/// that narrows takes the phone's.
+@Test func theDragsLookFollowsTheWidth() throws {
+    let mac = try sidebar(try makeStore(), width: .wide, capabilities: mac)
+    #expect(mac.model.drag == sidebarDrag())
+    let iPad = try sidebar(try makeStore(), width: .wide, capabilities: iPad)
+    #expect(iPad.model.drag == sidebarDrag())
+    _ = iPad.send(.action(.editMenuItemChosen))
+    #expect(iPad.model.drag == sidebarDrag())
+    _ = iPad.send(.widthChanged(.narrow))
+    #expect(iPad.model.drag == phoneDrag())
+}
+
+/// The sidebar's drag (`Mac.dc.html`, the drag's slot row and card): the tree's indent of 18 and 16; a gap of 12
+/// between the rows, holding the line, 2 pt in the accent with its ends rounded 1, from 2 after the tile of the drop's
+/// depth to 18 short of the edge, 8 short of the tree's content, and the circle, 10 across, ringed 2 pt in the accent
+/// and filled with the sidebar colour, 6 before that tile; and the card 170 by 30, 14 after that tile, rounded 7, on the
+/// surface with the lifted shadow, turned −1.2° at 95 %, a list's tile on it 18 across, rounded 5 with its glyph 12, 10
+/// in, and its title 8 after it in the sidebar's body; all of it on the popover's motion.
+private func sidebarDrag() -> DragModel {
+    DragModel(
+        indent: IndentModel(start: 18, step: 16), animation: .popover,
+        look: .indicator(.init(
+            height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
+            trailingGap: 18, circleDiameter: 10, circleOffset: -6,
+            circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .sidebar,
+            card: .init(
+                width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted,
+                rotation: -1.2, opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5,
+                glyphSize: 12, titleFont: .rowTitle
+            )
+        ))
+    )
+}
+
+/// The picker of Move to… in a wide window draws the sidebar's rows (Lists screen spec, section 6): each option the
+/// screen's row for the width with nothing of the session on it, on the sidebar colour, and "Top level" a row of the
+/// sidebar's too, 30 high, its tile the root's, 22 across and rounded 6, the divider glyph 11 on it, 18 in and the title
+/// 8 after it; an option is at least a row's 30 high. The check stands 20 short of a row's background, which is 10 in,
+/// so a line's and "Top level"'s stand 30 short of the edge, in the same column.
+@Test func thePickerInAWideWindow() throws {
+    let store = try makeStore()
+    for id in builtIns { try store.delete(view: id) }
+    let projects = try store.createView(NewTaskView(title: "Projects", color: .teal, icon: "folder"))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects))
+    let area = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let list = try sidebar(store, width: .wide, capabilities: mac)
+    _ = list.send(.action(.moveToMenuItemChosen(home)))
+    let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
+    let checked: [AccessoryModel<Action>] = [.check(check)]
+    let unchecked: [AccessoryModel<Action>] = [.hidden(.check(check))]
+    let picker = PickerModel<TaskViewList.Model.Kind, Action>(
+        title: "Move “Home” to…", hint: TextModel(text: "Choose where it goes.", font: .hint, color: .ink2),
+        cancel: ChoiceModel(title: "Cancel", isDestructive: false, action: .movePickerCancelled),
+        topLevel: .init(
+            icon: IconModel(icon: .divider, size: 11, weight: .regular, color: .ink2), tileSide: 22,
+            tileCornerRadius: 6, tileColor: .fill, tileToTitle: 8,
+            title: TextModel(text: "Top level", font: .rowTitle, color: .ink), leading: 18, height: 30,
+            accessories: unchecked, cellMinimumWidth: 0, endGap: 30, isChecked: false, action: .movePickerRowTapped(nil)
+        ),
+        options: [
+            .init(
+                row: .list(ListRowModel(
+                    height: 30, leading: 18, tile: rootTile(.teal, .folder), tileToTitle: 8,
+                    title: TextModel(text: "Projects", font: .rowTitleEmphasized, color: .ink), field: nil,
+                    need: 18 + 22 + 8 + 90 + 38, background: .sidebar, backgroundInset: 10, cornerRadius: 7,
+                    guides: [], childGuides: [], guide: sidebarGuide, accessories: checked, fadeWidth: 0,
+                    textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38,
+                    tap: .movePickerRowTapped(projects), menu: nil
+                )),
+                isDisabled: false, isChecked: true
+            ),
+            .init(
+                row: .list(ListRowModel(
+                    height: 30, leading: 34, tile: nestedTile(.stone, .bullets), tileToTitle: 8,
+                    title: TextModel(text: "Home", font: .rowTitle, color: .ink), field: nil,
+                    need: 34 + 18 + 8 + 90 + 38, background: .sidebar, backgroundInset: 10, cornerRadius: 7,
+                    guides: [], childGuides: [], guide: sidebarGuide, accessories: unchecked, fadeWidth: 0,
+                    textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38,
+                    tap: .movePickerRowTapped(home), menu: nil
+                )),
+                isDisabled: true, isChecked: false
+            ),
+            .init(
+                row: .area(AreaLineModel(
+                    height: 15, leading: 18, spacing: 6, label: TextModel(text: "WORK", font: .areaCaption, color: .ink3),
+                    field: nil, line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20,
+                    accessories: unchecked, cellMinimumWidth: 0, endGap: 30, tap: .movePickerRowTapped(area), menu: nil
+                )),
+                isDisabled: false, isChecked: false
+            ),
+        ],
+        hintGap: 8, minimumOptionHeight: 30, disabledOpacity: 0.35
+    )
+    #expect(list.model.movePicker == picker)
 }

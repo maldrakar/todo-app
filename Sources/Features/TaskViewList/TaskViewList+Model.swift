@@ -77,11 +77,12 @@ extension TaskViewList {
         /// screen plan, Task 9). It is session state, which no relaunch restores (ADR-0009, amendment of 2026-10-25).
         public let isEditing: Bool
 
-        /// The bar at the bottom of the screen, its controls as edit mode has them or not (spec sections 1 and 7).
+        /// The bar at the bottom of the screen, its controls as edit mode has them or not (spec sections 1 and 7), and
+        /// the Mac board's where the platform has no edit mode (Lists screen plan, Task 9).
         public let bar: BarModel<UserAction>
 
-        /// The look of the drag, whose gesture, lifted block, slot and depth are the platform's (the owner,
-        /// 2026-10-30).
+        /// The look of the drag for the window's width, whose gesture, lifted block, place and depth are the platform's
+        /// (the owner, 2026-10-30).
         public let drag: DragModel
 
         /// The confirmation of a delete while it is up, and nil when none is: a view draws it as an alert, its title
