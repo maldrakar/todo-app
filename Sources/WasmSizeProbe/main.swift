@@ -306,7 +306,8 @@ private enum WasmSizeProbe {
     }
 
     /// The sidebar as a line: how many lists it draws and how many of them are folded, its areas by their labels, and
-    /// the first list's tile, count and title: one switch over a row's kinds, as the sidebar's view has.
+    /// the first list's tile, count and title: one switch over a row's kinds, as the sidebar's view has, and one over a
+    /// list's accessories, as the row's view has.
     private static func sidebarLine(of model: AppModule.Model) -> String {
         var lists = 0
         var folded = 0
@@ -317,15 +318,23 @@ private enum WasmSizeProbe {
             case .area(let line):
                 areas.append(line.label?.text ?? "unnamed")
             case .list(let list):
+                var count = "uncounted"
+                var isFolded = false
+                for accessory in list.accessories {
+                    switch accessory {
+                    case .count(let text): count = text.text
+                    case .chevron(let chevron): isFolded = chevron.rotation != 0
+                    case .grip, .check, .space: continue
+                    }
+                }
                 if lists == 0 {
-                    let count = list.accessories.count.text.isEmpty ? "uncounted" : list.accessories.count.text
                     let emphasis = list.title.font.weight == .regular ? "plain" : "emphasized"
                     let tile = "\(list.tile.side) pt \(list.tile.color.rawValue) \(list.tile.glyph.icon.rawValue) tile"
                     let menu = list.menu?.sections.flatMap(\.items).map(\.title).joined(separator: "/") ?? "no menu"
                     first = "\(list.title.text) \(count) on a \(tile), \(emphasis), at \(list.leading) pt needing \(list.need), \(menu)"
                 }
                 lists += 1
-                if let chevron = list.accessories.chevron, chevron.rotation != 0 { folded += 1 }
+                if isFolded { folded += 1 }
             }
         }
         return "\(lists) lists, \(folded) folded, areas \(areas.joined(separator: " and ")), first \(first)"
@@ -347,29 +356,28 @@ private enum WasmSizeProbe {
         return "\(picker.title) of \(picker.options.count) rows, \(greyed) greyed out, in \(current), or \(picker.cancel.title)"
     }
 
-    /// The sidebar's bar as a line: its buttons, a group's among them, and its search field, through one switch over
-    /// the bar's items, and each button's press and fill through one switch over each, as the bar's view has.
+    /// The sidebar's bar as a line: its buttons and its menu buttons, a group's among them, with what a press does, and
+    /// its search field, through one switch over the bar's items, and each button's fill through one switch over it, as
+    /// the bar's view has.
     private static func barLine(of model: AppModule.Model) -> String {
         var search = "no search"
         let buttons = model.taskViewList.bar.items.flatMap { item in
             switch item {
-            case .button(let button): return [button]
+            case .button(let button): return [(button.label, "pressed")]
+            case .menuButton(let button):
+                return [(button.label, "a menu of \(button.menu.sections.flatMap(\.items).count)")]
             case .search(let field):
                 search = field.placeholder.text
                 return []
-            case .group(let buttons): return buttons
+            case .group(let buttons): return buttons.map { ($0.label, "pressed") }
             }
         }
-        let labels = buttons.map { button in
-            let press = switch button.press {
-            case .action: "pressed"
-            case .menu(let menu): "a menu of \(menu.sections.flatMap(\.items).count)"
-            }
-            let fill = switch button.fill {
+        let labels = buttons.map { label, press in
+            let fill = switch label.fill {
             case .container: "on its container"
             case .color: "filled"
             }
-            return "\(button.accessibilityLabel) \(press) \(fill)"
+            return "\(label.accessibilityLabel) \(press) \(fill)"
         }
         return "\(labels.joined(separator: ", ")), search \(search)"
     }

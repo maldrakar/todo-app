@@ -26,13 +26,9 @@ extension TaskViewList {
         }
 
         /// A row's kind, an enum so that a row is one of the two explicitly and never both or neither (the owner,
-        /// 2026-10-25, on the spec's first revision), each the model of the component that draws it.
-        ///
-        /// Indirect, so that a row and an option of the picker hold a reference to the component's model, about a
-        /// kilobyte on wasm32, and not the model itself, which every comparison and every copy of a row would put on
-        /// the stack: a debug build gives each copy a slot of its own, and a whole-model comparison overflowed the
-        /// wasm32 stack, 64 KiB, when measured (#161).
-        public indirect enum Kind: Equatable, Sendable {
+        /// 2026-10-25, on the spec's first revision), each the model of the component that draws it, which is a class,
+        /// so that a row and an option of the picker hold a reference to it and not the model itself (`ListRowModel`).
+        public enum Kind: Equatable, Sendable {
             /// An area's line, labelled with its name, and with none for an unnamed area, the line alone being the
             /// whole of how it looks (spec section 3), but in edit mode, where its label is "Area", the label a tap
             /// renames it by (spec section 1).
@@ -82,63 +78,29 @@ extension TaskViewList {
         public let isEditing: Bool
 
         /// The bar at the bottom of the screen, its controls as edit mode has them or not (spec sections 1 and 7).
-        public var bar: BarModel<UserAction> { boxedBar.value }
+        public let bar: BarModel<UserAction>
 
         /// The look of the drag, whose gesture, lifted block, slot and depth are the platform's (the owner,
         /// 2026-10-30).
-        public var drag: DragModel { boxedDrag.value }
+        public let drag: DragModel
 
         /// The confirmation of a delete while it is up, and nil when none is: a view draws it as an alert, its title
         /// and message with its two choices, which send `deleteConfirmed` and `deleteCancelled` (spec section 6). It
         /// is the module's state and not a screen, and no relaunch restores it (ADR-0009, amendment of 2026-10-25).
-        public var confirmation: ConfirmationModel<UserAction>? { boxedConfirmation?.value }
+        public let confirmation: ConfirmationModel<UserAction>?
 
         /// The picker of Move to… while it is open, and nil when it is closed: a view draws it as a sheet, "Top level"
         /// first and then its options, which send `movePickerRowTapped`, with its Cancel, which sends
-        /// `movePickerCancelled` (spec section 6). Each option is a row of the tree as the screen draws it, of the
-        /// same kind, so that a view draws it with the screen's own row. It is the module's state and not a screen,
-        /// and no relaunch restores it (ADR-0009, amendment of 2026-10-25).
-        public var movePicker: PickerModel<Kind, UserAction>? { boxedMovePicker?.value }
+        /// `movePickerCancelled` (spec section 6). Each option is a row of the tree of the kind the screen draws it
+        /// as, so that a view draws it with the screen's own row, with the check at its right where it is the present
+        /// choice and the room for one where it is not. It is the module's state and not a screen, and no relaunch
+        /// restores it (ADR-0009, amendment of 2026-10-25).
+        public let movePicker: PickerModel<Kind, UserAction>?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
         /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one
         /// would be a view holding logic (spec section 2). A list that could not be opened is said here, where
         /// the list that stays open is drawn beside it; what the list says about itself is in its own model.
         public let problem: String?
-
-        /// The bar, the drag's look and the dialogs, each kept on the heap, as a row's kind is, for the same reason:
-        /// a few hundred bytes each, which a model held inline would put on the stack at every comparison and copy.
-        private let boxedBar: Boxed<BarModel<UserAction>>
-        private let boxedDrag: Boxed<DragModel>
-        private let boxedConfirmation: Boxed<ConfirmationModel<UserAction>>?
-        private let boxedMovePicker: Boxed<PickerModel<Kind, UserAction>>?
-
-        init(
-            rows: [Row], selection: ViewID?, renaming: ViewID?, isEditing: Bool, bar: BarModel<UserAction>,
-            drag: DragModel, confirmation: ConfirmationModel<UserAction>?, movePicker: PickerModel<Kind, UserAction>?,
-            problem: String?
-        ) {
-            self.rows = rows
-            self.selection = selection
-            self.renaming = renaming
-            self.isEditing = isEditing
-            boxedBar = .boxed(bar)
-            boxedDrag = .boxed(drag)
-            boxedConfirmation = confirmation.map(Boxed.boxed)
-            boxedMovePicker = movePicker.map(Boxed.boxed)
-            self.problem = problem
-        }
-
-        /// A value kept on the heap and compared by what it holds: a single indirect case, so that it is a value like
-        /// any other and its equality is derived.
-        private enum Boxed<Value: Equatable & Sendable>: Equatable, Sendable {
-            indirect case boxed(Value)
-
-            var value: Value {
-                switch self {
-                case .boxed(let value): value
-                }
-            }
-        }
     }
 }

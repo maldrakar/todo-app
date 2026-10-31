@@ -67,11 +67,29 @@ func listRow(_ id: ViewID, in model: TaskViewList.Model) -> ListRowModel<TaskVie
     model.rows.first { $0.id == id }.flatMap(listRow)
 }
 
+/// The count a list's row draws, read over its accessories as a view reads them, and empty where it draws none. Not
+/// private, since the edits' and the components' tests read a count with it too.
+func drawnCount(of list: ListRowModel<TaskViewList.UserAction>) -> String {
+    for accessory in list.accessories {
+        if case .count(let count) = accessory { return count.text }
+    }
+    return ""
+}
+
+/// The chevron a list's row draws, read over its accessories as a view reads them, and nil where it draws none. Not
+/// private, since the components' tests read a chevron with it too.
+func drawnChevron(of list: ListRowModel<TaskViewList.UserAction>) -> AccessoryModel<TaskViewList.UserAction>.Chevron? {
+    for accessory in list.accessories {
+        if case .chevron(let chevron) = accessory { return chevron }
+    }
+    return nil
+}
+
 /// Whether the model draws a view's row folded: its chevron turned a quarter left, and false for a row with no
 /// chevron, where no fold is drawn; nil when no list's row holds the view. Not private, since the edits' tests read a
 /// fold with it too.
 func isFolded(_ id: ViewID, in model: TaskViewList.Model) -> Bool? {
-    listRow(id, in: model).map { $0.accessories.chevron?.rotation == -90 }
+    listRow(id, in: model).map { drawnChevron(of: $0)?.rotation == -90 }
 }
 
 /// Whether a row is an area's line with the label, nil for the line alone.
@@ -111,7 +129,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     ])
     // The Logbook holds the filed task and counts nothing, since nothing in it is open; the two lists with no rule and
     // nothing inside have no count at all, and read the same.
-    #expect(model.rows.map { listRow($0)?.accessories.count.text } == ["2", "", "", "", "", "", ""])
+    #expect(model.rows.map { listRow($0).map(drawnCount) } == ["2", "", "", "", "", "", ""])
 }
 
 /// Made wide, every row takes the sidebar's 20 pt tile, at any depth (`Mac.dc.html`, the 30 pt row). Told the window
@@ -180,7 +198,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(isAreaLine(past.first, labelled: "Work"))
     #expect(isAreaLine(past.last, labelled: nil))
     #expect(past.map { listRow($0)?.title.text } == [nil, "Clients", "Acme", nil])
-    #expect(past.map { listRow($0).map { $0.accessories.chevron != nil } } == [nil, true, false, nil])
+    #expect(past.map { listRow($0).map { drawnChevron(of: $0) != nil } } == [nil, true, false, nil])
 }
 
 /// Every edit to a task can move any count, so a change naming only tasks reads the counts again and not the rows: the
@@ -196,7 +214,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     refusingAName(reference)
     try store.createView(NewTaskView(title: "Docs"))
     #expect(list.send(.changed(created)) == nil)
-    #expect(listRow(inbox, in: list.model)?.accessories.count.text == "1")
+    #expect(listRow(inbox, in: list.model).map(drawnCount) == "1")
     #expect(list.model == reference.model, "the count moved, Docs is missing, and the draft and the sentence stayed")
 }
 
@@ -292,7 +310,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     _ = try store.apply([parent(of: work, .text(projects.rawValue), at: 1_800_000_000_000)])
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
-    #expect(listRow(work, in: list.model)?.accessories.chevron != nil, "nested, the area reads as a list; this is the setup")
+    #expect(listRow(work, in: list.model).flatMap(drawnChevron) != nil, "nested, the area reads as a list; this is the setup")
     #expect(list.send(.action(.disclosureTapped(work))) == nil)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work], "folded as a list")
     let moved = try changeSet(of: store) { _ = try store.apply([parent(of: work, .null, at: 1_800_000_000_001)]) }
@@ -621,12 +639,12 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     try store.createTask(NewTask(title: "Buy milk", tags: [errands]))
     let shopping = try store.createView(NewTaskView(title: "Shopping", filter: .hasTag(errands)))
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
-    #expect(listRow(shopping, in: list.model)?.accessories.count.text == "1", "the tag's task is counted; this is the setup")
+    #expect(listRow(shopping, in: list.model).map(drawnCount) == "1", "the tag's task is counted; this is the setup")
     let deleted = try changeSet(of: store) { try store.delete(tag: errands) }
     #expect(deleted.tasks.isEmpty && deleted.views.isEmpty, "a change naming the tag alone; this is the setup")
     let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
     try store.createView(NewTaskView(title: "Docs"))
     #expect(list.send(.changed(deleted)) == nil)
-    #expect(listRow(shopping, in: list.model)?.accessories.count.text == "")
+    #expect(listRow(shopping, in: list.model).map(drawnCount) == "")
     #expect(list.model == reference.model, "the count moved, and Docs is missing")
 }

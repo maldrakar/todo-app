@@ -32,8 +32,8 @@ extension TaskViewList {
             switch row.kind {
             case .area:
                 let line = areaLine(
-                    row, isEditing: isEditing, draft: draft, tap: .rowSelected(row.id),
-                    menu: isEditing ? nil : lineMenu(row.id)
+                    row, isEditing: isEditing, draft: draft, end: lineEnd(isEditing: isEditing),
+                    tap: .rowSelected(row.id), menu: isEditing ? nil : lineMenu(row.id)
                 )
                 return Model.Row(id: row.id, depth: row.depth, kind: .area(line))
             case .list:
@@ -44,8 +44,8 @@ extension TaskViewList {
                 let fold = row.hasChildren ? chevron(row.id, isFolded: collapsedViews.contains(row.id)) : nil
                 let list = listRow(
                     row, in: width, guides: Array(centres.prefix(row.depth)),
-                    accessories: accessories(count: count.map(String.init) ?? "", chevron: fold, hasGrip: isEditing),
-                    draft: draft, isSelected: row.id == selection, tap: .rowSelected(row.id),
+                    end: rowEnd(count: count, chevron: fold, hasGrip: isEditing), draft: draft,
+                    isSelected: row.id == selection, tap: .rowSelected(row.id),
                     menu: isEditing ? nil : listMenu(row.id, supportsMultipleWindows: supportsMultipleWindows)
                 )
                 centres = list.childGuides
@@ -71,7 +71,7 @@ extension TaskViewList {
                 .button(doneButton),
             ]
         } else {
-            [.button(moreButton), .search(searchField), .button(addButton)]
+            [.menuButton(moreButton), .search(searchField), .menuButton(addButton)]
         }
         return BarModel(
             items: items, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40, groupButtonSpacing: 6,
@@ -141,25 +141,29 @@ extension TaskViewList {
     /// for the width with none of this person's session on it, since nothing in the picker is hidden, highlighted or
     /// renamed: no menu, no count, no chevron, no grip, no guides, and an unnamed area's line alone, as outside edit
     /// mode (the owner's answer on #160, thread r4415002540); each sends `movePickerRowTapped`. The list being moved
-    /// and every list inside it cannot take it, and are drawn at 35 %; its present parent, a list or an area's line,
-    /// has the check, 15 pt bold in the accent, 20 from the edge; and an option is at least 36 high, so that an unnamed
-    /// area's line is no 17 pt target.
+    /// and every list inside it cannot take it, and are drawn at 35 %; its present parent, a list, an area's line or
+    /// the top level, has the check at its right and every other row the room for it (`Picker`); and an option is at
+    /// least 36 high, so that an unnamed area's line is no 17 pt target.
     static func movePicker(
         moving list: ReadRow, among rows: [ReadRow], in width: WindowWidth
     ) -> PickerModel<Model.Kind, UserAction> {
         let inside = subtree(of: list.id, in: rows)
         let options = rows.map { row in
+            let isChecked = row.id == list.parent
             let kind: Model.Kind = switch row.kind {
             case .area:
-                .area(areaLine(row, isEditing: false, draft: nil, tap: .movePickerRowTapped(row.id), menu: nil))
+                .area(areaLine(
+                    row, isEditing: false, draft: nil, end: Picker.lineEnd(isChecked: isChecked),
+                    tap: .movePickerRowTapped(row.id), menu: nil
+                ))
             case .list:
                 .list(listRow(
-                    row, in: width, guides: nil, accessories: accessories(count: "", chevron: nil, hasGrip: false),
-                    draft: nil, isSelected: false, tap: .movePickerRowTapped(row.id), menu: nil
+                    row, in: width, guides: nil, end: Picker.rowEnd(isChecked: isChecked), draft: nil,
+                    isSelected: false, tap: .movePickerRowTapped(row.id), menu: nil
                 ))
             }
             return PickerModel<Model.Kind, UserAction>.Option(
-                row: kind, isDisabled: inside.contains(row.id), isChecked: row.id == list.parent
+                row: kind, isDisabled: inside.contains(row.id), isChecked: isChecked
             )
         }
         return PickerModel(
@@ -170,87 +174,141 @@ extension TaskViewList {
                 icon: IconModel(icon: .divider, size: 15, weight: .regular, color: .ink2), tileSide: 30,
                 tileCornerRadius: 8, tileColor: .fill, tileToTitle: Phone.tileToTitle,
                 title: TextModel(text: "Top level", font: .rowTitle, color: .ink), leading: 20, height: Phone.rowHeight,
-                isChecked: list.parent == nil, action: .movePickerRowTapped(nil)
+                accessories: Picker.accessories(isChecked: list.parent == nil), cellWidth: Picker.checkCell,
+                endGap: Picker.endGap, isChecked: list.parent == nil, action: .movePickerRowTapped(nil)
             ),
-            options: options, check: IconModel(icon: .check, size: 15, weight: .bold, color: .accent),
-            checkTrailing: 20, hintGap: 8, minimumOptionHeight: 36, disabledOpacity: 0.35
+            options: options, hintGap: 8, minimumOptionHeight: 36, disabledOpacity: 0.35
         )
     }
 
     /// A list's row, the screen's and the picker's (`Phone.dc.html`, `.vrow`): 46 high, its tile at the indent of its
     /// drawn depth with the title in the ink 12 after it, or the field in the title's place, at least the title's 140
-    /// wide, 34 high, padded 10, rounded 10, on the surface with the accent's ring; a need of the tile, the gap, the
-    /// title's 140 and the accessories (`Phone.dc.html`, a row's `need`); on the fill colour where it is highlighted
-    /// and on the paper otherwise; and the guides it stands under, 1.5 pt in the line colour, with those a row one
-    /// level deeper stands under, its own and one under the centre of its tile. The picker draws no guides, so there
-    /// `guides` is nil and the row and a row under it stand under none.
+    /// wide, 34 high, padded 10, rounded 10; a need of the tile, the gap, the title's 140 and the accessories
+    /// (`Phone.dc.html`, a row's `need`); on the fill colour where it is highlighted and on the paper otherwise; the
+    /// guides it stands under, 1.5 pt in the line colour, with those a row one level deeper stands under, its own and
+    /// one under the centre of its tile; and what stands at its right, the tree's or the picker's. The picker draws no
+    /// guides, so there `guides` is nil and the row and a row under it stand under none.
     private static func listRow(
-        _ row: ReadRow, in width: WindowWidth, guides: [Double]?, accessories: ListRowModel<UserAction>.Accessories,
-        draft: String?, isSelected: Bool, tap: UserAction, menu: MenuModel<UserAction>?
+        _ row: ReadRow, in width: WindowWidth, guides: [Double]?, end: RowEnd, draft: String?, isSelected: Bool,
+        tap: UserAction, menu: MenuModel<UserAction>?
     ) -> ListRowModel<UserAction> {
         let leading = Phone.indent.leading(atDepth: row.depth)
         let tile = row.tile(in: width)
         let font = row.titleFont(in: width)
-        let field = draft.map { draft in
-            FieldModel(
-                text: draft, placeholder: "Title", font: font, color: .ink, background: .surface,
-                minimumWidth: Phone.titleWidth, height: 34, padding: 10, cornerRadius: 10, ring: Phone.fieldRing
-            )
-        }
         return ListRowModel(
             height: Phone.rowHeight, leading: leading, tile: tile, tileToTitle: Phone.tileToTitle,
-            title: TextModel(text: row.title, font: font, color: .ink), field: field,
-            need: leading + tile.side + Phone.tileToTitle + Phone.titleWidth + accessories.width,
+            title: TextModel(text: row.title, font: font, color: .ink),
+            field: draft.map {
+                titleField(
+                    $0, placeholder: "Title", font: font, minimumWidth: Phone.titleWidth, height: 34, padding: 10,
+                    cornerRadius: 10
+                )
+            },
+            need: leading + tile.side + Phone.tileToTitle + Phone.titleWidth + end.width,
             background: isSelected ? .fill : .paper, guides: guides ?? [],
             childGuides: guides.map { $0 + [leading + tile.side / 2] } ?? [],
-            guide: StrokeModel(color: .line, width: 1.5, dash: []), accessories: accessories, tap: tap, menu: menu
+            guide: StrokeModel(color: .line, width: 1.5, dash: []), accessories: end.accessories,
+            fadeWidth: end.fadeWidth, countMinimumWidth: Phone.countWidth, cellWidth: end.cellWidth, endGap: end.endGap,
+            accessoriesWidth: end.width, tap: tap, menu: menu
         )
     }
 
-    /// What stands at a list's row's right (`Phone.dc.html`, the row's sticky end): the fade of 10, the count in ink2
-    /// at least 20 wide, the chevron's cell of 36 on every row, the grip's cell of 36 more where the row drags, and 4
-    /// at the end, in the 72 pt of the row's need, which leaves 2 to spare, and 36 more with the grip.
-    private static func accessories(
-        count: String, chevron: ListRowModel<UserAction>.Chevron?, hasGrip: Bool
-    ) -> ListRowModel<UserAction>.Accessories {
-        ListRowModel.Accessories(
-            count: TextModel(text: count, font: .count, color: .ink2), countMinimumWidth: 20, chevron: chevron,
-            grip: hasGrip ? Phone.grip : nil, cellWidth: Phone.cellWidth, fadeWidth: 10, endGap: 4,
-            width: 72 + (hasGrip ? Phone.cellWidth : 0)
+    /// What stands at a list's row's right, and the sizes it stands by (`ListRowModel`): the tree's (`rowEnd`) or the
+    /// picker's (`Picker.rowEnd`).
+    private struct RowEnd {
+        let accessories: [AccessoryModel<UserAction>]
+        let fadeWidth: Double
+        let cellWidth: Double
+        let endGap: Double
+
+        /// How much of the row they take, which its need counts.
+        let width: Double
+    }
+
+    /// What stands at a list's row's right in the tree (`Phone.dc.html`, the row's sticky end): over a fade of 10, the
+    /// count in ink2 against the right of a cell at least 20 wide, or the cell kept empty where the row has no count;
+    /// the chevron in a cell of 36, or the cell kept empty on a list with no lists inside it, so that the counts stand
+    /// in one column; the grip in a cell of 36 more where the row drags; and 4 at the end, in the 72 pt of the row's
+    /// need, which leaves 2 to spare, and 36 more with the grip.
+    private static func rowEnd(count: Int?, chevron: AccessoryModel<UserAction>.Chevron?, hasGrip: Bool) -> RowEnd {
+        let counted: AccessoryModel<UserAction> = if let count {
+            .count(TextModel(text: String(count), font: .count, color: .ink2))
+        } else {
+            .space(Phone.countWidth)
+        }
+        let folds: AccessoryModel<UserAction> = if let chevron { .chevron(chevron) } else { .space(Phone.cellWidth) }
+        return RowEnd(
+            accessories: [counted, folds] + (hasGrip ? [.grip(Phone.grip)] : []), fadeWidth: 10,
+            cellWidth: Phone.cellWidth, endGap: 4, width: 72 + (hasGrip ? Phone.cellWidth : 0)
         )
     }
 
     /// The chevron of a list with lists inside it: 13 pt semibold in ink2, down while its branch is open and turned a
     /// quarter left while it is folded, turning on the popover's motion, saying what a tap on it will do, and sending
     /// the tap that folds or unfolds the branch.
-    private static func chevron(_ id: ViewID, isFolded: Bool) -> ListRowModel<UserAction>.Chevron {
-        ListRowModel.Chevron(
+    private static func chevron(_ id: ViewID, isFolded: Bool) -> AccessoryModel<UserAction>.Chevron {
+        AccessoryModel.Chevron(
             icon: IconModel(icon: .chevron, size: 13, weight: .semibold, color: .ink2), rotation: isFolded ? -90 : 0,
             animation: .popover, accessibilityLabel: isFolded ? "Expand" : "Collapse", action: .disclosureTapped(id)
         )
     }
 
     /// An area's line (`Phone.dc.html`, the area's row): 20 in, its label in ink2, or the field in the label's place,
-    /// 160 by 28, padded 8, rounded 8, on the surface with the accent's ring, then the line, 1 pt in the line colour,
-    /// then the grip where the line drags, 10 apart; 12 short of the edge after the grip and 20 after the line alone;
-    /// 36 high with a label or a field and 17 with the line alone. The label is the area's name, and an unnamed area
-    /// has none, the line alone being the whole of how it looks, but in edit mode, where it reads "Area", the label a
-    /// tap renames it by (Lists screen spec, sections 1 and 3).
+    /// 160 by 28, padded 8, rounded 8, then 10 after it the line, 1 pt in the line colour, and what stands at its
+    /// right, the tree's or the picker's; 36 high with a label or a field and 17 with the line alone. The label is the
+    /// area's name, and an unnamed area has none, the line alone being the whole of how it looks, but in edit mode,
+    /// where it reads "Area", the label a tap renames it by (Lists screen spec, sections 1 and 3).
     private static func areaLine(
-        _ row: ReadRow, isEditing: Bool, draft: String?, tap: UserAction, menu: MenuModel<UserAction>?
+        _ row: ReadRow, isEditing: Bool, draft: String?, end: LineEnd, tap: UserAction, menu: MenuModel<UserAction>?
     ) -> AreaLineModel<UserAction> {
         let label: String? = if !row.title.isEmpty { row.title } else if isEditing { "Area" } else { nil }
-        let field = draft.map { draft in
-            FieldModel(
-                text: draft, placeholder: "Area name", font: .areaLabel, color: .ink, background: .surface,
-                minimumWidth: 160, height: 28, padding: 8, cornerRadius: 8, ring: Phone.fieldRing
+        let field = draft.map {
+            titleField(
+                $0, placeholder: "Area name", font: .areaLabel, minimumWidth: 160, height: 28, padding: 8,
+                cornerRadius: 8
             )
         }
         return AreaLineModel(
-            height: label == nil && field == nil ? 17 : 36, leading: 20, trailing: isEditing ? 12 : 20, spacing: 10,
+            height: label == nil && field == nil ? 17 : 36, leading: 20, spacing: 10,
             label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: field,
-            line: StrokeModel(color: .line, width: 1, dash: []), grip: isEditing ? Phone.grip : nil, tap: tap,
-            menu: menu
+            line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: end.lineToAccessories,
+            accessories: end.accessories, cellWidth: end.cellWidth, endGap: end.endGap, tap: tap, menu: menu
+        )
+    }
+
+    /// What stands at an area's line's right, and the sizes it stands by (`AreaLineModel`): the tree's (`lineEnd`) or
+    /// the picker's (`Picker.lineEnd`).
+    private struct LineEnd {
+        let lineToAccessories: Double
+        let accessories: [AccessoryModel<UserAction>]
+        let cellWidth: Double
+        let endGap: Double
+    }
+
+    /// What stands at an area's line's right in the tree: nothing, the line ending 20 short of the edge, and in edit
+    /// mode the grip, 10 after the line in a cell of 22, as wide as Task 7 drew its 18 pt glyph, and 12 short of the
+    /// edge.
+    private static func lineEnd(isEditing: Bool) -> LineEnd {
+        if isEditing {
+            LineEnd(lineToAccessories: 10, accessories: [.grip(Phone.grip)], cellWidth: 22, endGap: 12)
+        } else {
+            LineEnd(lineToAccessories: 20, accessories: [], cellWidth: 22, endGap: 0)
+        }
+    }
+
+    /// The title field, where a name is typed, a list's row's title or an area's line's name: the draft, in the ink on
+    /// the surface with the accent's ring, 2 pt, at its minimum width and height, with its padding and its corners,
+    /// sending Return, Esc and a lost focus as the field's three actions. What it sends as the person types is its
+    /// view's to make from the text, `titleFieldChanged`.
+    private static func titleField(
+        _ draft: String, placeholder: String, font: DesignSystem.Font, minimumWidth: Double, height: Double,
+        padding: Double, cornerRadius: Double
+    ) -> TextFieldModel<UserAction> {
+        TextFieldModel(
+            text: draft, placeholder: placeholder, font: font, color: .ink, background: .surface,
+            minimumWidth: minimumWidth, height: height, padding: padding, cornerRadius: cornerRadius,
+            ring: StrokeModel(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
+            cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
         )
     }
 
@@ -301,12 +359,14 @@ extension TaskViewList {
 
     /// "…", on the platform's container, a menu holding Edit alone for now (the owner, 2026-10-25), with the grip's
     /// glyph.
-    private static let moreButton = ButtonModel<UserAction>(
-        icon: IconModel(icon: .ellipsis, size: 20, weight: .semibold, color: .ink), title: nil,
-        accessibilityLabel: "More", fill: .container,
-        press: .menu(MenuModel(sections: [
+    private static let moreButton = MenuButtonModel<UserAction>(
+        label: ButtonLabelModel(
+            icon: IconModel(icon: .ellipsis, size: 20, weight: .semibold, color: .ink), title: nil,
+            accessibilityLabel: "More", fill: .container
+        ),
+        menu: MenuModel(sections: [
             .init(items: [.init(title: "Edit", icon: .grip, isDestructive: false, action: .editMenuItemChosen)]),
-        ]))
+        ])
     )
 
     /// The search capsule: its magnifier, "Search" and the microphone in ink2, the glyphs 17 pt and the microphone in a
@@ -321,22 +381,27 @@ extension TaskViewList {
 
     /// "+", on the accent, a menu that makes a task, a list or an area: where each goes, and that a task is quick
     /// entry's, is the module's to decide (Lists screen spec, section 7).
-    private static let addButton = ButtonModel<UserAction>(
-        icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
-        accessibilityLabel: "Add", fill: .color(.accent),
-        press: .menu(MenuModel(sections: [
+    private static let addButton = MenuButtonModel<UserAction>(
+        label: ButtonLabelModel(
+            icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
+            accessibilityLabel: "Add", fill: .color(.accent)
+        ),
+        menu: MenuModel(sections: [
             .init(items: [
                 .init(title: "New Task", icon: .checkCircle, isDestructive: false, action: .newTaskMenuItemChosen),
                 .init(title: Words.newList, icon: .list, isDestructive: false, action: .newListMenuItemChosen(in: nil)),
                 .init(title: Words.newArea, icon: .divider, isDestructive: false, action: .newAreaMenuItemChosen),
             ]),
-        ]))
+        ])
     )
 
     /// Done, on the accent, the check that ends edit mode.
     private static let doneButton = ButtonModel<UserAction>(
-        icon: IconModel(icon: .check, size: 20, weight: .bold, color: .onAccent), title: nil,
-        accessibilityLabel: "Done", fill: .color(.accent), press: .action(.doneButtonTapped)
+        label: ButtonLabelModel(
+            icon: IconModel(icon: .check, size: 20, weight: .bold, color: .onAccent), title: nil,
+            accessibilityLabel: "Done", fill: .color(.accent)
+        ),
+        action: .doneButtonTapped
     )
 
     /// One half of the edit bar's group, a plus and the word in the accent, which makes a list at the end of the tree
@@ -345,9 +410,12 @@ extension TaskViewList {
         _ word: String, saying accessibilityLabel: String, _ action: UserAction
     ) -> ButtonModel<UserAction> {
         ButtonModel(
-            icon: IconModel(icon: .plus, size: 15, weight: .semibold, color: .accent),
-            title: TextModel(text: word, font: .barLabel, color: .accent), accessibilityLabel: accessibilityLabel,
-            fill: .container, press: .action(action)
+            label: ButtonLabelModel(
+                icon: IconModel(icon: .plus, size: 15, weight: .semibold, color: .accent),
+                title: TextModel(text: word, font: .barLabel, color: .accent), accessibilityLabel: accessibilityLabel,
+                fill: .container
+            ),
+            action: action
         )
     }
 
@@ -368,7 +436,10 @@ extension TaskViewList {
         /// width scrolls sideways to give it (`Phone.dc.html`, a row's `need`).
         static let titleWidth: Double = 140
 
-        /// The width of the chevron's cell and of the grip's.
+        /// The least width of a row's count's cell, which a row with no count keeps empty.
+        static let countWidth: Double = 20
+
+        /// The width of a row's chevron's cell and of its grip's.
         static let cellWidth: Double = 36
 
         /// The size of the grip's glyph, a row's, a line's and a lifted row's card's.
@@ -376,9 +447,37 @@ extension TaskViewList {
 
         /// The grip of a row and of a line in edit mode, which says that it drags (Lists screen spec, section 7).
         static let grip = IconModel(icon: .grip, size: gripSize, weight: .regular, color: .ink3)
+    }
 
-        /// The ring around a field, 2 pt in the accent.
-        static let fieldRing = StrokeModel(color: .accent, width: 2, dash: [])
+    /// The picker's check (`Phone.dc.html`, the Move to… sheet): 15 pt bold in the accent, in a cell of 18, the
+    /// canvas's check, which its glyph fills, 20 short of the right edge, at the right of the present choice, and the
+    /// cell kept empty at the right of every other row, so that the rows end in one column: "Top level", a list's row,
+    /// whose need counts the two, and an area's line, which ends 20 before them as Task 7 drew it.
+    private enum Picker {
+        static let checkCell: Double = 18
+        static let endGap: Double = 20
+
+        /// The check where a row is the present choice, and the room for it where it is not.
+        static func accessories(isChecked: Bool) -> [AccessoryModel<UserAction>] {
+            [isChecked ? .check(IconModel(icon: .check, size: 15, weight: .bold, color: .accent)) : .space(checkCell)]
+        }
+
+        /// What stands at a list's row's right in the picker: the check or its room, with no fade, since the row is
+        /// drawn whole and nothing runs under it.
+        static func rowEnd(isChecked: Bool) -> RowEnd {
+            RowEnd(
+                accessories: accessories(isChecked: isChecked), fadeWidth: 0, cellWidth: checkCell, endGap: endGap,
+                width: checkCell + endGap
+            )
+        }
+
+        /// What stands at an area's line's right in the picker: the check or its room, 20 after the line.
+        static func lineEnd(isChecked: Bool) -> LineEnd {
+            LineEnd(
+                lineToAccessories: 20, accessories: accessories(isChecked: isChecked), cellWidth: checkCell,
+                endGap: endGap
+            )
+        }
     }
 
     /// The words of the commands more than one control gives: New List and New Area, a menu's items and the edit

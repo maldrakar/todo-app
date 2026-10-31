@@ -7,67 +7,12 @@ import DesignSystem
 /// its platform needs to draw it, so a view decides nothing but what is the platform's: the gestures, the sideways
 /// scroll that keeps the accessories at the right edge of the screen, focus and Reduce Motion (ADR-0007, amendment of
 /// 2026-10-30).
-public struct ListRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
-    /// The chevron of a row with rows inside it, which folds and unfolds them: its glyph, turned by `rotation` degrees,
-    /// clockwise when positive, as CSS and SwiftUI turn, moving to a new turn on `animation`, the words it reads aloud,
-    /// which say what a tap on it will do, and the action the tap sends.
-    public struct Chevron: Equatable, Sendable {
-        public let icon: IconModel
-        public let rotation: Double
-        public let animation: DesignSystem.Animation
-        public let accessibilityLabel: String
-        public let action: Action
-
-        public init(
-            icon: IconModel, rotation: Double, animation: DesignSystem.Animation, accessibilityLabel: String,
-            action: Action
-        ) {
-            self.icon = icon
-            self.rotation = rotation
-            self.animation = animation
-            self.accessibilityLabel = accessibilityLabel
-            self.action = action
-        }
-    }
-
-    /// What stands at the right of the row (`Phone.dc.html`, the row's sticky end), in this order: a fade over
-    /// `fadeWidth` from clear to the row's background, so that a title running under them ends softly; the count, at
-    /// least `countMinimumWidth` wide and set against its right; a cell `cellWidth` wide on every row, which holds the
-    /// chevron where the row has one, so that the counts stand in one column; a cell as wide holding the grip where
-    /// there is one; and `endGap` at the end, all on the row's background and as high as the row, in points.
-    public struct Accessories: Equatable, Sendable {
-        /// The count of the row, finished, and empty where it is drawn as nothing.
-        public let count: TextModel
-        public let countMinimumWidth: Double
-
-        /// The chevron, and nil on a row with no rows inside it.
-        public let chevron: Chevron?
-
-        /// The grip, which says the row drags, and nil where it does not.
-        public let grip: IconModel?
-
-        public let cellWidth: Double
-        public let fadeWidth: Double
-        public let endGap: Double
-
-        /// How much of the row the accessories take, which the title leaves them: what they draw, with room to spare.
-        public let width: Double
-
-        public init(
-            count: TextModel, countMinimumWidth: Double, chevron: Chevron?, grip: IconModel?, cellWidth: Double,
-            fadeWidth: Double, endGap: Double, width: Double
-        ) {
-            self.count = count
-            self.countMinimumWidth = countMinimumWidth
-            self.chevron = chevron
-            self.grip = grip
-            self.cellWidth = cellWidth
-            self.fadeWidth = fadeWidth
-            self.endGap = endGap
-            self.width = width
-        }
-    }
-
+///
+/// A class, so that a row's kind, an option of a picker and every copy of either hold a reference to the row and not
+/// the row, some 750 bytes on wasm32, which a debug build puts on the stack at every copy and every comparison (the
+/// owner's 👍 on #163's thread r4431083210). Its `==` compares every stored property, as a struct's derived one would,
+/// and a test changes them one at a time, so that a property added later and left out of it fails.
+public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// The row's height, and where its tile starts, from the tree's leading edge, in points.
     public let height: Double
     public let leading: Double
@@ -83,7 +28,7 @@ public struct ListRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// The field the title is typed into while the row is being renamed, in the title's place, and nil while it is
     /// not: it fills the room between the tile and the accessories, and is never narrower than its minimum width, which
     /// `need` leaves it.
-    public let field: FieldModel?
+    public let field: TextFieldModel<Action>?
 
     /// How wide the tree must be for the row, from the tree's leading edge, in points: the tile at its leading edge,
     /// the gap, the least room its title takes, and the accessories. A tree too narrow for a row's need scrolls
@@ -101,7 +46,19 @@ public struct ListRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let childGuides: [Double]
     public let guide: StrokeModel
 
-    public let accessories: Accessories
+    /// What stands at the right of the row, in the order given (`Phone.dc.html`, the row's sticky end): over a fade
+    /// `fadeWidth` wide from clear to the row's background, so that a title running under them ends softly, a count set
+    /// against the right of a cell at least `countMinimumWidth` wide, a chevron, a grip or a check each centred in a
+    /// cell `cellWidth` wide, a space as wide as it says, and `endGap` at the end, all on the row's background and as
+    /// high as the row, in points.
+    public let accessories: [AccessoryModel<Action>]
+    public let fadeWidth: Double
+    public let countMinimumWidth: Double
+    public let cellWidth: Double
+    public let endGap: Double
+
+    /// How much of the row the accessories take, which the title leaves them: what they draw, with room to spare.
+    public let accessoriesWidth: Double
 
     /// What a tap on the row sends.
     public let tap: Action
@@ -115,13 +72,18 @@ public struct ListRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
         tile: TileModel,
         tileToTitle: Double,
         title: TextModel,
-        field: FieldModel?,
+        field: TextFieldModel<Action>?,
         need: Double,
         background: DesignSystem.Color,
         guides: [Double],
         childGuides: [Double],
         guide: StrokeModel,
-        accessories: Accessories,
+        accessories: [AccessoryModel<Action>],
+        fadeWidth: Double,
+        countMinimumWidth: Double,
+        cellWidth: Double,
+        endGap: Double,
+        accessoriesWidth: Double,
         tap: Action,
         menu: MenuModel<Action>?
     ) {
@@ -137,7 +99,35 @@ public struct ListRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
         self.childGuides = childGuides
         self.guide = guide
         self.accessories = accessories
+        self.fadeWidth = fadeWidth
+        self.countMinimumWidth = countMinimumWidth
+        self.cellWidth = cellWidth
+        self.endGap = endGap
+        self.accessoriesWidth = accessoriesWidth
         self.tap = tap
         self.menu = menu
+    }
+
+    public static func == (lhs: ListRowModel, rhs: ListRowModel) -> Bool {
+        if lhs === rhs { return true }
+        return lhs.height == rhs.height
+            && lhs.leading == rhs.leading
+            && lhs.tile == rhs.tile
+            && lhs.tileToTitle == rhs.tileToTitle
+            && lhs.title == rhs.title
+            && lhs.field == rhs.field
+            && lhs.need == rhs.need
+            && lhs.background == rhs.background
+            && lhs.guides == rhs.guides
+            && lhs.childGuides == rhs.childGuides
+            && lhs.guide == rhs.guide
+            && lhs.accessories == rhs.accessories
+            && lhs.fadeWidth == rhs.fadeWidth
+            && lhs.countMinimumWidth == rhs.countMinimumWidth
+            && lhs.cellWidth == rhs.cellWidth
+            && lhs.endGap == rhs.endGap
+            && lhs.accessoriesWidth == rhs.accessoriesWidth
+            && lhs.tap == rhs.tap
+            && lhs.menu == rhs.menu
     }
 }

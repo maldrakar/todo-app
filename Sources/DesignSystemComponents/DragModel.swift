@@ -5,7 +5,11 @@ import DesignSystem
 /// row would land and the card carried under the finger, both placed by the tree's `indent`, and the motion of the
 /// lift, the release and a move of the slot. The drag itself, which row lifts, where the slot stands and at which
 /// depth, is the platform's, since only the platform has the finger (the owner, 2026-10-30); this is its look.
-public struct DragModel: Equatable, Sendable {
+///
+/// A class, for the reason a list's row is one (`ListRowModel`): a screen's model holds it, every comparison of the
+/// screen's model compares it, and it is some 540 bytes on wasm32. Its `==` compares every stored property, and a test
+/// changes them one at a time.
+public final class DragModel: Equatable, Sendable {
     /// The slot where the lifted row would land: `height` high, its frame drawn `verticalInset` in from its top and
     /// from its bottom, from `inset` before the tile of the slot's depth to `trailingGap` short of the right edge of
     /// the tree on screen, its corners of `cornerRadius`, filled with `fill` and edged with `stroke`, in points. Behind
@@ -114,5 +118,13 @@ public struct DragModel: Equatable, Sendable {
         self.animation = animation
         self.slot = slot
         self.card = card
+    }
+
+    public static func == (lhs: DragModel, rhs: DragModel) -> Bool {
+        if lhs === rhs { return true }
+        return lhs.indent == rhs.indent
+            && lhs.animation == rhs.animation
+            && lhs.slot == rhs.slot
+            && lhs.card == rhs.card
     }
 }

@@ -83,11 +83,11 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let unnamed = try store.createView(NewTaskView(title: "", kind: .area))
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
-    #expect(listRow(inbox, in: list.model)?.accessories.count.text == "1", "the Inbox counts its task; this is the setup")
+    #expect(listRow(inbox, in: list.model).map(drawnCount) == "1", "the Inbox counts its task; this is the setup")
     #expect(areaLabels(in: list.model) == ["Work", nil])
     #expect(list.send(.action(.editMenuItemChosen)) == nil)
     #expect(list.model.isEditing)
-    #expect(list.model.rows.compactMap { listRow($0)?.accessories.count.text } == Array(repeating: "", count: 6))
+    #expect(list.model.rows.compactMap { listRow($0).map(drawnCount) } == Array(repeating: "", count: 6))
     #expect(areaLabels(in: list.model) == ["Work", "Area"])
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, unnamed])
     #expect(list.send(.action(.rowSelected(clients))) == nil)
@@ -121,7 +121,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     #expect(try store.view(BuiltInTaskViews.today)?.title == "Tomorrow")
     #expect(list.model == (try sidebarOn(inbox, in: store)))
     #expect(!list.model.isEditing)
-    #expect(listRow(inbox, in: list.model)?.accessories.count.text == "1")
+    #expect(listRow(inbox, in: list.model).map(drawnCount) == "1")
 }
 
 /// A name refused by Done keeps the field open on what was typed, as Return's refusal does, and edit mode with it,

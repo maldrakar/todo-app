@@ -50,21 +50,23 @@ private func lineMenu(_ id: ViewID) -> MenuModel<Action> {
     ])
 }
 
-/// The phone's accessories: a count, the chevron's cell, and the grip's in edit mode, 72 pt of a row's need and 36 more
-/// for the grip.
+/// The grip of a row and of a line in edit mode, 18 pt in ink3.
+private let grip = IconModel(icon: .grip, size: 18, weight: .regular, color: .ink3)
+
+/// The phone's accessories in the tree, in their order: the count in ink2, or its cell kept empty, 20 wide, where the
+/// row has none; the chevron, or its cell kept empty, 36 wide; and the grip in edit mode.
 private func accessories(
-    count: String, chevron: ListRowModel<Action>.Chevron?, isEditing: Bool = false
-) -> ListRowModel<Action>.Accessories {
-    .init(
-        count: TextModel(text: count, font: .count, color: .ink2), countMinimumWidth: 20, chevron: chevron,
-        grip: isEditing ? IconModel(icon: .grip, size: 18, weight: .regular, color: .ink3) : nil, cellWidth: 36,
-        fadeWidth: 10, endGap: 4, width: isEditing ? 108 : 72
-    )
+    count: String?, chevron: AccessoryModel<Action>.Chevron?, isEditing: Bool = false
+) -> [AccessoryModel<Action>] {
+    [
+        count.map { .count(TextModel(text: $0, font: .count, color: .ink2)) } ?? .space(20),
+        chevron.map { .chevron($0) } ?? .space(36),
+    ] + (isEditing ? [.grip(grip)] : [])
 }
 
 /// The chevron of a list with lists inside it, down while its branch is open and a quarter turned left while it is
 /// folded, saying what a tap will do.
-private func chevron(_ id: ViewID, folded: Bool) -> ListRowModel<Action>.Chevron {
+private func chevron(_ id: ViewID, folded: Bool) -> AccessoryModel<Action>.Chevron {
     .init(
         icon: IconModel(icon: .chevron, size: 13, weight: .semibold, color: .ink2), rotation: folded ? -90 : 0,
         animation: .popover, accessibilityLabel: folded ? "Expand" : "Collapse", action: .disclosureTapped(id)
@@ -74,67 +76,67 @@ private func chevron(_ id: ViewID, folded: Bool) -> ListRowModel<Action>.Chevron
 /// The guides under every list's row, 1.5 pt in the line colour.
 private let guide = StrokeModel(color: .line, width: 1.5, dash: [])
 
-/// The field on a list's row, in the row's title font.
-private func titleField(_ text: String, font: DesignSystem.Font) -> FieldModel {
-    FieldModel(
-        text: text, placeholder: "Title", font: font, color: .ink, background: .surface, minimumWidth: 140, height: 34,
-        padding: 10, cornerRadius: 10, ring: StrokeModel(color: .accent, width: 2, dash: [])
+/// A field a name is typed into, the title's on a list's row and the name's on an area's line: in the ink on the
+/// surface with the accent's ring, sending Return, Esc and a lost focus as the title field's.
+private func field(
+    _ text: String, placeholder: String, font: DesignSystem.Font, minimumWidth: Double, height: Double, padding: Double,
+    cornerRadius: Double
+) -> TextFieldModel<Action> {
+    TextFieldModel(
+        text: text, placeholder: placeholder, font: font, color: .ink, background: .surface, minimumWidth: minimumWidth,
+        height: height, padding: padding, cornerRadius: cornerRadius,
+        ring: StrokeModel(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
+        cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
     )
 }
 
-/// The kind of the row the model draws for a view, and nil when no row holds the view. A whole row is compared through
-/// its kind, which holds the row's model in a box, so that neither a test's frame nor its expectation holds a kilobyte
-/// of row: a debug build gives every copy a stack slot of its own, and the wasm32 stack is 64 KiB. For the same reason
-/// the expected rows are built in the helpers below.
-private func kind(of id: ViewID, in model: TaskViewList.Model) -> TaskViewList.Model.Kind? {
-    model.rows.first { $0.id == id }?.kind
+/// The field on a list's row, in the row's title font: 140 by 34, padded 10 and rounded 10, with the canvas's
+/// placeholder.
+private func titleField(_ text: String, font: DesignSystem.Font) -> TextFieldModel<Action> {
+    field(text, placeholder: "Title", font: font, minimumWidth: 140, height: 34, padding: 10, cornerRadius: 10)
 }
 
 /// A list's row whole as the phone draws it outside edit mode, but for what a test spells: its title and title font,
 /// its tile, where it starts, its need, its guides, its count and its chevron. It is 46 high with the title 12 after
-/// the tile in the ink, on the paper with no field, under guides 1.5 pt in the line colour, and a tap selects it; its
-/// menu is a list's on a phone.
+/// the tile in the ink, on the paper with no field, under guides 1.5 pt in the line colour, its accessories over a fade
+/// of 10, the count's cell at least 20 wide and the others 36, with 4 at the end, in the 72 of its need, and a tap
+/// selects it; its menu is a list's on a phone.
 private func phoneRow(
     _ id: ViewID, title: String, font: DesignSystem.Font, tile: TileModel, leading: Double, need: Double,
-    guides: [Double], childGuides: [Double], count: String, chevron: ListRowModel<Action>.Chevron?
-) -> TaskViewList.Model.Kind {
-    .list(ListRowModel(
+    guides: [Double], childGuides: [Double], count: String?, chevron: AccessoryModel<Action>.Chevron?
+) -> ListRowModel<Action> {
+    ListRowModel(
         height: 46, leading: leading, tile: tile, tileToTitle: 12, title: TextModel(text: title, font: font, color: .ink),
         field: nil, need: need, background: .paper, guides: guides, childGuides: childGuides, guide: guide,
-        accessories: accessories(count: count, chevron: chevron), tap: .rowSelected(id),
-        menu: listMenu(id, openInNewWindow: false)
-    ))
+        accessories: accessories(count: count, chevron: chevron), fadeWidth: 10, countMinimumWidth: 20, cellWidth: 36,
+        endGap: 4, accessoriesWidth: 72, tap: .rowSelected(id), menu: listMenu(id, openInNewWindow: false)
+    )
 }
 
 /// The chevron the model draws on a view's row, and nil where it draws none.
-private func chevron(of id: ViewID, in model: TaskViewList.Model) -> ListRowModel<Action>.Chevron? {
-    listRow(id, in: model)?.accessories.chevron
+private func chevron(of id: ViewID, in model: TaskViewList.Model) -> AccessoryModel<Action>.Chevron? {
+    listRow(id, in: model).flatMap(drawnChevron)
 }
 
-/// An area's line whole as the phone draws it, but for what a test spells: its height, how far short of the edge it
-/// ends, its label, the text of its field where one is open, whether it has the grip, 18 pt in ink3, and its menu. It
-/// starts 20 in, its parts 10 apart, the label in the area label's font in ink2, the line 1 pt in the line colour, and
-/// a tap on it is sent as the row's selection.
+/// An area's line whole as the phone draws it, but for what a test spells: its height, its label, the text of its
+/// field where one is open, whether it has the grip, and its menu. It starts 20 in, the label in the area label's font
+/// in ink2 10 before the line, 1 pt in the line colour, and a tap on it is sent as the row's selection; the line ends
+/// 20 short of the edge, and with the grip 10 before it, in a cell of 22, 12 short of the edge.
 private func phoneLine(
-    _ id: ViewID, height: Double, trailing: Double, label: String?, fieldText: String?, hasGrip: Bool,
-    menu: MenuModel<Action>?
-) -> TaskViewList.Model.Kind {
-    .area(AreaLineModel(
-        height: height, leading: 20, trailing: trailing, spacing: 10,
-        label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: fieldText.map(areaField),
-        line: StrokeModel(color: .line, width: 1, dash: []),
-        grip: hasGrip ? IconModel(icon: .grip, size: 18, weight: .regular, color: .ink3) : nil, tap: .rowSelected(id),
-        menu: menu
-    ))
+    _ id: ViewID, height: Double, label: String?, fieldText: String?, hasGrip: Bool, menu: MenuModel<Action>?
+) -> AreaLineModel<Action> {
+    AreaLineModel(
+        height: height, leading: 20, spacing: 10,
+        label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: fieldText.map(areaField), line: StrokeModel(color: .line, width: 1, dash: []),
+        lineToAccessories: hasGrip ? 10 : 20, accessories: hasGrip ? [.grip(grip)] : [], cellWidth: 22,
+        endGap: hasGrip ? 12 : 0, tap: .rowSelected(id), menu: menu
+    )
 }
 
-/// The field on an area's line: 160 by 28, padded 8 and rounded 8, the area label's font in the ink on the surface,
-/// with the accent's ring and the canvas's placeholder.
-private func areaField(_ text: String) -> FieldModel {
-    FieldModel(
-        text: text, placeholder: "Area name", font: .areaLabel, color: .ink, background: .surface, minimumWidth: 160,
-        height: 28, padding: 8, cornerRadius: 8, ring: StrokeModel(color: .accent, width: 2, dash: [])
-    )
+/// The field on an area's line: 160 by 28, padded 8 and rounded 8, in the area label's font, with the canvas's
+/// placeholder.
+private func areaField(_ text: String) -> TextFieldModel<Action> {
+    field(text, placeholder: "Area name", font: .areaLabel, minimumWidth: 160, height: 28, padding: 8, cornerRadius: 8)
 }
 
 /// A root list's row and a nested one's carry the phone's numbers whole (`Phone.dc.html`; Task 7's views): 46 high,
@@ -148,12 +150,12 @@ private func areaField(_ text: String) -> FieldModel {
     let projects = try store.createView(NewTaskView(title: "Projects", color: .teal, icon: "folder"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects, icon: "house", filter: .status([.open])))
     let model = try sidebar(store).model
-    #expect(kind(of: projects, in: model) == phoneRow(
+    #expect(listRow(projects, in: model) == phoneRow(
         projects, title: "Projects", font: .rowTitleEmphasized,
         tile: TileModel(color: .teal, icon: .folder, side: 30, cornerRadius: 8, glyphSize: 19), leading: 20, need: 274,
         guides: [], childGuides: [35], count: "1", chevron: chevron(projects, folded: false)
     ))
-    #expect(kind(of: home, in: model) == phoneRow(
+    #expect(listRow(home, in: model) == phoneRow(
         home, title: "Home", font: .nestedRowTitle,
         tile: TileModel(color: .stone, icon: .house, side: 26, cornerRadius: 7, glyphSize: 16), leading: 42, need: 292,
         guides: [35], childGuides: [35, 55], count: "1", chevron: nil
@@ -197,32 +199,33 @@ private func areaField(_ text: String) -> FieldModel {
     #expect(chevron(of: projects, in: list.model) == chevron(projects, folded: false))
 }
 
-/// An area's line on the phone (`Phone.dc.html`, the area's row): 20 in, 10 between its parts and 20 short of the edge,
-/// a named area's label in ink2 on a line 36 high and an unnamed area's line alone, 17 high, each with the menu of a
-/// line. Renamed, the field takes the label's place, 160 by 28 on the surface with the accent's ring, and the line is
-/// 36 high. In edit mode the grip comes, 12 short of the edge, no menu, and an unnamed area is labelled "Area".
+/// An area's line on the phone (`Phone.dc.html`, the area's row): 20 in, the label 10 before the line and the line 20
+/// short of the edge, a named area's label in ink2 on a line 36 high and an unnamed area's line alone, 17 high, each
+/// with the menu of a line. Renamed, the field takes the label's place, 160 by 28 on the surface with the accent's
+/// ring, and the line is 36 high. In edit mode the grip comes, 12 short of the edge, no menu, and an unnamed area is
+/// labelled "Area".
 @Test func anAreasLineUnnamedNamedRenamingAndInEditMode() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let unnamed = try store.createView(NewTaskView(title: "", kind: .area))
     let list = try sidebar(store)
-    #expect(kind(of: work, in: list.model) == phoneLine(
-        work, height: 36, trailing: 20, label: "Work", fieldText: nil, hasGrip: false, menu: lineMenu(work)
+    #expect(areaLine(work, in: list.model) == phoneLine(
+        work, height: 36, label: "Work", fieldText: nil, hasGrip: false, menu: lineMenu(work)
     ))
-    #expect(kind(of: unnamed, in: list.model) == phoneLine(
-        unnamed, height: 17, trailing: 20, label: nil, fieldText: nil, hasGrip: false, menu: lineMenu(unnamed)
+    #expect(areaLine(unnamed, in: list.model) == phoneLine(
+        unnamed, height: 17, label: nil, fieldText: nil, hasGrip: false, menu: lineMenu(unnamed)
     ))
     _ = list.send(.action(.renameMenuItemChosen(unnamed)))
-    #expect(kind(of: unnamed, in: list.model) == phoneLine(
-        unnamed, height: 36, trailing: 20, label: nil, fieldText: "", hasGrip: false, menu: lineMenu(unnamed)
+    #expect(areaLine(unnamed, in: list.model) == phoneLine(
+        unnamed, height: 36, label: nil, fieldText: "", hasGrip: false, menu: lineMenu(unnamed)
     ))
     _ = list.send(.action(.titleFieldCancelled))
     _ = list.send(.action(.editMenuItemChosen))
-    #expect(kind(of: unnamed, in: list.model) == phoneLine(
-        unnamed, height: 36, trailing: 12, label: "Area", fieldText: nil, hasGrip: true, menu: nil
+    #expect(areaLine(unnamed, in: list.model) == phoneLine(
+        unnamed, height: 36, label: "Area", fieldText: nil, hasGrip: true, menu: nil
     ))
-    #expect(kind(of: work, in: list.model) == phoneLine(
-        work, height: 36, trailing: 12, label: "Work", fieldText: nil, hasGrip: true, menu: nil
+    #expect(areaLine(work, in: list.model) == phoneLine(
+        work, height: 36, label: "Work", fieldText: nil, hasGrip: true, menu: nil
     ))
 }
 
@@ -240,16 +243,18 @@ private func areaField(_ text: String) -> FieldModel {
     #expect(listRow(clients, in: mac)?.menu == listMenu(clients, openInNewWindow: true))
     #expect(areaLine(work, in: phone)?.menu == lineMenu(work))
     #expect(areaLine(work, in: mac)?.menu == lineMenu(work))
-    #expect(listRow(inbox, in: mac)?.accessories.count.text == "1", "the Inbox counts its task; this is the setup")
+    #expect(listRow(inbox, in: mac).map(drawnCount) == "1", "the Inbox counts its task; this is the setup")
 
     let editing = try sidebar(store, supportsMultipleWindows: true)
     _ = editing.send(.action(.editMenuItemChosen))
     let lists = editing.model.rows.compactMap(listRow)
     #expect(lists.map(\.menu) == Array(repeating: nil, count: 6))
-    #expect(lists.map(\.accessories) == Array(repeating: accessories(count: "", chevron: nil, isEditing: true), count: 6))
+    let gripped = accessories(count: nil, chevron: nil, isEditing: true)
+    #expect(lists.map(\.accessories) == Array(repeating: gripped, count: 6), "no count, no chevron, and the grip")
+    #expect(lists.map(\.accessoriesWidth) == Array(repeating: 108, count: 6), "72 and the grip's cell of 36")
     #expect(lists.map(\.need) == Array(repeating: 310, count: 6), "20 + 30 + 12 + 140 + 108, the grip's cell among them")
     #expect(areaLine(work, in: editing.model)?.menu == nil)
-    #expect(areaLine(work, in: editing.model)?.grip == IconModel(icon: .grip, size: 18, weight: .regular, color: .ink3))
+    #expect(areaLine(work, in: editing.model)?.accessories == [.grip(grip)])
 }
 
 /// The bar at the bottom of the screen (`Phone.dc.html`, the bar): outside edit mode "…" on the glass with Edit, the
@@ -266,16 +271,18 @@ private func areaField(_ text: String) -> FieldModel {
     #expect(list.model.bar == barOutsideEditMode())
 }
 
-/// The bar outside edit mode: "…" on the platform's container, a menu holding Edit; the search capsule, its magnifier,
-/// "Search" and microphone in ink2, the glyphs 17 pt and the microphone in a 36 cell, 8 apart, 15 in and 6 at the end;
-/// and "+" on the accent, a menu holding New Task, New List and New Area.
+/// The bar outside edit mode: "…" on the platform's container, a menu button holding Edit; the search capsule, its
+/// magnifier, "Search" and microphone in ink2, the glyphs 17 pt and the microphone in a 36 cell, 8 apart, 15 in and 6 at the end;
+/// and "+" on the accent, a menu button holding New Task, New List and New Area.
 private func barOutsideEditMode() -> BarModel<Action> {
-    let more = ButtonModel<Action>(
-        icon: IconModel(icon: .ellipsis, size: 20, weight: .semibold, color: .ink), title: nil, accessibilityLabel: "More",
-        fill: .container,
-        press: .menu(MenuModel(sections: [
+    let more = MenuButtonModel<Action>(
+        label: ButtonLabelModel(
+            icon: IconModel(icon: .ellipsis, size: 20, weight: .semibold, color: .ink), title: nil,
+            accessibilityLabel: "More", fill: .container
+        ),
+        menu: MenuModel(sections: [
             .init(items: [.init(title: "Edit", icon: .grip, isDestructive: false, action: .editMenuItemChosen)]),
-        ]))
+        ])
     )
     let search = SearchFieldModel(
         placeholder: TextModel(text: "Search", font: .search, color: .ink2),
@@ -283,18 +290,20 @@ private func barOutsideEditMode() -> BarModel<Action> {
         trailingIcon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), trailingCell: 36,
         spacing: 8, leadingPadding: 15, trailingPadding: 6
     )
-    let add = ButtonModel<Action>(
-        icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
-        accessibilityLabel: "Add", fill: .color(.accent),
-        press: .menu(MenuModel(sections: [
+    let add = MenuButtonModel<Action>(
+        label: ButtonLabelModel(
+            icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
+            accessibilityLabel: "Add", fill: .color(.accent)
+        ),
+        menu: MenuModel(sections: [
             .init(items: [
                 .init(title: "New Task", icon: .checkCircle, isDestructive: false, action: .newTaskMenuItemChosen),
                 .init(title: "New List", icon: .list, isDestructive: false, action: .newListMenuItemChosen(in: nil)),
                 .init(title: "New Area", icon: .divider, isDestructive: false, action: .newAreaMenuItemChosen),
             ]),
-        ]))
+        ])
     )
-    return phoneBar([.button(more), .search(search), .button(add)])
+    return phoneBar([.menuButton(more), .search(search), .menuButton(add)])
 }
 
 /// The bar in edit mode: "+ List" and "+ Area" on one container, each a 15 pt plus in the accent 6 before its word,
@@ -302,14 +311,20 @@ private func barOutsideEditMode() -> BarModel<Action> {
 private func barInEditMode() -> BarModel<Action> {
     func groupButton(_ word: String, saying label: String, _ action: Action) -> ButtonModel<Action> {
         ButtonModel(
-            icon: IconModel(icon: .plus, size: 15, weight: .semibold, color: .accent),
-            title: TextModel(text: word, font: .barLabel, color: .accent), accessibilityLabel: label, fill: .container,
-            press: .action(action)
+            label: ButtonLabelModel(
+                icon: IconModel(icon: .plus, size: 15, weight: .semibold, color: .accent),
+                title: TextModel(text: word, font: .barLabel, color: .accent), accessibilityLabel: label,
+                fill: .container
+            ),
+            action: action
         )
     }
     let done = ButtonModel<Action>(
-        icon: IconModel(icon: .check, size: 20, weight: .bold, color: .onAccent), title: nil, accessibilityLabel: "Done",
-        fill: .color(.accent), press: .action(.doneButtonTapped)
+        label: ButtonLabelModel(
+            icon: IconModel(icon: .check, size: 20, weight: .bold, color: .onAccent), title: nil,
+            accessibilityLabel: "Done", fill: .color(.accent)
+        ),
+        action: .doneButtonTapped
     )
     return phoneBar([
         .group([
@@ -387,8 +402,9 @@ private func phoneDrag() -> DragModel {
 /// The picker of Move to… whole (`Phone.dc.html`, the Move to… sheet): its title naming the list, the hint, Cancel,
 /// "Top level" on a tile of the fill colour with the divider glyph, and the whole tree, each row drawn as the screen's
 /// with no menu, no count, no chevron, no grip, no highlight and no guides, sending `movePickerRowTapped`; the list moved
-/// and the lists inside it disabled, and its parent checked. An unnamed area's line stands alone in the picker, in edit
-/// mode too, where the screen labels it (the owner's answer on #160, thread r4415002540).
+/// and the lists inside it disabled, and its parent checked, the check 15 pt bold in the accent in a cell of 18, 20
+/// short of the edge, and the cell kept empty on every other row, "Top level" among them. An unnamed area's line stands
+/// alone in the picker, in edit mode too, where the screen labels it (the owner's answer on #160, thread r4415002540).
 @Test func thePickerWhole() throws {
     let store = try makeStore()
     for id in builtIns { try store.delete(view: id) }
@@ -411,19 +427,22 @@ private func phoneDrag() -> DragModel {
 }
 
 /// The picker of Move to… on Home, in the tree of the test above: Projects checked, Home disabled, Errands, the
-/// unnamed area's line alone and Clients under it, each a row of the screen's with nothing of the session on it.
+/// unnamed area's line alone and Clients under it, each a row of the screen's with nothing of the session on it, and at
+/// its right the check or the cell kept for it, 18 wide and 20 short of the edge, which a row's need counts.
 private func homesPicker(
     projects: ViewID, home: ViewID, errands: ViewID, area: ViewID, clients: ViewID
 ) -> PickerModel<TaskViewList.Model.Kind, Action> {
+    let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
     func option(
-        _ id: ViewID, _ title: String, font: DesignSystem.Font, tile: TileModel, depth: Int
+        _ id: ViewID, _ title: String, font: DesignSystem.Font, tile: TileModel, depth: Int, isChecked: Bool = false
     ) -> TaskViewList.Model.Kind {
         let leading = 20 + 22 * Double(depth)
         return .list(ListRowModel(
             height: 46, leading: leading, tile: tile, tileToTitle: 12,
-            title: TextModel(text: title, font: font, color: .ink), field: nil, need: leading + tile.side + 12 + 140 + 72,
+            title: TextModel(text: title, font: font, color: .ink), field: nil, need: leading + tile.side + 12 + 140 + 38,
             background: .paper, guides: [], childGuides: [], guide: guide,
-            accessories: accessories(count: "", chevron: nil), tap: .movePickerRowTapped(id), menu: nil
+            accessories: [isChecked ? .check(check) : .space(18)], fadeWidth: 0, countMinimumWidth: 20, cellWidth: 18,
+            endGap: 20, accessoriesWidth: 38, tap: .movePickerRowTapped(id), menu: nil
         ))
     }
     let rootTile = { (color: DesignSystem.Color.Components.Tile, icon: DesignSystem.Icon) in
@@ -435,11 +454,15 @@ private func homesPicker(
         topLevel: .init(
             icon: IconModel(icon: .divider, size: 15, weight: .regular, color: .ink2), tileSide: 30, tileCornerRadius: 8,
             tileColor: .fill, tileToTitle: 12, title: TextModel(text: "Top level", font: .rowTitle, color: .ink),
-            leading: 20, height: 46, isChecked: false, action: .movePickerRowTapped(nil)
+            leading: 20, height: 46, accessories: [.space(18)], cellWidth: 18, endGap: 20, isChecked: false,
+            action: .movePickerRowTapped(nil)
         ),
         options: [
             .init(
-                row: option(projects, "Projects", font: .rowTitleEmphasized, tile: rootTile(.teal, .folder), depth: 0),
+                row: option(
+                    projects, "Projects", font: .rowTitleEmphasized, tile: rootTile(.teal, .folder), depth: 0,
+                    isChecked: true
+                ),
                 isDisabled: false, isChecked: true
             ),
             .init(
@@ -455,9 +478,9 @@ private func homesPicker(
             ),
             .init(
                 row: .area(AreaLineModel(
-                    height: 17, leading: 20, trailing: 20, spacing: 10, label: nil, field: nil,
-                    line: StrokeModel(color: .line, width: 1, dash: []), grip: nil, tap: .movePickerRowTapped(area),
-                    menu: nil
+                    height: 17, leading: 20, spacing: 10, label: nil, field: nil,
+                    line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20, accessories: [.space(18)],
+                    cellWidth: 18, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
                 )),
                 isDisabled: false, isChecked: false
             ),
@@ -466,8 +489,7 @@ private func homesPicker(
                 isDisabled: false, isChecked: false
             ),
         ],
-        check: IconModel(icon: .check, size: 15, weight: .bold, color: .accent), checkTrailing: 20, hintGap: 8,
-        minimumOptionHeight: 36, disabledOpacity: 0.35
+        hintGap: 8, minimumOptionHeight: 36, disabledOpacity: 0.35
     )
 }
 
@@ -495,14 +517,14 @@ private func homesPicker(
     let projects = try store.createView(NewTaskView(title: "Projects", color: .teal, icon: "folder"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects, icon: "house"))
     let model = try sidebar(store, width: .wide).model
-    #expect(kind(of: projects, in: model) == phoneRow(
+    #expect(listRow(projects, in: model) == phoneRow(
         projects, title: "Projects", font: .rowTitleEmphasized,
         tile: TileModel(color: .teal, icon: .folder, side: 20, cornerRadius: 6, glyphSize: 13), leading: 20, need: 264,
-        guides: [], childGuides: [30], count: "", chevron: chevron(projects, folded: false)
+        guides: [], childGuides: [30], count: nil, chevron: chevron(projects, folded: false)
     ))
-    #expect(kind(of: home, in: model) == phoneRow(
+    #expect(listRow(home, in: model) == phoneRow(
         home, title: "Home", font: .rowTitle,
         tile: TileModel(color: .stone, icon: .house, side: 20, cornerRadius: 6, glyphSize: 13), leading: 42, need: 286,
-        guides: [30], childGuides: [30, 52], count: "", chevron: nil
+        guides: [30], childGuides: [30, 52], count: nil, chevron: nil
     ))
 }
