@@ -48,8 +48,8 @@ struct AreaLine<Action: Equatable & Sendable>: View {
             }
             .padding(.trailing, model.lineToAccessories)
             Accessories(
-                model.accessories, cellWidth: model.cellWidth, countMinimumWidth: nil, endGap: model.endGap,
-                height: model.height, send: { send?($0) }
+                model.accessories, cellMinimumWidth: model.cellMinimumWidth, countMinimumWidth: nil,
+                endGap: model.endGap, height: model.height, send: { send?($0) }
             )
         }
         .padding(.leading, model.leading)

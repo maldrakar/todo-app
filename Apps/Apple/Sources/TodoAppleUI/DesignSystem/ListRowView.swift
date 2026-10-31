@@ -60,8 +60,8 @@ extension ListRowView {
         var body: some View {
             let background = Color(model.background)
             Accessories(
-                model.accessories, cellWidth: model.cellWidth, countMinimumWidth: model.countMinimumWidth,
-                endGap: model.endGap, height: model.height, send: send
+                model.accessories, cellMinimumWidth: model.cellMinimumWidth,
+                countMinimumWidth: model.countMinimumWidth, endGap: model.endGap, height: model.height, send: send
             )
             .padding(.leading, model.fadeWidth)
             .background {

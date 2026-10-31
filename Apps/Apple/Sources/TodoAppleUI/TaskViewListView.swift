@@ -209,15 +209,16 @@ private struct MovePickerList: View {
     }
 
     /// The check where the model puts one at a row's right, its symbol alone, as this picker drew it before the
-    /// components' models (Task 6). The rest of what stands there, the room for the check on every other row, is the
-    /// phone's look, which this plain list leaves out until the plan's ninth task.
+    /// components' models (Task 6). The rest of what stands there, the check hidden in its room on every other row, is
+    /// the phone's look, which this plain list leaves out until the plan's ninth task.
     private func check(_ accessories: [AccessoryModel<TaskViewList.UserAction>]) -> some View {
         ForEach(accessories.indices, id: \.self) { index in
-            // The one switch over what stands at a row's right in this picker, every case drawn and no `default`.
+            // The one switch over what stands at a row's right in this picker, every case named and no `default`: the
+            // ones this plain list leaves out draw nothing.
             switch accessories[index] {
             case .check(let check):
                 Image(check.icon)
-            case .count, .chevron, .grip, .space:
+            case .count, .chevron, .grip, .space, .hidden:
                 EmptyView()
             }
         }

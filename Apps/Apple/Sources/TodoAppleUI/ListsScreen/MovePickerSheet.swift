@@ -14,8 +14,9 @@ import TaskViewListFeature
 /// that the picker closes, is the module's. The sheet is the platform's container, on the paper.
 ///
 /// A row here has none of the guides or the pinning the tree gives it, as the canvas's picker has none: a list is
-/// picked here and not opened or folded, and the module builds the rows with no count, chevron, grip or guide (Task 7;
-/// the owner's answer on #160, thread r4415002540).
+/// picked here and not opened or folded, and the module builds the rows with no menu, count, chevron, grip or highlight
+/// (Task 7; the Lists screen plan, Task 8, the picker's options). A list's row stands on its background whole, as in
+/// the tree.
 struct MovePickerSheet: View {
     private let model: PickerModel<TaskViewList.Model.Kind, TaskViewList.UserAction>
     private let send: (TaskViewList.UserAction) -> Void
@@ -76,7 +77,7 @@ struct MovePickerSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Accessories(
-                    topLevel.accessories, cellWidth: topLevel.cellWidth, countMinimumWidth: nil,
+                    topLevel.accessories, cellMinimumWidth: topLevel.cellMinimumWidth, countMinimumWidth: nil,
                     endGap: topLevel.endGap, height: topLevel.height, send: send
                 )
             }
@@ -104,6 +105,7 @@ struct MovePickerSheet: View {
                     ListRowView(list, changed: TaskViewList.UserAction.titleFieldChanged, send: send)
                     ListRowView.End(list, send: send)
                 }
+                .background(Color(list.background))
             }
         }
     }
