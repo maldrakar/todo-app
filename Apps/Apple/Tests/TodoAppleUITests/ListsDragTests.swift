@@ -6,9 +6,10 @@ import TaskViewListFeature
 import TodoCore
 
 // The drag of the Lists screen, `ListsDrag`, driven stage by stage as the screen drives it, over the rows a real
-// `TaskViewList` draws from a store in memory, with the frames a layout of those rows would report: a list's row 46 pt
-// high, a named area's line 36 and the slot 52, stacked from the top. Each drop the drag reports is then sent to the
-// module, which is the end-to-end case: the row lands where the slot was drawn, by the module's own reading of the drop
+// `TaskViewList` draws from a store in memory, with the tree's indent its model gives and the frames a layout of those
+// rows would report, each as high as its model says, a list's row 46 pt, a named area's line 36 and the slot 52,
+// stacked from the top. Each drop the drag reports is then sent to the module, which is the end-to-end case: the row
+// lands where the slot was drawn, by the module's own reading of the drop
 // (`TaskViewList.dropTarget(of:after:depth:in:)`).
 //
 // The tree every test starts from, its drawn depths in brackets: Inbox, Today, Upcoming, Logbook and Trash [0], then the
@@ -55,9 +56,9 @@ import TodoCore
     #expect(tree.drag?.depth == 0, "no shallower than E, the row after the slot")
     tree.press(.changed(tree.lowerHalf(of: tree.d, x: start.x + 300)))
     #expect(tree.drag?.depth == 2, "no deeper than one past D, the row before the slot")
-    tree.press(.changed(tree.lowerHalf(of: tree.d, x: start.x + ListRowView.indent)))
+    tree.press(.changed(tree.lowerHalf(of: tree.d, x: start.x + tree.indent)))
     #expect(tree.drag?.depth == 1, "a level for each indent the finger travels")
-    tree.press(.changed(tree.lowerHalf(of: tree.d, x: start.x + 2 * ListRowView.indent)))
+    tree.press(.changed(tree.lowerHalf(of: tree.d, x: start.x + 2 * tree.indent)))
     tree.press(.ended)
 
     #expect(tree.drops == [.rowDropped(tree.f, after: tree.d, depth: 2)])
@@ -131,8 +132,9 @@ import TodoCore
 }
 
 /// The tree of the tests, the module that draws it, and a drag over it, driven as the screen drives one: each stage of
-/// the press is handed to `ListsDrag.after(_:from:among:frames:)` with the items as drawn with no row lifted and the
-/// frames of what the screen draws at that moment, the slot among them while a row is lifted.
+/// the press is handed to `ListsDrag.after(_:from:among:frames:indent:)` with the items as drawn with no row lifted,
+/// the frames of what the screen draws at that moment, the slot among them while a row is lifted, and the tree's
+/// indent.
 private struct DraggedTree {
     let a: ViewID, w: ViewID, c: ViewID, d: ViewID, e: ViewID, h: ViewID, f: ViewID
     private(set) var drag: ListsDrag?
@@ -148,12 +150,17 @@ private struct DraggedTree {
         e = try store.createView(NewTaskView(title: "E", parent: w))
         h = try store.createView(NewTaskView(title: "H", kind: .area))
         f = try store.createView(NewTaskView(title: "F", parent: h))
-        module = try TaskViewList(store: store, route: TaskViewList.Route(list: nil), width: .narrow)
+        module = try TaskViewList(
+            store: store, route: TaskViewList.Route(list: nil), width: .narrow, supportsMultipleWindows: false
+        )
         _ = module.send(.action(.editMenuItemChosen))
     }
 
     /// The items the screen draws with no row lifted.
     var items: [ListsTreeItem] { ListsTreeItem.items(of: module.model.rows) }
+
+    /// How far a finger carries a lifted row sideways to change its depth by one, the step of the tree's indent.
+    var indent: CGFloat { module.model.drag.indent.step }
 
     /// The ids of the rows as drawn.
     var rowIDs: [ViewID] { module.model.rows.map(\.id) }
@@ -164,15 +171,15 @@ private struct DraggedTree {
     /// The drawn depth of a row.
     func depth(of id: ViewID) -> Int? { module.model.rows.first { $0.id == id }?.depth }
 
-    /// The frames of what the screen draws now, stacked from the top.
+    /// The frames of what the screen draws now, stacked from the top, each item as high as its model says.
     var frames: [ListsTreeItem.ID: CGRect] {
         var y: CGFloat = 0
         var frames: [ListsTreeItem.ID: CGRect] = [:]
         for item in drag?.drawn(items) ?? items {
             let height: CGFloat = switch item {
-            case .list: 46
-            case .area: 36
-            case .slot: 52
+            case .list(_, let list): list.height
+            case .area(_, let line): line.height
+            case .slot: module.model.drag.slot.height
             }
             frames[item.id] = CGRect(x: 0, y: y, width: 400, height: height)
             y += height
@@ -191,7 +198,7 @@ private struct DraggedTree {
 
     /// One stage of the press, as the screen hands it on.
     mutating func press(_ phase: ListsDrag.Phase) {
-        let step = ListsDrag.after(phase, from: drag, among: items, frames: frames)
+        let step = ListsDrag.after(phase, from: drag, among: items, frames: frames, indent: module.model.drag.indent)
         if let drop = step.drop { drops.append(drop) }
         drag = step.drag
     }

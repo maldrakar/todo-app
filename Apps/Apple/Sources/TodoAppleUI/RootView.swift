@@ -139,7 +139,7 @@ struct RootView: View {
         }
     }
 
-    /// The list of views beside the pane of the wide tree, in the look it had until the plan's eighth task draws the
+    /// The list of views beside the pane of the wide tree, in the look it had until the plan's ninth task draws the
     /// canvas's sidebar there.
     private var sidebar: some View {
         TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }

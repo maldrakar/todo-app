@@ -6,10 +6,12 @@ extension DesignSystem {
     ///
     /// The look's motions are its static members, the canvas's (`Main.dc.html`). Reduce Motion is the views' to
     /// honour: where the setting is on, a view draws the change without its animation.
-    public struct Animation: Sendable {
+    public struct Animation: Equatable, Sendable {
         /// A spring, an ease-in, or the cubic Bézier curve with the control points (x1, y1) and (x2, y2), as CSS's
         /// `cubic-bezier` writes it.
-        public enum Curve: Sendable { case spring, easeIn, bezier(x1: Double, y1: Double, x2: Double, y2: Double) }
+        public enum Curve: Equatable, Sendable {
+            case spring, easeIn, bezier(x1: Double, y1: Double, x2: Double, y2: Double)
+        }
 
         public let curve: Curve
         public let duration: Double

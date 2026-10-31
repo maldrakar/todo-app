@@ -98,7 +98,9 @@ value a peer wrote is as arbitrary as one a person typed.
   nothing.** Every `if` in it is over a `Bool` or an optional of the
   model, and every string about the data arrives finished from its
   module. Its own labels, a button's title or an empty pane's
-  placeholder, are its vocabulary, localised by the platform. It keeps
+  placeholder, are its vocabulary, localised by the platform, where no
+  component's model gives them: a component's model carries its own
+  words (ADR-0007, amendment of 2026-10-30). It keeps
   only what only it can know, such as focus, scroll, hover, the
   window's width, which it reports (below), or a drag in progress.
   (ADR-0006, spec section 2)
@@ -108,14 +110,20 @@ value a peer wrote is as arbitrary as one a person typed.
   layout its model gives it: it chooses no tree of containers by the
   width, assembles no path, and reads no route to decide what to
   draw. (Owner, 2026-10-22, #117; ADR-0006, amendment of 2026-10-22)
-- **A view may switch over three enums of its model, and no others.**
-  The shape of its layout; the screens of a stack, in one place per
-  stack, to pick a view per case; and the kind of a row, to pick the
-  row to draw. It is dispatch and not a condition over data: every
+- **A view may switch over three enums of its model, three of its
+  components' models, and no others.** The shape of its layout; the
+  screens of a stack, in one place per stack, to pick a view per case;
+  and the kind of a row, to pick the row to draw. Of a component's
+  model: what a button stands on, `ButtonLabelModel.Fill`; what stands
+  on a bar, `BarModel.Item`; and what stands at a row's right,
+  `AccessoryModel`. It is dispatch and not a condition over data: every
   case is drawn, with no `default`, so a screen added to a stack and
   not drawn stops the view compiling. (Navigation state spec, sections
   4 and 6, #117; ADR-0006, amendments of 2026-10-22 and 2026-10-25;
-  the row's kind is the owner's call on the Lists screen spec, #138)
+  the row's kind is the owner's call on the Lists screen spec, #138;
+  the components' enums are the Lists screen plan's Task 8, #161, as
+  the owner's review of #163 shaped them, and ADR-0007, amendment of
+  2026-10-30)
 
 ## In a review thread
 

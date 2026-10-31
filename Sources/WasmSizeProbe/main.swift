@@ -22,17 +22,19 @@ import WASILibc
 /// browser will ever load, so its size says as much about `TodoCLI` as about the core. This executable does what a web
 /// entry point will: it builds the root module over a store in memory from a window's path, which is the web's address
 /// bar, and drives every module of the window — a selection, a rename, a new list, a list made inside it, a fold, a new
-/// area, Move to… into it, a drop back to the root and New task in the sidebar, a link applied as `.route` through the
-/// window's stack, quick entry creating a task, a tap in the list sent to its element of the stack, which pushes the
-/// task, the way back as the shorter path, the window narrowing, Cancel, and Open in New Window, whose path it writes
-/// down — with the change each write produced, and a path the routes refuse, and it reads the layout the root cuts for
-/// the window's width and the sidebar's rows, the tiles built for that width among them. Beside that it calls the
-/// core's public API directly, and each group of calls has a client that ships it. The writes, the reads, a page and
-/// search are what the modules M3 adds will call. The filter codec and the journal exchange are the web host's own,
-/// which is where the spec leaves the gaps #23 found in them ("Goals and non-goals"). The snapshot is what a web page
-/// persists, reopened under the platform clock a web entry point passes. A group dropped because no module makes its
-/// calls would take out code the web client still ships. What a client calls is what the linker has to keep, so the
-/// number the job prints is the root module and the core a web client cannot dead-strip its way out of shipping.
+/// area, Move to… into it, a drop back to the root, edit mode and Done, a delete asked and cancelled, and New task in
+/// the sidebar, a link applied as `.route` through the window's stack, quick entry creating a task, a tap in the list
+/// sent to its element of the stack, which pushes the task, the way back as the shorter path, the window narrowing,
+/// Cancel, and Open in New Window, whose path it writes down — with the change each write produced, and a path the
+/// routes refuse, and it reads the layout the root cuts for the window's width and the sidebar's component models,
+/// its rows with the tiles built for that width, its bar in and out of edit mode, the confirmation, the picker and the
+/// look of the drag, each through the switches their views have. Beside that it calls the core's public API directly,
+/// and each group of calls has a client that ships it. The writes, the reads, a page and search are what the modules M3
+/// adds will call. The filter codec and the journal exchange are the web host's own, which is where the spec leaves the
+/// gaps #23 found in them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the
+/// platform clock a web entry point passes. A group dropped because no module makes its calls would take out code the
+/// web client still ships. What a client calls is what the linker has to keep, so the number the job prints is the root
+/// module and the core a web client cannot dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.
@@ -128,8 +130,11 @@ private enum WasmSizeProbe {
         var pending: [ChangeSet] = []
         appStore.onChange = { pending.append($0) }
         // Made wide, as a browser window opens, and narrowed further down, so that the layout the root cuts by the
-        // width, and the sidebar's tiles, are in the measurement in both their shapes.
-        let app = try AppModule(store: appStore, route: try AppModule.Route(path: "/"), width: .wide)
+        // width, and the sidebar's tiles, are in the measurement in both their shapes; told a window can open beside
+        // it, so that the menus are in it with every item they can hold.
+        let app = try AppModule(
+            store: appStore, route: try AppModule.Route(path: "/"), width: .wide, supportsMultipleWindows: true
+        )
         @discardableResult
         func perform(_ event: AppModule.Event) -> AppModule.Output? {
             let output = app.send(event)
@@ -146,15 +151,16 @@ private enum WasmSizeProbe {
         // the sidebar asks the root for and the root answers with quick entry, which the link below keeps up. The
         // sidebar is read before the window narrows and after, through one switch over a row's kinds.
         perform(.action(.taskViewList(.newListMenuItemChosen(in: nil))))
-        let newList = app.model.taskViewList.rows.first { $0.draft != nil }
+        let newList = app.model.taskViewList.renaming
+        let newListDraft = fieldText(in: app.model) ?? "none"
         perform(.action(.taskViewList(.titleFieldSubmitted)))
         if let newList {
-            perform(.action(.taskViewList(.newListMenuItemChosen(in: newList.id))))
+            perform(.action(.taskViewList(.newListMenuItemChosen(in: newList))))
             perform(.action(.taskViewList(.titleFieldSubmitted)))
-            perform(.action(.taskViewList(.disclosureTapped(newList.id))))
+            perform(.action(.taskViewList(.disclosureTapped(newList))))
         }
         perform(.action(.taskViewList(.newAreaMenuItemChosen)))
-        let newArea = app.model.taskViewList.rows.first { $0.draft != nil }
+        let newArea = app.model.taskViewList.renaming
         perform(.action(.taskViewList(.titleFieldSubmitted)))
         // Move to… on the outer list, its picker read through one switch over its rows' kinds, as the picker's view
         // has, and a tap on the new area's line, which moves the list into the area; then the list let go after Today
@@ -162,12 +168,21 @@ private enum WasmSizeProbe {
         var picker = "no picker"
         var dropped = "nowhere"
         if let newList, let newArea {
-            perform(.action(.taskViewList(.moveToMenuItemChosen(newList.id))))
+            perform(.action(.taskViewList(.moveToMenuItemChosen(newList))))
             picker = pickerLine(of: app.model)
-            perform(.action(.taskViewList(.movePickerRowTapped(newArea.id))))
-            perform(.action(.taskViewList(.rowDropped(newList.id, after: BuiltInTaskViews.today, depth: 0))))
-            dropped = app.model.taskViewList.rows.firstIndex { $0.id == newList.id }.map { "at row \($0)" } ?? "gone"
+            perform(.action(.taskViewList(.movePickerRowTapped(newArea))))
+            perform(.action(.taskViewList(.rowDropped(newList, after: BuiltInTaskViews.today, depth: 0))))
+            dropped = app.model.taskViewList.rows.firstIndex { $0.id == newList }.map { "at row \($0)" } ?? "gone"
         }
+        // The bar out of edit mode and in it, which Done ends, and the confirmation of a delete, put up and cancelled.
+        let bar = barLine(of: app.model)
+        perform(.action(.taskViewList(.editMenuItemChosen)))
+        let editBar = barLine(of: app.model)
+        perform(.action(.taskViewList(.doneButtonTapped)))
+        perform(.action(.taskViewList(.deleteMenuItemChosen(BuiltInTaskViews.trash))))
+        let asked = app.model.taskViewList.confirmation.map { "\($0.title) \($0.confirm.title) or \($0.cancel.title)" }
+        perform(.action(.taskViewList(.deleteCancelled)))
+        let drag = app.model.taskViewList.drag
         perform(.action(.taskViewList(.newTaskMenuItemChosen)))
         let askedForQuickEntry = app.model.quickEntry != nil
         let wideSidebar = sidebarLine(of: app.model)
@@ -214,9 +229,10 @@ private enum WasmSizeProbe {
         print("journal \(exported.count) operations, first \(exported.first.map { "\($0.entity.rawValue).\($0.field) at \($0.clock.raw)" } ?? "none"), pair \(JournalOperation.pairID(view, review))")
         print("replay changed \(replayed.isEmpty ? 0 : replayed.tasks.count), peer took \(received.changes.tasks.count) tasks and refused \(received.refused), relay holds \(relay.log.count) after \(pushed.changes.isEmpty ? "no pull" : "a pull")")
         print("snapshot \(snapshot.count) bytes, schema \(try restored.schemaVersion()), device \(restored.deviceID.count) characters, clock \(stamp > (exported.last?.clock ?? stamp)), rank \(Rank.between(nil, Rank.initial)) valid \(Rank.isValid(Rank.initial))")
-        print("root \(root.taskViewList.rows.count) rows, renamed \(renamed), new list \(newList?.draft ?? "none"), quick entry from the sidebar \(askedForQuickEntry), problem \(root.taskViewList.problem != nil)")
+        print("root \(root.taskViewList.rows.count) rows, renamed \(renamed), new list \(newListDraft), quick entry from the sidebar \(askedForQuickEntry), problem \(root.taskViewList.problem != nil)")
         print("sidebar wide \(wideSidebar); narrow \(narrowSidebar)")
         print("picker \(picker), then dropped \(dropped)")
+        print("bar \(bar); in edit mode \(editBar); asked \(asked ?? "nothing"); drag's slot \(drag.slot.height) pt at depth 2 from \(drag.indent.leading(atDepth: 2)), its card at \(drag.card.scale)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
@@ -265,20 +281,33 @@ private enum WasmSizeProbe {
         }
     }
 
-    /// The title of the sidebar's highlighted row, and nil when none is: one switch over a row's kinds, as the
-    /// sidebar's view has, an area's line never highlighted.
+    /// The title of the sidebar's highlighted row, and nil when none is: the row `selection` names, through one switch
+    /// over a row's kinds, as the sidebar's view has, an area's line never highlighted.
     private static func highlightedTitle(in model: AppModule.Model) -> String? {
-        for row in model.taskViewList.rows {
+        for row in model.taskViewList.rows where row.id == model.taskViewList.selection {
             switch row.kind {
-            case .list(let list) where list.isSelected: return list.title
-            case .list, .area: continue
+            case .list(let list): return list.title.text
+            case .area: continue
+            }
+        }
+        return nil
+    }
+
+    /// The text of the sidebar's open field, on the row `renaming` names, and nil when no field is open: one switch over
+    /// a row's kinds, as the sidebar's view has.
+    private static func fieldText(in model: AppModule.Model) -> String? {
+        for row in model.taskViewList.rows where row.id == model.taskViewList.renaming {
+            switch row.kind {
+            case .area(let line): return line.field?.text
+            case .list(let list): return list.field?.text
             }
         }
         return nil
     }
 
     /// The sidebar as a line: how many lists it draws and how many of them are folded, its areas by their labels, and
-    /// the first list's tile, count and title: one switch over a row's kinds, as the sidebar's view has.
+    /// the first list's tile, count and title: one switch over a row's kinds, as the sidebar's view has, and one over a
+    /// list's accessories, as the row's view has.
     private static func sidebarLine(of model: AppModule.Model) -> String {
         var lists = 0
         var folded = 0
@@ -286,35 +315,71 @@ private enum WasmSizeProbe {
         var first = "no list"
         for row in model.taskViewList.rows {
             switch row.kind {
-            case .area(let label):
-                areas.append(label ?? "unnamed")
+            case .area(let line):
+                areas.append(line.label?.text ?? "unnamed")
             case .list(let list):
+                var count = "uncounted"
+                var isFolded = false
+                for accessory in list.accessories {
+                    switch accessory {
+                    case .count(let text): count = text.text
+                    case .chevron(let chevron): isFolded = chevron.rotation != 0
+                    case .grip, .check, .space, .hidden: continue
+                    }
+                }
                 if lists == 0 {
-                    let count = list.countText.isEmpty ? "uncounted" : list.countText
-                    let emphasis = list.titleFont.weight == .regular ? "plain" : "emphasized"
+                    let emphasis = list.title.font.weight == .regular ? "plain" : "emphasized"
                     let tile = "\(list.tile.side) pt \(list.tile.color.rawValue) \(list.tile.glyph.icon.rawValue) tile"
-                    first = "\(list.title) \(count) on a \(tile), \(emphasis), at \(row.depth)"
+                    let menu = list.menu?.sections.flatMap(\.items).map(\.title).joined(separator: "/") ?? "no menu"
+                    first = "\(list.title.text) \(count) on a \(tile), \(emphasis), at \(list.leading) pt needing \(list.need), \(menu)"
                 }
                 lists += 1
-                if list.isCollapsed { folded += 1 }
+                if isFolded { folded += 1 }
             }
         }
         return "\(lists) lists, \(folded) folded, areas \(areas.joined(separator: " and ")), first \(first)"
     }
 
-    /// The move picker as a line: its title, how many rows it offers and how many of them are greyed out, and the
-    /// present parent, by its label or title, or "Top level": one switch over a row's kinds, as the picker's view has.
+    /// The move picker as a line: its title, how many rows it offers and how many of them are greyed out, the present
+    /// parent, by its label or title, or the top level's, and its Cancel: one switch over a row's kinds, as the picker's
+    /// view has.
     private static func pickerLine(of model: AppModule.Model) -> String {
         guard let picker = model.taskViewList.movePicker else { return "no picker" }
-        var current = picker.isTopLevelCurrent ? "Top level" : "nothing"
-        for pickerRow in picker.rows where pickerRow.isCurrent {
-            switch pickerRow.row.kind {
-            case .area(let label): current = label ?? "an unnamed area"
-            case .list(let list): current = list.title
+        var current = picker.topLevel.isChecked ? picker.topLevel.title.text : "nothing"
+        for option in picker.options where option.isChecked {
+            switch option.row {
+            case .area(let line): current = line.label?.text ?? "an unnamed area"
+            case .list(let list): current = list.title.text
             }
         }
-        let greyed = picker.rows.filter(\.isDisabled).count
-        return "\(picker.title) of \(picker.rows.count) rows, \(greyed) greyed out, in \(current)"
+        let greyed = picker.options.filter(\.isDisabled).count
+        return "\(picker.title) of \(picker.options.count) rows, \(greyed) greyed out, in \(current), or \(picker.cancel.title)"
+    }
+
+    /// The sidebar's bar as a line: its buttons and its menu buttons, a group's among them, with what a press does, and
+    /// its search field, through one switch over the bar's items, and each button's fill through one switch over it, as
+    /// the bar's view has.
+    private static func barLine(of model: AppModule.Model) -> String {
+        var search = "no search"
+        let buttons = model.taskViewList.bar.items.flatMap { item in
+            switch item {
+            case .button(let button): return [(button.label, "pressed")]
+            case .menuButton(let button):
+                return [(button.label, "a menu of \(button.menu.sections.flatMap(\.items).count)")]
+            case .search(let field):
+                search = field.placeholder.text
+                return []
+            case .group(let buttons): return buttons.map { ($0.label, "pressed") }
+            }
+        }
+        let labels = buttons.map { label, press in
+            let fill = switch label.fill {
+            case .container: "on its container"
+            case .color: "filled"
+            }
+            return "\(label.accessibilityLabel) \(press) \(fill)"
+        }
+        return "\(labels.joined(separator: ", ")), search \(search)"
     }
 
     /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.

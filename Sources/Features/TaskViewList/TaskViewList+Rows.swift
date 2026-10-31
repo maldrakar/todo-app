@@ -104,26 +104,6 @@ extension TaskViewList {
         return (shown, highlighted)
     }
 
-    /// The rows of the picker that moves a list: the whole tree in tree order with the folds ignored, each row drawn by
-    /// the screen's own rule, `drawnKind`, for the width and edit mode, with none of this person's session on it, no
-    /// draft, no fold, since nothing in the picker is hidden for a chevron to say so, and no highlight, since the
-    /// picker marks the present parent instead; the list being moved and every list inside it greyed out, since none
-    /// of them can take it (Lists screen spec, section 6).
-    static func pickerRows(
-        moving list: ReadRow, among rows: [ReadRow], in width: WindowWidth, isEditing: Bool, counts: [ViewID: Int]
-    ) -> [Model.MovePicker.Row] {
-        let greyed = subtree(of: list.id, in: rows)
-        return rows.map { row in
-            let kind = row.drawnKind(
-                in: width, isEditing: isEditing, count: counts[row.id], isFolded: false, isSelected: false
-            )
-            return Model.MovePicker.Row(
-                row: Model.Row(id: row.id, depth: row.depth, kind: kind, draft: nil),
-                isDisabled: greyed.contains(row.id), isCurrent: row.id == list.parent
-            )
-        }
-    }
-
     /// Where an area's lists go when the area is deleted, in rank order, each with its new parent and its place, so
     /// that they stand where they stood (Lists screen spec, sections 3 and 6): the line goes, so each goes to the end
     /// of the area above, or, when the area was the first, to the root above every line, the first where the root rule
@@ -196,31 +176,17 @@ extension TaskViewList {
 }
 
 extension TaskViewList.ReadRow {
-    /// What the row draws in a window of the width class, in edit mode or out of it, with the count the store answered
-    /// for it, whether the device holds it folded and whether it is the highlighted one: an area's line, which carries
-    /// its name and nothing else, or a list's row with everything finished. A fold is drawn only on a list with lists
-    /// inside it, where a chevron can take it back. The tile and the title's font are the Lists screen's layout, built
-    /// here from the row and the width whenever the model is computed, so that a window that narrows or widens moves
-    /// them with no read of the store (ADR-0007, amendment of 2026-10-26).
-    ///
-    /// Edit mode takes the counts off the rows and gives an unnamed area the label "Area", which a tap renames it by,
-    /// where outside it the line alone is the whole of how such an area looks (Lists screen spec, sections 1 and 3).
-    func drawnKind(
-        in width: WindowWidth, isEditing: Bool, count: Int?, isFolded: Bool, isSelected: Bool
-    ) -> TaskViewList.Model.Kind {
-        switch kind {
-        case .area:
-            if !title.isEmpty { return .area(label: title) }
-            return .area(label: isEditing ? "Area" : nil)
-        case .list:
-            let size = RowSize(width, depth: depth)
-            let shownCount = isEditing ? nil : count.flatMap { $0 > 0 ? $0 : nil }
-            return .list(TaskViewList.Model.ListRow(
-                title: title, tile: size.tile(tileColor, tileIcon), titleFont: size.titleFont(emphasized: hasChildren),
-                countText: shownCount.map(String.init) ?? "", hasChildren: hasChildren,
-                isCollapsed: hasChildren && isFolded, isSelected: isSelected
-            ))
-        }
+    /// The list's tile, in its colour and with its icon, and the title's font, one of the design system's four row
+    /// titles, at the size the Lists screen gives a row of its drawn depth in a window of the width class, the font
+    /// emphasized where the list has lists inside it. Both are built from the row and the width whenever the model is
+    /// computed, so that a window that narrows or widens moves them with no read of the store (ADR-0007, amendment of
+    /// 2026-10-26).
+    func tile(in width: WindowWidth) -> TileModel {
+        RowSize(width, depth: depth).tile(tileColor, tileIcon)
+    }
+
+    func titleFont(in width: WindowWidth) -> DesignSystem.Font {
+        RowSize(width, depth: depth).titleFont(emphasized: hasChildren)
     }
 
     /// The tile's colour, the store's name read as the design system's by its raw value, and stone for a list with

@@ -46,6 +46,10 @@ extension DesignSystem {
         /// The same blue in both appearances.
         public static let accent = Color(light: accentShade, dark: accentShade)
 
+        /// What stands on the accent, the glyphs of the bar's "+" and Done: white in both appearances, as the accent is
+        /// one blue in both.
+        public static let onAccent = Color(light: .white, dark: .white)
+
         /// In the dark the canvas lays the accent at 24 % over the paper; the opaque colour that comes to is mixed
         /// here, so that nothing behind the view shows through it.
         public static let accentSoft = Color(

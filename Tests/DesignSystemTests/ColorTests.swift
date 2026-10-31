@@ -18,3 +18,10 @@ private typealias RGB = DesignSystem.RGB
     #expect(channelGap(dark, RGB(hex: 0x212742)) <= 1)
     #expect(dark.opacity == 1)
 }
+
+/// What stands on the accent, the glyphs of "+" and Done, is white in both appearances, as the accent is one blue in
+/// both.
+@Test func whatStandsOnTheAccentIsWhiteInBothAppearances() {
+    #expect(DesignSystem.Color.onAccent.light == RGB(hex: 0xFFFFFF))
+    #expect(DesignSystem.Color.onAccent.dark == RGB(hex: 0xFFFFFF))
+}

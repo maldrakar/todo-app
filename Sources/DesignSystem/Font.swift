@@ -10,7 +10,7 @@ extension DesignSystem {
     /// rounded face; the rest is the system face.
     public struct Font: Equatable, Sendable {
         public enum TextStyle: Sendable { case largeTitle, headline, body, callout, subheadline, footnote, caption }
-        public enum Weight: Sendable { case regular, medium, semibold, heavy }
+        public enum Weight: Sendable { case regular, medium, semibold, bold, heavy }
         public let style: TextStyle
         public let weight: Weight
         public let rounded: Bool
@@ -35,5 +35,14 @@ extension DesignSystem {
 
         /// A nested row's title in semibold, 16 pt at the iPhone's default text size.
         public static let nestedRowTitleEmphasized = Font(style: .callout, weight: .semibold, rounded: false)
+
+        /// A word beside a glyph on a bar, the canvas's 15 pt semibold at the iPhone's default text size.
+        public static let barLabel = Font(style: .subheadline, weight: .semibold, rounded: false)
+
+        /// A line under a title that says what to do, 13 pt at the iPhone's default text size.
+        public static let hint = Font(style: .footnote, weight: .regular, rounded: false)
+
+        /// A search field's placeholder, 17 pt at the iPhone's default text size.
+        public static let search = Font(style: .body, weight: .regular, rounded: false)
     }
 }
