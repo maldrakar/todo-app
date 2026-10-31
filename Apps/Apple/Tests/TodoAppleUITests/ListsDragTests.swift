@@ -90,6 +90,31 @@ import TodoCore
     }
 }
 
+/// The Mac's pointer hands the drag its first two stages back to back, the lift where the press began and the move to
+/// where the pointer is, both over the frames the layout reported before the lift, then the release, and then the
+/// cancel that SwiftUI's reset of the pointer's gesture state sends (`ListsTree.pointerDrag(among:)`): the release
+/// reports one drop and puts the row down, and the cancel after it moves nothing.
+@Test func thePointersDragDropsOnceAndTheResetAfterItMovesNothing() throws {
+    var tree = try DraggedTree(
+        width: .wide, capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
+    )
+    let before = tree.frames
+    let start = tree.centre(of: tree.f)
+    let end = tree.lowerHalf(of: tree.d, x: start.x + tree.indent)
+    tree.press(.began(start), frames: before)
+    tree.press(.changed(end), frames: before)
+    #expect(tree.drag?.depth == 1)
+    tree.press(.ended)
+    #expect(tree.drag == nil)
+    tree.press(.cancelled)
+    #expect(tree.drag == nil)
+
+    #expect(tree.drops == [.rowDropped(tree.f, after: tree.d, depth: 1)])
+    tree.sendDrops()
+    #expect(tree.rows(from: tree.w) == [tree.w, tree.c, tree.d, tree.f, tree.e, tree.h])
+    #expect(tree.depth(of: tree.f) == 1)
+}
+
 /// An area's slot stands only right before another line or at the end of the tree: over another area's lists, or over
 /// the root's lists above the first line, it stays where it was. Let go before W, it goes to the root right after A, its
 /// lists with it.
@@ -234,9 +259,12 @@ private struct DraggedTree {
         return CGPoint(x: x ?? frame.midX, y: frame.minY + frame.height * fraction)
     }
 
-    /// One stage of the press, as the screen hands it on.
-    mutating func press(_ phase: ListsDrag.Phase) {
-        let step = ListsDrag.after(phase, from: drag, among: items, frames: frames, indent: module.model.drag.indent)
+    /// One stage of the press, as the tree hands it on, over the frames of what it draws now, or over the frames given,
+    /// those of an earlier layout, as the Mac's pointer hands its first two stages before the tree is laid out again.
+    mutating func press(_ phase: ListsDrag.Phase, frames given: [ListsTreeItem.ID: CGRect]? = nil) {
+        let step = ListsDrag.after(
+            phase, from: drag, among: items, frames: given ?? frames, indent: module.model.drag.indent
+        )
         if let drop = step.drop { drops.append(drop) }
         drag = step.drag
     }

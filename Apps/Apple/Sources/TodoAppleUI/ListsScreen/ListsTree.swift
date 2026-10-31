@@ -165,8 +165,8 @@ struct ListsTree: View {
     /// rounded, its inset in from either side of the tree. In a tree wider than the screen the background runs on past
     /// the pinned end to the screen's edge, as the canvas's does. The highlighted row, the list declared over the
     /// screen, stands on its highlight while that list is pushed and as it slides away, which the canvas's press on a
-    /// row is; Back takes the highlight away (`TaskViewList`, `.uncovered`). A tap on the row is its choice outside edit
-    /// mode and its rename in it.
+    /// row is; Back takes the highlight away (`TaskViewList`, `.uncovered`). A tap on the row is its choice outside
+    /// edit mode and its rename in it.
     ///
     /// A title runs on under the accessories, to be read when the tree is scrolled sideways, and so does the canvas's
     /// field, across the whole tree. This field stops where the accessories start on screen instead, so that its end

@@ -54,12 +54,15 @@ struct Bar<Action: Equatable & Sendable>: View {
             // Xcode 27.1 on 2026-10-27), and whose build is a compile check in this epic.
             EmptyView()
             #else
-            // Its label alone, as a plain button draws it, with no indicator of its own: the Mac's default style puts
-            // the label in a pull-down button's bezel beside its arrow, where iOS's draws the label as it is.
             Menu { MenuItems(button.menu, send: send) } label: { alone(button.label) }
+                #if os(macOS)
+                // Its label alone, as a plain button draws it, with no indicator: the Mac's default style puts the
+                // label in a pull-down button's bezel beside its arrow. iOS's draws the label as it is, and keeps its
+                // own look when pressed, which the phone's "…" and "+" had before the Mac drew them.
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
+                #endif
                 .menuOrder(.fixed)
                 .accessibilityLabel(button.label.accessibilityLabel)
             #endif
@@ -79,12 +82,14 @@ struct Bar<Action: Equatable & Sendable>: View {
 
     /// A button or a menu button standing alone, a circle as high as the bar's controls, on what its label puts it on.
     private func alone(_ label: ButtonLabelModel) -> some View {
-        standing(content(of: label).frame(width: model.controlHeight, height: model.controlHeight), on: label.fill)
+        buttonStanding(
+            content(of: label).frame(width: model.controlHeight, height: model.controlHeight), on: label.fill
+        )
     }
 
-    /// A button alone on what its label puts it on: the glass of its container, or a fill of its own with the model's
-    /// shadow under it.
-    @ViewBuilder private func standing(_ label: some View, on fill: FillModel) -> some View {
+    /// A button alone on what its label puts it on: the glass of its container, or a fill of its own casting the
+    /// model's shadow, where a search field on one casts none (`searchFieldStanding(on:in:)`).
+    @ViewBuilder private func buttonStanding(_ label: some View, on fill: FillModel) -> some View {
         switch fill {
         case .container:
             label.glass(in: Circle())
@@ -124,7 +129,7 @@ struct Bar<Action: Equatable & Sendable>: View {
         .padding(.trailing, search.trailingPadding)
         .frame(maxWidth: .infinity)
         .frame(height: model.controlHeight)
-        .standing(on: search.fill, in: RoundedRectangle(cornerRadius: search.cornerRadius))
+        .searchFieldStanding(on: search.fill, in: RoundedRectangle(cornerRadius: search.cornerRadius))
     }
 
     /// Buttons grouped on one capsule of glass, sharing its width, with the group's divider between each two of them.
@@ -174,8 +179,9 @@ extension View {
     }
 
     /// A search field in its shape on what its model puts it on, every case drawn and none by `default`
-    /// (`docs/style.md`, "Views"): the glass of its container, or a fill of its own with no shadow.
-    @ViewBuilder fileprivate func standing(on fill: FillModel, in shape: some Shape) -> some View {
+    /// (`docs/style.md`, "Views"): the glass of its container, or a fill of its own casting no shadow, where a button
+    /// alone on one casts the bar's (`Bar.buttonStanding(_:on:)`).
+    @ViewBuilder fileprivate func searchFieldStanding(on fill: FillModel, in shape: some Shape) -> some View {
         switch fill {
         case .container:
             glass(in: shape)
