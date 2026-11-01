@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-14
-- Related: `docs/specs/navigation.md` (approved 2026-10-14), `docs/specs/navigation-state.md` (approved 2026-10-22), `docs/specs/lists-screen.md` (approved 2026-10-25), #67, #100, #117, #138, ADR-0006, ADR-0007, ADR-0008
-- Amended: 2026-10-22, after the approval of the navigation state spec, and 2026-10-25, after the approval of the Lists screen spec (see the end)
+- Related: `docs/specs/navigation.md` (approved 2026-10-14), `docs/specs/navigation-state.md` (approved 2026-10-22), `docs/specs/lists-screen.md` (approved 2026-10-25), `docs/specs/list-screen.md` (approved 2026-11-01), #67, #100, #117, #138, #166, ADR-0004, ADR-0006, ADR-0007, ADR-0008
+- Amended: 2026-10-22, after the approval of the navigation state spec, 2026-10-25, after the approval of the Lists screen spec, and 2026-11-01, after the approval of the list screen spec (see the end)
 
 ## Context
 
@@ -45,3 +45,12 @@ Made with the approval of `docs/specs/lists-screen.md` (#138), whose section 5 h
 **A dialog over a screen, with no subject and no stack, is that screen's state, drawn from its model; a screen with a subject is declared in the slot.** A confirmation and a picker have no subject of their own, no address a link could name and nothing a relaunch should restore, so they live in the module's state beside its other session state, the model carries each as an optional, and the view draws it as an alert or a sheet while the optional holds a value. The slot keeps its meaning from the amendment of 2026-10-22: it holds a push or a modal, never both, and a dialog declared there would close what is pushed over the screen, the list open beside the sidebar on the Mac. The test for which is which: a screen has a subject, an id in its route, and can stand in a stack; a dialog has neither.
 
 Consequences. Easier: a dialog is two optionals and two actions away, with no case in the root's enum and no route. Harder: a module with dialogs has more session state that a relaunch loses, which is accepted since a half-finished confirmation is nothing to restore. Constrained: no dialog in a slot, and no screen with a subject drawn from a model's optional.
+
+## Amendment, 2026-11-01
+
+Made with the approval of `docs/specs/list-screen.md` (#166), whose sections 2, 3 and 9 hold the discussion. The list screen opens a block as a screen of its own, a list inside the list or the view of one of its groups, and opens a task in place as a card with the full screen a button away.
+
+1. **A list may declare a list over itself, by the view's id, as every list is addressed.** `TaskList.Route`'s head stays the view's id, and its tail becomes an enum of two cases, the task screen or another list, each holding that screen's route whole, so that `view/a/view/b/task/t` is list b open over list a with task t over b. A group opened as a view is a list over its list, since a group is a view of its own with an id (ADR-0004, amendment of 2026-11-01), and needs no word of its own in the text form. The same kind of screen stands twice in a stack, which the stack's ids were made for (amendment of 2026-10-22, point 2) and which no screen had done. The sidebar's highlight stays on the list it declared, the base of the chain.
+2. **A task opened in place is the list's state and not a screen.** The card is a row grown: it has the list's subject and no address of its own, so by the test of the amendment of 2026-10-25 it is state, drawn from the list's model as an optional, and never a slot's content. The list's `task/<id>` tail keeps M3's meaning, the task screen pushed over the list, which Open full screen declares; a link to a task opens the task screen, and a relaunch opens the list with no card, which is accepted.
+
+Consequences. Easier: one more case in one route's tail and no new kind of screen in the root's enum; a group's screen is the list screen on another route. Harder: the first chain of two screens of one kind in a stack, exercised by tests the stack never had. Constrained: the card never enters the route; a list over a list is declared by the view's id and nothing else.
