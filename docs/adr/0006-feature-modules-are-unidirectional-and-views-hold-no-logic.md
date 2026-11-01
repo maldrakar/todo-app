@@ -2,8 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-20
-- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), `docs/specs/navigation-state.md` (approved 2026-10-22), `docs/specs/lists-screen.md` (approved 2026-10-25), #63, #67, #78, #117, #138, ADR-0001, ADR-0004, ADR-0009
-- Amended: 2026-10-03, after the owner's review of #78, 2026-10-14, after the approval of the navigation spec, 2026-10-22, after the approval of the navigation state spec, and 2026-10-25, after the approval of the Lists screen spec (see the end)
+- Related: `docs/specs/feature-module-architecture.md` (approved 2026-09-20), `docs/specs/navigation.md` (approved 2026-10-14), `docs/specs/navigation-state.md` (approved 2026-10-22), `docs/specs/lists-screen.md` (approved 2026-10-25), `docs/specs/list-screen.md` (approved 2026-11-01), #63, #67, #78, #117, #138, #166, ADR-0001, ADR-0004, ADR-0009
+- Amended: 2026-10-03, after the owner's review of #78, 2026-10-14, after the approval of the navigation spec, 2026-10-22, after the approval of the navigation state spec, 2026-10-25, after the approval of the Lists screen spec, and 2026-11-01, after the approval of the list screen spec (see the end)
 
 ## Context
 
@@ -51,3 +51,11 @@ Made with the approval of `docs/specs/navigation-state.md` (#117), whose mechani
 Made with the approval of `docs/specs/lists-screen.md` (#138), whose section 5 holds the discussion. The amendment of 2026-10-22 gave a view a permission to switch over two enums of its model, the layout and the screens of a stack. The Lists screen draws rows of two kinds, a list and an area's line, and the owner chose an enum for the kind over two optionals, so that a row is one of the two explicitly and never both or neither (review of 2026-10-25).
 
 **A view may switch over a third enum of its model: the kind of a row, to pick the row to draw.** It is dispatch, as the other two are: every case is drawn, with no `default`, and no case is a condition over a domain value. `docs/style.md`, "Views", says so.
+
+## Amendment, 2026-11-01
+
+Made with the approval of `docs/specs/list-screen.md` (#166), whose section 8 holds the discussion. The decision names the change of the day among the events of the world and leaves it there; until now the modules took the day from the machine's clock as the UTC day, a day off for the hours in which the device's calendar differs from UTC, and nothing told a module that the day had changed. The list screen draws days everywhere, Today's rows, the days of a grouped list, a deadline due, "Done today", and so needs the device's own day and its change.
+
+**The device's calendar day and its change are events of the world the view reports through the host, as the width is; the core computes no "today".** The window's view reports the device's day and the instant it began at the window's start and again when the day changes, at midnight, when the time zone changes, or when the app wakes on another day, through the host's entrance for events of the world, as it reports the width (amendment of 2026-10-22, point 1), since nobody pressed anything. The root hands it to every screen of its stack as it hands the width, and a screen rereads what depends on it: the list its page and its strip, the sidebar its counts. A module formats a day for the screen from the core's `Day`, which stays a count of days with no time zone (ADR-0001, ADR-0004); the names of weekdays and months are the module's until the formatting service the decision names arrives. The event's name and shape are settled by the plan's compiler probe.
+
+Consequences. Easier: a day is data a test sends, so a module's midnight is one event in a test, and every screen of a window agrees on the day. Harder: one more event of the world that every flow's owner forwards in a line of its own, the point at which ADR-0009 says such events may fold into one case; whether the width and the day fold is the plan's. Constrained: no module reads a clock for a day; "today" reaches a module only as an event, and the core only as an argument.
