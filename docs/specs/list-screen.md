@@ -40,7 +40,7 @@ A list's screen is a sequence of blocks. First come the list's own tasks, the ta
 
 The canvas's "This week", a list whose rule is a tag and the next seven days, grouped by day, stands for any list with a rule and a grouping. No such list can be made in the app until the settings screen arrives: the store seeds Inbox, Today, Upcoming, Logbook and Trash and nothing else, the Lists screen's "New list" makes a folder and this screen's "+ Add list" a manual list, so Upcoming is the grouped list a person has, and the command line (`todo view create`) the way to make another until then. Whether "This week" becomes a sixth seed is the owner's (section "Open questions").
 
-A block's header is two controls. Its title opens the block as a screen of its own, pushed over this one, with back walking out the way in (owner, 2026-11-01): a list inside opens as itself, the same screen this document describes, on that list, its own tasks first and its own lists as blocks; a day of a grouped list opens as the same list narrowed to that day, titled by the day with the list's name and date under it, with no blocks of the lists inside, no columns and no "+ Add list", and with "+" and "+ Add task" adding to that day. The narrowed list is not a saved view, it is the list's own screen with a day for an argument, and its route carries the day (section 9). The header's chevron folds the block, which the device remembers per list (ADR-0010), as it remembers the sidebar's folded branches. The counts the canvas once drew on headers are gone (owner, 2026-11-01).
+A block's header is two controls. Its title opens the block as a screen of its own, pushed over this one, with back walking out the way in (owner, 2026-11-01): a list inside opens as itself, the same screen this document describes, on that list, its own tasks first and its own lists as blocks; a day of a grouped list opens as a view like any other, the list's rule and that day's condition on When, with the list's colour and sort, titled by the day with the list's name and the date under it (owner, 2026-11-01: a group is a view, Monday a view with a filter on When). It is a view the module derives from the list rather than one the store keeps a row for, and that is all that tells it from the lists in the sidebar: it has no lists inside, so its screen is one block; no grouping, so Show as has no columns to offer; and no id of its own to put a list into, so no "+ Add list"; "+" and "+ Add task" add what its rule asks, the list's tag and that day. Its address is the list's id and the group's key (section 9). The core already reads the list's page in groups by that key, and the derived view's rows are the group with it. The header's chevron folds the block, which the device remembers per list (ADR-0010), as it remembers the sidebar's folded branches. The counts the canvas once drew on headers are gone (owner, 2026-11-01).
 
 ### 3. Rows, the card, completing
 
@@ -93,13 +93,13 @@ Every day the screen draws, Today's rows, the days of This week, "Due Tue", "Don
 
 ### 9. The module
 
-`TaskList` stays the module, the screen the sidebar declares over itself and the task screen's opener. Its head gains the day a narrowed list is on, its tail becomes what it declares over itself, and its model, its actions and its state grow into the screen above. A sketch, not compiled:
+`TaskList` stays the module, the screen the sidebar declares over itself and the task screen's opener. Its head gains the key of the group it is open on, when a group of the list is open as a view, its tail becomes what it declares over itself, and its model, its actions and its state grow into the screen above. A sketch, not compiled:
 
 ```swift
 public struct Route: RouteValue {
     public struct Head: Equatable, Sendable {
         public let view: ViewID
-        public let day: Day?           // nil for the list itself, a day for the list narrowed to it
+        public let group: GroupKey?    // nil for the list itself; the key of the group open as a view, a day today
     }
     public enum Over: RouteValue {    // what the list declares over itself
         case task(TaskScreen.Route)   // Open full screen
@@ -116,14 +116,14 @@ public struct Model: Equatable, Sendable {
     public let openTask: TaskID?                 // the card, read beside its row
     public let done: DoneStripModel<UserAction>? // nil for Logbook, Trash and a day with nothing done
     public let addTask: ButtonModel<UserAction>? // the floating "+", nil where no task can be added
-    public let addList: ButtonModel<UserAction>? // "+ Add list", nil in a narrowed day and in Logbook and Trash
+    public let addList: ButtonModel<UserAction>? // "+ Add list", nil for a group open as a view and in Logbook and Trash
     public let showAs: MenuModel<UserAction>
     public let empty: EmptyStateModel?
     public let problem: String?
 }
 ```
 
-In the window's text form the list is `view/<id>`, then `day/<yyyy-mm-dd>` when it is narrowed, then either `view/…` for a list opened over it or `task/<id>` for the task screen, so that `view/a/view/b/task/t` is list b open over list a with task t over it, and `view/a/day/2026-10-26` is list a's Monday; the words are the list's own and the task screen's, which the list's route already knows. The sidebar's highlight stays on the list it declared, the base of the chain, while a list inside is open over it (engineer's call: the chain is the pane's history, and the sidebar lights what it opened). A link to a task keeps M3's meaning, the task screen pushed over its list; the card is not in the route, since it is a row grown and not a screen, and a relaunch opens the list with no card, which is accepted (engineer's call, revisited with the Task screen epic that makes the task a modal).
+In the window's text form the list is `view/<id>`, then the group's key when a group of it is open as a view, `day/<yyyy-mm-dd>` for the grouping by day that the app's lists use, with a word of its own for each grouping the core knows once a list comes to use it, then either `view/…` for a list opened over it or `task/<id>` for the task screen, so that `view/a/view/b/task/t` is list b open over list a with task t over it, and `view/a/day/2026-10-26` is list a's Monday, the view of a's rule and that day; the words are the list's own and the task screen's, which the list's route already knows. The sidebar's highlight stays on the list it declared, the base of the chain, while a list inside is open over it (engineer's call: the chain is the pane's history, and the sidebar lights what it opened). A link to a task keeps M3's meaning, the task screen pushed over its list; the card is not in the route, since it is a row grown and not a screen, and a relaunch opens the list with no card, which is accepted (engineer's call, revisited with the Task screen epic that makes the task a modal).
 
 The blocks are the list's model of the page: each a header, its rows, its "+ Add task", whether it is folded, what a drop into it does, and the day or the list it opens as; a row is the model of the row component with its check, title, meta and the actions its gestures send; the open task's card is one more model beside its row. The actions are named for the control and the gesture (`docs/style.md`): `rowTapped`, `checkTapped`, `cardBackgroundTapped`, `titleFieldChanged` and its three ends, `notesFieldChanged` and its ends, `subtaskCheckTapped`, `addSubtaskTapped` and the subtask field's four, `openFullScreenTapped`, `addTaskButtonTapped`, `addTaskRowTapped(in: block)`, `addListTapped`, the list name field's four, `blockTitleTapped`, `blockChevronTapped`, `tagChipTapped`, `showAsChosen(Layout.Kind)`, `rowDropped(TaskID, in: block, after: TaskID?)`, `deleteSwiped(TaskID)` and `deleteMenuItemChosen(TaskID)` for the Mac. Its outputs stay `closeRequested`; a list opened over this one answers the same way and is dropped with it.
 
@@ -144,7 +144,7 @@ Everything the screen draws is a component with a model in `DesignSystemComponen
 | `TodoCore`, the page | child sections first, then the own; tasks with no notes flag and no subtask counts | the own section first, and a folder's section reading the lists inside it; `hasNotes` and the counts of subtasks, done over all, per task in one read; the done tasks of a page, its rules with their status lifted, completed since an instant; the manual list of a view set in one transaction; a view whose rule lists itself made in one call |
 | `TodoCore`, the day | `Day` as a count of days | the weekday of a day; nothing else, the names are the module's |
 | `FeatureModule` | `WindowWidth` as the event of the world a view reports | the device's day beside it, as the root hands it down |
-| `TaskList` | titles in a list; a tap pushes the task | sections 1 to 9: the page as blocks and columns, the card, completing and the strip, adding a task and a list, the tag bar, the drag and the drop, the swipe, the day; a head with a day and a tail of two cases; the layout and the folds per device |
+| `TaskList` | titles in a list; a tap pushes the task | sections 1 to 9: the page as blocks and columns, the card, completing and the strip, adding a task and a list, the tag bar, the drag and the drop, the swipe, the day; a head with a group's key and a tail of two cases; the layout and the folds per device |
 | `TaskScreen` | the title | untouched: it is what Open full screen opens |
 | `TaskViewList` | highlights `route.list?.head`; counts by the UTC day | highlights the list's view; counts by the device's day |
 | `AppModule` | hands the width down | hands the day down too; its stack's enum of screens unchanged, since a list over a list is one more element of a kind it has |
@@ -155,7 +155,7 @@ Everything the screen draws is a component with a model in `DesignSystemComponen
 
 ### Testing, CI and the deliverable
 
-The module's tests run on the host and on wasm32, as every feature's do: the blocks of a list with own tasks and lists inside, of a list whose lists have lists of their own, one block each, of a folder, of a grouped list and of a narrowed day; the rows' meta texts and the day formats; the card's fields and subtasks; completing and the strip; where "+" and "+ Add task" put a task and what it carries; "+ Add list" and the manual list; the tag bar's chips and filter; the layout and the folds written and read back by a module made anew; a drop in each row of the table in section 6 and the refusals; the pins a reorder writes; the swipe; the routes read and written, a list over a list and a day among them; the day's change rereading the page. The core's tests cover the page's new order and a folder's section, the notes flag and the subtask counts, the done read, the manual list set in one transaction, the self-listing view, the weekday. The Apple package builds for every platform as today, and the screen is checked by hand on an iPhone simulator, an iPad simulator and the Mac, with screenshots in the pull request, as the Lists screen's were. CI does not change; the wasm size budget is re-measured, as in every epic.
+The module's tests run on the host and on wasm32, as every feature's do: the blocks of a list with own tasks and lists inside, of a list whose lists have lists of their own, one block each, of a folder, of a grouped list and of a group opened as a view; the rows' meta texts and the day formats; the card's fields and subtasks; completing and the strip; where "+" and "+ Add task" put a task and what it carries; "+ Add list" and the manual list; the tag bar's chips and filter; the layout and the folds written and read back by a module made anew; a drop in each row of the table in section 6 and the refusals; the pins a reorder writes; the swipe; the routes read and written, a list over a list and a day among them; the day's change rereading the page. The core's tests cover the page's new order and a folder's section, the notes flag and the subtask counts, the done read, the manual list set in one transaction, the self-listing view, the weekday. The Apple package builds for every platform as today, and the screen is checked by hand on an iPhone simulator, an iPad simulator and the Mac, with screenshots in the pull request, as the Lists screen's were. CI does not change; the wasm size budget is re-measured, as in every epic.
 
 The deliverable is the list screen on iPhone, iPad and Mac as the canvas draws it, in the two layouts, with the tasks of the store behind every row.
 
@@ -174,7 +174,7 @@ The deliverable is the list screen on iPhone, iPad and Mac as the canvas draws i
 | Delete with a confirmation, as a list's delete has | A task goes to the Trash and comes back; a list's delete is final for its lists. |
 | Quick entry retired, every new task inline | The Lists screen's "+" has no list open to add to; the owner wants a modal there with a choice of list, in an epic of its own (2026-11-01). |
 | The day computed in the core from the clock and a time zone handed to it | The core has no calendar by design (ADR-0001), and a day's change is an event, not a value: the platform knows both. |
-| A narrowed day as a saved view | Nothing of a saved view's is wanted: it is the list, narrowed, for as long as it is open. |
+| A day of a grouped list as a view the store keeps a row for | Upcoming's days are without end, and a row would carry nothing the derived view does not: the list's rule and the day's condition, the list's look, and an address from the list's id and the group's key. |
 | A list inside drawn with the blocks of its own lists inside it, to any depth | The owner keeps a parent's page one level deep (2026-11-01): a list inside is one block of its tasks, and its blocks are its own screen's, a tap on its header away. A page read to any depth would grow with the tree and indent a phone's rows away. |
 
 ## Components and data flow
@@ -235,7 +235,7 @@ The owner answered the brainstorm's questions on 2026-11-01: the own tasks come 
 
 ## Decisions to record as ADRs after approval
 
-1. An amendment to ADR-0009: a list may declare a list over itself, a list inside it or itself narrowed to a day, whose route carries the day; the same kind of screen stands twice in a stack; a task opened in place is the list's state and not a screen, and the task screen is still what the list's `task/<id>` tail means.
+1. An amendment to ADR-0009: a list may declare a list over itself, a list inside it or one of its groups as a view derived from it, the list's rule and the group's condition, whose route carries the group's key; the same kind of screen stands twice in a stack; a task opened in place is the list's state and not a screen, and the task screen is still what the list's `task/<id>` tail means.
 2. An amendment to ADR-0004: a list made inside a list on the list screen is a manual list, a view whose rule lists itself, which the core makes in one call; a task is in it by being put there.
 3. An amendment to ADR-0006: the device's calendar day and its change are events of the world the view reports through the host, as the width is; the core computes no "today".
 4. An amendment to ADR-0010: a list's layout and its folded blocks are the device's own state, under keys of the list's module.
