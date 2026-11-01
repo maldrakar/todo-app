@@ -1,8 +1,8 @@
 # Spec: The list screen
 
-- Status: Draft, 2026-11-01
-- Owner review: to be published
-- Issue: to be filed after approval
+- Status: Approved 2026-11-01 (revision 5)
+- Owner review: https://claude.ai/artifact/LkHnP681CciwgYNgJL8fkm
+- Issue: #166
 
 Written for the owner. The bar is readability: modules and their contracts in prose, types only where the design depends on them. Every type defined outside this document gets a one-line reminder at its first mention and an entry in the glossary at the end. Names in `code` that do not exist yet are working names, settled by a compiler probe in the plan, as the Lists screen spec did.
 
@@ -214,10 +214,10 @@ flowchart LR
 
 ## Open questions
 
-The owner answered the brainstorm's questions on 2026-11-01: the own tasks come first and then the lists inside; a new list made here is a manual list; "+ Add list" is the last row and the last column; a task is deleted by a swipe and the Mac's menu with no confirmation; a task is reordered by a long press and the pointer; the layout, the strip, the drop rules and the device's day are the engineer's calls as written above. Two questions the builder check raised are the owner's:
+The owner answered the brainstorm's questions on 2026-11-01: the own tasks come first and then the lists inside; a new list made here is a manual list; "+ Add list" is the last row and the last column; a task is deleted by a swipe and the Mac's menu with no confirmation; a task is reordered by a long press and the pointer; the layout, the strip, the drop rules and the device's day are the engineer's calls as written above. Two questions the builder check raised were left to the owner, who moved to the plan on 2026-11-01 without a word on either; the plan takes the engineer's recommendation on both, and the owner may reverse either in the plan's review:
 
-1. **Does "This week" become a sixth built-in?** The canvas draws it as the grouped list with a rule, and nothing in the app can make such a list until the settings screen (section 2). As a seed it is a fixed id every store starts with, like the five, a core and sync change and a row in every sidebar; without it, Upcoming is the grouped list the app has, and the canvas's board is a picture of what the settings screen will make. The engineer's recommendation: no sixth seed in this epic, Upcoming carries the grouping, and the plan's hand check makes a "This week" through the command line to exercise the day blocks.
-2. **Does completing cascade between a task and its subtasks?** Section 3 says it does not, either way: a completed task's open subtasks stay open, and the last subtask completed leaves the parent open with "4/4". Things does the same for a to-do's checklist. The other answers are a loop of writes in one transaction and a product rule the owner may want.
+1. **Does "This week" become a sixth built-in?** The canvas draws it as the grouped list with a rule, and nothing in the app can make such a list until the settings screen (section 2). As a seed it is a fixed id every store starts with, like the five, a core and sync change and a row in every sidebar; without it, Upcoming is the grouped list the app has, and the canvas's board is a picture of what the settings screen will make. The engineer's recommendation, taken: no sixth seed in this epic, Upcoming carries the grouping, and the plan's hand check makes a "This week" through the command line to exercise the day blocks.
+2. **Does completing cascade between a task and its subtasks?** Section 3 says it does not, either way: a completed task's open subtasks stay open, and the last subtask completed leaves the parent open with "4/4". Things does the same for a to-do's checklist. The other answers are a loop of writes in one transaction and a product rule the owner may want. The engineer's recommendation, taken: no cascade, section 3 stands.
 
 ## Risks
 
