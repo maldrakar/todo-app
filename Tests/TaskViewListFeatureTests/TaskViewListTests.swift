@@ -30,22 +30,13 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     }
 }
 
-/// Whether a row carries the highlight, read over its kind as a view drawing row by row reads it, a list's row on the
-/// fill colour: an area's line never does, since an area never opens.
-private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
-    switch row.kind {
-    case .area: false
-    case .list(let list): list.background == .fill
-    }
-}
-
 @Test func initialModelListsTheBuiltInViewsInRankOrderWithInboxSelected() throws {
     let model = try TaskViewList(
         store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone
     ).model
     #expect(model.rows.map(title(of:)) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash"])
     #expect(model.rows.allSatisfy { $0.depth == 0 })
-    #expect(model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.inbox])
+    #expect(highlighted(in: model) == [BuiltInTaskViews.inbox])
     #expect(model.problem == nil)
 }
 
@@ -74,7 +65,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
     #expect(list.model == (try sidebarOn(BuiltInTaskViews.today, in: store)))
-    #expect(list.model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.today])
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
     #expect(list.route == on(BuiltInTaskViews.today))
     // The highlight moved back leaves the model as it was, which is what says that a move carries every
     // other field of every row along: the title a row draws, and the depth a nested one is drawn at.
@@ -111,11 +102,11 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let open = list.model
     try store.delete(view: gone)
     #expect(list.send(.action(.rowSelected(gone))) == nil)
-    #expect(list.model.selection == gone, "the click declared the list on its row; this is the setup")
+    #expect(highlighted(in: list.model) == [gone], "the click declared the list on its row; this is the setup")
     #expect(list.send(.notOpened(.notFound(gone), stillOpen: on(BuiltInTaskViews.inbox).list)) == nil)
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list)
     #expect(list.model.rows == open.rows)
-    #expect(list.model.selection == BuiltInTaskViews.inbox)
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.inbox])
     #expect(list.model.problem == "The list could not be opened.")
     #expect(list.route == on(BuiltInTaskViews.inbox))
 
@@ -125,11 +116,11 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
         made.model == (try TaskViewList(store: store, route: on(ViewID()), width: .narrow, capabilities: iPhone)).model,
         "on no row, so nothing is highlighted"
     )
-    #expect(made.model.selection == nil)
+    #expect(highlighted(in: made.model).isEmpty)
     #expect(made.send(.notOpened(.notFound(gone), stillOpen: nil)) == nil)
     #expect(made.destination.pushed == nil)
     #expect(made.model.rows.map(title(of:)) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash"])
-    #expect(made.model.selection == nil)
+    #expect(highlighted(in: made.model).isEmpty)
     #expect(made.model.problem == "The list could not be opened.")
     #expect(made.route == .init(list: nil))
 }
@@ -156,8 +147,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.send(.uncovered) == nil)
     #expect(list.destination.pushed == nil)
     #expect(list.model.rows.map(title(of:)) == rows.map(title(of:)))
-    #expect(list.model.rows.filter(isHighlighted).isEmpty)
-    #expect(list.model.selection == nil)
+    #expect(highlighted(in: list.model).isEmpty)
     #expect(list.model.problem == nil)
     #expect(list.route == .init(list: nil))
     let renaming = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
@@ -168,7 +158,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(renaming.send(.uncovered) == nil)
     #expect(renaming.model.problem == "A title cannot be empty.")
     #expect(renaming.model.rows.first(where: { $0.id == BuiltInTaskViews.today }).flatMap(draft(of:)) == " ", "the field stays open on the draft")
-    #expect(renaming.model.selection == nil)
+    #expect(highlighted(in: renaming.model).isEmpty)
     #expect(renaming.destination.pushed == nil)
 }
 
@@ -204,8 +194,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let deleted = try changeSet(of: store) { try store.delete(view: BuiltInTaskViews.inbox) }
     #expect(list.send(.changed(deleted)) == nil, "a view a peer deleted is not a choice anybody made")
     #expect(list.model.rows.map(title(of:)) == ["Today", "Upcoming", "Logbook", "Trash"])
-    #expect(list.model.selection == nil, "the highlight went with its row")
-    #expect(list.model.rows.filter(isHighlighted).isEmpty)
+    #expect(highlighted(in: list.model).isEmpty, "the highlight went with its row")
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list, "a reread leaves the destination to the list's answer")
     let told = list.model
     #expect(list.send(.destinationAnswered(.closeRequested)) == nil)
@@ -245,32 +234,26 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.model.rows.map(title(of:)) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash", "Docs"])
     // A view that appeared elsewhere is no reason to lose the row the person is on, and no reason to say
     // that anything went wrong.
-    #expect(list.model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.today])
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
     #expect(list.model.problem == nil)
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
 }
 
-/// One highlight, read two ways: `selection` is what a list bound to one value reads, and `isSelected` what a
-/// client drawing row by row reads. Two readings that disagreed would have two clients highlight different
-/// rows, or bind a list to a row it does not draw.
-@Test func selectionNamesTheSelectedRow() throws {
+/// One highlight, on the row of the list declared: it moves with a choice, goes with its row, and lights no row for
+/// an id no row carries, so a client drawing row by row never lights two rows, or a row for a list it does not draw.
+@Test func theHighlightIsOnTheDeclaredListsRow() throws {
     let store = try makeStore()
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
-    #expect(list.model.selection == BuiltInTaskViews.inbox)
-    #expect(list.model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.inbox])
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.inbox])
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
-    #expect(list.model.selection == BuiltInTaskViews.today)
-    #expect(list.model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.today])
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
     let deleted = try changeSet(of: store) { try store.delete(view: BuiltInTaskViews.today) }
     #expect(list.send(.changed(deleted)) == nil)
-    #expect(list.model.selection == nil, "the highlight went with its row")
-    #expect(list.model.rows.filter(isHighlighted).isEmpty)
+    #expect(highlighted(in: list.model).isEmpty, "the highlight went with its row")
     // `.rowSelected` declares the list of whatever id it is given without asking the rows, so an id that names no
-    // row is a declaration the sidebar holds, until the stack hands it back, and draws nowhere: neither reading
-    // names it.
+    // row is a declaration the sidebar holds, until the stack hands it back, and draws nowhere.
     _ = list.send(.action(.rowSelected(ViewID())))
-    #expect(list.model.selection == nil, "an id no row carries is no row to bind to")
-    #expect(list.model.rows.filter(isHighlighted).isEmpty)
+    #expect(highlighted(in: list.model).isEmpty, "an id no row carries lights no row")
 }
 
 /// A chain thousands of links deep arrives from sync as easily as a shallow one, and a stack — 64 KiB of it
@@ -428,7 +411,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.model.rows.first.flatMap(draft(of:)) == " ", "the field a person is typing in outlives a peer's edit")
 }
 
-/// The selection and the rename are the module's own state, and a reread is what holds them to the rows it
+/// The highlight and the rename are the module's own state, and a reread is what holds them to the rows it
 /// just read: whichever of them names a row that did not come back goes with it. This is the rename's half,
 /// and the half a person is told about, because a name being typed is a thing to interrupt.
 @Test func aRenameEndsWhenThePeerDeletesTheRowItIsOn() throws {
@@ -493,7 +476,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let sentence = try #require(list.model.problem, "the refusal is the setup; without it this proves nothing")
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
     #expect(list.model.problem == sentence)
-    #expect(list.model.selection == BuiltInTaskViews.today)
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
     #expect(list.model.rows.map(draft(of:)) == ["", nil, nil, nil, nil])
     // The same state reached in the other order, the highlight moved before the refusal, compares the model
     // whole: nothing else moved.
@@ -544,7 +527,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list)
     #expect(list.model == (try sidebarOn(BuiltInTaskViews.inbox, in: store)), "the sidebar a link to the Inbox makes")
-    #expect(list.model.selection == BuiltInTaskViews.inbox)
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.inbox])
     #expect(list.model.problem == nil)
     #expect(list.route == on(BuiltInTaskViews.inbox))
 }
@@ -556,8 +539,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let list = try TaskViewList(store: store, route: on(BuiltInTaskViews.today), width: .narrow, capabilities: iPhone)
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
-    #expect(list.model.selection == BuiltInTaskViews.today)
-    #expect(list.model.rows.filter(isHighlighted).map(\.id) == [BuiltInTaskViews.today])
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
     let linked = try TaskViewList(
         store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
     )
@@ -574,7 +556,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.destination.pushed == nil)
     #expect(list.model.rows.map(title(of:)) == ["Today", "Upcoming", "Logbook", "Trash"])
-    #expect(list.model.selection == nil)
+    #expect(highlighted(in: list.model).isEmpty)
     #expect(list.model.problem == nil)
     #expect(list.route == .init(list: nil))
 }
@@ -603,8 +585,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     }
     #expect(list.send(.changed(synced)) == nil)
     #expect(list.model.rows.map(\.id).contains(linked), "the view arrived; without it this proves nothing")
-    #expect(list.model.selection == nil, "a highlight beside no list")
-    #expect(list.model.rows.filter(isHighlighted).isEmpty)
+    #expect(highlighted(in: list.model).isEmpty, "a highlight beside no list")
     #expect(list.destination.pushed == nil)
 
     let bare = try makeStore()
@@ -614,7 +595,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let restored = try changeSet(of: bare) { _ = try bare.apply(written(BuiltInTaskViews.inbox, [("deleted", Value(false))])) }
     #expect(fallback.send(.changed(restored)) == nil)
     #expect(fallback.model.rows.map(\.id).contains(BuiltInTaskViews.inbox), "the Inbox is back; without it this proves nothing")
-    #expect(fallback.model.selection == nil, "a highlight beside no list")
+    #expect(highlighted(in: fallback.model).isEmpty, "a highlight beside no list")
     #expect(fallback.destination.pushed == nil)
 }
 
@@ -626,7 +607,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     #expect(list.send(.route(on(BuiltInTaskViews.today))) == nil)
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
     #expect(list.model == (try sidebarOn(BuiltInTaskViews.today, in: store)), "the module a link to Today would have created")
-    #expect(list.model.selection == BuiltInTaskViews.today)
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
     #expect(list.route == on(BuiltInTaskViews.today))
 }
 
@@ -657,7 +638,7 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     _ = list.send(.action(.titleFieldSubmitted))
     #expect(list.model.problem != nil, "the refusal is the setup; without it this proves nothing")
     #expect(list.send(.route(on(BuiltInTaskViews.upcoming))) == nil)
-    #expect(list.model.selection == BuiltInTaskViews.upcoming)
+    #expect(highlighted(in: list.model) == [BuiltInTaskViews.upcoming])
     // The same state reached with the highlight on Upcoming before the refusal compares the model whole.
     let reference = try TaskViewList(
         store: store, route: on(BuiltInTaskViews.upcoming), width: .narrow, capabilities: iPhone
@@ -702,10 +683,10 @@ private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     let before = list.model
     let gone = ViewID()
     #expect(list.send(.route(on(gone))) == nil)
-    #expect(list.model.selection == nil, "declared on no row; this is the setup")
+    #expect(highlighted(in: list.model).isEmpty, "declared on no row; this is the setup")
     #expect(list.send(.notOpened(.notFound(gone), stillOpen: on(BuiltInTaskViews.today).list)) == nil)
     #expect(list.model.rows == before.rows)
-    #expect(list.model.selection == before.selection, "the highlight is back on Today")
+    #expect(highlighted(in: list.model) == highlighted(in: before), "the highlight is back on Today")
     #expect(list.model.problem == "The list could not be opened.")
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
     #expect(list.route == on(BuiltInTaskViews.today))

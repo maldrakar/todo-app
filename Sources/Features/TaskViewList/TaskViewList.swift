@@ -836,27 +836,27 @@ public final class TaskViewList: Routable {
         var problem: String?
 
         /// The model a view draws: the rows a person sees, those inside a folded list left out, with the window and
-        /// this person's session projected onto them (`drawnRows`); the highlighted row's id, on the list's row of the
-        /// view whose list is declared, or on the folded list that hides that row; the id of the row being renamed;
+        /// this person's session projected onto them (`drawnRows`), the highlight on the list's row of the view whose
+        /// list is declared, or on the folded list that hides that row; the id of the row being renamed;
         /// whether they are in edit mode; the bar for the platform's edit mode, as edit mode has it, and its "+" menu;
         /// the look of the drag for the width; the dialog up, if any; and the sentence, if any.
         var model: Model {
             let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
             // Read off the drawn rows and not copied from the destination or the walk: `.rowSelected` and `.route`
             // declare the list of an id without asking the rows, and an id no list's row carries, an area's line's
-            // among them, highlights nothing, so the model names no row for it either. A rename on a row a fold hides
-            // has no field drawn, so it names no row either.
-            let selection = shown.highlighted.flatMap { id in
+            // among them, highlights nothing, so no row is drawn highlighted for it. A rename on a row a fold hides
+            // has no field drawn, so the model names no row for it.
+            let highlighted = shown.highlighted.flatMap { id in
                 shown.rows.contains { $0.id == id && $0.kind == .list } ? id : nil
             }
             let renaming = rename.flatMap { rename in shown.rows.contains { $0.id == rename.id } ? rename.id : nil }
             let drawn = TaskViewList.drawnRows(
                 shown.rows, in: width, isEditing: isEditing, counts: counts, collapsedViews: collapsedViews,
-                selection: selection, rename: rename.map { ($0.id, $0.draft) },
+                highlighted: highlighted, rename: rename.map { ($0.id, $0.draft) },
                 opensWindowsBeside: capabilities.opensWindowsBeside
             )
             return Model(
-                rows: drawn, selection: selection, renaming: renaming, isEditing: isEditing,
+                rows: drawn, renaming: renaming, isEditing: isEditing,
                 bar: TaskViewList.bar(isEditing: isEditing, hasEditMode: capabilities.hasEditMode, in: width),
                 addMenu: TaskViewList.addMenu(hasEditMode: capabilities.hasEditMode),
                 drag: TaskViewList.drag(in: width), confirmation: confirmation, movePicker: movePicker,

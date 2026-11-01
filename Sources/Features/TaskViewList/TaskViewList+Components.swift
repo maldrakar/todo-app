@@ -17,7 +17,7 @@ extension TaskViewList {
     /// The rows a person sees as the screen draws them, an area's line or a list's row each, with the window and this
     /// person's session projected onto them: the numbers of the width; the counts, the grips and the menus as edit
     /// mode shows them, the menus with Open in New Window where a window can open beside this one; the folds; the
-    /// highlight on `selection`; and the field, with its draft, on the row being renamed.
+    /// highlight on the row `highlighted` names; and the field, with its draft, on the row being renamed.
     ///
     /// One pass in tree order, like the read, carrying the centres of the tiles of the branch it is in, so that each
     /// list's row has a guide under every ancestor's tile (`Phone.dc.html`, `guidesFor`): in tree order a row's
@@ -25,7 +25,7 @@ extension TaskViewList {
     /// line's own depth, so the line takes no guide and its lists stand under none.
     static func drawnRows(
         _ rows: [ReadRow], in width: WindowWidth, isEditing: Bool, counts: [ViewID: Int], collapsedViews: Set<ViewID>,
-        selection: ViewID?, rename: (id: ViewID, draft: String)?, opensWindowsBeside: Bool
+        highlighted: ViewID?, rename: (id: ViewID, draft: String)?, opensWindowsBeside: Bool
     ) -> [Model.Row] {
         let metrics = Metrics.of(width)
         var centres: [Double] = []
@@ -49,8 +49,8 @@ extension TaskViewList {
                 let list = listRow(
                     row, metrics, guides: Array(centres.prefix(row.depth)),
                     end: rowEnd(count: count, chevron: fold, hasGrip: isEditing, metrics), draft: draft,
-                    isHighlighted: row.id == selection,
-                    background: metrics.rowBackground(isHighlighted: row.id == selection), tap: .rowSelected(row.id),
+                    isHighlighted: row.id == highlighted,
+                    background: metrics.rowBackground(isHighlighted: row.id == highlighted), tap: .rowSelected(row.id),
                     menu: isEditing ? nil : listMenu(row.id, opensWindowsBeside: opensWindowsBeside)
                 )
                 centres = list.childGuides

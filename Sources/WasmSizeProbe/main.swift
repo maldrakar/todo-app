@@ -152,7 +152,7 @@ private enum WasmSizeProbe {
         perform(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today))))
         perform(.action(.taskViewList(.titleFieldChanged("Today, open"))))
         perform(.action(.taskViewList(.titleFieldSubmitted)))
-        let renamed = highlightedTitle(in: app.model) ?? "none"
+        let renamed = rowTitle(of: BuiltInTaskViews.today, in: app.model) ?? "none"
         // New list from "+", named as it opens; a list made inside it, which takes its colour and unfolds it; the
         // outer list folded by its chevron; an area from "+", left unnamed, which an area may be; and New task, which
         // the sidebar asks the root for and the root answers with quick entry, which the link below keeps up. The
@@ -290,10 +290,10 @@ private enum WasmSizeProbe {
         }
     }
 
-    /// The title of the sidebar's highlighted row, and nil when none is: the row `selection` names, through one switch
-    /// over a row's kinds, as the sidebar's view has, an area's line never highlighted.
-    private static func highlightedTitle(in model: AppModule.Model) -> String? {
-        for row in model.taskViewList.rows where row.id == model.taskViewList.selection {
+    /// The title of the sidebar's row that holds a view, and nil when no list's row does: through one switch over a
+    /// row's kinds, as the sidebar's view has, an area's line holding no list.
+    private static func rowTitle(of id: ViewID, in model: AppModule.Model) -> String? {
+        for row in model.taskViewList.rows where row.id == id {
             switch row.kind {
             case .list(let list): return list.title.text
             case .area: continue

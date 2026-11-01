@@ -3,12 +3,12 @@ import DesignSystemComponents
 import TodoCore
 
 extension TaskViewList {
-    /// What a view draws: the rows of the tree, the highlighted one and the one being renamed named once more for a
-    /// view that reads them as one value, whether the screen is in edit mode, the bar and its "+" menu named once more
-    /// for the app's menu bar, the look of the drag, the dialog up over the rows, and the sentence. The rows, the bar,
-    /// the drag and the dialogs are the models of the components that draw them, built for the screen in
-    /// `TaskViewList+Components.swift` with every value a platform needs to draw them, so that every platform draws the
-    /// same components and no decision stays behind on one (ADR-0007, amendment of 2026-10-30).
+    /// What a view draws: the rows of the tree, the one being renamed named once more for a view that reads it as one
+    /// value, whether the screen is in edit mode, the bar and its "+" menu named once more for the app's menu bar, the
+    /// look of the drag, the dialog up over the rows, and the sentence. The rows, the bar, the drag and the dialogs are
+    /// the models of the components that draw them, built for the screen in `TaskViewList+Components.swift` with every
+    /// value a platform needs to draw them, so that every platform draws the same components and no decision stays
+    /// behind on one (ADR-0007, amendment of 2026-10-30).
     public struct Model: Equatable, Sendable {
         /// One row of the tree, an area's line or a list's row (spec section 5).
         public struct Row: Equatable, Sendable, Identifiable {
@@ -37,25 +37,16 @@ extension TaskViewList {
             case list(ListRowModel<UserAction>)
         }
 
-        public let rows: [Row]
-
-        /// The id of the highlighted row, and nil when no row is highlighted: the highlight as one value, so that a
-        /// reader that wants it reads a field instead of searching the rows for one (spec section 4).
-        ///
-        /// It is the highlight a list's row draws as its background, held a second way: a client that draws row by
-        /// row reads the row. Both come off the same drawn rows when the model is assembled, so they name the same row
-        /// or none.
-        ///
-        /// The highlight is the view of the list this module declared, where a list's row holds it (navigation state
-        /// spec, "Open questions"): nil when it declared nothing, and when the view it declared has no such row, a
-        /// view that is gone or not yet synced, so a highlight goes with its row by computation and a row that arrives
-        /// later lights up only if its list is still declared.
+        /// The rows, a list's row drawing the highlight where its view is the list this module declared (navigation
+        /// state spec, "Open questions"), and none where it declared nothing or the view it declared has no row, a view
+        /// that is gone or not yet synced, so a highlight goes with its row and a row that arrives later lights up only
+        /// if its list is still declared (spec section 4).
         ///
         /// A row hidden by a fold passes its highlight to the folded list that hides it, the outermost of the folds
         /// above it, which is the one drawn, as the Finder lights a folder that closes over the selection (the owner,
         /// 2026-10-29, #158). Only the light moves: the list declared stays open, a click on the lit row declares that
         /// row's own list as a click on any row does, and the row lights up again once no fold hides it.
-        public let selection: ViewID?
+        public let rows: [Row]
 
         /// The id of the row whose field is open, and nil when no row drawn has one: what a view reads to show the
         /// field as it opens, the phone's screen scrolling to it, instead of searching the rows for it (the owner's 👍

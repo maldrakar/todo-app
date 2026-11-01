@@ -71,6 +71,13 @@ func listRow(_ id: ViewID, in model: TaskViewList.Model) -> ListRowModel<TaskVie
     model.rows.first { $0.id == id }.flatMap(listRow)
 }
 
+/// The ids of the rows that carry the highlight, read over their kinds as a view drawing row by row reads them, a
+/// list's row on the fill colour: an area's line never does, since an area never opens. Not private, since the
+/// module's tests read the highlight with it too.
+func highlighted(in model: TaskViewList.Model) -> [ViewID] {
+    model.rows.filter { listRow($0)?.background == .fill }.map(\.id)
+}
+
 /// The count a list's row draws, read over its accessories as a view reads them, and empty where it draws none. Not
 /// private, since the edits' and the components' tests read a count with it too.
 func drawnCount(of list: ListRowModel<TaskViewList.UserAction>) -> String {
@@ -583,8 +590,8 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 }
 
 /// A fold that hides the open list's row lights the row that hides it, the folded list a person can still see, as the
-/// Finder lights a folder that closes over the selection (the owner, 2026-10-29, #158): `selection` names it, and the
-/// model is the one a sidebar declared on that list draws. With two folds above the open list the outer one is lit,
+/// Finder lights a folder that closes over the selection (the owner, 2026-10-29, #158): the highlight is on it, and
+/// the model is the one a sidebar declared on that list draws. With two folds above the open list the outer one is lit,
 /// since it is the one drawn. Only the light moves: the list declared, with the task in it, stays open, and the folds
 /// taken back light its own row again.
 @Test func aFoldOverTheOpenListLightsTheFoldedListThatHidesIt() throws {
@@ -597,12 +604,12 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let route = TaskViewList.Route(list: .init(head: garden, task: TaskScreen.Route(head: task)))
     let list = try TaskViewList(store: store, route: route, width: .narrow, capabilities: iPhone)
     let open = list.model
-    #expect(open.selection == garden, "the open list's row is lit; this is the setup")
+    #expect(highlighted(in: open) == [garden], "the open list's row is lit; this is the setup")
     #expect(list.send(.action(.disclosureTapped(home))) == nil)
-    #expect(list.model.selection == home)
+    #expect(highlighted(in: list.model) == [home])
     #expect(list.model == (try sidebarOn(home, in: store)), "Home lit, as a sidebar declared on it draws it")
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
-    #expect(list.model.selection == projects, "the outer fold, the one drawn")
+    #expect(highlighted(in: list.model) == [projects], "the outer fold, the one drawn")
     #expect(list.model == (try sidebarOn(projects, in: store)))
     #expect(list.destination.pushed == route.list, "the light moved and the declaration did not")
     #expect(list.route == route)
@@ -626,11 +633,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
         store: store, route: .init(list: .init(head: contracts)), width: .narrow, capabilities: iPhone
     )
     let open = list.model
-    #expect(open.selection == contracts, "the open list's row is lit; this is the setup")
+    #expect(highlighted(in: open) == [contracts], "the open list's row is lit; this is the setup")
     #expect(list.send(.action(.disclosureTapped(acme))) == nil)
     #expect(list.model == (try sidebarOn(acme, in: store)))
     #expect(list.send(.action(.disclosureTapped(clients))) == nil)
-    #expect(list.model.selection == clients)
+    #expect(highlighted(in: list.model) == [clients])
     #expect(list.model == (try sidebarOn(clients, in: store)))
     #expect(list.destination.pushed == .init(head: contracts))
     #expect(list.send(.action(.disclosureTapped(clients))) == nil)
@@ -648,7 +655,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
         store: store, route: .init(list: .init(head: home)), width: .narrow, capabilities: iPhone
     )
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
-    #expect(list.model.selection == projects, "the fold lit Projects; this is the setup")
+    #expect(highlighted(in: list.model) == [projects], "the fold lit Projects; this is the setup")
     #expect(list.send(.action(.rowSelected(projects))) == nil)
     #expect(list.destination.pushed == .init(head: projects))
     #expect(list.route == .init(list: .init(head: projects)))
