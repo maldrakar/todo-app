@@ -90,18 +90,27 @@ TODO_DB=/tmp/second.sqlite swift run todo-mac
 TODO_ROUTE=/view/00000000-0000-4000-8000-000000000002/task/<task id> swift run todo-mac
 ```
 
-It opens a window: the list of views in a sidebar, and beside it the tasks of the view chosen there. Rename,
-in a row's context menu, opens a field on the row: Return or a click away keeps the new title, a blank one is
-refused with a sentence under the list, and Esc keeps the old title. The + on the sidebar's toolbar holds New
-Task, which opens quick entry, New List, which adds a list at the end of the tree, in the last area when there is
-one, with its field open and the highlight where it was, and New Area, which adds an unnamed area at the end, a line
-with its name field open. A click on a task pushes its screen, which shows its title,
+It opens a window: the list of views in a sidebar, and beside it the tasks of the view chosen there. The sidebar is
+the canvas's: each list a row with its tile, its title and the number of its open tasks, a chevron on a list with
+lists inside it that folds the branch, guides down the levels, and each area a line across the column with its name
+on it in capitals; a tree too deep for the column scrolls sideways, and the counts and chevrons stay at its right
+edge. A click chooses a list. A right click opens Rename, New List, Open in New Window, Move to… and Delete on a list,
+and Rename, New List and Delete Area on an area's line. Rename opens a field on the row: Return or a click away keeps
+the new title, a blank one is refused with a sentence under the rows, and Esc keeps the old title. Move to… opens a
+sheet of the whole tree to choose the new parent from, and Delete always asks. A row can be dragged at any time, a list
+with the lists inside it or an area with its lists, to a new place, and sideways for a new level, a line with a circle
+marking where it lands; the Mac has no edit mode. At the bottom of the sidebar the search field does nothing yet, and
+the + holds New Task, which opens quick entry, New List, which adds a list at the end of the last area, or of the tree
+when there is no area, with its field open and the highlight where it was, and New Area, which adds an unnamed area at
+the end, a line with its name field open. The File menu holds the same three for the window in front, New Task on ⌘N
+and New List on ⇧⌘N, the keys the + shows beside them, and New Window on ⌥⌘N, which opens another window on the Inbox.
+A click on a task pushes its screen, which shows its title,
 over the list, and the back button returns to the list. Quick Entry, the + on the list's toolbar, opens a sheet with
 a title field: Return or Add puts the task in the Inbox and closes the sheet, a blank title is refused with a
 sentence in the sheet, and Cancel or Esc closes it and writes nothing.
 
-Cmd-N opens another window on the Inbox, and Open in New Window, in a row's context menu, opens that view in a
-window of its own, every time, on the view a window shows too; every window shows what the others write.
+Open in New Window, in a list's context menu, opens that view in a window of its own, every time, on the view a window
+shows too; every window shows what the others write.
 `TODO_ROUTE` is the route the first window opens, in the text form a link carries after `todo://`: a path,
 `/view/<id>` or `/view/<id>/task/<id>`, with `?quick-entry` after it to open quick entry too. One that does not
 read opens the Inbox, as no `TODO_ROUTE` does, and one naming a view that is gone opens no list and says so under
@@ -168,8 +177,10 @@ area, or of the tree when there is no area, and New Area, which adds a line at t
 the new row, scrolled into view. Edit mode takes the counts away and gives every row a grip: a tap on a row or a line
 opens its name field, a long press lifts a row, a list with the lists inside it or an area with its lists, and carries
 it to a new place, sideways for a new level, and the bar holds + List, + Area and Done. Move to… opens a sheet of the
-whole tree to choose the new parent from, and Delete always asks. The wide windows, the Mac's and the iPad's, keep the
-sidebar's plain look for now (#149).
+whole tree to choose the new parent from, and Delete always asks. A wide window, the iPad's and that of an iPhone Plus
+or Pro Max turned sideways, draws the same tree as the Mac's sidebar with the phone's gestures: a long press opens a
+row's menu, the bar at the bottom of the column holds "…", the search capsule and "+", and in edit mode a long press
+lifts a row, a line with a circle marking where it lands.
 
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.

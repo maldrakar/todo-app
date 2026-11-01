@@ -65,6 +65,10 @@ struct RootView: View {
                 QuickEntryView(model: quickEntry) { host.send(.quickEntry($0)) }
             }
         }
+        // The sidebar's "+" menu for the menu bar while this window is focused (`AppScene.NewItemCommands`), from the
+        // root and not the sidebar, so that the sidebar's column hidden by its button and a narrow window's stack keep
+        // it.
+        .focusedSceneValue(\.addMenu, AppScene.AddMenu(of: host))
     }
 
     /// The wide window's tree: the sidebar beside the detail column, whose stack has the layout's column at its root,
@@ -139,10 +143,13 @@ struct RootView: View {
         }
     }
 
-    /// The list of views beside the pane of the wide tree, in the look it had until the plan's ninth task draws the
-    /// canvas's sidebar there.
+    /// The list of views beside the pane of the wide tree, the canvas's sidebar (`ListsSidebar`), as wide as the Mac
+    /// board's column at least and at first, 280 pt (`Mac.dc.html`, the column). A minimum and not only an ideal,
+    /// because the column opens at the width AppKit saved for it (`NSSplitView Subview Frames` in the app's defaults):
+    /// with a saved width, an ideal of 220 opened the column at 180, the minimum it had then (2026-10-12).
     private var sidebar: some View {
-        TaskViewListView(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
+        ListsSidebar(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
+            .navigationSplitViewColumnWidth(min: 280, ideal: 280)
     }
 
     /// One switch over the screens the window's stack can hold, the one place they are drawn: it picks a view per

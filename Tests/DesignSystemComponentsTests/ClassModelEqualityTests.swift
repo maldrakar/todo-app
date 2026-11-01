@@ -49,15 +49,17 @@ private func listRow(
     height: Double = 46, leading: Double = 20,
     tile: TileModel = TileModel(color: .stone, icon: .bullets, side: 30, cornerRadius: 8, glyphSize: 19),
     tileToTitle: Double = 12, title: TextModel = text, field: TextFieldModel<Action>? = nil, need: Double = 274,
-    background: DesignSystem.Color = .paper, guides: [Double] = [], childGuides: [Double] = [35],
-    guide: StrokeModel = stroke, accessories: [AccessoryModel<Action>] = [.space(20)], fadeWidth: Double = 10,
-    textMinimumWidth: Double = 20, cellMinimumWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72,
-    tap: Action = .first, menu: MenuModel<Action>? = nil
+    background: DesignSystem.Color = .paper, backgroundInset: Double = 0, cornerRadius: Double = 0,
+    guides: [Double] = [], childGuides: [Double] = [35], guide: StrokeModel = stroke,
+    accessories: [AccessoryModel<Action>] = [.space(20)], fadeWidth: Double = 10, textMinimumWidth: Double = 20,
+    cellMinimumWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72, tap: Action = .first,
+    menu: MenuModel<Action>? = nil
 ) -> ListRowModel<Action> {
     ListRowModel(
         height: height, leading: leading, tile: tile, tileToTitle: tileToTitle, title: title, field: field, need: need,
-        background: background, guides: guides, childGuides: childGuides, guide: guide, accessories: accessories,
-        fadeWidth: fadeWidth, textMinimumWidth: textMinimumWidth, cellMinimumWidth: cellMinimumWidth, endGap: endGap,
+        background: background, backgroundInset: backgroundInset, cornerRadius: cornerRadius, guides: guides,
+        childGuides: childGuides, guide: guide, accessories: accessories, fadeWidth: fadeWidth,
+        textMinimumWidth: textMinimumWidth, cellMinimumWidth: cellMinimumWidth, endGap: endGap,
         accessoriesWidth: accessoriesWidth, tap: tap, menu: menu
     )
 }
@@ -72,6 +74,8 @@ private func listRow(
         "field": listRow(field: field("Home")),
         "need": listRow(need: 310),
         "background": listRow(background: .fill),
+        "backgroundInset": listRow(backgroundInset: 10),
+        "cornerRadius": listRow(cornerRadius: 7),
         "guides": listRow(guides: [35]),
         "childGuides": listRow(childGuides: [35, 55]),
         "guide": listRow(guide: StrokeModel(color: .line, width: 1.5, dash: [])),
@@ -128,24 +132,36 @@ private let card = DragModel.Card(
 
 private func drag(
     indent: IndentModel = IndentModel(start: 20, step: 22), animation: DesignSystem.Animation = .popover,
-    slot: DragModel.Slot = slot, card: DragModel.Card = card
+    look: DragModel.Look = .slot(slot, card)
 ) -> DragModel {
-    DragModel(indent: indent, animation: animation, slot: slot, card: card)
+    DragModel(indent: indent, animation: animation, look: look)
 }
+
+private let indicator = DragModel.Indicator(
+    height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
+    trailingGap: 18, circleDiameter: 10, circleOffset: -6, circleRing: StrokeModel(color: .accent, width: 2, dash: []),
+    circleFill: .sidebar,
+    card: .init(
+        width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted, rotation: -1.2,
+        opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5, glyphSize: 12,
+        titleFont: .rowTitle
+    )
+)
 
 @Test func aDragComparesEveryStoredProperty() {
     expectEveryPropertyCompared({ drag() }, [
         "indent": drag(indent: IndentModel(start: 20, step: 24)),
         "animation": drag(animation: .check),
-        "slot": drag(slot: DragModel.Slot(
-            height: 50, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft, stroke: stroke
-        )),
-        "card": drag(card: DragModel.Card(
-            raise: 8, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface, grip: icon, gripCell: 40,
-            minimumWidth: 120, listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14,
-            lineHeight: 36, lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
-        )),
+        "look": drag(look: .indicator(indicator)),
     ])
+    #expect(drag(look: .slot(slot, card)) != drag(look: .slot(DragModel.Slot(
+        height: 50, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft, stroke: stroke
+    ), card)), "the slot is compared")
+    #expect(drag(look: .slot(slot, card)) != drag(look: .slot(slot, DragModel.Card(
+        raise: 8, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface, grip: icon, gripCell: 40,
+        minimumWidth: 120, listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14,
+        lineHeight: 36, lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
+    ))), "the card is compared")
 }
 
 private let topLevel = PickerModel<Int, Action>.TopLevel(

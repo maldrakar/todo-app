@@ -1,15 +1,24 @@
 // Sources/DesignSystemComponents/DragModel.swift
 import DesignSystem
 
-/// How the drag in a tree looks while a row is lifted (`Phone.dc.html`, the drag's slot and card): the slot where the
-/// row would land and the card carried under the finger, both placed by the tree's `indent`, and the motion of the
-/// lift, the release and a move of the slot. The drag itself, which row lifts, where the slot stands and at which
-/// depth, is the platform's, since only the platform has the finger (the owner, 2026-10-30); this is its look.
+/// How the drag in a tree looks while a row is lifted: what marks the place where the row would land and the card it is
+/// carried on, one of two looks (`Look`), both placed by the tree's `indent`, and the motion of the lift, the release
+/// and a move of the mark. The drag itself, which row lifts, where the mark stands and at which depth, is the
+/// platform's, since only the platform has the finger or the pointer (the owner, 2026-10-30); this is its look.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a screen's model holds it, every comparison of the
 /// screen's model compares it, and it is some 540 bytes on wasm32. Its `==` compares every stored property, and a test
 /// changes them one at a time.
 public final class DragModel: Equatable, Sendable {
+    /// What marks the place where the lifted row would land and the card it is carried on: the slot that opens there,
+    /// with the card under the finger (`Phone.dc.html`, the drag's slot and card), or the Finder's indicator, a line
+    /// and a circle, with its own card beside them (`Mac.dc.html`, the drag's slot row and card). A view switches over
+    /// it, every case drawn and no `default` (`docs/style.md`, "Views").
+    public enum Look: Equatable, Sendable {
+        case slot(Slot, Card)
+        case indicator(Indicator)
+    }
+
     /// The slot where the lifted row would land: `height` high, its frame drawn `verticalInset` in from its top and
     /// from its bottom, from `inset` before the tile of the slot's depth to `trailingGap` short of the right edge of
     /// the tree on screen, its corners of `cornerRadius`, filled with `fill` and edged with `stroke`, in points. Behind
@@ -105,26 +114,122 @@ public final class DragModel: Equatable, Sendable {
         }
     }
 
-    /// The tree's indent, which places the slot and the card at a depth, and is how far a finger carries a lifted row
-    /// sideways to change its depth by one.
+    /// The Finder's mark of the place where the lifted row would land, between the rows or into a parent alike: it
+    /// opens a gap `height` high between the rows, in which, centred in its height, run a line of `line`, from
+    /// `lineOffset` from the leading edge of the tile of the drop's depth to `trailingGap` short of the right edge of
+    /// the tree on screen, its ends rounded by `lineCornerRadius`, and a circle `circleDiameter` across, its leading
+    /// edge `circleOffset` from that tile's leading edge, ringed with `circleRing` and filled with `circleFill`; and
+    /// beside them its card. An offset is after the tile's leading edge where it is positive and before it where it is
+    /// negative, all in points.
+    public struct Indicator: Equatable, Sendable {
+        /// The lifted row on a card of its own at the mark (`Mac.dc.html`, `.drag-ghost`): `width` by `height`, its
+        /// leading edge `offset` from the leading edge of the tile of the drop's depth, centred on the line, its
+        /// corners of `cornerRadius`, on `background`, casting `shadow`, turned by `rotation` degrees, clockwise when
+        /// positive, at `opacity`, from 0 to 1, in points. A list's card holds the lifted row's tile in its colour
+        /// with its icon at the sizes here, `padding` in, and `tileToTitle` after it the row's title in `titleFont`; a
+        /// line's card holds the lifted line as the line draws itself.
+        public struct Card: Equatable, Sendable {
+            public let width: Double
+            public let height: Double
+            public let offset: Double
+            public let cornerRadius: Double
+            public let background: DesignSystem.Color
+            public let shadow: DesignSystem.Shadow
+            public let rotation: Double
+            public let opacity: Double
+            public let padding: Double
+            public let tileToTitle: Double
+            public let tileSide: Double
+            public let tileCornerRadius: Double
+            public let glyphSize: Double
+            public let titleFont: DesignSystem.Font
+
+            public init(
+                width: Double,
+                height: Double,
+                offset: Double,
+                cornerRadius: Double,
+                background: DesignSystem.Color,
+                shadow: DesignSystem.Shadow,
+                rotation: Double,
+                opacity: Double,
+                padding: Double,
+                tileToTitle: Double,
+                tileSide: Double,
+                tileCornerRadius: Double,
+                glyphSize: Double,
+                titleFont: DesignSystem.Font
+            ) {
+                self.width = width
+                self.height = height
+                self.offset = offset
+                self.cornerRadius = cornerRadius
+                self.background = background
+                self.shadow = shadow
+                self.rotation = rotation
+                self.opacity = opacity
+                self.padding = padding
+                self.tileToTitle = tileToTitle
+                self.tileSide = tileSide
+                self.tileCornerRadius = tileCornerRadius
+                self.glyphSize = glyphSize
+                self.titleFont = titleFont
+            }
+        }
+
+        public let height: Double
+        public let line: StrokeModel
+        public let lineOffset: Double
+        public let lineCornerRadius: Double
+        public let trailingGap: Double
+        public let circleDiameter: Double
+        public let circleOffset: Double
+        public let circleRing: StrokeModel
+        public let circleFill: DesignSystem.Color
+        public let card: Card
+
+        public init(
+            height: Double,
+            line: StrokeModel,
+            lineOffset: Double,
+            lineCornerRadius: Double,
+            trailingGap: Double,
+            circleDiameter: Double,
+            circleOffset: Double,
+            circleRing: StrokeModel,
+            circleFill: DesignSystem.Color,
+            card: Card
+        ) {
+            self.height = height
+            self.line = line
+            self.lineOffset = lineOffset
+            self.lineCornerRadius = lineCornerRadius
+            self.trailingGap = trailingGap
+            self.circleDiameter = circleDiameter
+            self.circleOffset = circleOffset
+            self.circleRing = circleRing
+            self.circleFill = circleFill
+            self.card = card
+        }
+    }
+
+    /// The tree's indent, which places the mark and the card at a depth, and is how far a finger or the pointer carries
+    /// a lifted row sideways to change its depth by one.
     public let indent: IndentModel
 
     public let animation: DesignSystem.Animation
-    public let slot: Slot
-    public let card: Card
+    public let look: Look
 
-    public init(indent: IndentModel, animation: DesignSystem.Animation, slot: Slot, card: Card) {
+    public init(indent: IndentModel, animation: DesignSystem.Animation, look: Look) {
         self.indent = indent
         self.animation = animation
-        self.slot = slot
-        self.card = card
+        self.look = look
     }
 
     public static func == (lhs: DragModel, rhs: DragModel) -> Bool {
         if lhs === rhs { return true }
         return lhs.indent == rhs.indent
             && lhs.animation == rhs.animation
-            && lhs.slot == rhs.slot
-            && lhs.card == rhs.card
+            && lhs.look == rhs.look
     }
 }

@@ -171,19 +171,20 @@ public final class AppModule: Routable {
     /// class when the window is made, and a default here would make that fallback a rule of the core (`docs/style.md`,
     /// "A lower layer holds no policy of its client").
     ///
-    /// Whether a window can open beside this one is the platform's to say when the window is made, and the sidebar is
-    /// made with it, so that Open in New Window is in a list's menu only where one can (`docs/specs/navigation.md`,
-    /// section 5). It does not change while the app runs, so no event moves it, and it has no default, for the reason
-    /// the width has none.
+    /// What the window's platform offers is the platform's to say when the window is made, and the sidebar is made with
+    /// it, so that Open in New Window is in a list's menu only where a window can open beside this one
+    /// (`docs/specs/navigation.md`, section 5), and edit mode only where the platform has it (Lists screen spec,
+    /// sections 7 and 8). It does not change while the app runs, so no event moves it, and it has no default, for the
+    /// reason the width has none.
     ///
     /// Throws what the sidebar's `init` throws and nothing else, as M2's root did: a window is not made around a
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A screen of the stack that
     /// cannot be made is its opener's to say, and quick entry cannot fail to be made.
     public init(
-        store: Store, route: Route = .default, width: WindowWidth, supportsMultipleWindows: Bool
+        store: Store, route: Route = .default, width: WindowWidth, capabilities: WindowCapabilities
     ) throws(StoreError) {
         let taskViewList = try TaskViewList(
-            store: store, route: route.sidebar, width: width, supportsMultipleWindows: supportsMultipleWindows
+            store: store, route: route.sidebar, width: width, capabilities: capabilities
         )
         // The stack and the seat are built once, here, each with the way to make what it holds: a closure over the
         // `init` of the kind the route names that captures the store and never this root. The root holds both in its

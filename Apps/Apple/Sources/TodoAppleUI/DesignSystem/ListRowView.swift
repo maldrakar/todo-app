@@ -44,10 +44,12 @@ struct ListRowView<Action: Equatable & Sendable>: View {
 }
 
 extension ListRowView {
-    /// What stands at the right of a list's row as its model describes it (`Phone.dc.html`, the row's sticky end): its
-    /// accessories (`Accessories`), as high as the row, on the row's own background, which fades in over the model's
-    /// fade, so that a title passing under them ends softly where a tree pins them to the right edge of the screen and
-    /// scrolls the rows sideways under them.
+    /// What stands at the right of a list's row as its model describes it (`Phone.dc.html` and `Mac.dc.html`, the row's
+    /// sticky end): its accessories (`Accessories`), as high as the row, on the row's own background, which fades in
+    /// over the model's fade, so that a title passing under them ends softly where a tree pins them to the right edge
+    /// of the screen and scrolls the rows sideways under them. Its background ends in the row's corners, the canvas's
+    /// `border-radius: 0 7px 7px 0`, so that the end of a row rounded on its background, the sidebar's highlighted one,
+    /// ends rounded with it.
     struct End: View {
         private let model: ListRowModel<Action>
         private let send: (Action) -> Void
@@ -70,7 +72,14 @@ extension ListRowView {
                         colors: [background.opacity(0), background], startPoint: .leading, endPoint: .trailing
                     )
                     .frame(width: model.fadeWidth)
-                    background
+                    // The colour in the shape and not clipped by it: a clip drew the fade beside it up to 4/255 off in
+                    // the light appearance (the iOS 26.3 simulator, 2026-10-31). Circular corners, as the canvas's
+                    // `border-radius` draws them (`ListTile`).
+                    UnevenRoundedRectangle(
+                        bottomTrailingRadius: model.cornerRadius, topTrailingRadius: model.cornerRadius,
+                        style: .circular
+                    )
+                    .fill(background)
                 }
             }
         }

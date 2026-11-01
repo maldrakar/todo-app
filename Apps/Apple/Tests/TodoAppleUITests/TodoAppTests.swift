@@ -5,6 +5,7 @@ import Observation
 import SwiftUI
 import AppFeature
 import DeviceFile
+import FeatureModule
 import TaskViewListFeature
 @testable import TodoAppleUI
 import TodoCore
@@ -54,7 +55,7 @@ import TodoCore
         weak var releasedRoot: TodoApp?
         do {
             let app = try TodoApp.launch(environment: ["TODO_DB": database])
-            let window = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true)
+            let window = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
             released = window.host
             releasedRoot = app
         }
@@ -67,7 +68,7 @@ import TodoCore
 @Test @MainActor func aWindowMadeFromNoPathIsTheDefaultWindow() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let host = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         #expect(host.route.path == defaultWindow)
     }
 }
@@ -77,7 +78,7 @@ import TodoCore
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: path, width: .wide, supportsMultipleWindows: true).host
+        let host = try app.makeWindow(path: path, width: .wide, capabilities: mac).host
         #expect(host.route.path == path)
     }
 }
@@ -89,7 +90,7 @@ import TodoCore
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)/task"
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: path, width: .wide, supportsMultipleWindows: true).host
+        let host = try app.makeWindow(path: path, width: .wide, capabilities: mac).host
         #expect(host.route.path == defaultWindow)
         #expect(host.model.problem == nil)
     }
@@ -117,13 +118,13 @@ import TodoCore
 }
 
 /// `TODO_ROUTE` goes to the first window made with no path of its own and is spent there: every later window made with
-/// none, Cmd-N's, opens the default window (the owner, 2026-10-20).
+/// none, New Window's, opens the default window (the owner, 2026-10-20).
 @Test @MainActor func theFirstWindowMadeWithNoPathOpensTheLaunchRoute() throws {
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
         let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
-        #expect(try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host.route.path == path)
-        let next = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true)
+        #expect(try app.makeWindow(path: nil, width: .wide, capabilities: mac).host.route.path == path)
+        let next = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
         #expect(next.host.route.path == defaultWindow)
     }
 }
@@ -134,9 +135,9 @@ import TodoCore
     try withFreshDatabase { database in
         let restored = "/view/\(BuiltInTaskViews.today)"
         let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": "/?quick-entry"])
-        let first = try app.makeWindow(path: restored, width: .wide, supportsMultipleWindows: true)
+        let first = try app.makeWindow(path: restored, width: .wide, capabilities: mac)
         #expect(first.host.route.path == restored)
-        let next = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true)
+        let next = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
         #expect(next.host.route.path == defaultWindow)
     }
 }
@@ -183,8 +184,8 @@ import TodoCore
 @Test @MainActor func aLinkOpensItsRouteInItsOwnWindow() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let linked = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true)
-        let other = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true)
+        let linked = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
+        let other = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
         linked.open(try #require(URL(string: "todo://" + path)))
         #expect(linked.host.route.path == path)
@@ -198,8 +199,8 @@ import TodoCore
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
         let path = "/view/\(BuiltInTaskViews.today)"
-        let linked = try app.makeWindow(path: path, width: .wide, supportsMultipleWindows: true)
-        let other = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true)
+        let linked = try app.makeWindow(path: path, width: .wide, capabilities: mac)
+        let other = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
         linked.open(try #require(URL(string: "todo://view/\(BuiltInTaskViews.today)")))
         #expect(linked.host.model.problem == "The link could not be opened.")
         #expect(linked.host.route.path == path)
@@ -213,7 +214,7 @@ import TodoCore
 @Test @MainActor func aWindowMadeNarrowIsLaidOutNarrow() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let model = try app.makeWindow(path: nil, width: .narrow, supportsMultipleWindows: false).host.model
+        let model = try app.makeWindow(path: nil, width: .narrow, capabilities: iPhone).host.model
         guard case .narrow(let path) = model.layout else {
             Issue.record("a window made narrow is laid out narrow, and is \(model.layout)")
             return
@@ -223,18 +224,49 @@ import TodoCore
     }
 }
 
-/// A window is made with whether another can open beside it, which its view reads from the platform and the root hands
-/// to the sidebar, whose lists' menus offer Open in New Window only where one can (`docs/specs/navigation.md`,
-/// section 5): a window that can have another beside it offers it on every list, and one that cannot, on none, whatever
-/// the width of either.
-@Test @MainActor func aWindowIsMadeWithWhetherAnotherCanOpenBesideIt() throws {
+/// A window is made with what its platform offers, which its view reads once and the root hands to the sidebar
+/// (`WindowCapabilities`), each of the two facts passed through on its own, at one width: whether another window can
+/// open beside it, where every list's menu offers Open in New Window and otherwise none does
+/// (`docs/specs/navigation.md`, section 5), and whether the platform has edit mode, where Edit, sent as the bar's "…"
+/// sends it, puts the sidebar in edit mode and otherwise moves nothing (Lists screen spec, sections 7 and 8).
+@Test @MainActor func aWindowIsMadeWithWhatItsPlatformOffers() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let multiple = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
-        let single = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: false).host
-        #expect(!multiple.model.taskViewList.rows.isEmpty, "the built-in lists")
-        #expect(multiple.model.taskViewList.rows.allSatisfy { offersANewWindow($0) })
-        #expect(!single.model.taskViewList.rows.contains { offersANewWindow($0) })
+        for opensWindowsBeside in [true, false] {
+            for hasEditMode in [true, false] {
+                let capabilities = WindowCapabilities(opensWindowsBeside: opensWindowsBeside, hasEditMode: hasEditMode)
+                let host = try app.makeWindow(path: nil, width: .wide, capabilities: capabilities).host
+                let rows = host.model.taskViewList.rows
+                #expect(!rows.isEmpty, "the built-in lists")
+                #expect(rows.allSatisfy { offersANewWindow($0) } == opensWindowsBeside, "\(capabilities)")
+                #expect(rows.contains { offersANewWindow($0) } == opensWindowsBeside, "\(capabilities)")
+                host.send(.taskViewList(.editMenuItemChosen))
+                #expect(host.model.taskViewList.isEditing == hasEditMode, "\(capabilities)")
+            }
+        }
+    }
+}
+
+/// A window publishes the menu of its sidebar's "+" for the app's menu bar, which draws its items in the File menu
+/// (`AppScene.NewItemCommands`): the module's menu as the window's platform has it, with ⌘N and ⇧⌘N on the Mac and
+/// none where the platform has edit mode, the same in edit mode, and an item chosen there goes to that window's
+/// sidebar as the "+"'s does (the controller's ruling on #149's hand check, 2026-10-31).
+@Test @MainActor func aWindowPublishesItsAddMenuForTheMenuBar() throws {
+    try withFreshDatabase { database in
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        for capabilities in [mac, iPhone] {
+            let host = try app.makeWindow(path: nil, width: .wide, capabilities: capabilities).host
+            let published = AppScene.AddMenu(of: host)
+            #expect(published.menu == host.model.taskViewList.addMenu)
+            let shortcuts = published.menu.sections.flatMap(\.items).map(\.shortcut)
+            #expect(shortcuts.contains { $0 != nil } == !capabilities.hasEditMode, "\(capabilities)")
+            host.send(.taskViewList(.editMenuItemChosen))
+            #expect(AppScene.AddMenu(of: host).menu == published.menu, "in edit mode too")
+            let before = host.model.taskViewList.rows.count
+            published.send(.newListMenuItemChosen(in: nil))
+            #expect(host.model.taskViewList.rows.count == before + 1, "New List made a list in this window")
+            #expect(host.model.taskViewList.renaming != nil, "with its field open")
+        }
     }
 }
 
@@ -244,8 +276,8 @@ import TodoCore
 @Test @MainActor func theWindowsWidthReachesItsHost() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let widened = try app.makeWindow(path: nil, width: .narrow, supportsMultipleWindows: false)
-        let other = try app.makeWindow(path: nil, width: .narrow, supportsMultipleWindows: false).host
+        let widened = try app.makeWindow(path: nil, width: .narrow, capabilities: iPhone)
+        let other = try app.makeWindow(path: nil, width: .narrow, capabilities: iPhone).host
         let before = widened.host.model
         let otherBefore = other.model
         guard case .narrow(let path) = before.layout, let list = path.first else {
@@ -268,13 +300,13 @@ import TodoCore
 @Test @MainActor func everyLiveHostOverOneStoreReceivesAChange() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let first = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
-        let writer = try app.makeWindow(path: "/?quick-entry", width: .wide, supportsMultipleWindows: true).host
-        let third = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let first = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let writer = try app.makeWindow(path: "/?quick-entry", width: .wide, capabilities: mac).host
+        let third = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         let before = first.model
         writer.send(.quickEntry(.titleFieldChanged("Milk")))
         writer.send(.quickEntry(.addButtonTapped))
-        let opened = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let opened = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         #expect(opened.model != before, "the write moved what a window draws")
         #expect(first.model == opened.model, "the window made before the writer")
         #expect(writer.model == opened.model, "the writer, its quick entry closed")
@@ -288,8 +320,8 @@ import TodoCore
 @Test @MainActor func anIdleHostTakesAChangeInsideAnotherHostsEvent() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let first = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
-        let second = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let first = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let second = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         let order = Order()
         withObservationTracking { _ = second.model } onChange: {
             MainActor.assumeIsolated { order.steps.append(.secondModelMoved) }
@@ -307,7 +339,7 @@ import TodoCore
 @Test @MainActor func aHostInFlightQueuesTheChange() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: "/?quick-entry", width: .wide, supportsMultipleWindows: true).host
+        let host = try app.makeWindow(path: "/?quick-entry", width: .wide, capabilities: mac).host
         host.send(.quickEntry(.titleFieldChanged("Milk")))
         let publications = Publications(by: host)
         host.send(.quickEntry(.addButtonTapped))
@@ -322,16 +354,16 @@ import TodoCore
 @Test @MainActor func aClosedWindowsHostIsReleasedAndReceivesNothing() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let writer = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let writer = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         weak var closed: ModuleHost<AppModule>?
         do {
-            let window = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true)
+            let window = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
             closed = window.host
         }
-        let later = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let later = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         #expect(closed == nil)
         writer.send(.taskViewList(.newListMenuItemChosen(in: nil)))
-        let opened = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let opened = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         #expect(later.model == opened.model, "the fan-out after the closed window reached the window after it")
     }
 }
@@ -350,7 +382,7 @@ import TodoCore
 @Test @MainActor func aWindowMakesOneHost() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let writer = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+        let writer = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
         let redraws = [Redraws(), Redraws()]
         let windows = redraws.map { redraws in
             hostInAWindow(ContentClosure(writer: writer, redraws: redraws) {
@@ -459,6 +491,11 @@ private func listTitles(_ model: AppModule.Model) -> [String]? {
 /// entry.
 private let defaultWindow = "/view/\(BuiltInTaskViews.inbox)"
 
+/// What the Mac offers a window, which most tests make theirs with, another window beside it and no edit mode; and what
+/// iPhone offers, no window beside it and edit mode.
+private let mac = WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
+private let iPhone = WindowCapabilities(opensWindowsBeside: false, hasEditMode: true)
+
 /// A scene's content closure in miniature: its body hands the window a new value of its content on every run, and
 /// it runs again on every model the writer publishes.
 private struct ContentClosure<Content: View>: View {
@@ -560,7 +597,7 @@ private struct ContentClosure<Content: View>: View {
 /// over the same file is the only one open.
 @MainActor private func launchAndCreateAList(_ environment: [String: String]) throws -> ViewID {
     let app = try TodoApp.launch(environment: environment)
-    let host = try app.makeWindow(path: nil, width: .wide, supportsMultipleWindows: true).host
+    let host = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
     let before = Set(host.model.taskViewList.rows.map(\.id))
     host.send(.taskViewList(.newListMenuItemChosen(in: nil)))
     return try #require(Set(host.model.taskViewList.rows.map(\.id)).subtracting(before).first)

@@ -4,11 +4,10 @@ import SwiftUI
 
 /// The field a row draws while it is being renamed, a view of its own so that each field watches its own focus: the
 /// action a lost focus sends names no row, and one flag shared by every row could not tell the field that lost focus
-/// from the one a rename moved to. A list's row and an area's line draw it in its model's look (`fieldLook(_:)`), and
-/// the wide window's sidebar plainly on its rows until the plan's ninth task replaces it; its text and its placeholder
-/// are its model's either way. It sends its model's actions for Return, Esc and a lost focus, and for the text as it is
-/// typed what `changed` makes of it, which a model cannot hold (`TextFieldModel`; the owner, on #163's thread
-/// r4431104202).
+/// from the one a rename moved to. A list's row and an area's line draw it in its model's look (`fieldLook(_:)`), its
+/// text and its placeholder its model's. It sends its model's actions for Return, Esc and a lost focus, and for the
+/// text as it is typed what `changed` makes of it, which a model cannot hold (`TextFieldModel`; the owner, on #163's
+/// thread r4431104202).
 struct TitleField<Action: Equatable & Sendable>: View {
     private let model: TextFieldModel<Action>
     private let changed: (String) -> Action
@@ -25,13 +24,16 @@ struct TitleField<Action: Equatable & Sendable>: View {
 
     var body: some View {
         TextField(model.placeholder, text: Binding(get: { model.text }, set: { send(changed($0)) }))
+            // Plain, its look the model's (`fieldLook(_:)`): the Mac's default style draws a bezel of its own inside
+            // it, where iOS's draws none.
+            .textFieldStyle(.plain)
             .focused($isFocused)
             .onSubmit { send(model.submitted) }
             #if os(macOS)
             // Esc. iOS and watchOS lack the modifier; what cancels a rename there is decided when they arrive.
             .onExitCommand { send(model.cancelled) }
             #endif
-            // A field opens for a person to type in, whether the menu or the toolbar opened it.
+            // A field opens for a person to type in, whether a row's menu, the bar's "+" or the File menu opened it.
             .onAppear { isFocused = true }
             .onChange(of: isFocused) { _, focused in
                 guard !focused else { return }

@@ -27,14 +27,15 @@ import WASILibc
 /// sent to its element of the stack, which pushes the task, the way back as the shorter path, the window narrowing,
 /// Cancel, and Open in New Window, whose path it writes down — with the change each write produced, and a path the
 /// routes refuse, and it reads the layout the root cuts for the window's width and the sidebar's component models,
-/// its rows with the tiles built for that width, its bar in and out of edit mode, the confirmation, the picker and the
-/// look of the drag, each through the switches their views have. Beside that it calls the core's public API directly,
-/// and each group of calls has a client that ships it. The writes, the reads, a page and search are what the modules M3
-/// adds will call. The filter codec and the journal exchange are the web host's own, which is where the spec leaves the
-/// gaps #23 found in them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the
-/// platform clock a web entry point passes. A group dropped because no module makes its calls would take out code the
-/// web client still ships. What a client calls is what the linker has to keep, so the number the job prints is the root
-/// module and the core a web client cannot dead-strip its way out of shipping.
+/// its rows with the numbers of that width, its bar in and out of edit mode and the bar of a root made with no edit
+/// mode, as the Mac's window is, the confirmation, the picker and the look of the drag in both widths, each through the
+/// switches their views have. Beside that it calls the core's public API directly, and each group of calls has a client
+/// that ships it. The writes, the reads, a page and search are what the modules M3 adds will call. The filter codec and
+/// the journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in them ("Goals and
+/// non-goals"). The snapshot is what a web page persists, reopened under the platform clock a web entry point passes. A
+/// group dropped because no module makes its calls would take out code the web client still ships. What a client calls
+/// is what the linker has to keep, so the number the job prints is the root module and the core a web client cannot
+/// dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.
@@ -130,10 +131,16 @@ private enum WasmSizeProbe {
         var pending: [ChangeSet] = []
         appStore.onChange = { pending.append($0) }
         // Made wide, as a browser window opens, and narrowed further down, so that the layout the root cuts by the
-        // width, and the sidebar's tiles, are in the measurement in both their shapes; told a window can open beside
-        // it, so that the menus are in it with every item they can hold.
+        // width, and the sidebar's numbers, are in the measurement in both their shapes; told a window can open beside
+        // it, so that the menus are in it with every item they can hold, and that it has edit mode, so that the edit
+        // bar is in it too. A second root, made as the Mac's window is, with no edit mode, has the other bar.
         let app = try AppModule(
-            store: appStore, route: try AppModule.Route(path: "/"), width: .wide, supportsMultipleWindows: true
+            store: appStore, route: try AppModule.Route(path: "/"), width: .wide,
+            capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: true)
+        )
+        let withoutEditMode = try AppModule(
+            store: appStore, width: .wide,
+            capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
         )
         @discardableResult
         func perform(_ event: AppModule.Event) -> AppModule.Output? {
@@ -145,7 +152,7 @@ private enum WasmSizeProbe {
         perform(.action(.taskViewList(.renameMenuItemChosen(BuiltInTaskViews.today))))
         perform(.action(.taskViewList(.titleFieldChanged("Today, open"))))
         perform(.action(.taskViewList(.titleFieldSubmitted)))
-        let renamed = highlightedTitle(in: app.model) ?? "none"
+        let renamed = rowTitle(of: BuiltInTaskViews.today, in: app.model) ?? "none"
         // New list from "+", named as it opens; a list made inside it, which takes its colour and unfolds it; the
         // outer list folded by its chevron; an area from "+", left unnamed, which an area may be; and New task, which
         // the sidebar asks the root for and the root answers with quick entry, which the link below keeps up. The
@@ -182,7 +189,7 @@ private enum WasmSizeProbe {
         perform(.action(.taskViewList(.deleteMenuItemChosen(BuiltInTaskViews.trash))))
         let asked = app.model.taskViewList.confirmation.map { "\($0.title) \($0.confirm.title) or \($0.cancel.title)" }
         perform(.action(.taskViewList(.deleteCancelled)))
-        let drag = app.model.taskViewList.drag
+        let drag = dragLine(of: app.model)
         perform(.action(.taskViewList(.newTaskMenuItemChosen)))
         let askedForQuickEntry = app.model.quickEntry != nil
         let wideSidebar = sidebarLine(of: app.model)
@@ -204,6 +211,7 @@ private enum WasmSizeProbe {
         perform(.action(.wentBack(to: [])))
         perform(.widthChanged(.narrow))
         let narrowSidebar = sidebarLine(of: app.model)
+        let narrowDrag = dragLine(of: app.model)
         perform(.action(.quickEntryButtonTapped))
         let drafted = app.model.quickEntry?.draft ?? "none"
         perform(.action(.quickEntry(.cancelButtonTapped)))
@@ -232,7 +240,8 @@ private enum WasmSizeProbe {
         print("root \(root.taskViewList.rows.count) rows, renamed \(renamed), new list \(newListDraft), quick entry from the sidebar \(askedForQuickEntry), problem \(root.taskViewList.problem != nil)")
         print("sidebar wide \(wideSidebar); narrow \(narrowSidebar)")
         print("picker \(picker), then dropped \(dropped)")
-        print("bar \(bar); in edit mode \(editBar); asked \(asked ?? "nothing"); drag's slot \(drag.slot.height) pt at depth 2 from \(drag.indent.leading(atDepth: 2)), its card at \(drag.card.scale)")
+        print("bar \(bar); in edit mode \(editBar); without edit mode \(barLine(of: withoutEditMode.model))")
+        print("asked \(asked ?? "nothing"); drag \(drag), narrow \(narrowDrag)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
@@ -281,10 +290,10 @@ private enum WasmSizeProbe {
         }
     }
 
-    /// The title of the sidebar's highlighted row, and nil when none is: the row `selection` names, through one switch
-    /// over a row's kinds, as the sidebar's view has, an area's line never highlighted.
-    private static func highlightedTitle(in model: AppModule.Model) -> String? {
-        for row in model.taskViewList.rows where row.id == model.taskViewList.selection {
+    /// The title of the sidebar's row that holds a view, and nil when no list's row does: through one switch over a
+    /// row's kinds, as the sidebar's view has, an area's line holding no list.
+    private static func rowTitle(of id: ViewID, in model: AppModule.Model) -> String? {
+        for row in model.taskViewList.rows where row.id == id {
             switch row.kind {
             case .list(let list): return list.title.text
             case .area: continue
@@ -356,30 +365,50 @@ private enum WasmSizeProbe {
         return "\(picker.title) of \(picker.options.count) rows, \(greyed) greyed out, in \(current), or \(picker.cancel.title)"
     }
 
-    /// The sidebar's bar as a line: its buttons and its menu buttons, a group's among them, with what a press does, and
-    /// its search field, through one switch over the bar's items, and each button's fill through one switch over it, as
-    /// the bar's view has.
+    /// The sidebar's bar as a line: its controls, a group's buttons among them, with what a press does and how many of
+    /// a menu's items have a shortcut, the search field with its trailing glyph or none, and each on what it stands on,
+    /// and whether a rule runs along its top, through one switch over the bar's items and one over what a control
+    /// stands on, as the bar's view has.
     private static func barLine(of model: AppModule.Model) -> String {
-        var search = "no search"
-        let buttons = model.taskViewList.bar.items.flatMap { item in
+        let bar = model.taskViewList.bar
+        let controls = bar.items.flatMap { item in
             switch item {
-            case .button(let button): return [(button.label, "pressed")]
+            case .button(let button):
+                return [(button.label.accessibilityLabel, "pressed", button.label.fill)]
             case .menuButton(let button):
-                return [(button.label, "a menu of \(button.menu.sections.flatMap(\.items).count)")]
+                let items = button.menu.sections.flatMap(\.items)
+                let shortcuts = "a menu of \(items.count) with \(items.compactMap(\.shortcut).count) shortcuts"
+                return [(button.label.accessibilityLabel, shortcuts, button.label.fill)]
             case .search(let field):
-                search = field.placeholder.text
-                return []
-            case .group(let buttons): return buttons.map { ($0.label, "pressed") }
+                let glyph = field.trailingGlyph.map(\.icon.icon.rawValue) ?? "nothing"
+                return [(field.placeholder.text, "ending in \(glyph)", field.fill)]
+            case .group(let buttons):
+                return buttons.map { ($0.label.accessibilityLabel, "pressed", $0.label.fill) }
             }
         }
-        let labels = buttons.map { label, press in
-            let fill = switch label.fill {
+        let labels = controls.map { name, does, fill in
+            let standing = switch fill {
             case .container: "on its container"
             case .color: "filled"
             }
-            return "\(label.accessibilityLabel) \(press) \(fill)"
+            return "\(name) \(does) \(standing)"
         }
-        return "\(labels.joined(separator: ", ")), search \(search)"
+        let rule = bar.rule.map { "under a rule of \($0.width) pt" } ?? "with no rule"
+        return "\(labels.joined(separator: ", ")), \(bar.height) pt high \(rule)"
+    }
+
+    /// The look of the sidebar's drag as a line: what marks a drop at depth 2, where it starts, and the card, through
+    /// one switch over the drag's looks, as the drag's view has.
+    private static func dragLine(of model: AppModule.Model) -> String {
+        let drag = model.taskViewList.drag
+        let tile = drag.indent.leading(atDepth: 2)
+        switch drag.look {
+        case .slot(let slot, let card):
+            return "a slot \(slot.height) pt from \(tile - slot.inset), its card at \(card.scale)"
+        case .indicator(let indicator):
+            let card = indicator.card
+            return "a line \(indicator.line.width) pt from \(tile + indicator.lineOffset), its card \(card.width) wide"
+        }
     }
 
     /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.

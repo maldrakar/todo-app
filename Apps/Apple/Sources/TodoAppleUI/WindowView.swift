@@ -3,11 +3,11 @@ import AppFeature
 import FeatureModule
 import SwiftUI
 
-/// The view of one window: it makes the window from the window's path, its width class and whether another window can
-/// open beside it, once, when the window first appears, holds it for as long as the window lives, draws the root over
-/// its host, hands it the links the system opens in it and the window's width class as it changes, writes its route
-/// back after every change, and opens the windows the root asks for (`docs/specs/navigation.md`, sections 5 and 7;
-/// navigation state spec, section 4).
+/// The view of one window: it makes the window from the window's path, its width class and what its platform offers,
+/// once, when the window first appears, holds it for as long as the window lives, draws the root over its host, hands
+/// it the links the system opens in it and the window's width class as it changes, writes its route back after every
+/// change, and opens the windows the root asks for (`docs/specs/navigation.md`, sections 5 and 7; navigation state
+/// spec, section 4).
 ///
 /// The window is kept in the view's state, which SwiftUI keeps for the life of the window, and is made when the view
 /// drawn while that state is empty appears. A scene's content closure runs more than once for a window and hands
@@ -44,9 +44,9 @@ struct WindowView: View {
     private let app: TodoApp
 
     /// The window's value in its group, the window's route in its text form beside an identity of the window's own
-    /// (`Value`): nil for a window opened with none, the first of a launch, every Cmd-N and the window a link opens at
-    /// a launch, which gets one at its first write. Its text is read once, when the window is made, and written after
-    /// every change of the route. It is what a relaunch restores the window from, on the Mac
+    /// (`Value`): nil for a window opened with none, the first of a launch, every New Window and the window a link
+    /// opens at a launch, which gets one at its first write. Its text is read once, when the window is made, and
+    /// written after every change of the route. It is what a relaunch restores the window from, on the Mac
     /// (`docs/specs/navigation.md`, section 7) and on iOS: on 2026-10-20, in the iOS 26.3 simulator, the scene's saved
     /// state held this value, and a scene the system had ended in the background was made again from it.
     ///
@@ -86,6 +86,18 @@ struct WindowView: View {
     /// simulator). The watch has the value too, from watchOS 9 (Xcode 27.1's watchOS SDK, 2026-10-30).
     @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
 
+    /// Whether the platform has edit mode, the phone's and the iPad's way of editing the list of views, false on the
+    /// Mac alone, whose rows the pointer drags at any time and whose every edit is in a row's menu (Lists screen spec,
+    /// sections 7 and 8): read when the window is made, beside whether another window can open, and handed to the root
+    /// with it (`WindowCapabilities`). A platform condition, since no environment value says it.
+    private var hasEditMode: Bool {
+        #if os(macOS)
+        false
+        #else
+        true
+        #endif
+    }
+
     init(app: TodoApp, value: Binding<Value?>) {
         self.app = app
         self._value = value
@@ -111,7 +123,8 @@ struct WindowView: View {
     private func makeWindow() {
         do {
             let window = try app.makeWindow(
-                path: value?.path ?? storedPath, width: width, supportsMultipleWindows: supportsMultipleWindows
+                path: value?.path ?? storedPath, width: width,
+                capabilities: WindowCapabilities(opensWindowsBeside: supportsMultipleWindows, hasEditMode: hasEditMode)
             )
             answerTheRoot(of: window.host)
             self.window = window
@@ -167,9 +180,9 @@ struct WindowView: View {
     }
     #else
     // The watch has one window and opens no other: nothing on it draws out the root's request for a window, since the
-    // sidebar's menu is not drawn there (`TaskViewListView`), so the root's output goes unanswered, and a link has one
-    // window to go to. `openWindow` and `handlesExternalEvents` are unavailable on watchOS (a file typechecked against
-    // the watchOS 10 SDK on 2026-10-14). This is the view's one platform condition.
+    // rows' menus are not drawn there (`ListsTree`), so the root's output goes unanswered, and a link has one window to
+    // go to. `openWindow` and `handlesExternalEvents` are unavailable on watchOS (a file typechecked against the
+    // watchOS 10 SDK on 2026-10-14). This and `hasEditMode` are the view's platform conditions.
     private func answerTheRoot(of host: ModuleHost<AppModule>) {}
 
     private func takingLinks(_ root: some View) -> some View { root }

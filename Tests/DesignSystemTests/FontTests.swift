@@ -27,3 +27,9 @@ private typealias Font = DesignSystem.Font
     #expect(Set(weights).count == weights.count)
     #expect(Font(style: .body, weight: .bold, rounded: false) != Font(style: .body, weight: .semibold, rounded: false))
 }
+
+/// An area's name in the sidebar is the caption in heavy and the rounded face, the canvas's 10.5 pt 800 in `ui-rounded`
+/// (`Mac.dc.html`, `.an`), at the Mac's caption size, 10 pt.
+@Test func anAreasCaptionIsTheCaptionHeavyAndRounded() {
+    #expect(Font.areaCaption == Font(style: .caption, weight: .heavy, rounded: true))
+}

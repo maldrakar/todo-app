@@ -43,6 +43,9 @@ extension DesignSystem {
         public static let ink3 = Color(light: RGB(hex: 0xA39C90), dark: RGB(hex: 0x6F6A62))
         public static let red = Color(light: RGB(hex: 0xC2362B), dark: RGB(hex: 0xF07468))
 
+        /// The guides down a tree's branches in the sidebar (`Mac.dc.html`, `--guide`).
+        public static let guide = Color(light: RGB(hex: 0xE0D9CC), dark: RGB(hex: 0x36332E))
+
         /// The same blue in both appearances.
         public static let accent = Color(light: accentShade, dark: accentShade)
 
@@ -55,8 +58,16 @@ extension DesignSystem {
         public static let accentSoft = Color(
             light: RGB(hex: 0xE7EAF9), dark: paper.dark.mixed(toward: accentShade, by: 0.24))
 
-        /// The accent's one shade, which both its appearances share and the dark accent soft mixes toward, spelled
-        /// once.
+        /// The light under the chosen row on the sidebar colour (`Mac.dc.html`, `selBg`): the canvas lays the accent at
+        /// 14 % over the sidebar in the light, and in the dark the accent lifted 32 % toward white at 22 % over it; the
+        /// opaque colours those come to are mixed here, as the accent soft's is, so that nothing behind the row shows
+        /// through it.
+        public static let selection = Color(
+            light: sidebar.light.mixed(toward: accentShade, by: 0.14),
+            dark: sidebar.dark.mixed(toward: accentShade.mixed(toward: .white, by: 0.32), by: 0.22))
+
+        /// The accent's one shade, which both its appearances share and the dark accent soft and the selection mix
+        /// toward, spelled once.
         private static let accentShade = RGB(hex: 0x3653C9)
     }
 }

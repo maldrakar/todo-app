@@ -1,7 +1,5 @@
 // Sources/Features/TaskViewList/TaskViewList+Rows.swift
 import DesignSystem
-import DesignSystemComponents
-import FeatureModule
 import TodoCore
 
 extension TaskViewList {
@@ -176,70 +174,18 @@ extension TaskViewList {
 }
 
 extension TaskViewList.ReadRow {
-    /// The list's tile, in its colour and with its icon, and the title's font, one of the design system's four row
-    /// titles, at the size the Lists screen gives a row of its drawn depth in a window of the width class, the font
-    /// emphasized where the list has lists inside it. Both are built from the row and the width whenever the model is
-    /// computed, so that a window that narrows or widens moves them with no read of the store (ADR-0007, amendment of
-    /// 2026-10-26).
-    func tile(in width: WindowWidth) -> TileModel {
-        RowSize(width, depth: depth).tile(tileColor, tileIcon)
-    }
-
-    func titleFont(in width: WindowWidth) -> DesignSystem.Font {
-        RowSize(width, depth: depth).titleFont(emphasized: hasChildren)
-    }
-
     /// The tile's colour, the store's name read as the design system's by its raw value, and stone for a list with
     /// none or with one the design system does not know, so that a platform draws every value it is given and picks no
-    /// default of its own (ADR-0007, amendment of 2026-10-26).
-    private var tileColor: DesignSystem.Color.Components.Tile {
+    /// default of its own (ADR-0007, amendment of 2026-10-26). The tile's sizes and the title's font are the width's,
+    /// which the components' builders give it whenever the model is computed, so that a window that narrows or widens
+    /// moves them with no read of the store.
+    var tileColor: DesignSystem.Color.Components.Tile {
         color.flatMap { DesignSystem.Color.Components.Tile(rawValue: $0.rawValue) } ?? .stone
     }
 
     /// The tile's glyph, the store's name of the icon read as the design system's, and the default glyph, bullets, for
     /// a list with none or with a name this app does not know, for the same reason.
-    private var tileIcon: DesignSystem.Icon {
+    var tileIcon: DesignSystem.Icon {
         icon.flatMap(DesignSystem.Icon.init(rawValue:)) ?? .bullets
-    }
-}
-
-/// The three sizes a list's row takes on the Lists screen, which the window's width class and the row's drawn depth
-/// choose between, so that the tile and the title's font are chosen by one rule.
-private enum RowSize {
-    /// A row at the root's drawn depth in a narrow window, the lists under an area's line among them.
-    case root
-    /// A row deeper than that in a narrow window.
-    case nested
-    /// A row of the sidebar in a wide window, at every depth.
-    case sidebar
-
-    init(_ width: WindowWidth, depth: Int) {
-        switch width {
-        case .narrow: self = depth == 0 ? .root : .nested
-        case .wide: self = .sidebar
-        }
-    }
-
-    /// The tile of the colour and the icon at this size, in points, as the canvas draws it: on the phone a side of
-    /// 30, a corner radius of 8 and a glyph of 19 at the root's depth, and 26, 7 and 16 deeper (`Phone.dc.html`,
-    /// `tileSize`); in the sidebar 20, 6 and 13 at every depth, the tile of the Mac's 30 pt row (`Mac.dc.html`).
-    func tile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
-        switch self {
-        case .root: TileModel(color: color, icon: icon, side: 30, cornerRadius: 8, glyphSize: 19)
-        case .nested: TileModel(color: color, icon: icon, side: 26, cornerRadius: 7, glyphSize: 16)
-        case .sidebar: TileModel(color: color, icon: icon, side: 20, cornerRadius: 6, glyphSize: 13)
-        }
-    }
-
-    /// The title's font at this size, emphasized for a row with lists inside it: the row title on the phone at the
-    /// root's depth and in the sidebar at every depth, whose body a platform draws at its sidebar's size, 13 pt on the
-    /// Mac and 17 on the iPad, and the nested row title, a size smaller, deeper on the phone.
-    func titleFont(emphasized: Bool) -> DesignSystem.Font {
-        switch (self, emphasized) {
-        case (.root, false), (.sidebar, false): .rowTitle
-        case (.root, true), (.sidebar, true): .rowTitleEmphasized
-        case (.nested, false): .nestedRowTitle
-        case (.nested, true): .nestedRowTitleEmphasized
-        }
     }
 }

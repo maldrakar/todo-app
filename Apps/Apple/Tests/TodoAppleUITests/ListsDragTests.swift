@@ -5,12 +5,12 @@ import TaskViewListFeature
 @testable import TodoAppleUI
 import TodoCore
 
-// The drag of the Lists screen, `ListsDrag`, driven stage by stage as the screen drives it, over the rows a real
-// `TaskViewList` draws from a store in memory, with the tree's indent its model gives and the frames a layout of those
-// rows would report, each as high as its model says, a list's row 46 pt, a named area's line 36 and the slot 52,
-// stacked from the top. Each drop the drag reports is then sent to the module, which is the end-to-end case: the row
-// lands where the slot was drawn, by the module's own reading of the drop
-// (`TaskViewList.dropTarget(of:after:depth:in:)`).
+// The drag of the Lists screen and the sidebar, `ListsDrag`, driven stage by stage as the tree drives it, over the rows
+// a real `TaskViewList` draws from a store in memory, with the tree's indent its model gives and the frames a layout of
+// those rows would report, each as high as its model says, stacked from the top: on the phone a list's row 46 pt, a
+// named area's line 36 and the slot 52; in the sidebar a row 30, a line 15 and the indicator's gap 12. Each drop the
+// drag reports is then sent to the module, which is the end-to-end case: the row lands where the slot was drawn, by the
+// module's own reading of the drop (`TaskViewList.dropTarget(of:after:depth:in:)`).
 //
 // The tree every test starts from, its drawn depths in brackets: Inbox, Today, Upcoming, Logbook and Trash [0], then the
 // root's list A [0]; the area W, with C [0] holding D [1], then E [0]; and the area H, with F [0].
@@ -65,6 +65,54 @@ import TodoCore
     tree.sendDrops()
     #expect(tree.rows(from: tree.w) == [tree.w, tree.c, tree.d, tree.f, tree.e, tree.h])
     #expect(tree.depth(of: tree.f) == 2, "the first list inside D")
+}
+
+/// The sidebar reads the pointer as the phone reads the finger, by its own rows and its own indent, a level for each 16
+/// pt, and the Mac drags with no edit mode: F carried into the lower half of D two levels to the right lands as the
+/// first list inside D, and one level to the right as D's sibling, right after it.
+@Test func theSidebarReadsADragByItsOwnRowsAndIndentWithNoEditMode() throws {
+    for depth in [2, 1] {
+        var tree = try DraggedTree(
+            width: .wide, capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
+        )
+        #expect(tree.indent == 16)
+        #expect(!tree.isEditing)
+        let start = tree.centre(of: tree.f)
+        tree.press(.began(start))
+        tree.press(.changed(tree.lowerHalf(of: tree.d, x: start.x + CGFloat(depth) * tree.indent)))
+        #expect(tree.drag?.depth == depth)
+        tree.press(.ended)
+
+        #expect(tree.drops == [.rowDropped(tree.f, after: tree.d, depth: depth)])
+        tree.sendDrops()
+        #expect(tree.rows(from: tree.w) == [tree.w, tree.c, tree.d, tree.f, tree.e, tree.h])
+        #expect(tree.depth(of: tree.f) == depth)
+    }
+}
+
+/// The Mac's pointer hands the drag its first two stages back to back, the lift where the press began and the move to
+/// where the pointer is, both over the frames the layout reported before the lift, then the release, and then the
+/// cancel that SwiftUI's reset of the pointer's gesture state sends (`ListsTree.pointerDrag(among:)`): the release
+/// reports one drop and puts the row down, and the cancel after it moves nothing.
+@Test func thePointersDragDropsOnceAndTheResetAfterItMovesNothing() throws {
+    var tree = try DraggedTree(
+        width: .wide, capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
+    )
+    let before = tree.frames
+    let start = tree.centre(of: tree.f)
+    let end = tree.lowerHalf(of: tree.d, x: start.x + tree.indent)
+    tree.press(.began(start), frames: before)
+    tree.press(.changed(end), frames: before)
+    #expect(tree.drag?.depth == 1)
+    tree.press(.ended)
+    #expect(tree.drag == nil)
+    tree.press(.cancelled)
+    #expect(tree.drag == nil)
+
+    #expect(tree.drops == [.rowDropped(tree.f, after: tree.d, depth: 1)])
+    tree.sendDrops()
+    #expect(tree.rows(from: tree.w) == [tree.w, tree.c, tree.d, tree.f, tree.e, tree.h])
+    #expect(tree.depth(of: tree.f) == 1)
 }
 
 /// An area's slot stands only right before another line or at the end of the tree: over another area's lists, or over
@@ -131,9 +179,10 @@ import TodoCore
     #expect(missed.drops.isEmpty)
 }
 
-/// The tree of the tests, the module that draws it, and a drag over it, driven as the screen drives one: each stage of
-/// the press is handed to `ListsDrag.after(_:from:among:frames:indent:)` with the items as drawn with no row lifted,
-/// the frames of what the screen draws at that moment, the slot among them while a row is lifted, and the tree's
+/// The tree of the tests, the module that draws it in a window of the width with what the window's platform offers, the
+/// phone's by default, in edit mode where the platform has it, and a drag over it, driven as the tree drives one: each
+/// stage of the press is handed to `ListsDrag.after(_:from:among:frames:indent:)` with the items as drawn with no row
+/// lifted, the frames of what the tree draws at that moment, the slot among them while a row is lifted, and the tree's
 /// indent.
 private struct DraggedTree {
     let a: ViewID, w: ViewID, c: ViewID, d: ViewID, e: ViewID, h: ViewID, f: ViewID
@@ -141,7 +190,10 @@ private struct DraggedTree {
     private(set) var drops: [TaskViewList.UserAction] = []
     private let module: TaskViewList
 
-    init() throws {
+    init(
+        width: WindowWidth = .narrow,
+        capabilities: WindowCapabilities = WindowCapabilities(opensWindowsBeside: false, hasEditMode: true)
+    ) throws {
         let store = try Store.openInMemory(device: "lists-drag-tests", now: Store.systemNow)
         a = try store.createView(NewTaskView(title: "A"))
         w = try store.createView(NewTaskView(title: "W", kind: .area))
@@ -151,7 +203,7 @@ private struct DraggedTree {
         h = try store.createView(NewTaskView(title: "H", kind: .area))
         f = try store.createView(NewTaskView(title: "F", parent: h))
         module = try TaskViewList(
-            store: store, route: TaskViewList.Route(list: nil), width: .narrow, supportsMultipleWindows: false
+            store: store, route: TaskViewList.Route(list: nil), width: width, capabilities: capabilities
         )
         _ = module.send(.action(.editMenuItemChosen))
     }
@@ -161,6 +213,9 @@ private struct DraggedTree {
 
     /// How far a finger carries a lifted row sideways to change its depth by one, the step of the tree's indent.
     var indent: CGFloat { module.model.drag.indent.step }
+
+    /// Whether the module is in edit mode, which the drag does not need where the platform has none.
+    var isEditing: Bool { module.model.isEditing }
 
     /// The ids of the rows as drawn.
     var rowIDs: [ViewID] { module.model.rows.map(\.id) }
@@ -179,12 +234,20 @@ private struct DraggedTree {
             let height: CGFloat = switch item {
             case .list(_, let list): list.height
             case .area(_, let line): line.height
-            case .slot: module.model.drag.slot.height
+            case .slot: slotHeight
             }
             frames[item.id] = CGRect(x: 0, y: y, width: 400, height: height)
             y += height
         }
         return frames
+    }
+
+    /// How high the mark of the drop's place is, by the drag's look: the phone's slot or the sidebar's indicator's gap.
+    private var slotHeight: CGFloat {
+        switch module.model.drag.look {
+        case .slot(let slot, _): slot.height
+        case .indicator(let indicator): indicator.height
+        }
     }
 
     func centre(of id: ViewID) -> CGPoint { point(in: id, at: 0.5, x: nil) }
@@ -196,9 +259,12 @@ private struct DraggedTree {
         return CGPoint(x: x ?? frame.midX, y: frame.minY + frame.height * fraction)
     }
 
-    /// One stage of the press, as the screen hands it on.
-    mutating func press(_ phase: ListsDrag.Phase) {
-        let step = ListsDrag.after(phase, from: drag, among: items, frames: frames, indent: module.model.drag.indent)
+    /// One stage of the press, as the tree hands it on, over the frames of what it draws now, or over the frames given,
+    /// those of an earlier layout, as the Mac's pointer hands its first two stages before the tree is laid out again.
+    mutating func press(_ phase: ListsDrag.Phase, frames given: [ListsTreeItem.ID: CGRect]? = nil) {
+        let step = ListsDrag.after(
+            phase, from: drag, among: items, frames: given ?? frames, indent: module.model.drag.indent
+        )
         if let drop = step.drop { drops.append(drop) }
         drag = step.drag
     }

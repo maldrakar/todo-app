@@ -60,6 +60,12 @@ struct MovePickerSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        // A sheet on the Mac is as large as what it holds, and a scroll view asks for no height of its own: the size
+        // the sidebar's plain picker had (2026-10-12), which no model holds, since it is the container's. iOS sizes a
+        // sheet itself, and a minimum height there would cut the sheet of an iPhone turned sideways.
+        .frame(minWidth: 320, minHeight: 400)
+        #endif
         .presentationBackground(Color(.paper))
     }
 

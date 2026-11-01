@@ -13,6 +13,10 @@ import TodoCore
 /// too.
 let inbox = BuiltInTaskViews.inbox
 
+/// What iPhone's window offers: no window beside it, and edit mode. Not private, since every test of the module that
+/// is not about the platform makes its sidebar with it.
+let iPhone = WindowCapabilities(opensWindowsBeside: false, hasEditMode: true)
+
 /// The five views every store starts with, in the order the seed ranks them. Not private, since the edits' tests
 /// compare the order of their rows with it too.
 let builtIns = [
@@ -67,6 +71,13 @@ func listRow(_ id: ViewID, in model: TaskViewList.Model) -> ListRowModel<TaskVie
     model.rows.first { $0.id == id }.flatMap(listRow)
 }
 
+/// The ids of the rows that carry the highlight, read over their kinds as a view drawing row by row reads them, a
+/// list's row on the fill colour: an area's line never does, since an area never opens. Not private, since the
+/// module's tests read the highlight with it too.
+func highlighted(in model: TaskViewList.Model) -> [ViewID] {
+    model.rows.filter { listRow($0)?.background == .fill }.map(\.id)
+}
+
 /// The count a list's row draws, read over its accessories as a view reads them, and empty where it draws none. Not
 /// private, since the edits' and the components' tests read a count with it too.
 func drawnCount(of list: ListRowModel<TaskViewList.UserAction>) -> String {
@@ -117,7 +128,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     try store.update(task: filed, [.status(.done)])
     let garden = try store.createView(NewTaskView(title: "Garden", color: .green, icon: "watering-can"))
     let reading = try store.createView(NewTaskView(title: "Reading", icon: "book"))
-    let model = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false).model
+    let model = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model
     func tile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
         TileModel(color: color, icon: icon, side: 30, cornerRadius: 8, glyphSize: 19)
     }
@@ -132,21 +143,21 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(model.rows.map { listRow($0).map(drawnCount) } == ["2", "", "", "", "", "", ""])
 }
 
-/// Made wide, every row takes the sidebar's 20 pt tile, at any depth (`Mac.dc.html`, the 30 pt row). Told the window
-/// narrowed, the rows take the phone's tiles by their drawn depth, 30 pt at the root's depth, an area's lists among
-/// them, and 26 deeper (`Phone.dc.html`, `tileSize`), from what the module holds: a view written since, with no change
-/// sent, is not among the rows, so the width moved the tiles with no read of the store. Widened again, it is the
-/// model it was made with.
+/// Made wide, the rows take the sidebar's tiles by their drawn depth, 22 pt at the root's depth, an area's lists among
+/// them, and 18 deeper (`Mac.dc.html`, `tileSize`). Told the window narrowed, the rows take the phone's tiles by their
+/// drawn depth, 30 pt at the root's depth and 26 deeper (`Phone.dc.html`, `tileSize`), from what the module holds: a
+/// view written since, with no change sent, is not among the rows, so the width moved the tiles with no read of the
+/// store. Widened again, it is the model it was made with.
 @Test func aWideWindowsRowsCarryTheSidebarsTiles() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", color: .indigo, icon: "briefcase"))
     try store.createView(NewTaskView(title: "Reviews", parent: work, color: .indigo, icon: "pen"))
     let home = try store.createView(NewTaskView(title: "Home", kind: .area))
     try store.createView(NewTaskView(title: "Garden", parent: home, color: .green, icon: "house"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .wide, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .wide, capabilities: iPhone)
     let wide = list.model
-    let narrow = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false).model
-    #expect(wide.rows.map(sizes(of:)) == Array(repeating: [20, 6, 13], count: 7) + [nil, [20, 6, 13]])
+    let narrow = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model
+    #expect(wide.rows.map(sizes(of:)) == Array(repeating: [22, 6, 14], count: 6) + [[18, 5, 12], nil, [22, 6, 14]])
     try store.createView(NewTaskView(title: "Unseen"))
     #expect(list.send(.widthChanged(.narrow)) == nil)
     #expect(list.model == narrow, "the narrow tiles, and no read: the view written since is not among the rows")
@@ -158,7 +169,8 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 /// A row's title is one of the design system's four, chosen by the module (ADR-0007, amendment of 2026-10-26): in a
 /// narrow window the row title at the root's drawn depth, an area's lists among them, and the nested row title deeper,
 /// each emphasized when the row has lists inside it; in a wide window the row title at every depth, which a platform
-/// draws at its sidebar's size, emphasized the same way.
+/// draws at its sidebar's size, emphasized where the row has lists inside it or is highlighted, as the Inbox is here
+/// (`Mac.dc.html`, the title's weight).
 @Test func aRowsTitleFontFollowsItsDepthAndChildren() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
@@ -169,17 +181,17 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     try store.createView(NewTaskView(title: "Acme", parent: clients))
     let builtIns: [DesignSystem.Font?] = Array(repeating: .rowTitle, count: 5)
-    let narrow = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false).model
+    let narrow = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model
     #expect(narrow.rows.dropFirst(5).map { listRow($0)?.title.font } == [
         .rowTitleEmphasized, .nestedRowTitleEmphasized, .nestedRowTitle, .rowTitle, nil, .rowTitleEmphasized,
         .nestedRowTitle,
     ])
     #expect(narrow.rows.prefix(5).map { listRow($0)?.title.font } == builtIns)
-    let wide = try TaskViewList(store: store, route: .init(list: nil), width: .wide, supportsMultipleWindows: false).model
+    let wide = try TaskViewList(store: store, route: .init(list: nil), width: .wide, capabilities: iPhone).model
     #expect(wide.rows.dropFirst(5).map { listRow($0)?.title.font } == [
         .rowTitleEmphasized, .rowTitleEmphasized, .rowTitle, .rowTitle, nil, .rowTitleEmphasized, .rowTitle,
     ])
-    #expect(wide.rows.prefix(5).map { listRow($0)?.title.font } == builtIns)
+    #expect(wide.rows.prefix(5).map { listRow($0)?.title.font } == [.rowTitleEmphasized] + builtIns.dropFirst())
 }
 
 /// An area is a line across the tree, and the lists under it stand at the root's drawn depth, their own lists one
@@ -191,7 +203,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     let unnamed = try store.createView(NewTaskView(title: "", kind: .area))
-    let model = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false).model
+    let model = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model
     let past = model.rows.dropFirst(5)
     #expect(past.map(\.id) == [work, clients, acme, unnamed], "past the five built-in views")
     #expect(past.map(\.depth) == [0, 0, 1, 0])
@@ -206,11 +218,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 /// refused name keeps its draft and its sentence, since a change answers nobody (spec section 4).
 @Test func aChangeToATaskRereadsTheCountsAndNotTheRows() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(list)
     #expect(list.model.problem == "A title cannot be empty.", "the refusal is the setup; without it this proves nothing")
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Buy milk")) }
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(reference)
     try store.createView(NewTaskView(title: "Docs"))
     #expect(list.send(.changed(created)) == nil)
@@ -232,7 +244,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let office = try store.createView(NewTaskView(title: "Office", parent: projects))
     let desk = try store.createView(NewTaskView(title: "Desk", parent: office))
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(list)
     let open = list.model
     #expect(list.send(.action(.disclosureTapped(home))) == nil)
@@ -242,7 +254,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "the branch goes whole, and the row after it stays")
     #expect(isFolded(projects, in: list.model) == true)
     #expect(try store.deviceState(collapsedViewsKey, as: [String].self).map(Set.init) == [projects.rawValue, home.rawValue])
-    let made = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let made = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(made)
     #expect(list.model == made.model, "a module made anew reads both folds back")
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
@@ -260,7 +272,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     try store.createView(NewTaskView(title: "Clients", parent: work))
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(list)
     let before = list.model
     for id in [errands, work, ViewID()] {
@@ -286,7 +298,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     try store.setDeviceState(collapsedViewsKey, [
         archive.rawValue, projects.rawValue, ViewID().rawValue, "not an id", work.rawValue,
     ])
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, work, clients])
     #expect(isFolded(projects, in: list.model) == true)
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
@@ -309,7 +321,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     _ = try store.apply([parent(of: work, .text(projects.rawValue), at: 1_800_000_000_000)])
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(
         listRow(work, in: list.model).flatMap(drawnChevron) != nil,
         "nested, the area reads as a list; this is the setup"
@@ -327,7 +339,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 /// titled "New list", has no colour, since nothing is above it to take one from, and has the list icon.
 @Test func newListFromPlusGoesIntoTheLastAreaOrToTheEndOfTheRoot() throws {
     let bare = try makeStore()
-    let atTheRoot = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let atTheRoot = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(atTheRoot.send(.action(.newListMenuItemChosen(in: nil))) == nil)
     let last = try rowBeingNamed(in: atTheRoot.model)
     #expect(atTheRoot.model.rows.map(\.id) == builtIns + [last.id])
@@ -339,13 +351,13 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let home = try store.createView(NewTaskView(title: "Home", kind: .area))
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home, color: .green))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.send(.action(.newListMenuItemChosen(in: nil))) == nil)
     let made = try rowBeingNamed(in: list.model)
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, home, garden, made.id])
     #expect(made.depth == 0)
     #expect(try stored(made.id, in: store) == ["New list", home.rawValue, "list", nil, "list"])
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = reference.send(.action(.renameMenuItemChosen(made.id)))
     #expect(list.model == reference.model)
 }
@@ -358,7 +370,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let projects = try store.createView(NewTaskView(title: "Projects", color: .teal, icon: "folder"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
     let errands = try store.createView(NewTaskView(title: "Errands"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
     #expect(isFolded(projects, in: list.model) == true, "the branch is folded; this is the setup")
     #expect(list.send(.action(.newListMenuItemChosen(in: projects))) == nil)
@@ -369,7 +381,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(made.depth == 1)
     #expect(listRow(made)?.tile == TileModel(color: .teal, icon: .list, side: 26, cornerRadius: 7, glyphSize: 16))
     #expect(try stored(made.id, in: store) == ["New list", projects.rawValue, "list", "teal", "list"])
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = reference.send(.action(.renameMenuItemChosen(made.id)))
     #expect(list.model == reference.model, "a module made anew reads the branch unfolded")
 }
@@ -381,14 +393,14 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area, color: .rose))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work, color: .violet))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.send(.action(.newListMenuItemChosen(in: work))) == nil)
     let made = try rowBeingNamed(in: list.model)
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, made.id])
     #expect(made.depth == 0)
     #expect(listRow(made)?.tile == TileModel(color: .stone, icon: .list, side: 30, cornerRadius: 8, glyphSize: 19))
     #expect(try stored(made.id, in: store) == ["New list", work.rawValue, "list", nil, "list"])
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = reference.send(.action(.renameMenuItemChosen(made.id)))
     #expect(list.model == reference.model)
 }
@@ -401,7 +413,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let store = try makeStore()
     let task = try store.createTask(NewTask(title: "Buy milk"))
     let route = TaskViewList.Route(list: .init(head: inbox, task: TaskScreen.Route(head: task)))
-    let list = try TaskViewList(store: store, route: route, width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: route, width: .narrow, capabilities: iPhone)
     let before = list.model
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.newListMenuItemChosen(in: ViewID()))) == nil)
@@ -412,7 +424,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(draft(of: made) == "New list")
     #expect(list.destination.pushed == route.list)
     #expect(list.route == route)
-    let reference = try TaskViewList(store: store, route: route, width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: route, width: .narrow, capabilities: iPhone)
     _ = reference.send(.action(.renameMenuItemChosen(made.id)))
     #expect(list.model == reference.model, "the field on the new row, the highlight on the Inbox, and nothing said")
 }
@@ -423,7 +435,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(list.send(.action(.newAreaMenuItemChosen)) == nil)
     let made = try rowBeingNamed(in: list.model)
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, made.id])
@@ -432,7 +444,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(draft(of: made) == "")
     #expect(try stored(made.id, in: store) == ["", nil, "area", nil, nil])
     #expect(list.destination.pushed == .init(head: inbox))
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = reference.send(.action(.renameMenuItemChosen(made.id)))
     #expect(list.model == reference.model)
 }
@@ -443,7 +455,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 /// its field stays open.
 @Test func anAreaAcceptsTheEmptyNameAndAListRefusesIt() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     _ = list.send(.action(.newAreaMenuItemChosen))
     let area = try rowBeingNamed(in: list.model).id
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
@@ -476,7 +488,9 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 @Test func aTapOrOpenInNewWindowOnAnAreasLineMovesNothing() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
-    let list = try TaskViewList(store: store, route: .init(list: .init(head: BuiltInTaskViews.upcoming)), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(
+        store: store, route: .init(list: .init(head: BuiltInTaskViews.upcoming)), width: .narrow, capabilities: iPhone
+    )
     refusingAName(list)
     let before = list.model
     #expect(list.send(.action(.rowSelected(work))) == nil)
@@ -489,7 +503,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 /// New task is quick entry, which is the root's to open over the window (Lists screen spec, section 5), so the module
 /// asks for it and moves nothing of its own, an open field and its sentence included.
 @Test func newTaskAsksTheRootForQuickEntry() throws {
-    let list = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone)
     refusingAName(list)
     let before = list.model
     #expect(list.send(.action(.newTaskMenuItemChosen)) == .newTaskRequested)
@@ -507,15 +521,19 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     try store.createView(NewTaskView(title: "Home", parent: projects))
     let errands = try store.createView(NewTaskView(title: "Errands"))
     try store.createView(NewTaskView(title: "Chores", parent: errands))
-    let first = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
-    let second = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let first = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let second = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(first.send(.action(.disclosureTapped(projects))) == nil)
     let filed = try changeSet(of: store) { try store.createTask(NewTask(title: "Buy milk")) }
     #expect(second.send(.changed(filed)) == nil)
     #expect(isFolded(projects, in: second.model) == false, "a change to a task reads the counts alone")
     let created = try changeSet(of: store) { try store.createView(NewTaskView(title: "Docs")) }
     #expect(second.send(.changed(created)) == nil)
-    #expect(second.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)).model)
+    #expect(
+        second.model == (
+            try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+        ).model
+    )
     #expect(isFolded(projects, in: second.model) == true)
     #expect(second.send(.action(.disclosureTapped(errands))) == nil)
     #expect(try store.deviceState(collapsedViewsKey, as: [String].self).map(Set.init) == [projects.rawValue, errands.rawValue])
@@ -527,8 +545,8 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
 @Test func anUnnamedAreaGoneMidRenameIsSaidWithoutAName() throws {
     let store = try makeStore()
     let area = try store.createView(NewTaskView(title: "", kind: .area))
-    let viaChange = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
-    let viaReturn = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let viaChange = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let viaReturn = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     for list in [viaChange, viaReturn] {
         _ = list.send(.action(.renameMenuItemChosen(area)))
         _ = list.send(.action(.titleFieldChanged("Home")))
@@ -538,7 +556,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(viaReturn.send(.action(.titleFieldSubmitted)) == nil)
     #expect(viaChange.model.problem == "The area is no longer there, so the new name was not saved.")
     #expect(viaChange.model == viaReturn.model)
-    #expect(viaChange.model.rows == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)).model.rows)
+    #expect(
+        viaChange.model.rows == (
+            try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+        ).model.rows
+    )
 }
 
 /// A fold is drawn only on a list with lists inside it, where a chevron can take it back: a leaf whose id the device's
@@ -550,7 +572,7 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
     let errands = try store.createView(NewTaskView(title: "Errands"))
     try store.setDeviceState(collapsedViewsKey, [projects.rawValue, errands.rawValue])
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(isFolded(projects, in: list.model) == true)
     #expect(isFolded(errands, in: list.model) == false, "a leaf the device's state names")
     let deleted = try changeSet(of: store) { try store.delete(view: home) }
@@ -560,12 +582,16 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(list.send(.changed(garden)) == nil)
     #expect(isFolded(projects, in: list.model) == true)
     #expect(list.model.rows.dropFirst(5).map(\.id) == [projects, errands], "the list that came back inside it is folded")
-    #expect(list.model == (try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)).model)
+    #expect(
+        list.model == (
+            try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+        ).model
+    )
 }
 
 /// A fold that hides the open list's row lights the row that hides it, the folded list a person can still see, as the
-/// Finder lights a folder that closes over the selection (the owner, 2026-10-29, #158): `selection` names it, and the
-/// model is the one a sidebar declared on that list draws. With two folds above the open list the outer one is lit,
+/// Finder lights a folder that closes over the selection (the owner, 2026-10-29, #158): the highlight is on it, and
+/// the model is the one a sidebar declared on that list draws. With two folds above the open list the outer one is lit,
 /// since it is the one drawn. Only the light moves: the list declared, with the task in it, stays open, and the folds
 /// taken back light its own row again.
 @Test func aFoldOverTheOpenListLightsTheFoldedListThatHidesIt() throws {
@@ -576,14 +602,14 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     try store.createView(NewTaskView(title: "Errands"))
     let task = try store.createTask(NewTask(title: "Buy seeds"))
     let route = TaskViewList.Route(list: .init(head: garden, task: TaskScreen.Route(head: task)))
-    let list = try TaskViewList(store: store, route: route, width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: route, width: .narrow, capabilities: iPhone)
     let open = list.model
-    #expect(open.selection == garden, "the open list's row is lit; this is the setup")
+    #expect(highlighted(in: open) == [garden], "the open list's row is lit; this is the setup")
     #expect(list.send(.action(.disclosureTapped(home))) == nil)
-    #expect(list.model.selection == home)
+    #expect(highlighted(in: list.model) == [home])
     #expect(list.model == (try sidebarOn(home, in: store)), "Home lit, as a sidebar declared on it draws it")
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
-    #expect(list.model.selection == projects, "the outer fold, the one drawn")
+    #expect(highlighted(in: list.model) == [projects], "the outer fold, the one drawn")
     #expect(list.model == (try sidebarOn(projects, in: store)))
     #expect(list.destination.pushed == route.list, "the light moved and the declaration did not")
     #expect(list.route == route)
@@ -603,13 +629,15 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     let contracts = try store.createView(NewTaskView(title: "Contracts", parent: acme))
     try store.createView(NewTaskView(title: "Billing", parent: work))
-    let list = try TaskViewList(store: store, route: .init(list: .init(head: contracts)), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(
+        store: store, route: .init(list: .init(head: contracts)), width: .narrow, capabilities: iPhone
+    )
     let open = list.model
-    #expect(open.selection == contracts, "the open list's row is lit; this is the setup")
+    #expect(highlighted(in: open) == [contracts], "the open list's row is lit; this is the setup")
     #expect(list.send(.action(.disclosureTapped(acme))) == nil)
     #expect(list.model == (try sidebarOn(acme, in: store)))
     #expect(list.send(.action(.disclosureTapped(clients))) == nil)
-    #expect(list.model.selection == clients)
+    #expect(highlighted(in: list.model) == [clients])
     #expect(list.model == (try sidebarOn(clients, in: store)))
     #expect(list.destination.pushed == .init(head: contracts))
     #expect(list.send(.action(.disclosureTapped(clients))) == nil)
@@ -623,9 +651,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
-    let list = try TaskViewList(store: store, route: .init(list: .init(head: home)), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(
+        store: store, route: .init(list: .init(head: home)), width: .narrow, capabilities: iPhone
+    )
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
-    #expect(list.model.selection == projects, "the fold lit Projects; this is the setup")
+    #expect(highlighted(in: list.model) == [projects], "the fold lit Projects; this is the setup")
     #expect(list.send(.action(.rowSelected(projects))) == nil)
     #expect(list.destination.pushed == .init(head: projects))
     #expect(list.route == .init(list: .init(head: projects)))
@@ -641,11 +671,11 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let errands = try store.createTag(title: "errands")
     try store.createTask(NewTask(title: "Buy milk", tags: [errands]))
     let shopping = try store.createView(NewTaskView(title: "Shopping", filter: .hasTag(errands)))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     #expect(listRow(shopping, in: list.model).map(drawnCount) == "1", "the tag's task is counted; this is the setup")
     let deleted = try changeSet(of: store) { try store.delete(tag: errands) }
     #expect(deleted.tasks.isEmpty && deleted.views.isEmpty, "a change naming the tag alone; this is the setup")
-    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, supportsMultipleWindows: false)
+    let reference = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
     try store.createView(NewTaskView(title: "Docs"))
     #expect(list.send(.changed(deleted)) == nil)
     #expect(listRow(shopping, in: list.model).map(drawnCount) == "")

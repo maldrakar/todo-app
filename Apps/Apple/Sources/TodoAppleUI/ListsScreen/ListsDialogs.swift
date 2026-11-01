@@ -5,9 +5,9 @@ import TaskViewListFeature
 
 /// The two dialogs of the list of views, drawn from the two optionals of its model, each the model of its dialog (Lists
 /// screen spec, section 6; ADR-0009, amendment of 2026-10-25): the confirmation of a delete as an alert, its title and
-/// message with its two choices, and the picker of Move to… as a sheet, whose content each view draws in its own
-/// look, so that the phone's screen, the sidebar and the plan's ninth task's sidebar put them up the one way. The alert
-/// and the sheet are the platform's; every word in them is the model's.
+/// message with its two choices, and the picker of Move to… as a sheet, whose content the view hands it, so that the
+/// phone's screen and the wide window's sidebar put them up the one way. The alert and the sheet are the platform's;
+/// every word in them is the model's.
 struct ListsDialogs<PickerContent: View>: ViewModifier {
     private let model: TaskViewList.Model
     private let send: (TaskViewList.UserAction) -> Void
