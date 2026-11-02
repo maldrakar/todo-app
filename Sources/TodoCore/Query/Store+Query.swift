@@ -47,31 +47,61 @@ extension Store {
         return try groups(of: view, from: try tasks(matching: view, today: today)).flatMap(\.tasks)
     }
 
-    /// A page: every child view as a section in rank order, then the view's own results that no child
-    /// claimed. One level deep — a child's own children flatten into the child's section here and become
-    /// sections of their own when that child is the page being opened.
+    /// A page: the view's own section first, then every child view as a section in rank order, which is the
+    /// product's order of a list (ADR-0004, amendment of 2026-11-01). One level deep — a child's own children
+    /// flatten into the child's section here and become sections of their own when that child is the page being
+    /// opened.
+    ///
+    /// The own section is the view's results that no child claimed, and it is there whenever the view has a rule,
+    /// empty or not, so that a list with nothing in it still has a block to add into; a folder has no rule, no
+    /// tasks of its own and no own section (spec section 2). A child with a rule holds its rule's results; a folder
+    /// inside holds the union of the rules of the lists under it to any depth, each task once and in the folder's
+    /// own sort, gathered as its count gathers them, so that it holds here what its number in the sidebar counts.
+    /// What a child holds leaves the own section; nothing is taken out between siblings.
     ///
     /// A child this app cannot read costs its own section and nothing more: it contributes no tasks and
     /// claims none, and `section.view?.needsNewerApp` names what stopped it, so the page still draws every
     /// sibling a newer app never touched. The view the page *is* stays an error, because there is no page
     /// to draw without it.
     public func page(of viewID: ViewID, today: Day) throws(StoreError) -> TaskViewPage {
-        guard let view = try view(viewID) else { throw .notFound(viewID) }
-        if let kind = view.needsNewerApp { throw .viewNeedsNewerApp(view.id, kind: kind) }
+        let view = try pageView(viewID)
         var sections: [TaskViewPage.Section] = []
         var claimed: Set<TaskID> = []
-        for child in try children(ofView: viewID) {
-            let tasks = child.needsNewerApp == nil ? try tasks(matching: child, today: today) : []
+        for (child, rules) in try childSections(of: viewID) {
+            let tasks = try tasks(selectedByAnyOf: rules, sort: child.sort, today: today)
             claimed.formUnion(tasks.map(\.id))
             sections.append(TaskViewPage.Section(view: child, groups: try groups(of: child, from: tasks)))
         }
-        // A folder with children has no remainder of its own. A view that selects nothing and has no children
-        // still gets one section, so that a page always names the view a person opened.
+        guard view.filter != nil else { return TaskViewPage(view: view, sections: sections) }
         let own = try tasks(matching: view, today: today).filter { !claimed.contains($0.id) }
-        if !own.isEmpty || sections.isEmpty {
-            sections.append(TaskViewPage.Section(view: nil, groups: try groups(of: view, from: own)))
-        }
-        return TaskViewPage(view: view, sections: sections)
+        return TaskViewPage(view: view, sections: [TaskViewPage.Section(view: nil, groups: try groups(of: view, from: own))] + sections)
+    }
+
+    /// The view a page is of, and its done read: it has to be there, and one this app cannot read is an error and
+    /// not an empty page, because a filter with a condition dropped is a list missing exactly the rows that
+    /// condition selected.
+    func pageView(_ id: ViewID) throws(StoreError) -> TaskView {
+        guard let view = try view(id) else { throw .notFound(id) }
+        if let kind = view.needsNewerApp { throw .viewNeedsNewerApp(view.id, kind: kind) }
+        return view
+    }
+
+    /// Every child of a view in rank order, with the rules its section of the page holds the tasks of: a list's
+    /// own rule, or the rules of a folder's lists, gathered as its count gathers them (`gatheredRules()`); none for
+    /// a child this app cannot read and for a folder with nothing under it to select. The page reads them, and the
+    /// done read lifts them.
+    func childSections(of viewID: ViewID) throws(StoreError) -> [(view: TaskView, rules: [Filter])] {
+        var gathered: [ViewID: [Filter]] = [:]
+        for (view, rules) in try gatheredRules() { gathered[view.id] = rules }
+        return try children(ofView: viewID).map { ($0, gathered[$0.id] ?? []) }
+    }
+
+    /// The tasks any of `rules` selects, each once, in `sort`. A list's section is its one rule, read as the
+    /// list's own read reads it, and a folder's is the disjunction of its lists' rules.
+    private func tasks(selectedByAnyOf rules: [Filter], sort: [SortKey], today: Day) throws(StoreError) -> [TodoTask] {
+        guard let first = rules.first else { return [] }
+        let statement = Store.viewStatement(filter: rules.count == 1 ? first : .or(rules), sort: sort, today: today)
+        return try loadTasks(sql: statement.sql, statement.params)
     }
 
     /// A view that this app cannot read is reported and not evaluated, because a filter with a condition
