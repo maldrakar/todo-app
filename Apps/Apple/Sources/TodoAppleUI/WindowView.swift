@@ -1,6 +1,5 @@
 // Apps/Apple/Sources/TodoAppleUI/WindowView.swift
 import AppFeature
-import Combine
 import FeatureModule
 import SwiftUI
 import TodoCore
@@ -48,9 +47,10 @@ import TodoCore
 /// view reads when it appears, and the view reads it again and reports it whenever it may have moved, at every change
 /// of the scene's phase, the app back in the foreground perhaps on another day among them, when the system says the
 /// calendar day changed, at midnight or on waking past it, and when the system's time zone changed. A day the root
-/// already has moves nothing, so a report that finds the same day costs one comparison. The two notifications and the
-/// scene's phase have the same names on macOS 14, iOS 17 and watchOS 10, so no platform condition is needed
-/// (typechecked against Xcode 27.1's SDKs on 2026-11-02).
+/// already has moves nothing, so a report that finds the same day costs one comparison. The scene's phase, the two
+/// notifications and `NotificationCenter.notifications(named:)`, which the view reads them through, have the same names
+/// on macOS 14, iOS 17 and watchOS 10, so no platform condition is needed (typechecked under Swift 6 against Xcode
+/// 27.1's SDKs on 2026-11-03).
 struct WindowView: View {
     private let app: TodoApp
 
@@ -101,15 +101,19 @@ struct WindowView: View {
         DeviceDay(at: Date(), in: .current)
     }
 
-    /// What the system posts when the device's day may have moved under a running app: the calendar's day changed, at
-    /// midnight or on waking past it, or the system's time zone changed. Delivered on the main queue, since the system
-    /// does not say which queue it posts either on and the window's way in is the main actor's. Built once, so that
-    /// every run of the body hands `onReceive` the same publisher and not a new chain, which it would subscribe to
-    /// again, and a notification `receive(on:)` held across a redraw could be dropped with the old subscription.
-    private static let dayMayHaveMoved: some Publisher<Notification, Never> =
-        NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
-            .merge(with: NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange))
-            .receive(on: DispatchQueue.main)
+    /// Reports the device's day to the window every time the system posts the notification, one of the two that say
+    /// the day may have moved under a running app: `NSCalendarDayChanged`, at midnight or on waking past it, and
+    /// `NSSystemTimeZoneDidChange`. One function for both, each run in a `.task` of its own.
+    ///
+    /// A `.task` over the notifications' async sequence, which Foundation alone gives, as the owner asked on #181: the
+    /// loop is a member of the view, which is the main actor's, so it runs on the main actor and each report reaches
+    /// the window's way in on the main thread by the language, whichever queue the system posts on, which it does not
+    /// say; and `.task` cancels it when the view goes, which ends the loop with the window's view. On 2026-11-03, under
+    /// Swift 6.4.0 on macOS 26.7.1, both notifications posted from a background thread reached such a loop on the main
+    /// thread.
+    private func reportTheDay(whenever name: Notification.Name, to window: TodoApp.Window) async {
+        for await _ in NotificationCenter.default.notifications(named: name) { window.dayChanged(day) }
+    }
 
     /// Whether the app can open a window beside this one, which only the platform can say (`docs/specs/navigation.md`,
     /// sections 5 and 10), read when the window is made and handed to the root, which hands it to the sidebar for the
@@ -146,7 +150,8 @@ struct WindowView: View {
                 .onChange(of: width, initial: true) { _, width in window.widthChanged(width) }
                 // Not on the first frame: the window was made with the day a moment ago.
                 .onChange(of: scenePhase) { window.dayChanged(day) }
-                .onReceive(WindowView.dayMayHaveMoved) { _ in window.dayChanged(day) }
+                .task { await reportTheDay(whenever: .NSCalendarDayChanged, to: window) }
+                .task { await reportTheDay(whenever: .NSSystemTimeZoneDidChange, to: window) }
         } else {
             // A view that fills the window, because a view with nothing in it never appears: on 2026-10-18 an
             // `onAppear` on a `Group` holding nothing never ran in a window of the group, and the window stayed
