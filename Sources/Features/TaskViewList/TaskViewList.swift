@@ -152,6 +152,13 @@ public final class TaskViewList: Routable {
         /// follow it with no read of the store; the sentence and an open field stay, and the width the module already
         /// has moves nothing.
         case widthChanged(WindowWidth)
+
+        /// The device's day, which the root hands the module when its window's view reports a new one, at midnight, in
+        /// a new time zone or on waking on another day: an event of the world and not a `UserAction`, as the width is
+        /// (spec section 8; ADR-0006, amendment of 2026-11-01). A count can depend on the day, so a new one rereads the
+        /// counts and nothing else; the day the module already has reads nothing. The sentence on screen, an open field
+        /// and the destination stay, since the day answers for nobody.
+        case dayChanged(DeviceDay)
     }
 
     public enum Output: Equatable, Sendable {
@@ -198,7 +205,9 @@ public final class TaskViewList: Routable {
     ///
     /// The width is the class of the window the module is drawn in, which the root hands it from its own: it has no
     /// default, as the root's has none, so that the class a window is made with is always its host's to say
-    /// (`docs/style.md`, "A lower layer holds no policy of its client").
+    /// (`docs/style.md`, "A lower layer holds no policy of its client"). The day is the device's, which the root hands
+    /// it from its own in the same way, the day the counts are read by (spec section 8), and has no default for the
+    /// same reason.
     ///
     /// What the window's platform offers is the platform's to say when the window is made, which the root hands on as
     /// it hands the width, and it does not change while the app runs: Open in New Window is in a list's menu only where
@@ -210,16 +219,16 @@ public final class TaskViewList: Routable {
     /// came up empty would look like a database with nothing in it (spec section 5). Only this module's own reads
     /// throw, the rows, their counts and the folds.
     public init(
-        store: Store, route: Route, width: WindowWidth, capabilities: WindowCapabilities
+        store: Store, route: Route, width: WindowWidth, day: DeviceDay, capabilities: WindowCapabilities
     ) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
-        let counts = try TaskViewList.counts(of: store)
+        let counts = try TaskViewList.counts(of: store, today: day.day)
         let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
         self.state = State(
-            rows: rows, counts: counts, collapsedViews: collapsedViews, width: width, capabilities: capabilities,
-            destination: Destination()
+            rows: rows, counts: counts, collapsedViews: collapsedViews, width: width, day: day,
+            capabilities: capabilities, destination: Destination()
         )
         setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
     }
@@ -509,7 +518,7 @@ public final class TaskViewList: Routable {
                     try reread()
                 } else if !changes.tasks.isEmpty || !changes.tags.isEmpty {
                     // Assigned after the read, so a read that failed leaves the counts on screen where they were.
-                    state.counts = try TaskViewList.counts(of: store)
+                    state.counts = try TaskViewList.counts(of: store, today: state.day.day)
                 }
             } catch {
                 // Only when there is nothing on screen already. A `.changed` neither clears a sentence nor
@@ -526,6 +535,18 @@ public final class TaskViewList: Routable {
             // The components' numbers are computed from the width on every read of the model, so this moves them
             // alone, and the same width again moves nothing.
             state.width = width
+            return nil
+        case .dayChanged(let day):
+            // The day is kept whether or not the read holds, since it is what the world says and every later read of
+            // the counts is by it; the counts are assigned after the read, so a read that failed leaves them on screen
+            // where they were, and says so only when nothing is on screen, as after a `.changed`.
+            guard day != state.day else { return nil }
+            state.day = day
+            do {
+                state.counts = try TaskViewList.counts(of: store, today: day.day)
+            } catch {
+                if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
+            }
             return nil
         }
     }
@@ -589,7 +610,7 @@ public final class TaskViewList: Routable {
     /// 2026-09-24).
     private func reread() throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
-        let counts = try TaskViewList.counts(of: store)
+        let counts = try TaskViewList.counts(of: store, today: state.day.day)
         let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         // A dialog goes with its row, and says nothing, as the highlight goes: the row leaving the tree says what
         // happened, and a dialog left up would ask about a row the module no longer holds.
@@ -813,11 +834,12 @@ public final class TaskViewList: Routable {
     private static let newListTitle = "New list"
 
     /// Everything this module holds between two events: the rows and their counts as the last reads produced them, the
-    /// lists folded on this device, the width class of the window and what its platform offers, the rename a person has
-    /// open, whether they are in edit mode, the dialog up over the rows, the list declared over the module,
-    /// and the sentence they were last told. One entity, moved field by field, from which the model is computed on
-    /// every read, so that nothing on screen is state in its own right and there is no second copy to keep in step
-    /// (owner's reviews of #77 and #101): the highlight is read off the destination, and is not kept beside it.
+    /// lists folded on this device, the width class of the window, the device's day the counts were read by and what
+    /// its platform offers, the rename a person has open, whether they are in edit mode, the dialog up over the rows,
+    /// the list declared over the module, and the sentence they were last told. One entity, moved field by field, from
+    /// which the model is computed on every read, so that nothing on screen is state in its own right and there is no
+    /// second copy to keep in step (owner's reviews of #77 and #101): the highlight is read off the destination, and is
+    /// not kept beside it.
     ///
     /// A struct and not a class: a field of a struct held in a `var` property is mutated in place and the array inside
     /// it is copy-on-write, so a class buys nothing here and would put a second reference type into a module that is
@@ -828,6 +850,7 @@ public final class TaskViewList: Routable {
         var counts: [ViewID: Int]
         var collapsedViews: Set<ViewID>
         var width: WindowWidth
+        var day: DeviceDay
         let capabilities: WindowCapabilities
         var rename: Rename?
         var isEditing = false

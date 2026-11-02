@@ -10,7 +10,8 @@ import TodoCore
 /// host still alive (`docs/specs/navigation.md`, section 5), where the feature-module spec's "one host and one root
 /// per process" becomes "one host per window, one store per process". A link the system opens in a window reaches that
 /// window's host through the same entrance as the change sets, by a way in handed to the window when it is made
-/// (section 7), and so does the width class the window's view reports (navigation state spec, section 4).
+/// (section 7), and so do the width class the window's view reports (navigation state spec, section 4) and the
+/// device's day (list screen spec, section 8).
 @MainActor
 final class TodoApp {
     /// The composition root of this process, put together the first time anything reads it. A `static let` is
@@ -88,8 +89,8 @@ final class TodoApp {
     }
 
     /// A window: a host around a root made from the path, or from the default route when there is none or it does not
-    /// read, with the width class the window opens with and what its platform offers, and the window's ways in for a
-    /// link and for its width.
+    /// read, with the width class the window opens with, the device's day and what its platform offers, and the
+    /// window's ways in for a link, for its width and for the day.
     ///
     /// A path is the window's route in its one text form, kept by the window to be restored from
     /// (`docs/specs/navigation.md`, section 7). One that does not read, written by another version of the app or by
@@ -107,17 +108,21 @@ final class TodoApp {
     /// when the window first appears and the root hands to the sidebar: whether a window can open beside this one, so
     /// that the lists' menus offer Open in New Window only where one can (`docs/specs/navigation.md`, section 5), and
     /// whether the platform has edit mode, which the sidebar's bar and rows are built by (Lists screen spec, sections 7
-    /// and 8); it has no default, for the width's reason.
+    /// and 8); it has no default, for the width's reason. The day is the device's when the window first appears, which
+    /// the window's view reads from the device's clock and calendar (`DeviceDay(at:in:)`), so that the window's first
+    /// frame counts and lists by it (list screen spec, section 8); it has no default either, for the width's reason.
     ///
-    /// The host's world entrance is kept for the fan-out and handed to the window inside `open` and `widthChanged`, and
-    /// the host itself is not kept: its caller, the window's view, holds the window for as long as the window lives
-    /// (`WindowView`), and once the caller lets go the host is released and the next fan-out passes it by. It throws
-    /// what the root's `init` throws, the store's error when the sidebar cannot be read, and its caller acts on the
-    /// throw.
-    func makeWindow(path: String?, width: WindowWidth, capabilities: WindowCapabilities) throws -> Window {
+    /// The host's world entrance is kept for the fan-out and handed to the window inside `open`, `widthChanged` and
+    /// `dayChanged`, and the host itself is not kept: its caller, the window's view, holds the window for as long as
+    /// the window lives (`WindowView`), and once the caller lets go the host is released and the next fan-out passes it
+    /// by. It throws what the root's `init` throws, the store's error when the sidebar cannot be read, and its caller
+    /// acts on the throw.
+    func makeWindow(
+        path: String?, width: WindowWidth, day: DeviceDay, capabilities: WindowCapabilities
+    ) throws -> Window {
         let unspentLaunchRoute = hostsMade == 0 ? launchRoute : nil
         let route = path.map { (try? AppModule.Route(path: $0)) ?? .default } ?? unspentLaunchRoute ?? .default
-        let root = try AppModule(store: store, route: route, width: width, capabilities: capabilities)
+        let root = try AppModule(store: store, route: route, width: width, day: day, capabilities: capabilities)
         // Replaced before `init` returns, since `init` hands the host's entrance over as its last step, so the
         // placeholder is never what is kept.
         var entrance: @MainActor (AppModule.Event) -> Void = { _ in }
@@ -129,7 +134,8 @@ final class TodoApp {
         return Window(
             host: host,
             open: { url in deliver(TodoApp.route(from: url).map(AppModule.Event.route) ?? .unreadableLink) },
-            widthChanged: { width in deliver(.widthChanged(width)) }
+            widthChanged: { width in deliver(.widthChanged(width)) },
+            dayChanged: { day in deliver(.dayChanged(day)) }
         )
     }
 
@@ -159,8 +165,9 @@ final class TodoApp {
     }
 
     /// What a window's view is handed once, when its window first appears: the window's host, and the window's ways
-    /// in for a link (the owner, 2026-10-20) and for its width class (navigation state spec, section 4). The view
-    /// holds it for as long as the window lives, and nothing else does.
+    /// in for a link (the owner, 2026-10-20), for its width class (navigation state spec, section 4) and for the
+    /// device's day (list screen spec, section 8). The view holds it for as long as the window lives, and nothing else
+    /// does.
     struct Window {
         /// The window's host, which the window's view draws and sends its actions to.
         let host: ModuleHost<AppModule>
@@ -182,6 +189,13 @@ final class TodoApp {
         /// reports the width through this and decides nothing by it (`docs/style.md`, "Views"; the owner, 2026-10-20,
         /// on the window's way in). It holds the host weakly, as `open` does.
         let widthChanged: @MainActor (WindowWidth) -> Void
+
+        /// Takes the device's day the window's view reads to this window's host, through the same entrance, as the
+        /// root's `.dayChanged`, which the root hands to every screen of the window (list screen spec, section 8). It
+        /// is an event of the world, as the width is, so it reaches the host by the composition root's way in and
+        /// never by the view's closure over user actions; the view reports the day through this and decides nothing by
+        /// it (`docs/style.md`, "Views"; ADR-0006, amendment of 2026-11-01). It holds the host weakly, as `open` does.
+        let dayChanged: @MainActor (DeviceDay) -> Void
     }
 
     /// Hands what a commit touched to every host still alive, in the order they were made, and forgets the

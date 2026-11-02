@@ -1,13 +1,15 @@
 // Apps/Apple/Sources/TodoAppleUI/WindowView.swift
 import AppFeature
+import Combine
 import FeatureModule
 import SwiftUI
+import TodoCore
 
-/// The view of one window: it makes the window from the window's path, its width class and what its platform offers,
-/// once, when the window first appears, holds it for as long as the window lives, draws the root over its host, hands
-/// it the links the system opens in it and the window's width class as it changes, writes its route back after every
-/// change, and opens the windows the root asks for (`docs/specs/navigation.md`, sections 5 and 7; navigation state
-/// spec, section 4).
+/// The view of one window: it makes the window from the window's path, its width class, the device's day and what its
+/// platform offers, once, when the window first appears, holds it for as long as the window lives, draws the root over
+/// its host, hands it the links the system opens in it and the window's width class and the device's day as they
+/// change, writes its route back after every change, and opens the windows the root asks for
+/// (`docs/specs/navigation.md`, sections 5 and 7; navigation state spec, section 4; list screen spec, section 8).
 ///
 /// The window is kept in the view's state, which SwiftUI keeps for the life of the window, and is made when the view
 /// drawn while that state is empty appears. A scene's content closure runs more than once for a window and hands
@@ -40,6 +42,15 @@ import SwiftUI
 /// still reaches the root, which takes the width it already has as nothing. The same day, rotating an iPhone 17 Pro
 /// Max with a task open, with the tree chosen from a reported width, wrote no path and drew no frame of the old tree at
 /// the new width.
+///
+/// The device's day reaches the root the same way, since the core has no time zone to tell it by (ADR-0001), and the
+/// view keeps no day and decides nothing by it (ADR-0006, amendment of 2026-11-01): the window is made with the day the
+/// view reads when it appears, and the view reads it again and reports it whenever it may have moved, when the scene
+/// becomes active, which is the app back in the foreground, perhaps on another day, when the system says the calendar
+/// day changed, at midnight or on waking past it, and when the system's time zone changed. A day the root already has
+/// moves nothing, so a report that finds the same day costs one comparison. The two notifications and the scene's
+/// phase have the same names on macOS 14, iOS 17 and watchOS 10, so no platform condition is needed (typechecked
+/// against Xcode 27.1's SDKs on 2026-11-02).
 struct WindowView: View {
     private let app: TodoApp
 
@@ -78,6 +89,25 @@ struct WindowView: View {
         horizontalSizeClass == .compact ? .narrow : .wide
     }
 
+    /// The phase of the window's scene, which only the view can know, read for the moment the scene becomes active
+    /// again, when the day may have moved while the app was away.
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// The device's day now, read from the device's clock and its calendar, whose time zone only the view has, each
+    /// time it is read and kept nowhere: the root keeps the day it is handed, and nothing here is decided by it.
+    private var day: DeviceDay {
+        DeviceDay(at: Date(), in: .current)
+    }
+
+    /// What the system posts when the device's day may have moved under a running app: the calendar's day changed, at
+    /// midnight or on waking past it, or the system's time zone changed. Delivered on the main queue, since the system
+    /// does not say which queue it posts either on and the window's way in is the main actor's.
+    private var dayMayHaveMoved: some Publisher<Notification, Never> {
+        NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
+            .merge(with: NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange))
+            .receive(on: DispatchQueue.main)
+    }
+
     /// Whether the app can open a window beside this one, which only the platform can say (`docs/specs/navigation.md`,
     /// sections 5 and 10), read when the window is made and handed to the root, which hands it to the sidebar for the
     /// lists' menus: it does not change while the app runs, so nothing reports it again. Read on 2026-10-18: true on
@@ -111,6 +141,9 @@ struct WindowView: View {
                 // On the first frame as well, `initial`, for a class that moved after the window was made; a width the
                 // window has already moves nothing in the root.
                 .onChange(of: width, initial: true) { _, width in window.widthChanged(width) }
+                // Not on the first frame: the window was made with the day a moment ago.
+                .onChange(of: scenePhase) { _, phase in if phase == .active { window.dayChanged(day) } }
+                .onReceive(dayMayHaveMoved) { _ in window.dayChanged(day) }
         } else {
             // A view that fills the window, because a view with nothing in it never appears: on 2026-10-18 an
             // `onAppear` on a `Group` holding nothing never ran in a window of the group, and the window stayed
@@ -123,7 +156,7 @@ struct WindowView: View {
     private func makeWindow() {
         do {
             let window = try app.makeWindow(
-                path: value?.path ?? storedPath, width: width,
+                path: value?.path ?? storedPath, width: width, day: day,
                 capabilities: WindowCapabilities(opensWindowsBeside: supportsMultipleWindows, hasEditMode: hasEditMode)
             )
             answerTheRoot(of: window.host)
@@ -206,5 +239,35 @@ extension WindowView {
             self.id = id
             self.path = path
         }
+    }
+}
+
+extension DeviceDay {
+    /// The device's day at an instant, as a device on the calendar reads it: the day the calendar's time zone puts the
+    /// instant on, and the instant that day began there, in the clock's milliseconds (list screen spec, section 8).
+    /// Only the view has a time zone to read it by (ADR-0001), and it hands the reading in whole.
+    ///
+    /// The day is read in the Gregorian calendar in the calendar's time zone, whatever calendar the device is set to:
+    /// `Day` is a Gregorian date, and a Buddhist, Japanese, Hebrew or Islamic calendar's year and month are numbers of
+    /// another calendar, which `Day(year:month:day:)` would take for another date. The calendar is handed for its time
+    /// zone, which is the device's.
+    ///
+    /// The clock is data from outside (`docs/style.md`), so an instant before the epoch reads as the epoch, as
+    /// `Store.systemNow()` reads such a clock, and one past `Date.distantFuture` as that date. Foundation's calendar
+    /// stops at 4713 BC and at 506713 by itself, infinities and NaN included, so nothing here would trap without the
+    /// bounds (probed 2026-11-02 under Swift 6.4.0 on macOS 26.7.1); what they keep out is a day `Day` does not mean
+    /// the same by, a year before Christ, which the calendar numbers from one again, and a date before October 1582,
+    /// which it reads in the Julian calendar.
+    init(at now: Date, in calendar: Calendar) {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        let instant = min(max(now, Date(timeIntervalSince1970: 0)), .distantFuture)
+        self.init(
+            day: Day(
+                year: gregorian.component(.year, from: instant), month: gregorian.component(.month, from: instant),
+                day: gregorian.component(.day, from: instant)
+            ),
+            began: Int64(gregorian.startOfDay(for: instant).timeIntervalSince1970 * 1000)
+        )
     }
 }

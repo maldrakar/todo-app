@@ -15,7 +15,7 @@ private let iPad = WindowCapabilities(opensWindowsBeside: true, hasEditMode: tru
 private func sidebar(
     _ store: Store, width: WindowWidth = .narrow, capabilities: WindowCapabilities = iPhone
 ) throws -> TaskViewList {
-    try TaskViewList(store: store, route: .init(list: nil), width: width, capabilities: capabilities)
+    try TaskViewList(store: store, route: .init(list: nil), width: width, day: testDay, capabilities: capabilities)
 }
 
 /// The area's line the model draws for a view, and nil when no row holds the view or its row is a list's.
