@@ -304,3 +304,317 @@ import TestSupport
         #expect(try store.view(id)?.needsNewerApp == column, "a \(column) that is not text")
     }
 }
+
+// MARK: - A group's view and a manual list
+
+/// An operation the way one arrives from another device, stamped past every clock the test's store has used, so that it
+/// wins its field as a peer's later edit does.
+private func fromPeer(_ store: Store, _ id: ViewID, _ field: String, _ value: Value) throws {
+    let stamp = HLC(millis: store.clock.next().millis + 1_000, counter: 0)
+    try store.receive([JournalOperation(entity: .view, entityID: id.rawValue, field: field, value: value, clock: stamp, device: "peer")])
+}
+
+/// What the store keeps of a view's row, whatever it reads as: the fields a group's view is compared by.
+private func storedRow(_ store: Store, _ id: ViewID) throws -> [Value] {
+    try #require(try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT kind, parent, title, filter, sort, color, icon, deleted FROM views WHERE id = ?", [.text(id.rawValue)])
+    }.first)
+}
+
+/// The fields of a view journaled under one stamp, the latest the view's operations carry, by name.
+private func lastWrite(_ store: Store, _ id: ViewID) throws -> [String] {
+    try store.sql { () throws(SQLiteError) in
+        try store.db.rows(
+            "SELECT field FROM ops WHERE entity_id = ? AND clock = (SELECT max(clock) FROM ops WHERE entity_id = ?) ORDER BY field",
+            [.text(id.rawValue), .text(id.rawValue)]
+        )
+    }.map { $0[0].string ?? "" }
+}
+
+/// Every commit a write makes, which is how a test tells one transaction from two.
+private func commits(of store: Store, _ write: () throws -> Void) rethrows -> [ChangeSet] {
+    var commits: [ChangeSet] = []
+    store.onChange = { commits.append($0) }
+    defer { store.onChange = nil }
+    try write()
+    return commits
+}
+
+/// A list with a rule and a look of its own, the kind of list a group is opened from.
+private func thisWeek(_ store: Store) throws -> ViewID {
+    try store.createView(NewTaskView(
+        title: "This week", color: .indigo, icon: "calendar", filter: .and([.status([.open]), .when(.between(0, 6))]),
+        sort: [SortKey(.when), SortKey(.title)], groupBy: .whenDay
+    ))
+}
+
+/// A row of kind `group` reads as one where it has a parent the store holds and a rule: the third kind beside `list`
+/// and `area` (ADR-0004, amendment of 2026-11-01), here as a peer's operations bring one, and it is one of its list's
+/// children, which the page, the counts and the sidebar skip by its kind.
+@Test func aStoredGroupWithAParentAndAFilterReadsAsAGroup() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = ViewID("g")
+    let stamp = store.clock.next()
+    try store.apply([
+        store.op(.view, group.rawValue, "title", .text("Tomorrow"), stamp),
+        store.op(.view, group.rawValue, "kind", .text("group"), stamp),
+        store.op(.view, group.rawValue, "parent", .text(list.rawValue), stamp),
+        store.op(.view, group.rawValue, "filter", .text(try Filter.when(.on(1)).json()), stamp),
+    ])
+    let read = try #require(try store.view(group))
+    #expect(read.kind == .group && read.parent == list && read.filter == .when(.on(1)))
+    #expect(try store.children(ofView: list).map(\.id) == [group])
+}
+
+/// A group whose list is gone reads as gone with it, and never as a list at the root, which is where the reading rule
+/// would lift any other child of a deleted parent: a list named "Tomorrow" at the root of the sidebar (owner's review of
+/// the plan, 2026-11-02). The list's tombstone arrives as a peer's does, so no delete of this app's ran, and the row
+/// itself is still stored live. A group under a group is no group either, whether that group reads or not, since a
+/// group holds no lists; so a group under an orphan stays out of the tree too.
+@Test func anOrphanGroupReadsAsDeleted() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let under = ViewID("under")
+    let stamp = store.clock.next()
+    try store.apply([
+        store.op(.view, under.rawValue, "kind", .text("group"), stamp),
+        store.op(.view, under.rawValue, "parent", .text(group.rawValue), stamp),
+        store.op(.view, under.rawValue, "filter", .text(try Filter.when(.on(2)).json()), stamp),
+    ])
+    #expect(try store.view(under) == nil, "a group under a group is an orphan while its parent reads")
+    #expect(try store.view(group)?.kind == .group)
+
+    try fromPeer(store, list, "deleted", Value(true))
+
+    #expect(try storedRow(store, group)[7] == .integer(0), "no cascade ran: the row is stored live")
+    #expect(try !store.views().contains { $0.id == group || $0.id == under })
+    #expect(try store.view(group) == nil)
+    #expect(try store.children(ofView: nil).map(\.id) == [
+        BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash,
+    ])
+}
+
+/// A group's rule is its list's and its condition written out, so a row of kind `group` with no filter is no group of
+/// anything, and reads as gone rather than as a folder under its list.
+@Test func aGroupWithoutAFilterReadsAsDeleted() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = ViewID("g")
+    let stamp = store.clock.next()
+    try store.apply([
+        store.op(.view, group.rawValue, "title", .text("Tomorrow"), stamp),
+        store.op(.view, group.rawValue, "kind", .text("group"), stamp),
+        store.op(.view, group.rawValue, "parent", .text(list.rawValue), stamp),
+    ])
+    #expect(try store.view(group) == nil)
+    #expect(try store.children(ofView: list).isEmpty)
+}
+
+/// `groupView` is the one way to make a group's view, so that its id is always the one every device derives: a create
+/// that asks for the kind is refused, and writes nothing.
+@Test func createViewRefusesAGroup() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let before = try store.views()
+    #expect(throws: StoreError.invalid("a group's view is made from its list")) {
+        try store.createView(NewTaskView(title: "Tomorrow", parent: list, kind: .group, filter: .when(.on(1))))
+    }
+    #expect(try store.views() == before)
+}
+
+/// A group's view stays under its list and holds no lists (ADR-0004, amendment of 2026-11-01), as an area stays at the
+/// root: a move of one is refused, to the root or under another list, and so is a view moved under one, made under one,
+/// or a manual list made in one. None of the refusals writes anything.
+@Test func aGroupIsNotMovedAndTakesNoChild() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let other = try store.createView(NewTaskView(title: "Other", filter: .status([.open])))
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let before = try store.views()
+    let stays = StoreError.invalid("a group's view stays under its list")
+    let holdsNoLists = StoreError.invalid("a group's view holds no lists")
+    #expect(throws: stays) { try store.move(view: group, to: nil, at: .end) }
+    #expect(throws: stays) { try store.move(view: group, to: other, at: .end) }
+    #expect(throws: holdsNoLists) { try store.move(view: other, to: group, at: .end) }
+    #expect(throws: holdsNoLists) { try store.createView(NewTaskView(title: "Inside", parent: group)) }
+    #expect(throws: holdsNoLists) { try store.createManualList("Inside", in: group, color: nil) }
+    #expect(try store.views() == before)
+}
+
+/// A list made on the list screen is a manual list, the heading of ADR-0004: a view whose rule lists itself, which one
+/// call makes in one transaction, the id minted before the filter that names it, with the `list` icon and the colour it
+/// is given, last among its parent's lists (ADR-0004, amendment of 2026-11-01). A task is in it by being pinned there.
+@Test func aManualListIsMadeInOneTransactionWithItsOwnIDInItsRule() throws {
+    let store = try makeStore()
+    let parent = try thisWeek(store)
+    let first = try store.createView(NewTaskView(title: "First", parent: parent, filter: .status([.open])))
+    var made: ViewID?
+    let written = try commits(of: store) { made = try store.createManualList("Errands", in: parent, color: .teal) }
+    let id = try #require(made)
+    #expect(written.map(\.views) == [[id]], "one transaction")
+    let list = try #require(try store.view(id))
+    #expect(list.filter == .listedIn(id) && list.kind == .list && list.icon == "list" && list.color == .teal)
+    #expect(list.title == "Errands" && list.parent == parent && list.groupBy == nil && list.sort.isEmpty)
+    #expect(try store.children(ofView: parent).map(\.id) == [first, id], "ranked last")
+    let stamps = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT count(*), count(DISTINCT clock) FROM ops WHERE entity_id = ?", [.text(id.rawValue)])
+    }
+    #expect(stamps == [[.integer(11), .integer(1)]], "eleven fields under one stamp")
+    let task = try store.createTask(NewTask(title: "Buy stamps"))
+    try store.pin(task: task, in: id)
+    #expect(try store.tasks(in: id, today: Day(year: 2026, month: 11, day: 2)).map(\.id) == [task])
+    #expect(throws: StoreError.notFound(ViewID("gone"))) { try store.createManualList("Lost", in: ViewID("gone"), color: nil) }
+}
+
+/// The view of one group of a list, Monday of "This week", is made in one call and one transaction: kind `group`, the
+/// list's rule and the condition written out as its filter, the list's colour, icon and sort, no grouping, its parent
+/// the list, and its id derived from the list's id and the condition's JSON (ADR-0004, amendment of 2026-11-01).
+@Test func aGroupViewIsMadeFromItsListInOneTransaction() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let inside = try store.createView(NewTaskView(title: "Inside", parent: list, filter: .status([.open])))
+    let condition = Filter.when(.on(1))
+    var made: ViewID?
+    let written = try commits(of: store) { made = try store.groupView(of: list, condition: condition, titled: "Tomorrow") }
+    let group = try #require(made)
+    #expect(group == EntityID.derived(from: list, try condition.json()))
+    #expect(written.map(\.views) == [[group]], "one transaction")
+    let read = try #require(try store.view(group))
+    #expect(read.kind == .group && read.parent == list && read.title == "Tomorrow")
+    #expect(read.filter == .and([.and([.status([.open]), .when(.between(0, 6))]), condition]))
+    #expect(read.color == .indigo && read.icon == "calendar" && read.sort == [SortKey(.when), SortKey(.title)] && read.groupBy == nil)
+    #expect(try store.children(ofView: list).map(\.id) == [inside, group], "ranked last among the list's children")
+    let stamps = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT count(*), count(DISTINCT clock) FROM ops WHERE entity_id = ?", [.text(group.rawValue)])
+    }
+    #expect(stamps == [[.integer(11), .integer(1)]], "eleven fields under one stamp")
+}
+
+/// Opening the same group again finds the row by the id it derives and writes nothing when nothing changed: no
+/// transaction, no change set, and the journal as it was, since drawing a page must not grow the journal.
+@Test func aGroupViewMadeAgainWritesNothing() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let journal = try store.journal(after: 0)
+    var again: ViewID?
+    let written = try commits(of: store) { again = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow") }
+    #expect(again == group)
+    #expect(written.isEmpty)
+    #expect(try store.journal(after: 0) == journal)
+}
+
+/// When the list's rule or look changed since its group was made, opening the group brings it up to date, and only the
+/// fields that differ are written, under one stamp: the rule by `update(view:)`, the colour as a settings screen or a
+/// peer writes it, the title as the module words it today; the rest stays as it is.
+@Test func aGroupViewFollowsItsListsRuleAndLook() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    try store.update(view: list, [.filter(.status([.open])), .sort([SortKey(.deadline)])])
+    try store.apply([store.op(.view, list.rawValue, "color", .text("rose"), store.clock.next())])
+
+    let written = try commits(of: store) { try store.groupView(of: list, condition: .when(.on(1)), titled: "Monday") }
+
+    #expect(written.map(\.views) == [[group]], "one transaction")
+    #expect(try lastWrite(store, group) == ["color", "filter", "sort", "title"])
+    let read = try #require(try store.view(group))
+    #expect(read.filter == .and([.status([.open]), .when(.on(1))]) && read.sort == [SortKey(.deadline)])
+    #expect(read.color == .rose && read.icon == "calendar" && read.title == "Monday" && read.parent == list)
+}
+
+/// Only a list with a rule has groups to open: a folder and an area select nothing and are refused, a group's view
+/// holds no grouping of its own, and a view that is not there, or is gone, is not found. A condition that the list's
+/// rule takes past the depth a read takes is refused as every such filter is, though it is within the depth alone.
+/// Nothing is written.
+@Test func aGroupViewOfAFolderIsRefused() throws {
+    let store = try makeStore()
+    let folder = try store.createView(NewTaskView(title: "Folder"))
+    let area = try store.createView(NewTaskView(title: "Work", kind: .area))
+    let list = try thisWeek(store)
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let gone = try store.createView(NewTaskView(title: "Gone", filter: .status([.open])))
+    try store.delete(view: gone)
+    let journal = try store.journal(after: 0)
+    let folderHasNone = StoreError.invalid("a folder has no groups")
+    #expect(throws: folderHasNone) { try store.groupView(of: folder, condition: .when(.on(1)), titled: "Tomorrow") }
+    #expect(throws: folderHasNone) { try store.groupView(of: area, condition: .when(.on(1)), titled: "Tomorrow") }
+    #expect(throws: StoreError.invalid("a group has no groups")) { try store.groupView(of: group, condition: .when(.on(2)), titled: "In 2 days") }
+    #expect(throws: StoreError.notFound(gone)) { try store.groupView(of: gone, condition: .when(.on(1)), titled: "Tomorrow") }
+    #expect(throws: StoreError.notFound(ViewID("none"))) { try store.groupView(of: ViewID("none"), condition: .when(.on(1)), titled: "Tomorrow") }
+    var deep = Filter.when(.empty)
+    for _ in 0..<(maximumDepth - 2) { deep = .not(deep) }
+    #expect(nestingDepth(of: try deep.json()) == maximumDepth)
+    let tooDeep = StoreError.invalidFilter(String(describing: FilterError.malformed("nested deeper than \(maximumDepth) levels")))
+    #expect(throws: tooDeep) { try store.groupView(of: list, condition: deep, titled: "Deep") }
+    #expect(try store.journal(after: 0) == journal)
+}
+
+/// A group's row lives and dies with its list (owner's review of the plan, 2026-11-02): the tree delete the Lists screen
+/// deletes a list by takes its groups with the lists under it, in its one transaction.
+@Test func aListsTreeDeleteTakesItsGroups() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let inside = try store.createView(NewTaskView(title: "Inside", parent: list, filter: .status([.open])))
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let written = try commits(of: store) { try store.delete(viewTree: list) }
+    #expect(written.map(\.views) == [[list, inside, group]])
+    #expect(try storedRow(store, group)[7] == .integer(1), "tombstoned, not only unread")
+}
+
+/// The one-view delete takes the list's groups too, in the same transaction, though the lists inside it surface at the
+/// root as before: a group cannot stand anywhere but under its list, and a row left behind would sync to an older app,
+/// which reads it as a list.
+@Test func aListsDeleteTakesItsGroups() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let inside = try store.createView(NewTaskView(title: "Inside", parent: list, filter: .status([.open])))
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let written = try commits(of: store) { try store.delete(view: list) }
+    #expect(written.map(\.views) == [[list, group]], "one change set naming both")
+    #expect(try storedRow(store, group)[7] == .integer(1))
+    #expect(try store.view(inside)?.parent == nil, "a list inside surfaces at the root")
+    let tombstones = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT count(DISTINCT clock) FROM ops WHERE entity = 'view' AND field = 'deleted' AND value = 1")
+    }
+    #expect(tombstones == [[.integer(1)]], "under one stamp")
+}
+
+/// A group's row deleted alone, by this app or by an older one that read it as a list, is not refused, since the same
+/// tombstone can arrive from a peer whatever this app refuses; opening the group again takes the row with the derived id
+/// back, writing only what differs, the tombstone.
+@Test func aDeletedGroupRowComesBackWhenItsGroupIsOpened() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let made = try #require(try store.view(group))
+    try store.delete(view: group)
+    #expect(try store.view(group) == nil)
+
+    let written = try commits(of: store) { try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow") }
+
+    #expect(written.map(\.views) == [[group]])
+    #expect(try lastWrite(store, group) == ["deleted"])
+    let back = try #require(try store.view(group))
+    #expect(back.kind == .group && back.parent == list && back.filter == made.filter && back.title == made.title)
+}
+
+/// An older app reads a group's row as a list and can move it, here under another list, where it still reads as a group
+/// since its parent is a list. Opening the group from its own list writes the parent back, and nothing else.
+@Test func aGroupRowMovedByAPeerReturnsUnderItsList() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let other = try store.createView(NewTaskView(title: "Other", filter: .status([.open])))
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    try fromPeer(store, group, "parent", .text(other.rawValue))
+    #expect(try store.view(group)?.parent == other)
+
+    let written = try commits(of: store) { try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow") }
+
+    #expect(written.map(\.views) == [[group]])
+    #expect(try lastWrite(store, group) == ["parent"])
+    #expect(try store.view(group)?.parent == list)
+    #expect(try store.children(ofView: other).isEmpty)
+}

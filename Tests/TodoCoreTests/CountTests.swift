@@ -646,3 +646,29 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
     #expect(held.map(\.title) == ["shared", "office", "kitchen", "finished"])
     #expect(try store.taskCounts(today: today)[folder] == held.filter { $0.status == .open }.count)
 }
+
+/// A group's view counts nothing, since nothing in the sidebar draws it, and adds nothing to the view above it: not to
+/// the list it groups, which counts its own rule, nor to a folder a peer's row of kind `group` stands under, which
+/// counts its lists alone (ADR-0004, amendment of 2026-11-01).
+@Test func aGroupCountsNothingAndAddsNothingToItsList() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    try store.createTask(NewTask(title: "dated", when: today.advanced(by: 1)))
+    try store.createTask(NewTask(title: "tagged", tags: [work]))
+    let all = try store.createView(NewTaskView(title: "All", filter: .when(.on(1))))
+    let group = try store.groupView(of: all, condition: .when(.on(1)), titled: "Tomorrow")
+    let folder = try store.createView(NewTaskView(title: "Folder"))
+    let tagged = try store.createView(NewTaskView(title: "Work", parent: folder, filter: .hasTag(work)))
+    let stamp = store.clock.next()
+    try store.apply([
+        store.op(.view, "peer-group", "kind", .text("group"), stamp),
+        store.op(.view, "peer-group", "parent", .text(folder.rawValue), stamp),
+        store.op(.view, "peer-group", "filter", .text(try Filter.when(.on(1)).json()), stamp),
+    ])
+    #expect(try store.view(ViewID("peer-group"))?.kind == .group)
+
+    let counts = try store.taskCounts(today: today)
+    #expect(counts[group] == nil && counts[ViewID("peer-group")] == nil)
+    #expect(counts[all] == 1 && counts[tagged] == 1)
+    #expect(counts[folder] == 1, "the group under the folder adds nothing to it")
+}

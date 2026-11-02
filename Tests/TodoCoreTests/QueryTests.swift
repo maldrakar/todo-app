@@ -363,3 +363,18 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     #expect(page.sections.map { $0.view?.id } == [folder])
     #expect(sectionTasks(page) == [[office, binnedKitchen]], "the binned office task is in neither list's read")
 }
+
+/// A child of a kind other than `list` is no section of its parent's page and claims none of its tasks: a group's view
+/// is a screen of its own over the list and not a block on it (ADR-0004, amendment of 2026-11-01), though it is still
+/// one of the list's children, and the done read, which reads the page's sections, skips it alike.
+@Test func aChildOfAKindOtherThanListIsNotASection() throws {
+    let store = try makeStore()
+    let loose = try store.createTask(NewTask(title: "loose"))
+    let all = try store.createView(NewTaskView(title: "All", filter: .status([.open])))
+    let group = try store.groupView(of: all, condition: .when(.empty), titled: "No date")
+
+    let page = try store.page(of: all, today: today)
+    #expect(page.sections.map { $0.view?.id } == [nil])
+    #expect(sectionTasks(page) == [[loose]], "the group claimed nothing")
+    #expect(try store.children(ofView: all).map(\.id) == [group])
+}
