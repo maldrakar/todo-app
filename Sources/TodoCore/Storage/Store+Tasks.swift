@@ -5,10 +5,13 @@ extension Store {
     /// Every column a `TodoTask` is read from, in the order `task(from:)` decodes them. `parent` and `trashed`
     /// come from the tree and not from `tasks`, which is what makes a merge's leftovers invisible to a read.
     ///
-    /// The notes are read as whether there are any, `length(t.notes) > 0`, which SQLite answers from the record's
-    /// header without loading the text from its overflow pages, so no read of a list loads them (ADR-0002); a test
-    /// of the comparison with the text, `t.notes != ''`, would load every one. `notes(of:)` reads the text.
-    static let taskColumns = "t.id, t.title, t.status, t.when_day, t.deadline_day, tt.parent, t.rank, tt.trashed, t.created_at, t.updated_at, t.completed_at, length(t.notes) > 0"
+    /// The notes are read as whether there are any, `octet_length(t.notes) > 0`, their size in bytes, which SQLite
+    /// answers from the record's header without loading the text from its overflow pages, so no read of a list loads
+    /// them (ADR-0002). `length()` would load them: it counts the characters of a text, and the column read skips the
+    /// overflow pages for `octet_length()` of anything but for `length()` of a blob alone (`OP_Column`, the
+    /// vendored `sqlite3.c`); it also stops at the first NUL, so a note that starts with one would read as none. A
+    /// comparison with the text, `t.notes != ''`, would load every one too. `notes(of:)` reads the text.
+    static let taskColumns = "t.id, t.title, t.status, t.when_day, t.deadline_day, tt.parent, t.rank, tt.trashed, t.created_at, t.updated_at, t.completed_at, octet_length(t.notes) > 0"
 
     // MARK: - Writes
 

@@ -43,7 +43,7 @@ extension Store {
     /// Child views are ignored, which is the one thing a page does that this does not: a page draws them as
     /// sections of their own and subtracts what they claimed. This is the list behind a picker.
     public func tasks(in viewID: ViewID, today: Day) throws(StoreError) -> [TodoTask] {
-        let view = try readableView(viewID)
+        let view = try Store.readableView(viewID, among: try views())
         let rules = view.filter.map { [$0] } ?? []
         return try groups(of: view, from: try tasks(selectedByAnyOf: rules, sort: view.sort, today: today)).flatMap(\.tasks)
     }
@@ -66,10 +66,11 @@ extension Store {
     /// sibling a newer app never touched. The view the page *is* stays an error, because there is no page
     /// to draw without it.
     public func page(of viewID: ViewID, today: Day) throws(StoreError) -> TaskViewPage {
-        let view = try readableView(viewID)
+        let allViews = try views()
+        let view = try Store.readableView(viewID, among: allViews)
         var sections: [TaskViewPage.Section] = []
         var claimed: Set<TaskID> = []
-        for (child, rules) in try childSections(of: viewID) {
+        for (child, rules) in Store.childSections(of: viewID, among: allViews) {
             let tasks = try tasks(selectedByAnyOf: rules, sort: child.sort, today: today)
             claimed.formUnion(tasks.map(\.id))
             sections.append(TaskViewPage.Section(view: child, groups: try groups(of: child, from: tasks)))
@@ -79,23 +80,23 @@ extension Store {
         return TaskViewPage(view: view, sections: [TaskViewPage.Section(view: nil, groups: try groups(of: view, from: own))] + sections)
     }
 
-    /// The view a read is of: a page, its done tasks or the flat list. It has to be there, and one this app cannot
-    /// read is reported and not evaluated, because a filter with a condition dropped is a list missing exactly the
-    /// rows that condition selected.
-    func readableView(_ id: ViewID) throws(StoreError) -> TaskView {
-        guard let view = try view(id) else { throw .notFound(id) }
+    /// The view a read is of, a page, its done tasks or the flat list, found among the views the read read once. It
+    /// has to be there, and one this app cannot read is reported and not evaluated, because a filter with a condition
+    /// dropped is a list missing exactly the rows that condition selected.
+    static func readableView(_ id: ViewID, among views: [TaskView]) throws(StoreError) -> TaskView {
+        guard let view = views.first(where: { $0.id == id }) else { throw .notFound(id) }
         if let kind = view.needsNewerApp { throw .viewNeedsNewerApp(view.id, kind: kind) }
         return view
     }
 
-    /// Every child of a view in rank order, with the rules its section of the page holds the tasks of: a list's
-    /// own rule, or the rules of a folder's lists, gathered as its count gathers them (`gatheredRules()`); none for
-    /// a child this app cannot read and for a folder with nothing under it to select. The page reads them, and the
-    /// done read lifts them.
-    func childSections(of viewID: ViewID) throws(StoreError) -> [(view: TaskView, rules: [Filter])] {
+    /// Every child of a view in rank order, as `children(ofView:)` lists them, from the views the read read once,
+    /// with the rules its section of the page holds the tasks of: a list's own rule, or the rules of a folder's
+    /// lists, gathered as its count gathers them (`gatheredRules(of:)`); none for a child this app cannot read and
+    /// for a folder with nothing under it to select. The page reads them, and the done read lifts them.
+    static func childSections(of viewID: ViewID, among views: [TaskView]) -> [(view: TaskView, rules: [Filter])] {
         var gathered: [ViewID: [Filter]] = [:]
-        for (view, rules) in try gatheredRules() { gathered[view.id] = rules }
-        return try children(ofView: viewID).map { ($0, gathered[$0.id] ?? []) }
+        for (view, rules) in gatheredRules(of: views) { gathered[view.id] = rules }
+        return views.filter { $0.parent == viewID }.map { ($0, gathered[$0.id] ?? []) }
     }
 
     /// The tasks any of `rules` selects, each once, in `sort`: every read of a view's tasks is read here. A list's

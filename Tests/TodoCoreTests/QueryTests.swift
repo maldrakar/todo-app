@@ -251,7 +251,9 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     caught = nil
     do { _ = try store.done(in: bad, since: 0, today: today) } catch { caught = error }
     #expect(caught == .viewNeedsNewerApp(bad, kind: "reminder_soon"), "and so is its done read, which would read it as a folder")
-    #expect(try store.done(in: folder, since: 0, today: today).isEmpty, "while its parent's strip loses only what it would have added")
+    try store.update(task: kept, [.status(.done)])
+    let strip = try store.done(in: folder, since: 0, today: today).map(\.id)
+    #expect(strip == [kept], "while its parent's strip still reads the sibling it can read")
 }
 
 /// The product's order of a page (ADR-0004, amendment of 2026-11-01): the view's own tasks first, then one section

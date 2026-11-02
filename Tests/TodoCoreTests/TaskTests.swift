@@ -208,7 +208,8 @@ import TestSupport
 
 /// Whether a task has notes is read with it, by every reader through the one loader, so a row can draw its note
 /// glyph with no read of its own (spec section 3); the notes themselves stay where they are and are read by
-/// `notes(of:)`. A note cleared to nothing is no note.
+/// `notes(of:)`. A note cleared to nothing is no note, and a note is one by its bytes, so one that starts with a NUL,
+/// which a write binds with its length and so keeps whole, is a note: `length()` would stop at the NUL and read none.
 @Test func aTaskSaysWhetherItHasNotes() throws {
     let store = try makeStore()
     let project = try store.createTask(NewTask(title: "Project"))
@@ -222,6 +223,9 @@ import TestSupport
     #expect(try store.page(of: view, today: Day(year: 2026, month: 11, day: 2)).sections.flatMap(\.groups).flatMap(\.tasks).map(\.hasNotes) == [true, false])
     try store.update(task: with, [.notes("")])
     #expect(try store.task(with)?.hasNotes == false, "a note cleared to nothing is no note")
+    try store.update(task: with, [.notes("\u{0}after a NUL")])
+    #expect(try store.notes(of: with) == "\u{0}after a NUL", "the write keeps the NUL")
+    #expect(try store.task(with)?.hasNotes == true, "a note that starts with a NUL is a note")
 }
 
 /// A task counts its children done over all, as its row's "2/4" reads (spec section 3): a cancelled child is no
@@ -256,14 +260,17 @@ import TestSupport
     #expect(task.subtasks == 0 && task.subtasksDone == 0)
 }
 
-/// The notes flag is the length of the notes, which SQLite reads from the record's header without loading the text
-/// from its overflow pages, so a list still reads no notes (ADR-0002). `EXPLAIN` shows it on the `Column` opcode
-/// that reads the notes: P5 carries `OPFLAG_LENGTHARG`, 0x40, where a comparison with the text, `notes != ''`, would
-/// carry nothing and load it. Every read of the notes column by the loader's statement has to carry it, and there has
-/// to be one, or the flag is read some other way and this proves nothing.
+/// The notes flag is the size of the notes in bytes, `octet_length`, which SQLite reads from the record's header
+/// without loading the text from its overflow pages, so a list still reads no notes (ADR-0002). `EXPLAIN` shows it on
+/// the `Column` opcode that reads the notes: P5 carries `OPFLAG_BYTELENARG`, 0xc0. That value and no other skips the
+/// overflow pages of a text: `OP_Column` uses the content it has not loaded only for `typeof()` (0x80), for
+/// `length()` (0x40) of a blob, and for `octet_length()` (0xc0) of anything (`Sources/CSQLite/sqlite3.c`, the branch
+/// "This branch happens only when content is on overflow pages"); `length()` of a text counts its characters and
+/// loads it, as a comparison with the text, `notes != ''`, would. Every read of the notes column by the loader's
+/// statement has to carry it, and there has to be one, or the flag is read some other way and this proves nothing.
 @Test func theNotesFlagLoadsNoNotes() throws {
     let store = try makeStore()
-    let lengthOnly: Int64 = 0x40
+    let byteLengthOnly: Int64 = 0xc0
     let program = try store.sql { () throws(SQLiteError) in
         try store.db.rows("EXPLAIN " + Store.taskQuery(where: "t.id = ?", orderBy: "t.rank", limit: nil), [.text("t")])
     }
@@ -279,5 +286,5 @@ import TestSupport
     let notesReads = program.filter { $0[1].string == "Column" && cursors.contains($0[2].int64 ?? -1) && $0[3].int64 == notesColumn }
     #expect(!cursors.isEmpty, "the statement opens the tasks table: \(program)")
     #expect(!notesReads.isEmpty, "the statement reads the notes column for the flag: \(program)")
-    #expect(notesReads.allSatisfy { ($0[6].int64 ?? 0) & lengthOnly != 0 }, "every read of the notes is of their length alone: \(notesReads)")
+    #expect(notesReads.allSatisfy { ($0[6].int64 ?? 0) & byteLengthOnly == byteLengthOnly }, "every read of the notes is of their size in bytes alone: \(notesReads)")
 }

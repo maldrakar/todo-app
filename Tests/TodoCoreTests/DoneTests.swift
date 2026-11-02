@@ -71,7 +71,7 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     #expect(try store.done(in: folder, since: 0, today: today).map(\.id) == [kitchen])
 }
 
-/// A folder with no list under it has no rule to read, so it has no strip, and no statement is run to say so.
+/// A folder with no list under it has no rule to read, so its strip is empty, an empty folder inside adding none.
 @Test func doneOfAViewWithNoRuleAndNoListsIsEmpty() throws {
     let store = try makeStore()
     try finish(store, try store.createTask(NewTask(title: "done")))

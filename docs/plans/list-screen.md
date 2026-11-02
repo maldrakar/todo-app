@@ -54,7 +54,7 @@ from.
 
 | File | Task | Holds |
 | ---- | ---- | ----- |
-| `Sources/TodoCore/Query/Store+Query.swift` | 1, 2 | `page(of:today:)` with the own section first, a folder's section as the union of its lists (1); children of kind `list` alone, Task 2's guard in `childSections(of:)` (2) |
+| `Sources/TodoCore/Query/Store+Query.swift` | 1, 2 | `page(of:today:)` with the own section first, a folder's section as the union of its lists (1); children of kind `list` alone, Task 2's guard in `childSections(of:among:)` (2) |
 | `Sources/TodoCore/Model/TodoTask.swift` | 1 | `TodoTask.hasNotes`, `subtasks`, `subtasksDone` |
 | `Sources/TodoCore/Storage/Store+Tasks.swift` | 1 | `taskColumns` with the notes flag; `loadTasks(sql:)` reading the subtask counts beside the tags |
 | `Sources/TodoCore/Query/Store+Counts.swift` | 1 | the gathering of a folder's rules shared with the page |
@@ -228,7 +228,7 @@ extension Store {
 - `groupView` requires the list to exist and be `.list` with a rule (`.notFound`, or `.invalid("a folder has no groups")`); its id is `EntityID.derived(from: list, condition's JSON)`, the JSON from the sorted-keys encoder the store already writes filters with, so two devices spell one condition in one string; its filter is `.and([list.filter, condition])`, refused with `.invalidFilter` past `maximumDepth` as every filter is. The row with the derived id is the group's row whatever it holds, tombstoned or moved by an older app that read it as a list, or made by a peer: its kind, parent, title, filter, sort, colour, icon and `deleted` are compared with what a fresh make would write and only the fields that differ are written under one stamp, so a deleted row comes back and a moved one returns under its list; when none differs, no `apply` runs and no change set is reported.
 - `createManualList` mints the id, builds the creation fields with `filter: .listedIn(id)`, `kind: .list`, `icon: "list"`, the given colour and parent, ranks the row last among the parent's children, and applies once; the parent must exist and not be a group.
 - The derived id is a function the core keeps stable for ever (ADR-0004, amendment of 2026-11-01): the digest, the separator and the UUID layout are fixed by a test vector pinned in the first run, and the test states the input that produced it. The five seeds' shape `00000000-0000-4000-8000-00000000000N` cannot collide with it, since version 8 sets the thirteenth hex digit to `8`.
-- The counts skip the new kind with no change: `countedRules` guards `view.kind == .list` (`Store+Counts.swift:104`). Task 2 adds the guard to `page(of:today:)`: a child of a kind other than `.list` is skipped and claims nothing, so a group's row is not a section of its list's page. Task 1 shipped the page without it, since `viewKind` reads every child as `.list` until `.group` exists (`Store+Views.swift:258-260`) and nothing stored could make it bite; it goes in `childSections(of:)` (`Store+Query.swift:95`), which the page and `done(in:since:today:)` both read, so the one guard keeps a group's row out of its list's sections and its strip's rules alike. `children(ofView:)` and `views()` still return it, and the sidebar skips it in Task 6. The probe makes a manual list and a group's view twice, so both calls and the derivation stay in the measurement.
+- The counts skip the new kind with no change: `countedRules` guards `view.kind == .list` (`Store+Counts.swift:105`). Task 2 adds the guard to `page(of:today:)`: a child of a kind other than `.list` is skipped and claims nothing, so a group's row is not a section of its list's page. Task 1 shipped the page without it, since `viewKind` reads every child as `.list` until `.group` exists (`Store+Views.swift:258-260`) and nothing stored could make it bite; it goes in `childSections(of:among:)` (`Store+Query.swift:96`), which the page and `done(in:since:today:)` both read, so the one guard keeps a group's row out of its list's sections and its strip's rules alike. `children(ofView:)` and `views()` still return it, and the sidebar skips it in Task 6. The probe makes a manual list and a group's view twice, so both calls and the derivation stay in the measurement.
 
 **Tests.**
 
@@ -594,13 +594,13 @@ struct Edits: Equatable {
 
 **Verified facts and traps.**
 
-- `createTask` always writes status open and pins nothing (`Store+Tasks.swift:22-34`); `update(task:)` moves `completed_at` only across open and not-open (`:59-63`); `delete(task:)` tombstones (`:82`); `trash` follows the tree (`:69-82`); `add(tag:to:)` requires both to exist and `remove` only the task (`:113-125`).
-- `pin` ranks among `pinnedItems(of:excluding: task)` and `Placement.after(anchor)` throws `.notFound(anchor)` when the anchor is not among them (`Store+Views.swift:151-167`, `Store+Tasks.swift:188-191`): the reorder's anchor must be a pinned task, which is why the unpinned above are pinned first, in the same call.
-- The manual list applies within a group and pinned tasks come first in it (`manualFirst`, `Store+Query.swift:172-181`); no row says it is pinned, so the module intersects the block's rows with `store.manualList(of:)` to find the unpinned above (dossier, answer f).
+- `createTask` always writes status open and pins nothing (`Store+Tasks.swift:25-37`); `update(task:)` moves `completed_at` only across open and not-open (`:66-70`); `delete(task:)` tombstones (`:89`); `trash` follows the tree (`:76-89`); `add(tag:to:)` requires both to exist and `remove` only the task (`:120-132`).
+- `pin` ranks among `pinnedItems(of:excluding: task)` and `Placement.after(anchor)` throws `.notFound(anchor)` when the anchor is not among them (`Store+Views.swift:151-167`, `Store+Tasks.swift:191-194`): the reorder's anchor must be a pinned task, which is why the unpinned above are pinned first, in the same call.
+- The manual list applies within a group and pinned tasks come first in it (`manualFirst`, `Store+Query.swift:173-182`); no row says it is pinned, so the module intersects the block's rows with `store.manualList(of:)` to find the unpinned above (dossier, answer f).
 - `TextFieldModel` carries no `changed` action (`TextFieldModel.swift:9`); the typed-text actions above are the view's `changed: (String) -> Action`, as `TitleField` has it.
 - `TaskChange` has no parent or tag case (`TodoTask.swift:73-79`); a subtask is `NewTask(parent:)`; the five seeds' rules are at `TaskView.swift:119-139`.
 - Every public write is one `apply`, one transaction and one `onChange` (`Store+Apply.swift:22-26`); a module never writes in answer to `.changed` (ADR-0009), and every write here answers an action.
-- The strip's "since" is `DeviceDay.began` in the clock's milliseconds, the same scale as `completed_at` (`Store+Tasks.swift:66`).
+- The strip's "since" is `DeviceDay.began` in the clock's milliseconds, the same scale as `completed_at` (`Store+Tasks.swift:69`).
 
 ### Task 8: The list screen on iPhone
 
