@@ -4,7 +4,11 @@ import SQLiteKit
 extension Store {
     /// Every column a `TodoTask` is read from, in the order `task(from:)` decodes them. `parent` and `trashed`
     /// come from the tree and not from `tasks`, which is what makes a merge's leftovers invisible to a read.
-    static let taskColumns = "t.id, t.title, t.status, t.when_day, t.deadline_day, tt.parent, t.rank, tt.trashed, t.created_at, t.updated_at, t.completed_at"
+    ///
+    /// The notes are read as whether there are any, `length(t.notes) > 0`, which SQLite answers from the record's
+    /// header without loading the text from its overflow pages, so no read of a list loads them (ADR-0002); a test
+    /// of the comparison with the text, `t.notes != ''`, would load every one. `notes(of:)` reads the text.
+    static let taskColumns = "t.id, t.title, t.status, t.when_day, t.deadline_day, tt.parent, t.rank, tt.trashed, t.created_at, t.updated_at, t.completed_at, length(t.notes) > 0"
 
     // MARK: - Writes
 
@@ -278,14 +282,19 @@ extension Store {
         return "SELECT \(Store.taskColumns) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND (\(clause)) ORDER BY \(orderBy)\(limitClause)"
     }
 
-    /// Runs an assembled task query and attaches the tags.
+    /// Runs an assembled task query and attaches the tags and the counts of the subtasks.
     func loadTasks(sql: String, _ params: [Value]) throws(StoreError) -> [TodoTask] {
         let rows = try self.sql { () throws(SQLiteError) in try db.rows(sql, params) }
-        let tags = try tagsByTask(rows.map { $0[0].string ?? "" })
-        return rows.map { Store.task(from: $0, tags: tags[$0[0].string ?? ""] ?? []) }
+        let ids = rows.map { $0[0].string ?? "" }
+        let tags = try tagsByTask(ids)
+        let subtasks = try subtasksByTask(ids)
+        return rows.map { row in
+            let id = row[0].string ?? ""
+            return Store.task(from: row, tags: tags[id] ?? [], subtasks: subtasks[id] ?? (0, 0))
+        }
     }
 
-    static func task(from row: [Value], tags: Set<TagID>) -> TodoTask {
+    static func task(from row: [Value], tags: Set<TagID>, subtasks: (all: Int, done: Int)) -> TodoTask {
         TodoTask(
             id: TaskID(row[0].string ?? ""),
             title: row[1].string ?? "",
@@ -302,7 +311,10 @@ extension Store {
             trashed: row[7].bool,
             createdAt: row[8].int64 ?? 0,
             updatedAt: row[9].int64 ?? 0,
-            completedAt: row[10].int64
+            completedAt: row[10].int64,
+            hasNotes: row[11].bool,
+            subtasks: subtasks.all,
+            subtasksDone: subtasks.done
         )
     }
 
@@ -319,5 +331,23 @@ extension Store {
             for row in rows { tags[row[0].string ?? "", default: []].insert(TagID(row[1].string ?? "")) }
         }
         return tags
+    }
+
+    /// The children of a whole page of tasks counted, all and the ones no longer open, in one statement per chunk
+    /// of ids, as the tags are read, and not one per task; each is driven by `task_tree_parent` from the ids. A
+    /// child in the Trash or deleted is not counted, since no list shows it as the task's, and a task with no child
+    /// has no row here and reads 0 over 0.
+    private func subtasksByTask(_ ids: [String]) throws(StoreError) -> [String: (all: Int, done: Int)] {
+        guard !ids.isEmpty else { return [:] }
+        var counts: [String: (all: Int, done: Int)] = [:]
+        for chunk in Store.chunked(ids) {
+            let rows = try sql { () throws(SQLiteError) in
+                try db.rows("SELECT tt.parent, count(*), sum(t.status != 0) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND tt.trashed = 0 AND tt.parent IN (\(Store.placeholders(chunk.count))) GROUP BY tt.parent", chunk.map { .text($0) })
+            }
+            // SQLite counts in 64 bits and `Int` is 32 bits wide on wasm32, so a count the type cannot hold is clamped
+            // rather than trapped, which keeps the done ones within all of them.
+            for row in rows { counts[row[0].string ?? ""] = (Int(clamping: row[1].int64 ?? 0), Int(clamping: row[2].int64 ?? 0)) }
+        }
+        return counts
     }
 }

@@ -311,4 +311,16 @@ enum Schema {
         value TEXT NOT NULL
     ) WITHOUT ROWID;
     """
+
+    /// The completion time, for the done read of a page (spec section 3): the tasks a page's rules completed since
+    /// the day began are a handful among every task they ever completed, and the read is driven by this index from
+    /// the instant it is given rather than from the rules, whose own conditions select the open and the done alike.
+    ///
+    /// Partial, since an open task has no completion time: an index over the whole column would hold a null for
+    /// each of them, which no read asks about. SQLite takes it for any comparison on the column, a bound `>= ?`
+    /// among them, because a comparison is never true of a null. An index adds no column and no journal field, so
+    /// nothing a peer sends changes and a file an older app opens is one whose index it never reads.
+    static let version6 = """
+    CREATE INDEX tasks_completed ON tasks(completed_at) WHERE completed_at IS NOT NULL;
+    """
 }

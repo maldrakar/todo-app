@@ -59,3 +59,16 @@ import Testing
     #expect(last.daysSinceEpoch == Int32.max - 719_468, "a reading past the last day is the last day")
     #expect(last.description == "5879610-09-09")
 }
+
+/// Day zero, 1970-01-01, was a Thursday, and a day before the epoch is a negative count, so the weekday is the count
+/// plus four under a floor modulo, which a truncating `%` gets wrong for every day before 1970. The ends of the count
+/// are a day a peer may have written, and neither may trap: the weekday is taken from the stored count and not by
+/// advancing a day, which traps outside `Int32`.
+@Test func aDayKnowsItsWeekday() {
+    #expect(Day(year: 1970, month: 1, day: 1).weekday == .thursday)
+    #expect(Day(year: 2026, month: 10, day: 26).weekday == .monday)
+    #expect(Day(year: 1969, month: 12, day: 28).weekday == .sunday)
+    #expect(Day(year: 1969, month: 12, day: 31).weekday == .wednesday)
+    #expect(Day(daysSinceEpoch: .max).weekday == .friday)
+    #expect(Day(daysSinceEpoch: .min).weekday == .tuesday)
+}
