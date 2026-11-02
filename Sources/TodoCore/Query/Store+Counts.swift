@@ -21,34 +21,46 @@ extension Store {
         return counts
     }
 
-    /// The statement of every count `taskCounts` runs, by view, in the order it runs them.
-    ///
-    /// What each view counts is gathered from the leaves up in one pass over the tree order reversed, where every
-    /// child comes before its parent: a list with a rule counts its rule, and a folder the rules of the lists
-    /// under it, which each view hands up as one flat list, so the walk here never recurses and a folder's
-    /// condition is as deep as its deepest rule and not as deep as the tree. SQLite's code generation still
-    /// recurses over a wide disjunction (#152). Then the sizes of the tags any rule could be driven by are read,
-    /// once for the call, and each statement is written.
+    /// The statement of every count `taskCounts` runs, by view, in the order it runs them: what each view counts,
+    /// gathered by `gatheredRules(of:)`; then the sizes of the tags any rule could be driven by, read once for the
+    /// call; then each statement.
     ///
     /// Assembled here, beside `viewStatement` and for its reason: `theCountStatementUsesTheIndexes` and
     /// `aCountIsDrivenByItsRulesOwnIndex` explain the query plans of exactly these statements, and a guard that
     /// explained a copy would pass while a count itself degraded into a scan.
     func countStatements(today: Day) throws(StoreError) -> [(view: ViewID, sql: String, params: [Value])] {
-        var counted: [(view: ViewID, rules: [Filter])] = []
-        var childRules: [ViewID: [Filter]] = [:]
+        let counted = Store.gatheredRules(of: try views())
         var candidates: Set<TagID> = []
-        for view in try views().reversed() {
-            guard let rules = Store.countedRules(of: view, children: childRules[view.id] ?? []) else { continue }
-            counted.append((view.id, rules))
+        for (view, _) in counted {
             if let filter = view.filter { candidates.formUnion(CountCompiler.candidateTags(of: filter)) }
-            if let parent = view.parent { childRules[parent, default: []] += rules }
         }
         let sizes = try tagSizes(among: candidates)
         let compiler = CountCompiler(today: today, tagSizes: sizes.tags, openTasks: sizes.open)
         return counted.map { view, rules in
             let count = compiler.compile(rules)
-            return (view, Store.countStatement(over: count.condition.sql, driven: count.driven), count.condition.params)
+            return (view.id, Store.countStatement(over: count.condition.sql, driven: count.driven), count.condition.params)
         }
+    }
+
+    /// What every one of `views`, in the tree order `views()` reads them in, selects any of, in that order reversed;
+    /// a view with nothing to select is left out. The count of a view counts these rules, and a folder's section of
+    /// its parent's page reads them (`page(of:today:)`), so that a folder holds on a page what its number in the
+    /// sidebar counts (spec section 2): one gathering for both, so the two cannot come to disagree. It takes the views
+    /// its caller read rather than reading them, so a page reads the table once for its view, its children and this.
+    ///
+    /// Gathered from the leaves up in one pass over the tree order reversed, where every child comes before its
+    /// parent: a list with a rule selects its rule, and a folder the rules of the lists under it, which each view
+    /// hands up as one flat list, so the walk here never recurses and a folder's condition is as deep as its deepest
+    /// rule and not as deep as the tree. SQLite's code generation still recurses over a wide disjunction (#152).
+    static func gatheredRules(of views: [TaskView]) -> [(view: TaskView, rules: [Filter])] {
+        var gathered: [(view: TaskView, rules: [Filter])] = []
+        var childRules: [ViewID: [Filter]] = [:]
+        for view in views.reversed() {
+            guard let rules = Store.countedRules(of: view, children: childRules[view.id] ?? []) else { continue }
+            gathered.append((view, rules))
+            if let parent = view.parent { childRules[parent, default: []] += rules }
+        }
+        return gathered
     }
 
     /// The open tasks the status index holds, the trashed and the deleted among them, counted on the index alone.

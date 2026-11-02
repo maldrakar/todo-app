@@ -110,6 +110,15 @@ private let today = Day(year: 2026, month: 9, day: 11)
     #expect(FilterCompiler.whereClause(.trashed(true), today: today) == SQLFragment(sql: "tt.trashed = 1", params: []))
 }
 
+/// A union of reads keeps each read's own exclusion of the Trash, each read in parentheses of its own, so that the
+/// `or` between them never leans on SQL's precedence of `and` to keep a read whole.
+@Test func aUnionOfReadsKeepsEachReadsOwnTrash() {
+    #expect(FilterCompiler.whereClause(anyOf: [.status([.open]), .trashed(true)], today: today) == SQLFragment(
+        sql: "(((t.status IN (?)) AND tt.trashed = 0) OR (tt.trashed = 1))", params: [.integer(0)]
+    ))
+    #expect(FilterCompiler.whereClause(anyOf: [], today: today) == SQLFragment(sql: "0", params: []), "no read selects nothing")
+}
+
 @Test func orderByPutsEmptyDaysLastAndEndsWithRankAndID() {
     #expect(FilterCompiler.orderBy([]) == "t.rank, t.id")
     #expect(FilterCompiler.orderBy([SortKey(.when)]) == "(t.when_day IS NULL), t.when_day ASC, t.rank, t.id")

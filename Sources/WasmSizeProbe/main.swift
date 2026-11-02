@@ -86,8 +86,10 @@ private enum WasmSizeProbe {
         try store.unpin(task: ship, from: view)
         try store.delete(view: folder)
 
-        // Reads: a page, the flat list behind a picker, the sidebar, and one task with its notes.
+        // Reads: a page and the tasks its rules completed, the flat list behind a picker, the sidebar, and one task
+        // with its notes.
         let page = try store.page(of: view, today: today)
+        let strip = try store.doneTasks(in: view, since: 0, today: today)
         let inbox = try store.page(of: BuiltInTaskViews.inbox, today: today)
         let listed = try store.tasks(in: view, today: today)
         let reread = try store.view(view)?.title ?? ""
@@ -231,6 +233,7 @@ private enum WasmSizeProbe {
 
         print("tasks \(restoredTasks.count), tags \(try store.tags().count), views \(try store.views().count) of \(sidebar.count) at the root, roots \(roots.count)")
         print("page \(page.view.title): \(page.sections.count) sections, groups \(page.sections.flatMap(\.groups).map { label($0.key) }.joined(separator: "/")), listed \(listed.count), inbox \(inbox.sections.count)")
+        print("rows \(page.sections.flatMap(\.groups).flatMap(\.tasks).map { "\($0.hasNotes ? "notes" : "none") \($0.subtasksDone)/\($0.subtasks)" }.joined(separator: ", ")), done \(strip.map(\.title).joined(separator: ", ")), \(today) is weekday \(today.weekday.rawValue) of \(Weekday.allCases.count)")
         print("task \(title) of \(reread) (\(tagTitle), notes \(notes.count) characters), pinned \(pinned.count), today \(today) to \(today.advanced(by: 7)) is \(today.advanced(by: 7) - today) days")
         print("quick find \(quick.count): \(quick.map(label).joined(separator: ", ")); notes search \(ranked.count), best \(ranked.first.map { "\($0.snippet) \($0.score < 0)" } ?? "none")")
         print("filter \(json.count) bytes, round-trips \(decoded == filter), sort \(SortField.allCases.count) fields, groups \(GroupBy.allCases.count)")

@@ -33,6 +33,19 @@ enum FilterCompiler {
         return SQLFragment(sql: "(\(fragment.sql)) AND tt.trashed = 0", params: fragment.params)
     }
 
+    /// The fragment of a union of views' reads: each rule as `whereClause` writes it, with its own exclusion of the
+    /// Trash and in parentheses of its own, and the reads joined by `or`. One rule is that rule's read. A folder
+    /// holds what its lists hold, so a list whose rule names the Trash reads it there and a list whose rule does not
+    /// still leaves it out: an exclusion written once over a disjunction would be dropped for every rule as soon as
+    /// one named the Trash.
+    static func whereClause(anyOf rules: [Filter], today: Day) -> SQLFragment {
+        let reads = rules.map { rule in
+            let read = whereClause(rule, today: today)
+            return SQLFragment(sql: "(\(read.sql))", params: read.params)
+        }
+        return joined(reads, separator: " OR ", empty: "0")
+    }
+
     static func compile(_ filter: Filter, today: Day, form: Form = .plain) -> SQLFragment {
         switch filter {
         case .status(let statuses):

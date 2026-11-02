@@ -7,9 +7,10 @@ public enum TaskStatus: Int64, Sendable, CaseIterable {
 }
 
 /// A task as read from the store, and a value that never changes after the read: `parent` and `trashed` are
-/// effective values from the task tree, so a copy kept across a write would describe a tree that has moved.
-/// Notes are read separately, because they are the one field of a task that is unbounded and no list needs
-/// them.
+/// effective values from the task tree, and so are the counts of its subtasks, so a copy kept across a write
+/// would describe a tree that has moved. Notes are read separately, because they are the one field of a task that
+/// is unbounded and no list needs them; whether it has any is read with it, so a row draws its note glyph and its
+/// "2/4" from the one read of its list (spec section 3).
 public struct TodoTask: Equatable, Sendable {
     public let id: TaskID
     public let title: String
@@ -23,6 +24,12 @@ public struct TodoTask: Equatable, Sendable {
     public let createdAt: Int64
     public let updatedAt: Int64
     public let completedAt: Int64?
+    /// Whether the task has notes. The notes stay where they are, the last column of `tasks`, read on their
+    /// own by `notes(of:)` and written by `TaskChange.notes`; no read of a list loads them (ADR-0002).
+    public let hasNotes: Bool
+    /// The task's children that are not deleted and not in the Trash, and the ones among them no longer open.
+    public let subtasks: Int
+    public let subtasksDone: Int
 }
 
 /// What a caller knows about a task before it exists. Everything but the title has a default, and the id, the

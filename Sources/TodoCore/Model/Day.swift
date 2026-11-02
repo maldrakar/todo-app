@@ -108,3 +108,22 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
         return "\(pad(c.year, 4))-\(pad(c.month, 2))-\(pad(c.day, 2))"
     }
 }
+
+/// A day of the week, numbered from Monday, zero, to Sunday, six: the week begins on Monday. The core numbers the
+/// days and names none: what a day is called, and in which language, is the module's that formats it (spec section 12).
+public enum Weekday: Int, Equatable, Sendable, CaseIterable {
+    case monday = 0, tuesday, wednesday, thursday, friday, saturday, sunday
+}
+
+extension Day {
+    /// The day of the week this day falls on. Day zero, 1970-01-01, was a Thursday, the fourth day of a week that
+    /// begins on Monday, so the weekday is the count plus three, modulo seven, and the modulo has to floor: a day
+    /// before the epoch is a negative count, which `%` truncates towards zero. It is computed on the count's own
+    /// remainder, which no `Int` overflows, and never by advancing a day, which traps outside `Int32`, so a day a
+    /// peer wrote at either end of the count has one too.
+    public var weekday: Weekday {
+        // The remainder lies in -6...6, so adding ten, which is three and a whole week, leaves it non-negative
+        // and the index in 0...6, the cases' own order.
+        Weekday.allCases[(Int(daysSinceEpoch % 7) + 10) % 7]
+    }
+}

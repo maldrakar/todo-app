@@ -620,3 +620,29 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
         }
     }
 }
+
+/// A folder's number in the sidebar and its section on its parent's page are one union (spec section 2): the
+/// lists under it to any depth, each task once, a list this app cannot read adding nothing to either. The count
+/// counts the open tasks of what the section holds.
+@Test func theCountAndThePageGatherAFoldersRulesAlike() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let home = try store.createTag(title: "home")
+    try store.createTask(NewTask(title: "shared", tags: [work, home]))
+    try store.createTask(NewTask(title: "office", tags: [work]))
+    try store.createTask(NewTask(title: "kitchen", tags: [home]))
+    let finished = try store.createTask(NewTask(title: "finished", tags: [work]))
+    try store.update(task: finished, [.status(.done)])
+    try store.createTask(NewTask(title: "loose"))
+    let top = try store.createView(NewTaskView(title: "Top"))
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: top))
+    try store.createView(NewTaskView(title: "Work", parent: folder, filter: .hasTag(work)))
+    let deeper = try store.createView(NewTaskView(title: "Deeper", parent: folder))
+    try store.createView(NewTaskView(title: "Home", parent: deeper, filter: .hasTag(home)))
+    try applyView(store, "newer", parent: deeper, filter: "{\"kind\":\"reminder_soon\"}")
+
+    let section = try #require(try store.page(of: top, today: today).sections.first { $0.view?.id == folder })
+    let held = section.groups.flatMap(\.tasks)
+    #expect(held.map(\.title) == ["shared", "office", "kitchen", "finished"])
+    #expect(try store.taskCounts(today: today)[folder] == held.filter { $0.status == .open }.count)
+}

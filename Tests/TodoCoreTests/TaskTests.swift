@@ -205,3 +205,86 @@ import TestSupport
     try store.move(task: first, at: .end)
     #expect(try store.children(of: project).map(\.title) == ["3", "2", "1"])
 }
+
+/// Whether a task has notes is read with it, by every reader through the one loader, so a row can draw its note
+/// glyph with no read of its own (spec section 3); the notes themselves stay where they are and are read by
+/// `notes(of:)`. A note cleared to nothing is no note, and a note is one by its bytes, so one that starts with a NUL,
+/// which a write binds with its length and so keeps whole, is a note: `length()` would stop at the NUL and read none.
+@Test func aTaskSaysWhetherItHasNotes() throws {
+    let store = try makeStore()
+    let project = try store.createTask(NewTask(title: "Project"))
+    let with = try store.createTask(NewTask(title: "with", notes: "# md", parent: project))
+    let without = try store.createTask(NewTask(title: "without", parent: project))
+    let view = try store.createView(NewTaskView(title: "Project", filter: .parent(project)))
+
+    #expect(try store.task(with)?.hasNotes == true)
+    #expect(try store.task(without)?.hasNotes == false)
+    #expect(try store.children(of: project).map(\.hasNotes) == [true, false])
+    #expect(try store.page(of: view, today: Day(year: 2026, month: 11, day: 2)).sections.flatMap(\.groups).flatMap(\.tasks).map(\.hasNotes) == [true, false])
+    try store.update(task: with, [.notes("")])
+    #expect(try store.task(with)?.hasNotes == false, "a note cleared to nothing is no note")
+    try store.update(task: with, [.notes("\u{0}after a NUL")])
+    #expect(try store.notes(of: with) == "\u{0}after a NUL", "the write keeps the NUL")
+    #expect(try store.task(with)?.hasNotes == true, "a note that starts with a NUL is a note")
+}
+
+/// A task counts its children done over all, as its row's "2/4" reads (spec section 3): a cancelled child is no
+/// longer open, so it is done here as it is in the Logbook; a child in the Trash and a deleted one are not the
+/// task's any more and are not counted; a grandchild is its own parent's, not the task's.
+@Test func aTaskCountsItsSubtasksDoneOverAll() throws {
+    let store = try makeStore()
+    let project = try store.createTask(NewTask(title: "Project"))
+    let open = try store.createTask(NewTask(title: "open", parent: project))
+    let done = try store.createTask(NewTask(title: "done", parent: project))
+    try store.update(task: done, [.status(.done)])
+    let canceled = try store.createTask(NewTask(title: "canceled", parent: project))
+    try store.update(task: canceled, [.status(.canceled)])
+    let binned = try store.createTask(NewTask(title: "binned", parent: project))
+    try store.trash(task: binned)
+    let gone = try store.createTask(NewTask(title: "gone", parent: project))
+    try store.update(task: gone, [.status(.done)])
+    try store.delete(task: gone)
+    try store.createTask(NewTask(title: "grandchild", parent: open))
+
+    let task = try #require(try store.task(project))
+    #expect(task.subtasks == 3 && task.subtasksDone == 2)
+    let row = try #require(try store.children(of: nil).first { $0.id == project })
+    #expect(row.subtasks == 3 && row.subtasksDone == 2, "a list reads the counts as the task itself does")
+    #expect(try store.task(open)?.subtasks == 1, "the grandchild is its own parent's")
+}
+
+@Test func aTaskWithNoChildrenReadsZeroOverZero() throws {
+    let store = try makeStore()
+    let leaf = try store.createTask(NewTask(title: "leaf"))
+    let task = try #require(try store.task(leaf))
+    #expect(task.subtasks == 0 && task.subtasksDone == 0)
+}
+
+/// The notes flag is the size of the notes in bytes, `octet_length`, which SQLite reads from the record's header
+/// without loading the text from its overflow pages, so a list still reads no notes (ADR-0002). `EXPLAIN` shows it on
+/// the `Column` opcode that reads the notes: P5 carries `OPFLAG_BYTELENARG`, 0xc0. That value and no other skips the
+/// overflow pages of a text: `OP_Column` uses the content it has not loaded only for `typeof()` (0x80), for
+/// `length()` (0x40) of a blob, and for `octet_length()` (0xc0) of anything (`Sources/CSQLite/sqlite3.c`, the branch
+/// "This branch happens only when content is on overflow pages"); `length()` of a text counts its characters and
+/// loads it, as a comparison with the text, `notes != ''`, would. Every read of the notes column by the loader's
+/// statement has to carry it, and there has to be one, or the flag is read some other way and this proves nothing.
+@Test func theNotesFlagLoadsNoNotes() throws {
+    let store = try makeStore()
+    let byteLengthOnly: Int64 = 0xc0
+    let program = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("EXPLAIN " + Store.taskQuery(where: "t.id = ?", orderBy: "t.rank", limit: nil), [.text("t")])
+    }
+    let tasksRoot = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT rootpage FROM sqlite_master WHERE type = 'table' AND name = 'tasks'").first?.first?.int64
+    }
+    let notesColumn = try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT cid FROM pragma_table_info('tasks') WHERE name = 'notes'").first?.first?.int64
+    }
+    // EXPLAIN's columns: addr, opcode, p1, p2, p3, p4, p5, comment. The cursor the tasks table is opened on is the
+    // `OpenRead` of its root page.
+    let cursors = Set(program.filter { $0[1].string == "OpenRead" && $0[3].int64 == tasksRoot }.compactMap { $0[2].int64 })
+    let notesReads = program.filter { $0[1].string == "Column" && cursors.contains($0[2].int64 ?? -1) && $0[3].int64 == notesColumn }
+    #expect(!cursors.isEmpty, "the statement opens the tasks table: \(program)")
+    #expect(!notesReads.isEmpty, "the statement reads the notes column for the flag: \(program)")
+    #expect(notesReads.allSatisfy { ($0[6].int64 ?? 0) & byteLengthOnly == byteLengthOnly }, "every read of the notes is of their size in bytes alone: \(notesReads)")
+}

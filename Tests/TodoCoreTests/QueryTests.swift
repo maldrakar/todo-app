@@ -22,6 +22,12 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     return ids
 }
 
+/// The tasks of each section of a page, in order: a page's shape compared whole, so a section that is missing or
+/// out of place fails the comparison rather than an index past the end.
+private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
+    page.sections.map { $0.groups.flatMap(\.tasks).map(\.id) }
+}
+
 @Test func builtInViewsSelectTheExpectedTasks() throws {
     let store = try makeStore()
     _ = try seeded(store)
@@ -43,7 +49,7 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     #expect(try store.tasks(in: BuiltInTaskViews.today, today: today).map(\.title) == ["overdue", "due"])
 }
 
-@Test func pagesRenderChildViewsAsSectionsThenTheRemainder() throws {
+@Test func pagesRenderTheRemainderThenChildViewsAsSections() throws {
     let store = try makeStore()
     let project = try store.createTask(NewTask(title: "Project"))
     let design = try store.createTask(NewTask(title: "design", parent: project))
@@ -57,11 +63,8 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
 
     let page = try store.page(of: view, today: today)
     #expect(page.view.id == view)
-    #expect(page.sections.count == 2)
-    #expect(page.sections[0].view?.id == phase1)
-    #expect(page.sections[0].groups.flatMap(\.tasks).map(\.id) == [design, build])
-    #expect(page.sections[1].view == nil)
-    #expect(page.sections[1].groups.flatMap(\.tasks).map(\.id) == [ship])
+    #expect(page.sections.map { $0.view?.id } == [nil, phase1])
+    #expect(sectionTasks(page) == [[ship], [design, build]])
 
     let folder = try store.createView(NewTaskView(title: "Folder"))
     try store.move(view: view, to: folder, at: .end)
@@ -153,8 +156,7 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     // view instead of its own would draw one group in the opposite order.
     try store.pin(task: early, in: view, at: .start)
 
-    let section = try store.page(of: view, today: today).sections[0]
-    #expect(section.view?.id == phase)
+    let section = try #require(try store.page(of: view, today: today).sections.first { $0.view?.id == phase })
     #expect(section.groups.map(\.key) == [.day(today), .day(today.advanced(by: 1))], "the child's grouping")
     #expect(section.groups.flatMap(\.tasks).map(\.title) == ["early", "late"], "the child's manual list")
 }
@@ -188,7 +190,7 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     for id in [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash] {
         let view = try #require(try store.view(id))
         let filter = try #require(view.filter)
-        let statement = Store.viewStatement(filter: filter, sort: view.sort, today: today)
+        let statement = Store.viewStatement(rules: [filter], sort: view.sort, today: today)
         let plan = try store.sql { () throws(SQLiteError) in
             try store.db.rows("EXPLAIN QUERY PLAN " + statement.sql, statement.params).map { $0[3].string ?? "" }
         }
@@ -221,7 +223,8 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
 
 /// A child view a newer app wrote costs its own section and nothing else. Blanking the whole page over it
 /// would hide every sibling the newer app never touched, and a folder holds lists that have nothing to do
-/// with each other. The view the page *is* stays an error: there is no page to draw without it.
+/// with each other. The view the page *is* stays an error, and so does its done read: there is no page to draw
+/// without it, and a strip read past the rule it cannot read would read the view as a folder.
 @Test func aChildViewFromANewerAppLosesItsSectionAndNotThePage() throws {
     let store = try makeStore()
     let folder = try store.createView(NewTaskView(title: "Folder"))
@@ -245,4 +248,118 @@ private func seeded(_ store: Store) throws -> [String: TaskID] {
     var caught: StoreError?
     do { _ = try store.page(of: bad, today: today) } catch { caught = error }
     #expect(caught == .viewNeedsNewerApp(bad, kind: "reminder_soon"), "opening that view itself is still an error")
+    caught = nil
+    do { _ = try store.doneTasks(in: bad, since: 0, today: today) } catch { caught = error }
+    #expect(caught == .viewNeedsNewerApp(bad, kind: "reminder_soon"), "and so is its done read, which would read it as a folder")
+    try store.update(task: kept, [.status(.done)])
+    let strip = try store.doneTasks(in: folder, since: 0, today: today).map(\.id)
+    #expect(strip == [kept], "while its parent's strip still reads the sibling it can read")
+}
+
+/// The product's order of a page (ADR-0004, amendment of 2026-11-01): the view's own tasks first, then one section
+/// per list inside it in the sidebar's order. What a list inside claims is not among the own.
+@Test func theOwnSectionComesFirstAndTheListsInsideFollow() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let home = try store.createTag(title: "home")
+    let loose = try store.createTask(NewTask(title: "loose"))
+    let office = try store.createTask(NewTask(title: "office", tags: [work]))
+    let kitchen = try store.createTask(NewTask(title: "kitchen", tags: [home]))
+    let all = try store.createView(NewTaskView(title: "All", filter: .status([.open])))
+    let workList = try store.createView(NewTaskView(title: "Work", parent: all, filter: .hasTag(work)))
+    let homeList = try store.createView(NewTaskView(title: "Home", parent: all, filter: .hasTag(home)))
+
+    let page = try store.page(of: all, today: today)
+    #expect(page.sections.map { $0.view?.id } == [nil, workList, homeList])
+    #expect(sectionTasks(page) == [[loose], [office], [kitchen]])
+}
+
+/// A list with a rule has its own section whether its rule selects anything or not, so that the block a task is
+/// added into is there to add into (spec section 2); with a list inside it, the empty own section still comes first.
+@Test func aListWithARuleAndNothingInItHasAnEmptyOwnSection() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let office = try store.createTask(NewTask(title: "office", tags: [work]))
+    let list = try store.createView(NewTaskView(title: "Due today", filter: .when(.on(0))))
+    #expect(try store.page(of: list, today: today).sections == [TaskViewPage.Section(view: nil, groups: [])])
+
+    let inside = try store.createView(NewTaskView(title: "Work", parent: list, filter: .hasTag(work)))
+    let page = try store.page(of: list, today: today)
+    #expect(page.sections.map { $0.view?.id } == [nil, inside])
+    #expect(sectionTasks(page) == [[], [office]], "the own section is there and empty")
+}
+
+/// A folder has no rule and so no tasks of its own: its page is the sections of the lists inside it and nothing
+/// else, and an empty folder's page has no section at all.
+@Test func aFolderHasNoOwnSection() throws {
+    let store = try makeStore()
+    let open = try store.createTask(NewTask(title: "open"))
+    let folder = try store.createView(NewTaskView(title: "Folder"))
+    #expect(try store.page(of: folder, today: today).sections.isEmpty, "an empty folder draws nothing")
+
+    let inside = try store.createView(NewTaskView(title: "Open", parent: folder, filter: .status([.open])))
+    let page = try store.page(of: folder, today: today)
+    #expect(page.sections.map { $0.view?.id } == [inside])
+    #expect(sectionTasks(page) == [[open]])
+}
+
+/// A folder inside a list holds what the lists under it select, to any depth, each task once however many of them
+/// select it, as its count counts them (spec section 2), in the folder's own sort, which for a folder is the rank;
+/// and what it holds is claimed and leaves the list's own section.
+@Test func aFolderInsideReadsTheUnionOfItsListsOnce() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let home = try store.createTag(title: "home")
+    let shared = try store.createTask(NewTask(title: "shared", tags: [work, home]))
+    let office = try store.createTask(NewTask(title: "office", tags: [work]))
+    let kitchen = try store.createTask(NewTask(title: "kitchen", tags: [home]))
+    let loose = try store.createTask(NewTask(title: "loose"))
+    let all = try store.createView(NewTaskView(title: "All", filter: .status([.open])))
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: all))
+    try store.createView(NewTaskView(title: "Work", parent: folder, filter: .hasTag(work)))
+    let deeper = try store.createView(NewTaskView(title: "Deeper", parent: folder))
+    try store.createView(NewTaskView(title: "Home", parent: deeper, filter: .hasTag(home)))
+
+    let page = try store.page(of: all, today: today)
+    #expect(page.sections.map { $0.view?.id } == [nil, folder])
+    #expect(sectionTasks(page) == [[loose], [shared, office, kitchen]], "the shared task once, in rank order, and not among the own")
+}
+
+/// A folder with nothing under it to select, an empty folder inside it included, is still a section of its parent's
+/// page, empty, as an empty list inside is, so that it has a block on the screen.
+@Test func aFolderInsideWithNothingToCountIsAnEmptySection() throws {
+    let store = try makeStore()
+    let loose = try store.createTask(NewTask(title: "loose"))
+    let all = try store.createView(NewTaskView(title: "All", filter: .status([.open])))
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: all))
+    try store.createView(NewTaskView(title: "Empty", parent: folder))
+
+    let page = try store.page(of: all, today: today)
+    #expect(page.sections.map { $0.view?.id } == [nil, folder])
+    #expect(page.sections.map(\.groups.isEmpty) == [false, true])
+    #expect(sectionTasks(page) == [[loose], []])
+}
+
+/// A folder inside holds the union of its lists' own reads, and each read keeps its own Trash: a list whose rule
+/// names the Trash reads it, and a list whose rule does not still leaves its trashed tasks out, so a trashed task
+/// only the second list's rule selects is in neither read and not in the union. The built-in Trash cannot show it,
+/// since its rule takes every trashed task and the union holds the other list's trashed ones as the Trash's; a list
+/// that names the Trash and asks for more, here the binned tasks tagged home, does.
+@Test func aFolderInsideTakesTheTrashOnlyFromTheListThatNamesIt() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let home = try store.createTag(title: "home")
+    let office = try store.createTask(NewTask(title: "office", tags: [work]))
+    let binnedOffice = try store.createTask(NewTask(title: "binned office", tags: [work]))
+    try store.trash(task: binnedOffice)
+    let binnedKitchen = try store.createTask(NewTask(title: "binned kitchen", tags: [home]))
+    try store.trash(task: binnedKitchen)
+    let top = try store.createView(NewTaskView(title: "Top"))
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: top))
+    try store.createView(NewTaskView(title: "Work", parent: folder, filter: .hasTag(work)))
+    try store.createView(NewTaskView(title: "Binned at home", parent: folder, filter: .and([.trashed(true), .hasTag(home)])))
+
+    let page = try store.page(of: top, today: today)
+    #expect(page.sections.map { $0.view?.id } == [folder])
+    #expect(sectionTasks(page) == [[office, binnedKitchen]], "the binned office task is in neither list's read")
 }
