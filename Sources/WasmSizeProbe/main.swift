@@ -89,7 +89,7 @@ private enum WasmSizeProbe {
         // Reads: a page and the tasks its rules completed, the flat list behind a picker, the sidebar, and one task
         // with its notes.
         let page = try store.page(of: view, today: today)
-        let strip = try store.done(in: view, since: 0, today: today)
+        let strip = try store.doneTasks(in: view, since: 0, today: today)
         let inbox = try store.page(of: BuiltInTaskViews.inbox, today: today)
         let listed = try store.tasks(in: view, today: today)
         let reread = try store.view(view)?.title ?? ""

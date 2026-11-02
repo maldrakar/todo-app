@@ -249,10 +249,10 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     do { _ = try store.page(of: bad, today: today) } catch { caught = error }
     #expect(caught == .viewNeedsNewerApp(bad, kind: "reminder_soon"), "opening that view itself is still an error")
     caught = nil
-    do { _ = try store.done(in: bad, since: 0, today: today) } catch { caught = error }
+    do { _ = try store.doneTasks(in: bad, since: 0, today: today) } catch { caught = error }
     #expect(caught == .viewNeedsNewerApp(bad, kind: "reminder_soon"), "and so is its done read, which would read it as a folder")
     try store.update(task: kept, [.status(.done)])
-    let strip = try store.done(in: folder, since: 0, today: today).map(\.id)
+    let strip = try store.doneTasks(in: folder, since: 0, today: today).map(\.id)
     #expect(strip == [kept], "while its parent's strip still reads the sibling it can read")
 }
 

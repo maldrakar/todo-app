@@ -30,7 +30,7 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     try finish(store, canceled, as: .canceled)
     try finish(store, evening)
 
-    #expect(try store.done(in: BuiltInTaskViews.inbox, since: since, today: today).map(\.id) == [evening, canceled, morning])
+    #expect(try store.doneTasks(in: BuiltInTaskViews.inbox, since: since, today: today).map(\.id) == [evening, canceled, morning])
 }
 
 /// Every rule a person has asks for open tasks, and the strip is about the ones that stopped being open, so the
@@ -45,9 +45,9 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     try finish(store, tomorrow)
     #expect(try store.tasks(in: BuiltInTaskViews.today, today: today).isEmpty, "Today's own read asks for open tasks")
 
-    #expect(try store.done(in: BuiltInTaskViews.today, since: 0, today: today).map(\.id) == [due])
+    #expect(try store.doneTasks(in: BuiltInTaskViews.today, since: 0, today: today).map(\.id) == [due])
     let notCanceled = try store.createView(NewTaskView(title: "Not cancelled", filter: .and([.when(.on(0)), .not(.status([.canceled]))])))
-    #expect(try store.done(in: notCanceled, since: 0, today: today).isEmpty, "a negated status lifts to false")
+    #expect(try store.doneTasks(in: notCanceled, since: 0, today: today).isEmpty, "a negated status lifts to false")
 }
 
 /// A list's strip holds what its own rule and the lists inside it completed, a folder inside contributing its lists,
@@ -67,8 +67,8 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     let deeper = try store.createView(NewTaskView(title: "Deeper", parent: folder))
     try store.createView(NewTaskView(title: "Home", parent: deeper, filter: .hasTag(home)))
 
-    #expect(try store.done(in: list, since: 0, today: today).map(\.id) == [kitchen, office, due], "the stray task no rule selects is left out")
-    #expect(try store.done(in: folder, since: 0, today: today).map(\.id) == [kitchen])
+    #expect(try store.doneTasks(in: list, since: 0, today: today).map(\.id) == [kitchen, office, due], "the stray task no rule selects is left out")
+    #expect(try store.doneTasks(in: folder, since: 0, today: today).map(\.id) == [kitchen])
 }
 
 /// A folder with no list under it has no rule to read, so its strip is empty, an empty folder inside adding none.
@@ -76,9 +76,9 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     let store = try makeStore()
     try finish(store, try store.createTask(NewTask(title: "done")))
     let folder = try store.createView(NewTaskView(title: "Folder"))
-    #expect(try store.done(in: folder, since: 0, today: today).isEmpty)
+    #expect(try store.doneTasks(in: folder, since: 0, today: today).isEmpty)
     try store.createView(NewTaskView(title: "Empty", parent: folder))
-    #expect(try store.done(in: folder, since: 0, today: today).isEmpty, "an empty folder inside adds no rule")
+    #expect(try store.doneTasks(in: folder, since: 0, today: today).isEmpty, "an empty folder inside adds no rule")
 }
 
 /// A task in the Trash is not done, it is thrown away, and no strip shows it, as no list's read does unless its rule
@@ -92,8 +92,8 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     try store.trash(task: binned)
     let open = try store.createView(NewTaskView(title: "Open", filter: .status([.open])))
 
-    #expect(try store.done(in: open, since: 0, today: today).map(\.id) == [kept], "the rule lifted selects every task, and the Trash stays out")
-    #expect(try store.done(in: BuiltInTaskViews.trash, since: 0, today: today).map(\.id) == [binned])
+    #expect(try store.doneTasks(in: open, since: 0, today: today).map(\.id) == [kept], "the rule lifted selects every task, and the Trash stays out")
+    #expect(try store.doneTasks(in: BuiltInTaskViews.trash, since: 0, today: today).map(\.id) == [binned])
 }
 
 /// The done read is driven by the completion time, from the instant it is given: the tasks a list completed today
@@ -127,6 +127,6 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     try store.createView(NewTaskView(title: "Work", parent: folder, filter: .and([.status([.open]), .hasTag(work)])))
     try store.createView(NewTaskView(title: "Binned at home", parent: folder, filter: .and([.trashed(true), .hasTag(home)])))
 
-    let done = try store.done(in: folder, since: 0, today: today).map(\.id)
+    let done = try store.doneTasks(in: folder, since: 0, today: today).map(\.id)
     #expect(done == [binnedKitchen, office], "the binned office task is in neither rule's read")
 }

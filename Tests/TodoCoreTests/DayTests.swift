@@ -61,7 +61,7 @@ import Testing
 }
 
 /// Day zero, 1970-01-01, was a Thursday, and a day before the epoch is a negative count, so the weekday is the count
-/// plus four under a floor modulo, which a truncating `%` gets wrong for every day before 1970. The ends of the count
+/// plus three under a floor modulo, which a truncating `%` gets wrong for every day before 1970. The ends of the count
 /// are a day a peer may have written, and neither may trap: the weekday is taken from the stored count and not by
 /// advancing a day, which traps outside `Int32`.
 @Test func aDayKnowsItsWeekday() {
@@ -71,4 +71,12 @@ import Testing
     #expect(Day(year: 1969, month: 12, day: 31).weekday == .wednesday)
     #expect(Day(daysSinceEpoch: .max).weekday == .friday)
     #expect(Day(daysSinceEpoch: .min).weekday == .tuesday)
+}
+
+/// The week begins on Monday (owner's review of #179): the cases run from Monday to Sunday, numbered from zero, so a
+/// module that lays out a week walks `allCases` in the order a person reads it.
+@Test func theWeekBeginsOnMonday() {
+    #expect(Weekday.allCases == [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday])
+    #expect(Weekday.monday.rawValue == 0)
+    #expect(Weekday.sunday.rawValue == 6)
 }

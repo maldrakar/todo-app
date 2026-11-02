@@ -14,7 +14,7 @@ extension Store {
     ///
     /// A core statement and not a stored rule: no condition of a filter is about the completion time, and a new kind
     /// of condition written into a view would read as `needsNewerApp` on an app older than it (ADR-0004).
-    public func done(in viewID: ViewID, since: Int64, today: Day) throws(StoreError) -> [TodoTask] {
+    public func doneTasks(in viewID: ViewID, since: Int64, today: Day) throws(StoreError) -> [TodoTask] {
         let allViews = try views()
         let view = try Store.readableView(viewID, among: allViews)
         let rules = (view.filter.map { [$0] } ?? []) + Store.childSections(of: viewID, among: allViews).flatMap(\.rules)
