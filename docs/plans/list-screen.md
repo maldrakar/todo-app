@@ -54,12 +54,13 @@ from.
 
 | File | Task | Holds |
 | ---- | ---- | ----- |
-| `Sources/TodoCore/Query/Store+Query.swift` | 1 | `page(of:today:)` with the own section first, a folder's section as the union of its lists, children of kind `list` alone; `TaskViewPage.Row` with the notes flag and the subtask counts; `TaskViewPage.Group.rows` |
+| `Sources/TodoCore/Query/Store+Query.swift` | 1 | `page(of:today:)` with the own section first, a folder's section as the union of its lists, children of kind `list` alone |
+| `Sources/TodoCore/Model/TodoTask.swift` | 1 | `TodoTask.hasNotes`, `subtasks`, `subtasksDone` |
+| `Sources/TodoCore/Storage/Store+Tasks.swift` | 1 | `taskColumns` with the notes flag; `loadTasks(sql:)` reading the subtask counts beside the tags |
 | `Sources/TodoCore/Query/Store+Counts.swift` | 1 | the gathering of a folder's rules shared with the page |
 | `Sources/TodoCore/Query/Store+Done.swift` | 1 | `done(in:since:today:)`: the page's rules with their status conditions lifted, completed since an instant |
 | `Sources/TodoCore/Storage/Schema.swift`, `Migrations.swift` | 1 | `version6`: the partial index on `completed_at` |
 | `Sources/TodoCore/Model/Day.swift` | 1 | `Weekday`, `Day.weekday` |
-| `Sources/TodoCLI/Format.swift` | 1 | the page printed from `Group.rows` |
 | `Sources/TodoCore/Model/TaskView.swift` | 2 | `TaskViewKind.group` |
 | `Sources/TodoCore/Model/EntityID.swift` | 2 | `EntityID.derived(from:_:)`, the FNV-1a digest written as a UUID |
 | `Sources/TodoCore/Storage/Store+Views.swift` | 2 | `viewKind` passing `group` through; `createView` refusing a group; the internal create that takes an id; `createManualList(_:in:color:)`; `groupView(of:condition:titled:)`; `move(view:)` refusing a group |
@@ -85,7 +86,7 @@ from.
 | `Apps/Apple/Sources/TodoAppleUI/ListScreen/ListScreen.swift`, `BlockView.swift`, `TaskRowView.swift`, `TaskCardView.swift`, `TagBarView.swift`, `DoneStripView.swift`, `BoardView.swift`, `ColumnView.swift`, `GlassButton.swift`, `FloatingButton.swift`, `SwipeToDelete.swift`, `RowLiftGesture.swift`, `EmptyStateView.swift` | 8 | the phone's screen and its parts, drawn from the component models |
 | `Apps/Apple/Sources/TodoAppleUI/ListScreen/ListPane.swift` | 9 | the Mac's and the iPad's pane |
 | `Sources/WasmSizeProbe/main.swift`, `scripts/wasm-size.sh` | 1, 2, 3, 6, 7 | the probe drives the new reads, writes, events and models; the budget re-measured |
-| `Tests/TodoCoreTests/QueryTests.swift`, `CountTests.swift`, `DayTests.swift`, `StoreOpenTests.swift`, new `DoneTests.swift` | 1 | the page's order and rows, the folder's section, the done read and its index, the weekday, the migration |
+| `Tests/TodoCoreTests/QueryTests.swift`, `TaskTests.swift`, `CountTests.swift`, `DayTests.swift`, `StoreOpenTests.swift`, new `DoneTests.swift` | 1 | the page's order, the folder's section, the notes flag and the subtask counts, the done read and its index, the weekday, the migration |
 | `Tests/TodoCoreTests/ViewTests.swift`, `EntityIDTests.swift`, `SyncTests.swift` | 2 | the kind, the derived id, the two one-call constructors, two devices making one row |
 | `Tests/AppFeatureTests/AppModuleTests.swift`, `RouteTests.swift` | 3, 6 | the day handed down (3); a list over a list and its text form (6) |
 | `Tests/TaskViewListFeatureTests/*` | 3, 6 | counts by the day (3); no group row (6) |
@@ -99,7 +100,7 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | | The page's order, a folder's lists, the rows' flags, the done read and the weekday | `feature`, `core` | |
+| 1 | | The page's order, a folder's lists, a task's flags, the done read and the weekday | `feature`, `core` | |
 | 2 | | A group's view and a manual list, each in one call | `feature`, `core` | |
 | 3 | | The device's day as an event of the world | `feature`, `core`, `ui-apple` | |
 | 4 | | The design system's tokens and the screen's component models | `feature`, `core`, `ui-apple` | |
@@ -122,31 +123,25 @@ Task 9 for the Mac and the iPad, where the adapted view goes. Task 5
 answers the one question the spec names as its first risk before Task 8
 builds on it.
 
-### Task 1: The page's order, a folder's lists, the rows' flags, the done read and the weekday
+### Task 1: The page's order, a folder's lists, a task's flags, the done read and the weekday
 
-**Goal.** The store reads a view's page in the product's order, the own section first, with a folder inside reading as the union of its lists, as its count does; every row of the page carries whether the task has notes and how many subtasks it has, done over all; the store answers which tasks a page's rules completed since an instant; and a day knows its weekday (spec sections 2, 3, 8 and 12).
+**Goal.** The store reads a view's page in the product's order, the own section first, with a folder inside reading as the union of its lists, as its count does; every task read carries whether it has notes and how many subtasks it has, done over all, so that the page's rows and the strip's have their meta line from the one read; the store answers which tasks a page's rules completed since an instant; and a day knows its weekday (spec sections 2, 3, 8 and 12).
 
-**Files.** `Sources/TodoCore/Query/Store+Query.swift`, `Store+Counts.swift`; new `Store+Done.swift`; `Sources/TodoCore/Storage/Schema.swift`, `Migrations.swift`; `Sources/TodoCore/Model/Day.swift`; `Sources/TodoCLI/Format.swift`; `Sources/WasmSizeProbe/main.swift`; `Tests/TodoCoreTests/QueryTests.swift`, `CountTests.swift`, `DayTests.swift`, `StoreOpenTests.swift`, new `DoneTests.swift`; `CHANGELOG.md`.
+**Files.** `Sources/TodoCore/Query/Store+Query.swift`, `Store+Counts.swift`; new `Store+Done.swift`; `Sources/TodoCore/Model/TodoTask.swift`, `Day.swift`; `Sources/TodoCore/Storage/Store+Tasks.swift`, `Schema.swift`, `Migrations.swift`; `Sources/WasmSizeProbe/main.swift`; `Tests/TodoCoreTests/QueryTests.swift`, `TaskTests.swift`, `CountTests.swift`, `DayTests.swift`, `StoreOpenTests.swift`, new `DoneTests.swift`; `CHANGELOG.md`.
 
 **Interface.** Consumed by Tasks 6 and 7.
 
 ```swift
-extension TaskViewPage {
-    /// One task of a page with what its row says beside the title, read with the page: whether it has notes,
-    /// and its subtasks, the ones no longer open over all of them.
-    public struct Row: Equatable, Sendable {
-        public let task: TodoTask
-        public let hasNotes: Bool
-        public let subtasksDone: Int
-        public let subtasks: Int
-    }
-    public struct Group: Equatable, Sendable {
-        public let key: GroupKey?
-        public let rows: [Row]          // was `tasks: [TodoTask]`
-    }
+public struct TodoTask: Equatable, Sendable {
+    // the eleven fields as today, then what the notes column and the tree say of the task, read with it
+    /// Whether the task has notes; the read never loads them (ADR-0002).
+    public let hasNotes: Bool
+    /// The task's children that are not deleted and not in the Trash, and the ones among them no longer open.
+    public let subtasks: Int
+    public let subtasksDone: Int
 }
 extension Store {
-    public func page(of viewID: ViewID, today: Day) throws(StoreError) -> TaskViewPage   // the signature stays; the order and the rows change
+    public func page(of viewID: ViewID, today: Day) throws(StoreError) -> TaskViewPage   // the signature and `Group.tasks` stay; the order changes
     /// The tasks the page's rules select once their status conditions are lifted, no longer open and completed at
     /// or after `since`, the clock's milliseconds; newest first. Empty for a view with no rule and no lists.
     public func done(in viewID: ViewID, since: Int64, today: Day) throws(StoreError) -> [TodoTask]
@@ -162,16 +157,17 @@ extension Day {
 **Rules.**
 
 - The page's sections: the view's own section first, present whenever the view has a rule, empty or not, so that a list with a rule and nothing in it has a block to add into; absent for a folder, which has no own tasks (spec section 2). Then one section per child of kind `.list`, in `children(ofView:)` order; a child of another kind is skipped and claims nothing, which today excludes nothing, since an area is never a child in a read, and from Task 2 on excludes a group's row. A child with a rule holds its rule's results as today; a child with no rule, a folder, holds the union of the rules gathered from the lists under it to any depth, the same gathering `taskCounts(today:)` does (`countStatements`, `Store+Counts.swift:36-45`), extracted into one internal helper both call, ordered by the folder's own sort, which is the default tail `t.rank, t.id` since a folder has none; a folder with nothing to count holds an empty section. A child's `needsNewerApp` still gives an empty section. The own section is the view's results minus every child's claim, as today; nothing dedups between siblings.
-- A row's flags come from two statements per section over the section's task ids, chunked as `loadTasks(sql:)` chunks its tag query (`Store.chunked`, `Store+Tasks.swift:315`): `SELECT id FROM tasks WHERE notes != '' AND id IN (…)` for the notes flag, and `SELECT tt.parent, count(*), sum(t.status != 0) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND tt.trashed = 0 AND tt.parent IN (…) GROUP BY tt.parent` for the subtasks; a task with no children reads 0 over 0. `tasks(in:today:)` keeps returning `[TodoTask]`, `rows.map(\.task)`, so the probe and the CLI change only where they read a group.
+- The flags are fields of `TodoTask`, read by every reader through the one loader, as the tags are (owner's review of the plan, 2026-11-02). `hasNotes` is `length(t.notes) > 0` as one more column of `taskColumns`, which SQLite answers from the record's header without loading the text from its overflow pages, so a list still never reads the notes (ADR-0002). The counts come from one statement per chunk of the loaded ids beside the tags' (`tagsByTask`, `Store+Tasks.swift:303-315`): `SELECT tt.parent, count(*), sum(t.status != 0) FROM tasks t JOIN task_tree tt ON tt.id = t.id WHERE t.deleted = 0 AND tt.trashed = 0 AND tt.parent IN (…) GROUP BY tt.parent`, over `task_tree_parent`; a task with no children reads 0 over 0. `TaskViewPage.Group.tasks`, `tasks(in:today:)`, the CLI and the probe keep their shape, and the strip's rows, which `done(in:since:today:)` returns as the same type, carry their meta line with no second read.
 - `done(in:since:today:)` gathers the page's rules, the view's own and each list child's, a folder child contributing its lists' union, and lifts every `.status(_)` out of each: a status condition becomes `.and([])`, which compiles to true (`FilterCompiler.swift:79`), inside a `.not` too, which makes that branch false, accepted and tested. The lifted rules are joined by `.or`, compiled bare with `FilterCompiler.compile`, and the statement adds `AND t.status != 0 AND t.completed_at >= ?` and `tt.trashed = 0` unless a rule mentions the Trash, ordered `t.completed_at DESC, t.id`. A view with no rule and no lists answers `[]` without a statement. Logbook's rule lifted is every task, which the module never asks for, since the strip is not drawn there (spec section 3).
 - `version6` adds `CREATE INDEX tasks_completed ON tasks(completed_at) WHERE completed_at IS NOT NULL`; the done statement's plan is `SEARCH t USING INDEX tasks_completed` for a rule whose own conditions drive nothing narrower, which the EXPLAIN test holds as `QueryTests` holds the view statement's.
 - `Day.weekday` is `(daysSinceEpoch + 4) mod 7` with a floor modulo, since day zero, 1970-01-01, was a Thursday and a day before the epoch is negative; the names of the days are the module's, not the core's (spec section 12).
-- The CLI prints a group's rows from `rows.map(\.task)` and nothing else changes in it; the probe reads `page` and `done` so both stay in the measurement.
-- Cost: the page now runs two statements more per section and the done read one more per strip; measured in a release build at 50,000 tasks with the harness of #153 (`TreePerformanceTests`), the numbers in the pull request; the remedy the spec names, a narrower read for the rows a screen can show, is not built here (spec, "Risks").
+- The CLI does not change; the probe reads `page` and `done` so both stay in the measurement.
+- Cost: every read of tasks now runs one statement more per chunk of ids, the page's per section and the done read's per strip among them, `task(_:)` one more for its one id; the card's `children(of:)` in Task 7 counts grandchildren nobody draws, accepted for one shape; measured in a release build at 50,000 tasks with the harness of #153 (`TreePerformanceTests`), the numbers in the pull request; the remedy the spec names, a narrower read for the rows a screen can show, is not built here (spec, "Risks").
 
 **Tests.**
 
-- `QueryTests`: `theOwnSectionComesFirstAndTheListsInsideFollow`; `aListWithARuleAndNothingInItHasAnEmptyOwnSection`; `aFolderHasNoOwnSection`; `aFolderInsideReadsTheUnionOfItsListsOnce`, two lists sharing a task; `aFolderInsideWithNothingToCountIsAnEmptySection`; `aChildOfAKindOtherThanListIsNotASection`, by a view whose stored kind Task 2 will make `group`, written as a journal op; `aRowSaysWhetherTheTaskHasNotes`; `aRowCountsItsSubtasksDoneOverAll`, a trashed and a deleted child not counted; `aRowWithNoChildrenReadsZeroOverZero`; `tasksInAViewAreThePagesRowsFlattened`.
+- `QueryTests`: `theOwnSectionComesFirstAndTheListsInsideFollow`; `aListWithARuleAndNothingInItHasAnEmptyOwnSection`; `aFolderHasNoOwnSection`; `aFolderInsideReadsTheUnionOfItsListsOnce`, two lists sharing a task; `aFolderInsideWithNothingToCountIsAnEmptySection`; `aChildOfAKindOtherThanListIsNotASection`, by a view whose stored kind Task 2 will make `group`, written as a journal op.
+- `TaskTests`: `aTaskSaysWhetherItHasNotes`, read back by `task(_:)`, `children(of:)` and the page alike; `aTaskCountsItsSubtasksDoneOverAll`, a cancelled one counted as done, a trashed and a deleted child not counted; `aTaskWithNoChildrenReadsZeroOverZero`; `theNotesFlagLoadsNoNotes`, by `EXPLAIN` of `taskQuery`, the `Column` read for the flag carrying the length-only flag in P5.
 - `CountTests`: `theCountAndThePageGatherAFoldersRulesAlike`, the same union through both.
 - `DoneTests`: `doneReadsTheTasksTheRulesCompletedSinceAnInstant`, a task completed before `since` left out; `doneLiftsEveryStatusConditionOfTheRules`, Today's rule finds a done task; `doneReadsTheListsInsideAndTheirFolders`; `doneOfAViewWithNoRuleAndNoListsIsEmpty`; `doneLeavesTheTrashOutUnlessARuleNamesIt`; `theDoneStatementUsesTheCompletedIndex`, by EXPLAIN QUERY PLAN.
 - `StoreOpenTests`: `aStoreOpensAtVersionSixWithTheCompletedIndex`, from a version 5 snapshot.
@@ -181,7 +177,8 @@ extension Day {
 
 - `page` today appends the own section only when `!own.isEmpty || sections.isEmpty` (`Store+Query.swift:67-69`), so a view with lists inside and no own tasks has no own section; the rule above changes that to "present whenever the view has a rule", and the CLI's printing is the only other reader.
 - A folder child contributes `[]` because `tasks(matching:)` returns `[]` for `filter == nil` (`Store+Query.swift:82`); `countStatements` gathers `childRules` by parent in one pass over `views().reversed()` (`Store+Counts.swift:36-45`), leaf-up, so grandchildren fold into the outer folder; the page reuses that gathering rather than recursing.
-- `TodoTask` has eleven fields and no notes or subtask count (`Sources/TodoCore/Model/TodoTask.swift:13-26`); notes are `notes TEXT NOT NULL DEFAULT ''` (`Schema.swift:24`); children live in `task_tree(parent)` with the status in `tasks`, indexed by `task_tree_parent` and `tasks_parent(parent, rank)`.
+- `TodoTask` has eleven fields and no notes or subtask count (`Sources/TodoCore/Model/TodoTask.swift:13-26`), and its doc comment says why the notes stay out, which a flag keeps true; `parent` and `trashed` are already values the tree says of a task. Every reader goes through `loadTasks(sql:)`, which runs the select and then `tagsByTask` over the loaded ids in chunks (`Store+Tasks.swift:282-286`, `303-315`), the shape the counts take; no test constructs a `TodoTask`, so three fields more break no expected value. Notes are `notes TEXT NOT NULL DEFAULT ''`, the last column (`Schema.swift:24`); children live in `task_tree(parent)` with the status in `tasks`, indexed by `task_tree_parent` and `tasks_parent(parent, rank)`.
+- `length(notes)` loads no notes: SQLite's `EXPLAIN` of `SELECT length(notes) > 0 FROM tasks` shows the `Column` opcode with P5 = 64, `OPFLAG_LENGTHARG`, which reads the length from the record header and skips the overflow pages, and of `SELECT notes != ''` with P5 = 0, which loads the text (checked 2026-11-02 on the system's 3.51.0; the vendored amalgamation is 3.53.4 and the flag is older than both).
 - `completed_at` is written only when the status crosses open and not-open, `stamp.millis` on leaving open and null on returning (`Store+Tasks.swift:59-63`); there is no index on it and no `Filter` condition over it (`Filter.swift:27-40`), which is why the done read is a core statement and not a stored rule: a new JSON kind would read as `needsNewerApp` on an older app.
 - `FilterCompiler.compile` yields the bare fragment and `whereClause` adds `tt.trashed = 0` unless the filter mentions trash (`FilterCompiler.swift:30-34`); `.and([])` compiles to `1` and `.or([])` to `0` (`:79-82`); `.not` is `NOT COALESCE((…), 0)` (`:83-89`).
 - The wide `OR` trap on wasm32 (#152) is SQLite's code generation over many alternatives; the done read joins the page's rules by `.or`, which for the seeded lists is one or two; a folder of many lists is the case to measure, and the issue stays open for it.
@@ -499,7 +496,7 @@ public final class TaskList: Routable {
 
 - The route reads `view/<id>`, then `task/<id>` into `.task`, or `view/…` into `.list`, or nothing; a third word is refused as today. Reading and writing a chain of lists are loops over the path and the chain, never a recursion over them: the reader collects every `view/<id>` into an array and folds it from the end, since a path is data from outside. `/view/a/view/b/task/t` reads as list a over which list b stands over which task t stands.
 - `AppModule.Screen` maps the two-case tail: `destination` of a list is `list.destination.map { .task($0) or .list($0) }`; `route(over:)` puts whatever stands above into `over`; `take` hands `.destinationAnswered(.task(…))` and `.destinationAnswered(.list(…))` to the list as `Route.Over.Answer`, and `.notOpened`'s `stillOpen` as `Over?`; the base keeps `above?.list` as the chain's base. `Screen`, `ScreenModel`, `ScreenAction` and `RootView.screen(_:)` gain no case (spec section 12).
-- The page is `store.page(of: head, today: day.day)`, read in `init`, on `.changed` when `rereads` holds (`TaskList.swift:259`), and on a new day. The blocks: one per group of the own section, `BlockID.own(key)`, headed by the day's title and date for a grouping by day and by nothing for a list that groups by nothing; then one per list child section, `BlockID.list(child.id)`, headed by the child's title in its colour and drawn when empty too. The rows are `TaskRowModel`s built from `TaskViewPage.Row`: the check in the page view's colour for the own blocks and the child's for its block, the title struck when the task is not open, the meta line in the spec's order, deadline, tags, subtasks, notes, the deadline red from the day it is due.
+- The page is `store.page(of: head, today: day.day)`, read in `init`, on `.changed` when `rereads` holds (`TaskList.swift:259`), and on a new day. The blocks: one per group of the own section, `BlockID.own(key)`, headed by the day's title and date for a grouping by day and by nothing for a list that groups by nothing; then one per list child section, `BlockID.list(child.id)`, headed by the child's title in its colour and drawn when empty too. The rows are `TaskRowModel`s built from the page's tasks: the check in the page view's colour for the own blocks and the child's for its block, the title struck when the task is not open, the meta line in the spec's order, deadline, tags, subtasks, notes, the deadline red from the day it is due.
 - The tag bar's chips are the tags of the page's open tasks counted over every row, most used first and ties by title from `store.tags()`, a tag on every task dropped; a tap toggles a pick, picks are session state, and a picked set filters the rows of every block and column to the tasks carrying any of them; a block emptied by the filter keeps its header. The bar is nil when no chip would show.
 - The folds are `store.deviceState("taskList.folded.<head>", as: [String].self)`, a block's key written as `day/<yyyy-mm-dd>`, `day/none`, or `view/<id>`, read when the module is made and written with `try?` on every chevron tap, as the sidebar's are (`TaskViewList.swift:534-559`); a folded block draws its header and no rows. The layout is `store.deviceState("taskList.layout.<head>", as: Model.Layout.Kind.self)`, `.list` when nothing is kept; `showAsChosen` writes it and rebuilds; in columns the folds are ignored and every block is a column with its `ColumnModel` look. Show as is a `MenuButtonModel` with two items, Columns disabled with the subtitle "Group the list in its settings to get columns" when the page has one block and no grouping (spec section 5).
 - `blockTitleTapped(.list(id))` declares `.list(Route(head: id))`. `blockTitleTapped(.own(key))` for a key with a condition calls `store.groupView(of: head, condition:, titled:)` and declares `.list(Route(head: theID))`: the condition is `.when(.on(Int64(day - today)))` or `.deadline(…)` by the list's `groupBy`, `.when(.empty)` for `.day(nil)`, `.hasTag(t)` for `.tag(t)`, `.parent(p)` for `.parent(p)`, `.status([s])` for `.status(s)`; a key with no condition, `.tag(nil)`, has a header that opens nothing. The row's title is the distance in words, "Today", "Tomorrow", "Yesterday", "In 3 days", "4 days ago", "No date", or the tag's title, the parent's title, the status's name. What the store refuses becomes the sentence, and the model's `problem`. A group's view is a list like any other to this module: its own screen reads its page, which has one own section and no lists inside.
