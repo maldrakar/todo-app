@@ -22,20 +22,19 @@ extension Store {
         return try loadTasks(sql: statement.sql, statement.params)
     }
 
-    /// The statement the done read runs: the rules lifted and joined by `or`, compiled bare, under the read's own
-    /// conditions, a status no longer open and a completion at or after `since`, and the Trash left out unless a rule
-    /// names it, as a view's read leaves it out (`FilterCompiler.whereClause`). The completion bound drives it from
-    /// `tasks_completed` (`Schema.version6`) unless SQLite, which has no statistics of the store, takes a condition of
-    /// a rule's own for a narrower one: an equality, such as the Inbox's empty day or a project's parent.
+    /// The statement the done read runs: the rules lifted, each read as its list's read is, with its own exclusion of
+    /// the Trash, and the reads joined by `or` (`FilterCompiler.whereClause(anyOf:today:)`), so a done task in the
+    /// Trash is in the strip only by a rule that names the Trash; then the read's own conditions, a status no longer
+    /// open and a completion at or after `since`. The completion bound drives it from `tasks_completed`
+    /// (`Schema.version6`) unless SQLite, which has no statistics of the store, takes a condition of a rule's own for
+    /// a narrower one: an equality, such as the Inbox's empty day or a project's parent.
     ///
     /// Assembled here rather than inside the read, so that `theDoneStatementUsesTheCompletedIndex` explains the query
     /// plan of exactly this statement, as `builtInViewsUseIndexes` explains `viewStatement`'s.
     static func doneStatement(rules: [Filter], since: Int64, today: Day) -> (sql: String, params: [Value]) {
-        let lifted = Filter.or(rules.map(Store.liftingStatus))
-        let condition = FilterCompiler.compile(lifted, today: today)
-        let trash = FilterCompiler.mentionsTrashed(lifted) ? "" : " AND tt.trashed = 0"
-        let clause = "(\(condition.sql)) AND t.status != 0 AND t.completed_at >= ?\(trash)"
-        return (Store.taskQuery(where: clause, orderBy: "t.completed_at DESC, t.id", limit: nil), condition.params + [.integer(since)])
+        let reads = FilterCompiler.whereClause(anyOf: rules.map(Store.liftingStatus), today: today)
+        let clause = "(\(reads.sql)) AND t.status != 0 AND t.completed_at >= ?"
+        return (Store.taskQuery(where: clause, orderBy: "t.completed_at DESC, t.id", limit: nil), reads.params + [.integer(since)])
     }
 
     /// A rule with every status condition lifted out of it: each becomes `and([])`, which is true, so the rule says

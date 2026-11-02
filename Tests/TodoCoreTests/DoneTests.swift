@@ -110,3 +110,23 @@ private func finish(_ store: Store, _ id: TaskID, as status: TaskStatus = .done)
     #expect(driver.hasPrefix("SEARCH t USING INDEX tasks_completed (completed_at>?)"), "the done read is driven by \(driver): \(plan)")
     #expect(!plan.contains { $0 == "SCAN t" || $0.hasPrefix("SCAN t ") || $0 == "SCAN tt" || $0.hasPrefix("SCAN tt ") }, "\(plan)")
 }
+
+/// The done read lifts each rule and keeps each one's own Trash, as a folder's section does: a done task in the
+/// Trash is in the strip only by a rule that names the Trash, and not by a sibling's rule that does not.
+@Test func doneTakesTheTrashOnlyFromTheRuleThatNamesIt() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let home = try store.createTag(title: "home")
+    let office = try store.createTask(NewTask(title: "office", tags: [work]))
+    let binnedOffice = try store.createTask(NewTask(title: "binned office", tags: [work]))
+    let binnedKitchen = try store.createTask(NewTask(title: "binned kitchen", tags: [home]))
+    for task in [office, binnedOffice, binnedKitchen] { try finish(store, task) }
+    try store.trash(task: binnedOffice)
+    try store.trash(task: binnedKitchen)
+    let folder = try store.createView(NewTaskView(title: "Folder"))
+    try store.createView(NewTaskView(title: "Work", parent: folder, filter: .and([.status([.open]), .hasTag(work)])))
+    try store.createView(NewTaskView(title: "Binned at home", parent: folder, filter: .and([.trashed(true), .hasTag(home)])))
+
+    let done = try store.done(in: folder, since: 0, today: today).map(\.id)
+    #expect(done == [binnedKitchen, office], "the binned office task is in neither rule's read")
+}

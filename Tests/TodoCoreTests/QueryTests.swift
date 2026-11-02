@@ -190,7 +190,7 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     for id in [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash] {
         let view = try #require(try store.view(id))
         let filter = try #require(view.filter)
-        let statement = Store.viewStatement(filter: filter, sort: view.sort, today: today)
+        let statement = Store.viewStatement(rules: [filter], sort: view.sort, today: today)
         let plan = try store.sql { () throws(SQLiteError) in
             try store.db.rows("EXPLAIN QUERY PLAN " + statement.sql, statement.params).map { $0[3].string ?? "" }
         }
@@ -336,4 +336,28 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     #expect(page.sections.map { $0.view?.id } == [nil, folder])
     #expect(page.sections.map(\.groups.isEmpty) == [false, true])
     #expect(sectionTasks(page) == [[loose], []])
+}
+
+/// A folder inside holds the union of its lists' own reads, and each read keeps its own Trash: a list whose rule
+/// names the Trash reads it, and a list whose rule does not still leaves its trashed tasks out, so a trashed task
+/// only the second list's rule selects is in neither read and not in the union. The built-in Trash cannot show it,
+/// since its rule takes every trashed task and the union holds the other list's trashed ones as the Trash's; a list
+/// that names the Trash and asks for more, here the binned tasks tagged home, does.
+@Test func aFolderInsideTakesTheTrashOnlyFromTheListThatNamesIt() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let home = try store.createTag(title: "home")
+    let office = try store.createTask(NewTask(title: "office", tags: [work]))
+    let binnedOffice = try store.createTask(NewTask(title: "binned office", tags: [work]))
+    try store.trash(task: binnedOffice)
+    let binnedKitchen = try store.createTask(NewTask(title: "binned kitchen", tags: [home]))
+    try store.trash(task: binnedKitchen)
+    let top = try store.createView(NewTaskView(title: "Top"))
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: top))
+    try store.createView(NewTaskView(title: "Work", parent: folder, filter: .hasTag(work)))
+    try store.createView(NewTaskView(title: "Binned at home", parent: folder, filter: .and([.trashed(true), .hasTag(home)])))
+
+    let page = try store.page(of: top, today: today)
+    #expect(page.sections.map { $0.view?.id } == [folder])
+    #expect(sectionTasks(page) == [[office, binnedKitchen]], "the binned office task is in neither list's read")
 }

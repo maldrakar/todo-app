@@ -56,9 +56,10 @@ extension Store {
     /// The own section is the view's results that no child claimed, and it is there whenever the view has a rule,
     /// empty or not, so that a list with nothing in it still has a block to add into; a folder has no rule, no
     /// tasks of its own and no own section (spec section 2). A child with a rule holds its rule's results; a folder
-    /// inside holds the union of the rules of the lists under it to any depth, each task once and in the folder's
-    /// own sort, gathered as its count gathers them, so that it holds here what its number in the sidebar counts.
-    /// What a child holds leaves the own section; nothing is taken out between siblings.
+    /// inside holds the union of the reads of the lists under it to any depth, each read keeping its own exclusion
+    /// of the Trash, each task once and in the folder's own sort, the rules gathered as its count gathers them, so
+    /// that it holds here what its number in the sidebar counts. What a child holds leaves the own section; nothing
+    /// is taken out between siblings.
     ///
     /// A child this app cannot read costs its own section and nothing more: it contributes no tasks and
     /// claims none, and `section.view?.needsNewerApp` names what stopped it, so the page still draws every
@@ -98,24 +99,25 @@ extension Store {
     }
 
     /// The tasks any of `rules` selects, each once, in `sort`: every read of a view's tasks is read here. A list's
-    /// is its one rule, and a folder's section on a page the disjunction of its lists' rules; a folder read on its
-    /// own has no rule and selects nothing.
+    /// is its one rule, and a folder's section on a page the union of its lists' reads; a folder read on its own
+    /// has no rule and selects nothing.
     private func tasks(selectedByAnyOf rules: [Filter], sort: [SortKey], today: Day) throws(StoreError) -> [TodoTask] {
-        guard let first = rules.first else { return [] }
-        let statement = Store.viewStatement(filter: rules.count == 1 ? first : .or(rules), sort: sort, today: today)
+        guard !rules.isEmpty else { return [] }
+        let statement = Store.viewStatement(rules: rules, sort: sort, today: today)
         return try loadTasks(sql: statement.sql, statement.params)
     }
 
-    /// The statement and parameters a view's read runs: the filter and the sort, and nothing of the manual
-    /// list. Ordering by the list here would order the whole result by it, and a manual list belongs to a
-    /// group — `group(_:by:manual:)` applies it where it belongs. A filter that asks about the list,
-    /// `listedIn`, is a condition like any other and compiles into a subquery of its own.
+    /// The statement and parameters a view's read runs: the rules, one for a list and its lists' for a folder's
+    /// section, each read with its own exclusion of the Trash (`FilterCompiler.whereClause(anyOf:today:)`), and the
+    /// sort, and nothing of the manual list. Ordering by the list here would order the whole result by it, and a
+    /// manual list belongs to a group — `group(_:by:manual:)` applies it where it belongs. A filter that asks about
+    /// the list, `listedIn`, is a condition like any other and compiles into a subquery of its own.
     ///
     /// Assembled here rather than inside the read, so that `builtInViewsUseIndexes` explains the query plan
     /// of exactly this statement (spec, "Cost"). A guard that explained a copy would pass while the read
     /// itself degraded into a scan.
-    static func viewStatement(filter: Filter, sort: [SortKey], today: Day) -> (sql: String, params: [Value]) {
-        let clause = FilterCompiler.whereClause(filter, today: today)
+    static func viewStatement(rules: [Filter], sort: [SortKey], today: Day) -> (sql: String, params: [Value]) {
+        let clause = FilterCompiler.whereClause(anyOf: rules, today: today)
         return (Store.taskQuery(where: clause.sql, orderBy: FilterCompiler.orderBy(sort), limit: nil), clause.params)
     }
 
