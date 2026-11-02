@@ -1,6 +1,6 @@
 # Plan: The list screen
 
-- Status: Draft
+- Status: Approved 2026-11-02, after three threads on #169: the flags as fields of `TodoTask`, a group's row living and dying with its list, where the notes live
 - Spec: `docs/specs/list-screen.md`, approved 2026-11-01 (#167)
 - Epic: #166
 
@@ -101,15 +101,15 @@ from.
 
 | # | Issue | Title | Labels | Depends on |
 | - | ----- | ----- | ------ | ---------- |
-| 1 | | The page's order, a folder's lists, a task's flags, the done read and the weekday | `feature`, `core` | |
-| 2 | | A group's view and a manual list, each in one call | `feature`, `core` | |
-| 3 | | The device's day as an event of the world | `feature`, `core`, `ui-apple` | |
-| 4 | | The design system's tokens and the screen's component models | `feature`, `core`, `ui-apple` | |
-| 5 | | Spike: three drags on one screen | `spike`, `ui-apple` | |
-| 6 | | The module's page: blocks, rows, the tag bar, a list over a list, a group's view | `feature`, `core` | 1, 2, 3, 4 |
-| 7 | | The module's edits: completing, the card, adding, deleting, the reorder and the drop | `feature`, `core` | 6 |
-| 8 | | The list screen on iPhone | `feature`, `ui-apple` | 4, 5, 7 |
-| 9 | | The list pane on the Mac and the iPad | `feature`, `ui-apple` | 8 |
+| 1 | #170 | The page's order, a folder's lists, a task's flags, the done read and the weekday | `feature`, `core` | |
+| 2 | #171 | A group's view and a manual list, each in one call | `feature`, `core` | |
+| 3 | #172 | The device's day as an event of the world | `feature`, `core`, `ui-apple` | |
+| 4 | #173 | The design system's tokens and the screen's component models | `feature`, `core`, `ui-apple` | |
+| 5 | #174 | Spike: three drags on one screen | `spike`, `ui-apple` | |
+| 6 | #175 | The module's page: blocks, rows, the tag bar, a list over a list, a group's view | `feature`, `core` | 1, 2, 3, 4 |
+| 7 | #176 | The module's edits: completing, the card, adding, deleting, the reorder and the drop | `feature`, `core` | 6 |
+| 8 | #177 | The list screen on iPhone | `feature`, `ui-apple` | 4, 5, 7 |
+| 9 | #178 | The list pane on the Mac and the iPad | `feature`, `ui-apple` | 8 |
 
 The owner reviews this table and the interface of every task below.
 
