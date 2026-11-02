@@ -314,11 +314,11 @@ private func fromPeer(_ store: Store, _ id: ViewID, _ field: String, _ value: Va
     try store.receive([JournalOperation(entity: .view, entityID: id.rawValue, field: field, value: value, clock: stamp, device: "peer")])
 }
 
-/// What the store keeps of a view's row, whatever it reads as: the fields a group's view is compared by.
-private func storedRow(_ store: Store, _ id: ViewID) throws -> [Value] {
-    try #require(try store.sql { () throws(SQLiteError) in
-        try store.db.rows("SELECT kind, parent, title, filter, sort, color, icon, deleted FROM views WHERE id = ?", [.text(id.rawValue)])
-    }.first)
+/// The tombstone a view's row stores, whatever the row reads as.
+private func storedTombstone(_ store: Store, _ id: ViewID) throws -> Value? {
+    try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT deleted FROM views WHERE id = ?", [.text(id.rawValue)])
+    }.first?.first
 }
 
 /// The fields of a view journaled under one stamp, the latest the view's operations carry, by name.
@@ -388,7 +388,7 @@ private func thisWeek(_ store: Store) throws -> ViewID {
 
     try fromPeer(store, list, "deleted", Value(true))
 
-    #expect(try storedRow(store, group)[7] == .integer(0), "no cascade ran: the row is stored live")
+    #expect(try storedTombstone(store, group) == .integer(0), "no cascade ran: the row is stored live")
     #expect(try !store.views().contains { $0.id == group || $0.id == under })
     #expect(try store.view(group) == nil)
     #expect(try store.children(ofView: nil).map(\.id) == [
@@ -561,7 +561,7 @@ private func thisWeek(_ store: Store) throws -> ViewID {
     let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
     let written = try commits(of: store) { try store.delete(viewTree: list) }
     #expect(written.map(\.views) == [[list, inside, group]])
-    #expect(try storedRow(store, group)[7] == .integer(1), "tombstoned, not only unread")
+    #expect(try storedTombstone(store, group) == .integer(1), "tombstoned, not only unread")
 }
 
 /// The one-view delete takes the list's groups too, in the same transaction, though the lists inside it surface at the
@@ -574,7 +574,7 @@ private func thisWeek(_ store: Store) throws -> ViewID {
     let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
     let written = try commits(of: store) { try store.delete(view: list) }
     #expect(written.map(\.views) == [[list, group]], "one change set naming both")
-    #expect(try storedRow(store, group)[7] == .integer(1))
+    #expect(try storedTombstone(store, group) == .integer(1))
     #expect(try store.view(inside)?.parent == nil, "a list inside surfaces at the root")
     let tombstones = try store.sql { () throws(SQLiteError) in
         try store.db.rows("SELECT count(DISTINCT clock) FROM ops WHERE entity = 'view' AND field = 'deleted' AND value = 1")

@@ -131,7 +131,7 @@ extension Store {
             try insert(new, id: id, at: .end)
             return id
         }
-        let differing = zip(fields, row).filter { $0.0.1 != $0.1 }.map(\.0)
+        let differing = zip(fields, row).compactMap { field, stored in field.1 == stored ? nil : field }
         guard !differing.isEmpty else { return id }
         let stamp = clock.next()
         try apply(differing.map { op(.view, id.rawValue, $0.0, $0.1, stamp) })
