@@ -252,19 +252,29 @@ extension Store {
     ///
     /// A group stands under a view that is stored, live and no group, with a rule, and reads as gone anywhere else,
     /// rather than lifted to the root by `effectiveParents` as any other child of a missing parent is, where it would
-    /// stand as a list named "Tomorrow" (owner's review of the list screen plan, 2026-11-02). The views that can hold
-    /// one are taken from the rows in one pass, and a stray group's node is marked deleted before the parents resolve,
-    /// so a list a peer put under it surfaces at the root, as a list under any deleted view does, and a group under it
-    /// reads as gone too, since no group holds one.
+    /// stand as a list named "Tomorrow" (owner's review of the list screen plan, 2026-11-02). And a group holds no
+    /// lists, so a view of another kind whose stored parent is a group's row, which an app older than the kind can
+    /// write since it reads that row as a list, reads at the root, as a link to a missing parent does: under a group
+    /// it would be a list inside a screen that has none, and under its own group's row it would close a cycle once
+    /// opening the group writes the row's parent back to it. The rows that can hold a group and the rows of groups are
+    /// taken in one pass, and both rules are written into the nodes before the parents resolve, so a stray group's
+    /// node is deleted, a group under it reads as gone too, and a view under any group's row stands at the root.
     public func views() throws(StoreError) -> [TaskView] {
         let rows = try sql { () throws(SQLiteError) in
             try db.rows("SELECT id, title, parent, rank, filter, sort, group_by, created_at, updated_at, deleted, kind, color, icon FROM views")
         }
-        let canHoldGroups = Set(rows.compactMap { $0[9].bool || Store.storedViewKind($0[10]) == .group ? nil : $0[0].string })
-        let nodes = rows.map { row in
-            let isStrayGroup = Store.storedViewKind(row[10]) == .group
-                && (row[4].isNull || row[2].string.map(canHoldGroups.contains) != true)
-            return TreeRules.Node(id: row[0].string ?? "", parent: row[2].string, deleted: row[9].bool || isStrayGroup)
+        let kinds = rows.map { Store.storedViewKind($0[10]) }
+        var canHoldGroups: Set<String> = []
+        var groups: Set<String> = []
+        for (row, kind) in zip(rows, kinds) {
+            guard let id = row[0].string else { continue }
+            if kind == .group { groups.insert(id) } else if !row[9].bool { canHoldGroups.insert(id) }
+        }
+        let nodes = zip(rows, kinds).map { row, kind in
+            let parent = row[2].string
+            let isStrayGroup = kind == .group && (row[4].isNull || parent.map(canHoldGroups.contains) != true)
+            let link = kind != .group && parent.map(groups.contains) == true ? nil : parent
+            return TreeRules.Node(id: row[0].string ?? "", parent: link, deleted: row[9].bool || isStrayGroup)
         }
         let parents = TreeRules.effectiveParents(nodes)
         let views = zip(rows, nodes).compactMap { row, node -> TaskView? in

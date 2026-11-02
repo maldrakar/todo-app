@@ -53,8 +53,9 @@ extension EntityID {
     /// group row's id is this function of its list's id and its condition (ADR-0004, amendment of 2026-11-01), and
     /// `aDerivedIDIsTheOneThePlanPinned` holds it to one vector. UUID-shaped, because every route reads an id with
     /// `init(uuidString:)`; version 8 is the RFC's for an id laid out by its own rule, and it keeps a derived id
-    /// apart from the seeds', whose version digit is 4.
-    public static func derived(from base: EntityID, _ name: String) -> EntityID {
+    /// apart from the seeds', whose version digit is 4. `package`, as `init(uuidString:)` is: the core derives a
+    /// group's id itself, and only the package's own tests call it from outside.
+    package static func derived(from base: EntityID, _ name: String) -> EntityID {
         let bytes = Array("\(base.rawValue)\u{0}\(name)".utf8)
         let high = fnv1a64(bytes, from: fnvOffsetBasis)
         let low = fnv1a64(bytes, from: high)

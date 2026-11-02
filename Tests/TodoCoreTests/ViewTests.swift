@@ -56,10 +56,7 @@ import TestSupport
         try store.db.rows("SELECT field, value FROM ops WHERE entity_id = ? AND field IN ('kind', 'color', 'icon') ORDER BY field", [.text(area.rawValue)])
     }
     #expect(journaled == [[.text("color"), .null], [.text("icon"), .null], [.text("kind"), .text("area")]])
-    let stamps = try store.sql { () throws(SQLiteError) in
-        try store.db.rows("SELECT count(*), count(DISTINCT clock) FROM ops WHERE entity_id = ?", [.text(area.rawValue)])
-    }
-    #expect(stamps == [[.integer(11), .integer(1)]], "eleven fields under one stamp, in one write")
+    #expect(try journaledFields(store, area) == [[.integer(11), .integer(1)]], "eleven fields under one stamp, in one write")
 }
 
 /// An area stands at the root and selects nothing (ADR-0004, amendment of 2026-10-25), and the store refuses
@@ -186,14 +183,11 @@ import TestSupport
     try store.createView(NewTaskView(title: "Garden", parent: home))
     let before = try store.views()
 
-    var commits: [ChangeSet] = []
-    store.onChange = { commits.append($0) }
-    try store.delete(viewTree: work)
-    store.onChange = nil
+    let written = try commits(of: store) { try store.delete(viewTree: work) }
 
     let tree: Set<ViewID> = [work, reviews, projects, alpha]
     #expect(try store.views() == before.filter { !tree.contains($0.id) }, "the tree is gone, and nothing of it surfaced at the root")
-    #expect(commits.map(\.views) == [tree], "one transaction, which addressed the tree")
+    #expect(written.map(\.views) == [tree], "one transaction, which addressed the tree")
     let tombstones = try store.sql { () throws(SQLiteError) in
         try store.db.rows("SELECT entity_id, clock FROM ops WHERE entity = 'view' AND field = 'deleted' AND value = 1")
     }
@@ -331,6 +325,14 @@ private func lastWrite(_ store: Store, _ id: ViewID) throws -> [String] {
     }.map { $0[0].string ?? "" }
 }
 
+/// How many of a view's fields the journal holds and under how many stamps: a view made in one write is all eleven of
+/// its fields under one.
+private func journaledFields(_ store: Store, _ id: ViewID) throws -> [[Value]] {
+    try store.sql { () throws(SQLiteError) in
+        try store.db.rows("SELECT count(*), count(DISTINCT clock) FROM ops WHERE entity_id = ?", [.text(id.rawValue)])
+    }
+}
+
 /// Every commit a write makes, which is how a test tells one transaction from two.
 private func commits(of store: Store, _ write: () throws -> Void) rethrows -> [ChangeSet] {
     var commits: [ChangeSet] = []
@@ -458,10 +460,7 @@ private func thisWeek(_ store: Store) throws -> ViewID {
     #expect(list.filter == .listedIn(id) && list.kind == .list && list.icon == "list" && list.color == .teal)
     #expect(list.title == "Errands" && list.parent == parent && list.groupBy == nil && list.sort.isEmpty)
     #expect(try store.children(ofView: parent).map(\.id) == [first, id], "ranked last")
-    let stamps = try store.sql { () throws(SQLiteError) in
-        try store.db.rows("SELECT count(*), count(DISTINCT clock) FROM ops WHERE entity_id = ?", [.text(id.rawValue)])
-    }
-    #expect(stamps == [[.integer(11), .integer(1)]], "eleven fields under one stamp")
+    #expect(try journaledFields(store, id) == [[.integer(11), .integer(1)]], "eleven fields under one stamp")
     let task = try store.createTask(NewTask(title: "Buy stamps"))
     try store.pin(task: task, in: id)
     #expect(try store.tasks(in: id, today: Day(year: 2026, month: 11, day: 2)).map(\.id) == [task])
@@ -486,10 +485,7 @@ private func thisWeek(_ store: Store) throws -> ViewID {
     #expect(read.filter == .and([.and([.status([.open]), .when(.between(0, 6))]), condition]))
     #expect(read.color == .indigo && read.icon == "calendar" && read.sort == [SortKey(.when), SortKey(.title)] && read.groupBy == nil)
     #expect(try store.children(ofView: list).map(\.id) == [inside, group], "ranked last among the list's children")
-    let stamps = try store.sql { () throws(SQLiteError) in
-        try store.db.rows("SELECT count(*), count(DISTINCT clock) FROM ops WHERE entity_id = ?", [.text(group.rawValue)])
-    }
-    #expect(stamps == [[.integer(11), .integer(1)]], "eleven fields under one stamp")
+    #expect(try journaledFields(store, group) == [[.integer(11), .integer(1)]], "eleven fields under one stamp")
 }
 
 /// Opening the same group again finds the row by the id it derives and writes nothing when nothing changed: no
@@ -617,4 +613,40 @@ private func thisWeek(_ store: Store) throws -> ViewID {
     #expect(try lastWrite(store, group) == ["parent"])
     #expect(try store.view(group)?.parent == list)
     #expect(try store.children(ofView: other).isEmpty)
+}
+
+/// An older app reads a group's row as a list and can move a list under it. A group holds no lists (ADR-0004, amendment
+/// of 2026-11-01), so the link reads as no link, as one to a missing parent does: the list stands at the root, among the
+/// root's children, and is no section of the group's page, which stays one section, its own.
+@Test func aListPutUnderAGroupByAPeerReadsAtTheRoot() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let errands = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
+    try fromPeer(store, errands, "parent", .text(group.rawValue))
+
+    #expect(try store.view(errands)?.parent == nil)
+    #expect(try store.children(ofView: nil).contains { $0.id == errands })
+    #expect(try store.children(ofView: group).isEmpty)
+    #expect(try store.page(of: group, today: Day(year: 2026, month: 11, day: 2)).sections.map { $0.view?.id } == [nil])
+}
+
+/// The way an older app can close a cycle through a group: it moves the group's row to the root, where the row reads as
+/// gone, and then the list under the row it read as a list. Opening the group from the list writes the row's parent back,
+/// and the list's link to the group reads as no link, so the group stands under its list and the list at the root rather
+/// than both on a cycle at the root; and the list's delete takes the group with it.
+@Test func aListUnderItsOwnGroupDoesNotCloseACycle() throws {
+    let store = try makeStore()
+    let list = try thisWeek(store)
+    let group = try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    try fromPeer(store, group, "parent", .null)
+    try fromPeer(store, list, "parent", .text(group.rawValue))
+
+    try store.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+
+    let read = try #require(try store.view(group))
+    #expect(read.kind == .group && read.parent == list)
+    #expect(try store.view(list)?.parent == nil)
+    let written = try commits(of: store) { try store.delete(view: list) }
+    #expect(written.map(\.views) == [[list, group]])
 }

@@ -2,7 +2,8 @@
 
 /// A view as read from the store: a filter over tasks, a place in the sidebar tree, and how its results are
 /// sorted and grouped. `parent` is effective, by the rule the task tree follows — a link to a missing,
-/// deleted or circular parent reads as no link and the view shows at the root.
+/// deleted or circular parent reads as no link and the view shows at the root, and so does a link to a group's
+/// view, which holds no lists.
 ///
 /// A view with no filter has no results of its own and serves as a folder; a heading inside a project is the
 /// same mechanism, a child view whose filter is "listed in this view". `needsNewerApp` carries the kind this
