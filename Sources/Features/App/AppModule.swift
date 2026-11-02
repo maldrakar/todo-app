@@ -263,7 +263,7 @@ public final class AppModule: Routable {
             // subject is gone asks to be closed, which the walk after it follows. The root reads the store for nothing
             // of its own (spec section 3, ADR-0006, amendment of 2026-10-14), and its sentence stays: a change answers
             // nothing a person was told.
-            let output = sendToEveryScreen(.changed(changes), .changed(changes))
+            let output = sendToTheSidebarAndEveryScreen(sidebar: .changed(changes), screens: .changed(changes))
             react(to: state.quickEntry.send(.changed(changes)))
             return output
         case .created:
@@ -301,20 +301,23 @@ public final class AppModule: Routable {
             // that a screen the walk after it makes starts on it, as every screen made later does. The layout, the
             // route and the root's sentence stay: the day answers nothing a person was told.
             state.today.day = day
-            return sendToEveryScreen(.dayChanged(day), .dayChanged(day))
+            return sendToTheSidebarAndEveryScreen(sidebar: .dayChanged(day), screens: .dayChanged(day))
         }
     }
 
-    /// Hands an event of the world to the sidebar and then to each screen standing over it, bottom up, as the path
-    /// stood when the event arrived, which is read before the sidebar takes it: a screen the walk after one of them
-    /// drops, with what stands over it, is a screen whose id the loop then finds gone and hands nothing. Of what the
-    /// sidebar answers the root returns the first drawn, as the stack does within one call. One walk for every event
-    /// every screen is handed, `.changed` and `.dayChanged`, so that the two reach the same screens in the same order.
-    private func sendToEveryScreen(_ event: TaskViewList.Event, _ screenEvent: Screen.Event) -> Output? {
+    /// Hands an event of the world to the sidebar, in the sidebar's words, and then to each screen standing over it, in
+    /// the screens' words, bottom up, as the path stood when the event arrived, which is read before the sidebar takes
+    /// it: a screen the walk after one of them drops, with what stands over it, is a screen whose id the loop then
+    /// finds gone and hands nothing. Of what the sidebar answers the root returns the first drawn, as the stack does
+    /// within one call. One walk for every event the sidebar and every screen are handed, `.changed` and `.dayChanged`,
+    /// so that the two reach the same modules in the same order. The event is spelled twice, since the sidebar and the
+    /// screens each have an enum of their own, and the labels put the two spellings side by side at the call, where a
+    /// pair that does not match shows.
+    private func sendToTheSidebarAndEveryScreen(sidebar: TaskViewList.Event, screens: Screen.Event) -> Output? {
         let path = state.stack.path
-        var output = react(to: state.stack.send(event))
+        var output = react(to: state.stack.send(sidebar))
         for id in path {
-            let answer = react(to: state.stack.send(screenEvent, to: id))
+            let answer = react(to: state.stack.send(screens, to: id))
             output = output ?? answer
         }
         return output

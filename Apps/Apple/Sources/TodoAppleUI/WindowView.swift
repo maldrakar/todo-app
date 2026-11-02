@@ -45,12 +45,12 @@ import TodoCore
 ///
 /// The device's day reaches the root the same way, since the core has no time zone to tell it by (ADR-0001), and the
 /// view keeps no day and decides nothing by it (ADR-0006, amendment of 2026-11-01): the window is made with the day the
-/// view reads when it appears, and the view reads it again and reports it whenever it may have moved, when the scene
-/// becomes active, which is the app back in the foreground, perhaps on another day, when the system says the calendar
-/// day changed, at midnight or on waking past it, and when the system's time zone changed. A day the root already has
-/// moves nothing, so a report that finds the same day costs one comparison. The two notifications and the scene's
-/// phase have the same names on macOS 14, iOS 17 and watchOS 10, so no platform condition is needed (typechecked
-/// against Xcode 27.1's SDKs on 2026-11-02).
+/// view reads when it appears, and the view reads it again and reports it whenever it may have moved, at every change
+/// of the scene's phase, the app back in the foreground perhaps on another day among them, when the system says the
+/// calendar day changed, at midnight or on waking past it, and when the system's time zone changed. A day the root
+/// already has moves nothing, so a report that finds the same day costs one comparison. The two notifications and the
+/// scene's phase have the same names on macOS 14, iOS 17 and watchOS 10, so no platform condition is needed
+/// (typechecked against Xcode 27.1's SDKs on 2026-11-02).
 struct WindowView: View {
     private let app: TodoApp
 
@@ -89,8 +89,10 @@ struct WindowView: View {
         horizontalSizeClass == .compact ? .narrow : .wide
     }
 
-    /// The phase of the window's scene, which only the view can know, read for the moment the scene becomes active
-    /// again, when the day may have moved while the app was away.
+    /// The phase of the window's scene, which only the view can know, read for its changes alone: the day may have
+    /// moved while the app was away, and the view reports it at every change of the phase, with no condition over the
+    /// phase, since a day the root already has moves nothing and so the view decides nothing by the phase either
+    /// (`docs/style.md`, "Views").
     @Environment(\.scenePhase) private var scenePhase
 
     /// The device's day now, read from the device's clock and its calendar, whose time zone only the view has, each
@@ -101,12 +103,13 @@ struct WindowView: View {
 
     /// What the system posts when the device's day may have moved under a running app: the calendar's day changed, at
     /// midnight or on waking past it, or the system's time zone changed. Delivered on the main queue, since the system
-    /// does not say which queue it posts either on and the window's way in is the main actor's.
-    private var dayMayHaveMoved: some Publisher<Notification, Never> {
+    /// does not say which queue it posts either on and the window's way in is the main actor's. Built once, so that
+    /// every run of the body hands `onReceive` the same publisher and not a new chain, which it would subscribe to
+    /// again, and a notification `receive(on:)` held across a redraw could be dropped with the old subscription.
+    private static let dayMayHaveMoved: some Publisher<Notification, Never> =
         NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
             .merge(with: NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange))
             .receive(on: DispatchQueue.main)
-    }
 
     /// Whether the app can open a window beside this one, which only the platform can say (`docs/specs/navigation.md`,
     /// sections 5 and 10), read when the window is made and handed to the root, which hands it to the sidebar for the
@@ -142,8 +145,8 @@ struct WindowView: View {
                 // window has already moves nothing in the root.
                 .onChange(of: width, initial: true) { _, width in window.widthChanged(width) }
                 // Not on the first frame: the window was made with the day a moment ago.
-                .onChange(of: scenePhase) { _, phase in if phase == .active { window.dayChanged(day) } }
-                .onReceive(dayMayHaveMoved) { _ in window.dayChanged(day) }
+                .onChange(of: scenePhase) { window.dayChanged(day) }
+                .onReceive(WindowView.dayMayHaveMoved) { _ in window.dayChanged(day) }
         } else {
             // A view that fills the window, because a view with nothing in it never appears: on 2026-10-18 an
             // `onAppear` on a `Group` holding nothing never ran in a window of the group, and the window stayed

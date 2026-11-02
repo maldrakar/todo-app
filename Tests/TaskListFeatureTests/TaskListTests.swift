@@ -371,6 +371,24 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     #expect(list.destination.pushed == route.task)
 }
 
+/// A new day answers nobody, so the sentence on screen stays while the rows are read again: here the one a link to a
+/// task that is gone left, which answered something the person did.
+@Test func aNewDayLeavesTheSentenceOnScreen() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Call the bank", when: testDay.day))
+    let gone = try store.createTask(NewTask(title: "Buy milk"))
+    try store.delete(task: gone)
+    let today = BuiltInTaskViews.today
+    let list = try TaskList(store: store, route: .init(head: today), day: deviceDay(testDay.day.advanced(by: -1)))
+    _ = list.send(.route(.init(head: today, task: .init(head: gone))))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
+    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.model.rows.isEmpty, "the task is tomorrow's; this is the setup")
+    #expect(list.send(.dayChanged(testDay)) == nil)
+    #expect(list.model.rows.map(\.title) == ["Call the bank"])
+    #expect(list.model.problem == "The task is gone.")
+}
+
 /// The day the list already has, told again, reads nothing: a task written since, with no change sent, stays out of
 /// the rows, where a list made anew reads it, so a reread would have shown it. A new day then reads it.
 @Test func theSameDayAgainReadsNothing() throws {

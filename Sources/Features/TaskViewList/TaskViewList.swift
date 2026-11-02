@@ -222,7 +222,7 @@ public final class TaskViewList: Routable {
         store: Store, route: Route, width: WindowWidth, day: DeviceDay, capabilities: WindowCapabilities
     ) throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
-        let counts = try TaskViewList.counts(of: store, today: day.day)
+        let counts = try store.taskCounts(today: day.day)
         let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         let inbox = rows.contains(where: { $0.id == BuiltInTaskViews.inbox }) ? BuiltInTaskViews.inbox : nil
         self.store = store
@@ -518,7 +518,7 @@ public final class TaskViewList: Routable {
                     try reread()
                 } else if !changes.tasks.isEmpty || !changes.tags.isEmpty {
                     // Assigned after the read, so a read that failed leaves the counts on screen where they were.
-                    state.counts = try TaskViewList.counts(of: store, today: state.day.day)
+                    state.counts = try store.taskCounts(today: state.day.day)
                 }
             } catch {
                 // Only when there is nothing on screen already. A `.changed` neither clears a sentence nor
@@ -543,7 +543,7 @@ public final class TaskViewList: Routable {
             guard day != state.day else { return nil }
             state.day = day
             do {
-                state.counts = try TaskViewList.counts(of: store, today: day.day)
+                state.counts = try store.taskCounts(today: day.day)
             } catch {
                 if state.problem == nil { state.problem = Problem.couldNotRead.sentence }
             }
@@ -610,7 +610,7 @@ public final class TaskViewList: Routable {
     /// 2026-09-24).
     private func reread() throws(StoreError) {
         let rows = try TaskViewList.rows(of: store)
-        let counts = try TaskViewList.counts(of: store, today: state.day.day)
+        let counts = try store.taskCounts(today: state.day.day)
         let collapsedViews = try TaskViewList.collapsedViews(in: store, among: rows)
         // A dialog goes with its row, and says nothing, as the highlight goes: the row leaving the tree says what
         // happened, and a dialog left up would ask about a row the module no longer holds.
@@ -847,6 +847,10 @@ public final class TaskViewList: Routable {
     /// state, which the window's stack follows (ADR-0009, amendment of 2026-10-22).
     private struct State {
         var rows: [ReadRow]
+        /// The number of open tasks each view selects, which the store answers for every view in one call: read beside
+        /// every read of the rows, since a change to any task can move any count (Lists screen spec, section 4), and
+        /// by the device's day the module is given, read again when the day changes, so that a count that depends on
+        /// the day is the device's own and does not go stale across midnight (spec section 8).
         var counts: [ViewID: Int]
         var collapsedViews: Set<ViewID>
         var width: WindowWidth
