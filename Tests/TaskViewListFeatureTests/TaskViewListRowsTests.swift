@@ -681,3 +681,16 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     #expect(listRow(shopping, in: list.model).map(drawnCount) == "")
     #expect(list.model == reference.model, "the count moved, and Docs is missing")
 }
+
+/// A group's view is a screen over its list and no row of the sidebar (ADR-0004, amendment of 2026-11-01): the list it
+/// groups is listed and the group is not, and it is left out before the tree is walked, so a list whose only child is a
+/// group has no lists inside and draws no chevron.
+@Test func theSidebarListsNoGroupsView() throws {
+    let store = try makeStore()
+    let week = try store.createView(NewTaskView(title: "This week", filter: .status([.open]), groupBy: .whenDay))
+    try store.groupView(of: week, condition: .when(.on(1)), titled: "Tomorrow")
+    let model = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone).model
+    #expect(model.rows.map(\.id) == builtIns + [week])
+    let row = try #require(listRow(week, in: model))
+    #expect(drawnChevron(of: row) == nil, "a group is no list inside")
+}

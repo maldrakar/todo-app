@@ -89,6 +89,22 @@ private func offers(_ store: Store) throws -> Int64 {
     #expect(try b.task(kid) == nil)
 }
 
+/// Two devices that open one group of one list each make its view, with the id both derive from the list's id and the
+/// condition, so the exchange merges their writes into one row and neither ends with two (ADR-0004, amendment of
+/// 2026-11-01; ADR-0003).
+@Test func twoDevicesOpeningOneGroupMakeOneRow() throws {
+    let (a, b, relay) = try pair()
+    let list = try a.createView(NewTaskView(title: "Upcoming soon", filter: .status([.open]), sort: [SortKey(.when)], groupBy: .whenDay))
+    try exchange(a, b, relay)
+    let fromA = try a.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    let fromB = try b.groupView(of: list, condition: .when(.on(1)), titled: "Tomorrow")
+    #expect(fromA == fromB)
+    try exchange(a, b, relay)
+    #expect(try a.views().filter { $0.kind == .group }.map(\.id) == [fromA])
+    #expect(try b.views().filter { $0.kind == .group }.map(\.id) == [fromA])
+    #expect(try a.view(fromA) == (try b.view(fromA)))
+}
+
 @Test func receiveChangesNothingForAnOperationTheStoreAlreadyHolds() throws {
     let (a, _, _) = try pair()
     let id = try a.createTask(NewTask(title: "mine"))
