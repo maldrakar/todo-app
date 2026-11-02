@@ -43,8 +43,9 @@ extension Store {
     /// Child views are ignored, which is the one thing a page does that this does not: a page draws them as
     /// sections of their own and subtracts what they claimed. This is the list behind a picker.
     public func tasks(in viewID: ViewID, today: Day) throws(StoreError) -> [TodoTask] {
-        guard let view = try view(viewID) else { throw .notFound(viewID) }
-        return try groups(of: view, from: try tasks(matching: view, today: today)).flatMap(\.tasks)
+        let view = try readableView(viewID)
+        let rules = view.filter.map { [$0] } ?? []
+        return try groups(of: view, from: try tasks(selectedByAnyOf: rules, sort: view.sort, today: today)).flatMap(\.tasks)
     }
 
     /// A page: the view's own section first, then every child view as a section in rank order, which is the
@@ -64,7 +65,7 @@ extension Store {
     /// sibling a newer app never touched. The view the page *is* stays an error, because there is no page
     /// to draw without it.
     public func page(of viewID: ViewID, today: Day) throws(StoreError) -> TaskViewPage {
-        let view = try pageView(viewID)
+        let view = try readableView(viewID)
         var sections: [TaskViewPage.Section] = []
         var claimed: Set<TaskID> = []
         for (child, rules) in try childSections(of: viewID) {
@@ -72,15 +73,15 @@ extension Store {
             claimed.formUnion(tasks.map(\.id))
             sections.append(TaskViewPage.Section(view: child, groups: try groups(of: child, from: tasks)))
         }
-        guard view.filter != nil else { return TaskViewPage(view: view, sections: sections) }
-        let own = try tasks(matching: view, today: today).filter { !claimed.contains($0.id) }
+        guard let rule = view.filter else { return TaskViewPage(view: view, sections: sections) }
+        let own = try tasks(selectedByAnyOf: [rule], sort: view.sort, today: today).filter { !claimed.contains($0.id) }
         return TaskViewPage(view: view, sections: [TaskViewPage.Section(view: nil, groups: try groups(of: view, from: own))] + sections)
     }
 
-    /// The view a page is of, and its done read: it has to be there, and one this app cannot read is an error and
-    /// not an empty page, because a filter with a condition dropped is a list missing exactly the rows that
-    /// condition selected.
-    func pageView(_ id: ViewID) throws(StoreError) -> TaskView {
+    /// The view a read is of: a page, its done tasks or the flat list. It has to be there, and one this app cannot
+    /// read is reported and not evaluated, because a filter with a condition dropped is a list missing exactly the
+    /// rows that condition selected.
+    func readableView(_ id: ViewID) throws(StoreError) -> TaskView {
         guard let view = try view(id) else { throw .notFound(id) }
         if let kind = view.needsNewerApp { throw .viewNeedsNewerApp(view.id, kind: kind) }
         return view
@@ -96,21 +97,12 @@ extension Store {
         return try children(ofView: viewID).map { ($0, gathered[$0.id] ?? []) }
     }
 
-    /// The tasks any of `rules` selects, each once, in `sort`. A list's section is its one rule, read as the
-    /// list's own read reads it, and a folder's is the disjunction of its lists' rules.
+    /// The tasks any of `rules` selects, each once, in `sort`: every read of a view's tasks is read here. A list's
+    /// is its one rule, and a folder's section on a page the disjunction of its lists' rules; a folder read on its
+    /// own has no rule and selects nothing.
     private func tasks(selectedByAnyOf rules: [Filter], sort: [SortKey], today: Day) throws(StoreError) -> [TodoTask] {
         guard let first = rules.first else { return [] }
         let statement = Store.viewStatement(filter: rules.count == 1 ? first : .or(rules), sort: sort, today: today)
-        return try loadTasks(sql: statement.sql, statement.params)
-    }
-
-    /// A view that this app cannot read is reported and not evaluated, because a filter with a condition
-    /// dropped is a list missing exactly the rows that condition selected. A view with no filter is a folder
-    /// and selects nothing of its own.
-    private func tasks(matching view: TaskView, today: Day) throws(StoreError) -> [TodoTask] {
-        if let kind = view.needsNewerApp { throw .viewNeedsNewerApp(view.id, kind: kind) }
-        guard let filter = view.filter else { return [] }
-        let statement = Store.viewStatement(filter: filter, sort: view.sort, today: today)
         return try loadTasks(sql: statement.sql, statement.params)
     }
 

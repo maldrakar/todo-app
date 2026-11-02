@@ -335,8 +335,8 @@ extension Store {
 
     /// The children of a whole page of tasks counted, all and the ones no longer open, in one statement per chunk
     /// of ids, as the tags are read, and not one per task; each is driven by `task_tree_parent` from the ids. A
-    /// child in the Trash or deleted is not counted, since no list shows it as the task's, and a task with no child
-    /// has no row here and reads 0 over 0.
+    /// child in the Trash or deleted is not counted, since it is not among the children the task's card reads
+    /// (`children(of:)`), and a task with no child has no row here and reads 0 over 0.
     private func subtasksByTask(_ ids: [String]) throws(StoreError) -> [String: (all: Int, done: Int)] {
         guard !ids.isEmpty else { return [:] }
         var counts: [String: (all: Int, done: Int)] = [:]

@@ -7,14 +7,15 @@ extension Store {
     ///
     /// This is the Done strip under a list (spec section 3): the rules are the page's, the view's own and each
     /// child's, a folder inside contributing its lists' as its section does, so a task finished in a list inside is
-    /// in the strip of the list around it. Every rule a person has asks for open tasks, and the strip is the tasks
-    /// that stopped being open, so the status conditions come out of the rules before they are read. `since` is an
-    /// instant and not a day, because the core has no time zone (ADR-0001): the platform knows when its day began.
+    /// in the strip of the list around it. A list's rule asks for the open tasks it draws as rows, and the strip is
+    /// the tasks that stopped being open, so the status conditions come out of the rules before they are read. `since`
+    /// is an instant and not a day, because the core has no time zone (ADR-0001): the platform knows when its day
+    /// began.
     ///
     /// A core statement and not a stored rule: no condition of a filter is about the completion time, and a new kind
     /// of condition written into a view would read as `needsNewerApp` on an app older than it (ADR-0004).
     public func done(in viewID: ViewID, since: Int64, today: Day) throws(StoreError) -> [TodoTask] {
-        let view = try pageView(viewID)
+        let view = try readableView(viewID)
         let rules = (view.filter.map { [$0] } ?? []) + (try childSections(of: viewID)).flatMap(\.rules)
         guard !rules.isEmpty else { return [] }
         let statement = Store.doneStatement(rules: rules, since: since, today: today)
@@ -23,8 +24,9 @@ extension Store {
 
     /// The statement the done read runs: the rules lifted and joined by `or`, compiled bare, under the read's own
     /// conditions, a status no longer open and a completion at or after `since`, and the Trash left out unless a rule
-    /// names it, as a view's read leaves it out (`FilterCompiler.whereClause`). The completion bound is what drives it,
-    /// from `tasks_completed` (`Schema.version6`), where a rule's own conditions select nothing narrower.
+    /// names it, as a view's read leaves it out (`FilterCompiler.whereClause`). The completion bound drives it from
+    /// `tasks_completed` (`Schema.version6`) unless SQLite, which has no statistics of the store, takes a condition of
+    /// a rule's own for a narrower one: an equality, such as the Inbox's empty day or a project's parent.
     ///
     /// Assembled here rather than inside the read, so that `theDoneStatementUsesTheCompletedIndex` explains the query
     /// plan of exactly this statement, as `builtInViewsUseIndexes` explains `viewStatement`'s.

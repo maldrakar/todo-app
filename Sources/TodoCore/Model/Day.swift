@@ -109,8 +109,8 @@ public struct Day: Hashable, Comparable, Sendable, CustomStringConvertible {
     }
 }
 
-/// A day of the week, numbered from Sunday as the Gregorian week is. The core numbers the days and names none:
-/// what a day is called, and in which language, is the module's that formats it (spec section 12).
+/// A day of the week, numbered from Sunday, zero, to Saturday, six. The core numbers the days and names none: what
+/// a day is called, and in which language, is the module's that formats it (spec section 12).
 public enum Weekday: Int, Equatable, Sendable, CaseIterable {
     case sunday = 0, monday, tuesday, wednesday, thursday, friday, saturday
 }
