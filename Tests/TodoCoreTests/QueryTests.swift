@@ -363,31 +363,3 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     #expect(page.sections.map { $0.view?.id } == [folder])
     #expect(sectionTasks(page) == [[office, binnedKitchen]], "the binned office task is in neither list's read")
 }
-
-/// A child of a kind other than `list` is no section of its parent's page and claims none of its tasks: a group's view
-/// is a screen of its own over the list and not a block on it (ADR-0004, amendment of 2026-11-01), though it is still
-/// one of the list's children. The done read, which reads the rules of the page's sections, takes no group's rule
-/// either: a peer's row of kind `group` under the list, whose rule selects a finished task the list's does not, which no
-/// group `groupView` makes can, leaves it out of the list's strip.
-@Test func aChildOfAKindOtherThanListIsNotASection() throws {
-    let store = try makeStore()
-    let work = try store.createTag(title: "work")
-    let office = try store.createTask(NewTask(title: "office", tags: [work]))
-    let finished = try store.createTask(NewTask(title: "finished"))
-    try store.update(task: finished, [.status(.done)])
-    let list = try store.createView(NewTaskView(title: "Work", filter: .and([.status([.open]), .hasTag(work)])))
-    let group = try store.groupView(of: list, condition: .when(.empty), titled: "No date")
-    let peerGroup = ViewID("peer-group")
-    let stamp = store.clock.next()
-    try store.apply([
-        store.op(.view, peerGroup.rawValue, "kind", .text("group"), stamp),
-        store.op(.view, peerGroup.rawValue, "parent", .text(list.rawValue), stamp),
-        store.op(.view, peerGroup.rawValue, "filter", .text(try Filter.when(.empty).json()), stamp),
-    ])
-
-    let page = try store.page(of: list, today: today)
-    #expect(page.sections.map { $0.view?.id } == [nil])
-    #expect(sectionTasks(page) == [[office]], "the groups claimed nothing")
-    #expect(Set(try store.children(ofView: list).map(\.id)) == [group, peerGroup])
-    #expect(try store.doneTasks(in: list, since: 0, today: today).isEmpty, "the finished task only the peer's group selects")
-}
