@@ -10,7 +10,8 @@ extension DesignSystem {
         public let blue: Double
         public let opacity: Double
 
-        /// White, the surface's light shade and what a tile's glyph is lifted toward in the dark.
+        /// White, the surface's light shade, what a tile's glyph and a check are lifted toward in the dark, and the
+        /// mark on a check's fill.
         static let white = RGB(hex: 0xFFFFFF)
 
         /// This colour moved `amount` of the way toward `other`, channel by channel, keeping its own opacity.
@@ -20,6 +21,11 @@ extension DesignSystem {
                 green: green + (other.green - green) * amount,
                 blue: blue + (other.blue - blue) * amount,
                 opacity: opacity)
+        }
+
+        /// This colour at `opacity`, its channels kept.
+        func withOpacity(_ opacity: Double) -> RGB {
+            RGB(red: red, green: green, blue: blue, opacity: opacity)
         }
     }
 
@@ -65,6 +71,19 @@ extension DesignSystem {
         public static let selection = Color(
             light: sidebar.light.mixed(toward: accentShade, by: 0.14),
             dark: sidebar.dark.mixed(toward: accentShade.mixed(toward: .white, by: 0.32), by: 0.22))
+
+        /// The glass of the list screen's round buttons where the platform has no glass of its own to put under them
+        /// (`Phone.dc.html`, `--glass`): white at 72 % in the light and #322F2B at 72 % in the dark, laid over what
+        /// passes under the button, which the canvas blurs.
+        public static let glass = Color(light: .white.withOpacity(0.72), dark: RGB(hex: 0x322F2B, opacity: 0.72))
+
+        /// The hairline round the glass and the cards of a column (`Phone.dc.html`, `--glassline`): the ink at 8 % in
+        /// the light and white at 8 % in the dark.
+        public static let glassLine = Color(light: ink.light.withOpacity(0.08), dark: .white.withOpacity(0.08))
+
+        /// Under a row where it was just dropped, fading out (`Phone.dc.html`, `--fresh`): the accent at 12 % in the
+        /// light and white at 8 % in the dark.
+        public static let fresh = Color(light: accentShade.withOpacity(0.12), dark: .white.withOpacity(0.08))
 
         /// The accent's one shade, which both its appearances share and the dark accent soft and the selection mix
         /// toward, spelled once.

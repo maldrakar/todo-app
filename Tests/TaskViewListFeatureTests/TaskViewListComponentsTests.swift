@@ -852,16 +852,18 @@ private func barWithoutEditMode() -> BarModel<Action> {
 private func sidebarDrag() -> DragModel {
     DragModel(
         indent: IndentModel(start: 18, step: 16), animation: .popover,
-        look: .indicator(.init(
-            height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
-            trailingGap: 18, circleDiameter: 10, circleOffset: -6,
-            circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .sidebar,
-            card: .init(
+        look: .indicator(
+            .init(
+                height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
+                trailingGap: 18, circleDiameter: 10, circleOffset: -6,
+                circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .sidebar
+            ),
+            .init(
                 width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted,
                 rotation: -1.2, opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5,
                 glyphSize: 12, titleFont: .rowTitle
             )
-        ))
+        )
     )
 }
 

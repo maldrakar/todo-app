@@ -27,9 +27,28 @@ extension DesignSystem.Color.Components {
                 dark: base.mixed(toward: .white, by: 0.3))
         }
 
+        /// A column of the board in this colour while a dragged card would drop into it (`Phone.dc.html`, `tint`): its
+        /// base at 10 % opacity in the light and 20 % in the dark.
+        public var dropTint: DesignSystem.Color {
+            DesignSystem.Color(light: base.withOpacity(0.1), dark: base.withOpacity(0.2))
+        }
+
+        /// The check of a task in this colour (`Phone.dc.html`, `paint`): its ring the base mixed 20 % toward the ink
+        /// in the light and 18 % toward white in the dark, its fill the base in the light and the base mixed 8 % toward
+        /// white in the dark, and its mark the same in both appearances.
+        public var check: DesignSystem.Color.Components.Check {
+            DesignSystem.Color.Components.Check(
+                ring: DesignSystem.Color(
+                    light: base.mixed(toward: DesignSystem.Color.ink.light, by: 0.2),
+                    dark: base.mixed(toward: .white, by: 0.18)),
+                fill: DesignSystem.Color(light: base, dark: base.mixed(toward: .white, by: 0.08)),
+                mark: DesignSystem.Color(light: mark, dark: mark))
+        }
+
         /// The base of each tile colour (`Phone.dc.html`, `COLORS`), from which the canvas's `paint` rule draws its
-        /// background and its glyph, so that those are the canvas's and not 44 shades worked out by hand. A `switch`
-        /// without a `default`, so a colour added here stops this compiling until it has a base.
+        /// background, its glyph, its check's ring and fill and its drop tint, so that those are the canvas's and not
+        /// 110 shades worked out by hand. A `switch` without a `default`, so a colour added here stops this compiling
+        /// until it has one.
         private var base: DesignSystem.RGB {
             switch self {
             case .blue: DesignSystem.RGB(hex: 0x3E6EC5)
@@ -45,12 +64,27 @@ extension DesignSystem.Color.Components {
             case .sky: DesignSystem.RGB(hex: 0x2A86B9)
             }
         }
-    }
-}
 
-extension DesignSystem.RGB {
-    /// This colour at `opacity`, its channels kept.
-    fileprivate func withOpacity(_ opacity: Double) -> DesignSystem.RGB {
-        DesignSystem.RGB(red: red, green: green, blue: blue, opacity: opacity)
+        /// The mark on the check's fill, written down as the canvas's rule gives it (`Phone.dc.html`, `paint`): white,
+        /// unless white's contrast on the fill is under 3 by WCAG, when it is the light ink, in either appearance,
+        /// since the dark ink is nearly white. Amber alone is under 3, at 2.61 in the light and 2.41 in the dark. It is
+        /// written and not worked out because the contrast needs `pow`, which the standard library does not have, and
+        /// this target depends on nothing; a test works the rule out on every fill and holds this to it. A `switch`
+        /// without a `default`, so a colour added here stops this compiling until its mark is written down.
+        private var mark: DesignSystem.RGB {
+            switch self {
+            case .amber: DesignSystem.Color.ink.light
+            case .blue, .rose, .green, .stone, .indigo, .teal, .pink, .orange, .violet, .sky: .white
+            }
+        }
+    }
+
+    /// A task's check in a list's colour (`Tile.check`): the ring of an open check, whose inside stays clear; the fill
+    /// of a checked one, which it draws as its ring too, so that a checked check is a disc; and the mark drawn on the
+    /// fill. Which of them a check draws is its view's to read from whether it is checked.
+    public struct Check: Equatable, Sendable {
+        public let ring: DesignSystem.Color
+        public let fill: DesignSystem.Color
+        public let mark: DesignSystem.Color
     }
 }

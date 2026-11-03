@@ -13,3 +13,11 @@ import DesignSystem
     let raised = DesignSystem.Shadow.raised
     #expect([raised.opacity, raised.radius, raised.y] == [0.12, 12, 5])
 }
+
+/// A card at rest in a column casts black at 6 %, blurred over 1 pt and dropped 1 pt: the canvas's
+/// `0 1px 2px rgba(0,0,0,.06)` under a column's card (`Phone.dc.html`, `.card`), its 2 px blur halved into a platform's
+/// radius.
+@Test func aCardAtRestCastsTheFaintShadow() {
+    let resting = DesignSystem.Shadow.resting
+    #expect([resting.opacity, resting.radius, resting.y] == [0.06, 1, 1])
+}

@@ -23,8 +23,9 @@ import TodoCore
 }
 
 /// The lists' sixteen icons read the names the store keeps for them as they did before the chrome's glyphs joined them,
-/// and each of the chrome's ten reads its own name, as every icon does (Lists screen plan, Task 8).
-@Test func everyIconReadsItsOwnNameTheChromesTenAmongThem() {
+/// and each of the chrome's sixteen reads its own name, as every icon does: the Lists screen's ten (Lists screen plan,
+/// Task 8) and the list screen's six (list screen plan, Task 4).
+@Test func everyIconReadsItsOwnNameTheChromesAmongThem() {
     let lists: [String: DesignSystem.Icon] = [
         "tray": .tray, "sun": .sun, "calendar": .calendar, "week": .week, "logbook": .logbook, "trash": .trash,
         "briefcase": .briefcase, "house": .house, "hourglass": .hourglass, "pen": .pen, "bag": .bag, "wrench": .wrench,
@@ -33,10 +34,12 @@ import TodoCore
     let chrome: [String: DesignSystem.Icon] = [
         "ellipsis": .ellipsis, "plus": .plus, "check": .check, "chevron": .chevron, "grip": .grip,
         "magnifier": .magnifier, "microphone": .microphone, "newWindow": .newWindow, "checkCircle": .checkCircle,
-        "divider": .divider,
+        "divider": .divider, "flag": .flag, "hash": .hash, "note": .note, "expand": .expand, "columns": .columns,
+        "chevronLeft": .chevronLeft,
     ]
     for (name, icon) in lists.merging(chrome, uniquingKeysWith: { first, _ in first }) {
         #expect(DesignSystem.Icon(rawValue: name) == icon, "\(name)")
     }
+    #expect(lists.count == 16 && chrome.count == 16)
     #expect(DesignSystem.Icon.allCases.count == lists.count + chrome.count)
 }

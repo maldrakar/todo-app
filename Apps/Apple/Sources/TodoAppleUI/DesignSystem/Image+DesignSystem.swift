@@ -10,11 +10,12 @@ extension Image {
 
     /// The symbol an icon draws. A symbol that does not exist draws nothing and says nothing, so every name was looked
     /// up in the system's `name_availability.plist` (`/System/Library/CoreServices/CoreGlyphs.bundle`): the lists'
-    /// sixteen on 2026-10-26, each from iOS 15, macOS 12 and watchOS 8 at the latest, and the chrome's ten on
-    /// 2026-10-30, each from the 2019, 2020 or 2021 releases, so all of them on iOS 17, macOS 14 and watchOS 10, and a
-    /// test asks the Mac for each. The chrome's are the symbols the Lists screen drew before its models named them
-    /// (Task 7). The `switch` names every case with no `default`, so an icon added to the look stops this compiling
-    /// until it has a symbol.
+    /// sixteen on 2026-10-26, each from iOS 15, macOS 12 and watchOS 8 at the latest, the chrome's ten on 2026-10-30,
+    /// each from the 2019, 2020 or 2021 releases, and the list screen's six on 2026-11-03, each from the 2019 releases
+    /// but `note.text`, from the 2020 ones, so all of them on iOS 17, macOS 14 and watchOS 10, and a test asks the Mac
+    /// for each. The chrome's ten are the symbols the Lists screen drew before its models named them (Task 7). The
+    /// `switch` names every case with no `default`, so an icon added to the look stops this compiling until it has a
+    /// symbol.
     static func systemName(for icon: DesignSystem.Icon) -> String {
         switch icon {
         case .tray: "tray"
@@ -43,6 +44,12 @@ extension Image {
         case .newWindow: "macwindow.badge.plus"
         case .checkCircle: "checkmark.circle"
         case .divider: "rectangle.split.1x2"
+        case .flag: "flag"
+        case .hash: "number"
+        case .note: "note.text"
+        case .expand: "arrow.up.left.and.arrow.down.right"
+        case .columns: "rectangle.split.3x1"
+        case .chevronLeft: "chevron.left"
         }
     }
 }

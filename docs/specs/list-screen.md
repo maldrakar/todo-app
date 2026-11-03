@@ -123,7 +123,7 @@ public struct Model: Equatable, Sendable {
     public let addTask: ButtonModel<UserAction>? // the floating "+", nil where no task can be added
     public let addList: ButtonModel<UserAction>? // "+ Add list", nil on a group's screen and in Logbook and Trash
     public let showAs: MenuModel<UserAction>
-    public let empty: EmptyStateModel?
+    public let empty: EmptyScreenModel?
     public let problem: String?
 }
 ```

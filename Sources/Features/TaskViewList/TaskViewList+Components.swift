@@ -771,16 +771,18 @@ extension TaskViewList {
         /// 500. The motion is the phone's, since the canvas's drag is frozen.
         private static let sidebarDrag = DragModel(
             indent: sidebarIndent, animation: .popover,
-            look: .indicator(DragModel.Indicator(
-                height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
-                trailingGap: 18, circleDiameter: 10, circleOffset: -6,
-                circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .sidebar,
-                card: DragModel.Indicator.Card(
+            look: .indicator(
+                DropIndicatorModel(
+                    height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2,
+                    lineCornerRadius: 1, trailingGap: 18, circleDiameter: 10, circleOffset: -6,
+                    circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .sidebar
+                ),
+                DragModel.IndicatorCard(
                     width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted,
                     rotation: -1.2, opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5,
                     glyphSize: 12, titleFont: .rowTitle
                 )
-            ))
+            )
         )
     }
 

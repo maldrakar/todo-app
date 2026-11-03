@@ -12,11 +12,12 @@ import DesignSystem
 public final class DragModel: Equatable, Sendable {
     /// What marks the place where the lifted row would land and the card it is carried on: the slot that opens there,
     /// with the card under the finger (`Phone.dc.html`, the drag's slot and card), or the Finder's indicator, a line
-    /// and a circle, with its own card beside them (`Mac.dc.html`, the drag's slot row and card). A view switches over
-    /// it, every case drawn and no `default` (`docs/style.md`, "Views").
+    /// and a circle, with its own card beside them (`Mac.dc.html`, the drag's slot row and card). The indicator is
+    /// placed from the leading edge of the tile of the drop's depth. A view switches over it, every case drawn and no
+    /// `default` (`docs/style.md`, "Views").
     public enum Look: Equatable, Sendable {
         case slot(Slot, Card)
-        case indicator(Indicator)
+        case indicator(DropIndicatorModel, IndicatorCard)
     }
 
     /// The slot where the lifted row would land: `height` high, its frame drawn `verticalInset` in from its top and
@@ -114,102 +115,58 @@ public final class DragModel: Equatable, Sendable {
         }
     }
 
-    /// The Finder's mark of the place where the lifted row would land, between the rows or into a parent alike: it
-    /// opens a gap `height` high between the rows, in which, centred in its height, run a line of `line`, from
-    /// `lineOffset` from the leading edge of the tile of the drop's depth to `trailingGap` short of the right edge of
-    /// the tree on screen, its ends rounded by `lineCornerRadius`, and a circle `circleDiameter` across, its leading
-    /// edge `circleOffset` from that tile's leading edge, ringed with `circleRing` and filled with `circleFill`; and
-    /// beside them its card. An offset is after the tile's leading edge where it is positive and before it where it is
-    /// negative, all in points.
-    public struct Indicator: Equatable, Sendable {
-        /// The lifted row on a card of its own at the mark (`Mac.dc.html`, `.drag-ghost`): `width` by `height`, its
-        /// leading edge `offset` from the leading edge of the tile of the drop's depth, centred on the line, its
-        /// corners of `cornerRadius`, on `background`, casting `shadow`, turned by `rotation` degrees, clockwise when
-        /// positive, at `opacity`, from 0 to 1, in points. A list's card holds the lifted row's tile in its colour
-        /// with its icon at the sizes here, `padding` in, and `tileToTitle` after it the row's title in `titleFont`; a
-        /// line's card holds the lifted line as the line draws itself.
-        public struct Card: Equatable, Sendable {
-            public let width: Double
-            public let height: Double
-            public let offset: Double
-            public let cornerRadius: Double
-            public let background: DesignSystem.Color
-            public let shadow: DesignSystem.Shadow
-            public let rotation: Double
-            public let opacity: Double
-            public let padding: Double
-            public let tileToTitle: Double
-            public let tileSide: Double
-            public let tileCornerRadius: Double
-            public let glyphSize: Double
-            public let titleFont: DesignSystem.Font
-
-            public init(
-                width: Double,
-                height: Double,
-                offset: Double,
-                cornerRadius: Double,
-                background: DesignSystem.Color,
-                shadow: DesignSystem.Shadow,
-                rotation: Double,
-                opacity: Double,
-                padding: Double,
-                tileToTitle: Double,
-                tileSide: Double,
-                tileCornerRadius: Double,
-                glyphSize: Double,
-                titleFont: DesignSystem.Font
-            ) {
-                self.width = width
-                self.height = height
-                self.offset = offset
-                self.cornerRadius = cornerRadius
-                self.background = background
-                self.shadow = shadow
-                self.rotation = rotation
-                self.opacity = opacity
-                self.padding = padding
-                self.tileToTitle = tileToTitle
-                self.tileSide = tileSide
-                self.tileCornerRadius = tileCornerRadius
-                self.glyphSize = glyphSize
-                self.titleFont = titleFont
-            }
-        }
-
+    /// The lifted row on a card of its own at the indicator (`Mac.dc.html`, `.drag-ghost`): `width` by `height`, its
+    /// leading edge `offset` from the leading edge of the tile of the drop's depth, centred on the indicator's line,
+    /// its corners of `cornerRadius`, on `background`, casting `shadow`, turned by `rotation` degrees, clockwise when
+    /// positive, at `opacity`, from 0 to 1, in points. A list's card holds the lifted row's tile in its colour with its
+    /// icon at the sizes here, `padding` in, and `tileToTitle` after it the row's title in `titleFont`; a line's card
+    /// holds the lifted line as the line draws itself.
+    public struct IndicatorCard: Equatable, Sendable {
+        public let width: Double
         public let height: Double
-        public let line: StrokeModel
-        public let lineOffset: Double
-        public let lineCornerRadius: Double
-        public let trailingGap: Double
-        public let circleDiameter: Double
-        public let circleOffset: Double
-        public let circleRing: StrokeModel
-        public let circleFill: DesignSystem.Color
-        public let card: Card
+        public let offset: Double
+        public let cornerRadius: Double
+        public let background: DesignSystem.Color
+        public let shadow: DesignSystem.Shadow
+        public let rotation: Double
+        public let opacity: Double
+        public let padding: Double
+        public let tileToTitle: Double
+        public let tileSide: Double
+        public let tileCornerRadius: Double
+        public let glyphSize: Double
+        public let titleFont: DesignSystem.Font
 
         public init(
+            width: Double,
             height: Double,
-            line: StrokeModel,
-            lineOffset: Double,
-            lineCornerRadius: Double,
-            trailingGap: Double,
-            circleDiameter: Double,
-            circleOffset: Double,
-            circleRing: StrokeModel,
-            circleFill: DesignSystem.Color,
-            card: Card
+            offset: Double,
+            cornerRadius: Double,
+            background: DesignSystem.Color,
+            shadow: DesignSystem.Shadow,
+            rotation: Double,
+            opacity: Double,
+            padding: Double,
+            tileToTitle: Double,
+            tileSide: Double,
+            tileCornerRadius: Double,
+            glyphSize: Double,
+            titleFont: DesignSystem.Font
         ) {
+            self.width = width
             self.height = height
-            self.line = line
-            self.lineOffset = lineOffset
-            self.lineCornerRadius = lineCornerRadius
-            self.trailingGap = trailingGap
-            self.circleDiameter = circleDiameter
-            self.circleOffset = circleOffset
-            self.circleRing = circleRing
-            self.circleFill = circleFill
-            self.card = card
+            self.offset = offset
+            self.cornerRadius = cornerRadius
+            self.background = background
+            self.shadow = shadow
+            self.rotation = rotation
+            self.opacity = opacity
+            self.padding = padding
+            self.tileToTitle = tileToTitle
+            self.tileSide = tileSide
+            self.tileCornerRadius = tileCornerRadius
+            self.glyphSize = glyphSize
+            self.titleFont = titleFont
         }
     }
 

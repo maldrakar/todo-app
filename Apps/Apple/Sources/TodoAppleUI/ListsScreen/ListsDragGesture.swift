@@ -202,7 +202,7 @@ extension ListsDrag {
     ///
     /// The phone's slot (`DragModel.Slot`; `Phone.dc.html`, the slot's row) is taller than a row, so that it is steady
     /// under the finger, its frame drawn within it from its inset before the tile of its depth to its gap short of the
-    /// right edge of the screen, filled and edged as the model says. The sidebar's indicator (`DragModel.Indicator`;
+    /// right edge of the screen, filled and edged as the model says. The sidebar's indicator (`DropIndicatorModel`;
     /// `Mac.dc.html`, the drag's slot row) is a gap between the rows with the line and the circle centred in it, placed
     /// from the leading edge of the tile of its depth, and the lifted row's card at it (`IndicatorCard`).
     struct Slot: View {
@@ -239,8 +239,8 @@ extension ListsDrag {
             switch model.look {
             case .slot(let slot, _):
                 slotMark(slot)
-            case .indicator(let indicator):
-                indicatorMark(indicator)
+            case .indicator(let indicator, let card):
+                indicatorMark(indicator, card)
             }
         }
 
@@ -262,7 +262,7 @@ extension ListsDrag {
         /// The line, a rule rounded at its ends, and the circle over its start, ringed inside its diameter as the
         /// canvas's border is, each placed from the tile's leading edge at the mark's depth; and the card at the mark,
         /// centred on the line.
-        private func indicatorMark(_ indicator: DragModel.Indicator) -> some View {
+        private func indicatorMark(_ indicator: DropIndicatorModel, _ card: DragModel.IndicatorCard) -> some View {
             let tile = model.indent.leading(atDepth: depth)
             let lineStart = tile + indicator.lineOffset
             return ZStack(alignment: .leading) {
@@ -280,14 +280,14 @@ extension ListsDrag {
             .frame(height: indicator.height)
             .overlay(alignment: .leading) {
                 if let lifted {
-                    IndicatorCard(lifted, indicator.card)
-                        .padding(.leading, tile + indicator.card.offset)
+                    IndicatorCard(lifted, card)
+                        .padding(.leading, tile + card.offset)
                 }
             }
         }
     }
 
-    /// The lifted row on the sidebar's card, as the indicator's card describes it (`DragModel.Indicator.Card`;
+    /// The lifted row on the sidebar's card, as the indicator's card describes it (`DragModel.IndicatorCard`;
     /// `Mac.dc.html`, `.drag-ghost`): its size, on its background with its corners, casting its shadow, turned by its
     /// rotation and at its opacity, grown by nothing. A list's card holds the lifted row's tile, in its own colour and
     /// with its own icon at the card's sizes, and its title in the card's font, its padding in, its gap apart. A line's
@@ -296,9 +296,9 @@ extension ListsDrag {
     /// line alone, across the card. It takes no touch.
     fileprivate struct IndicatorCard: View {
         private let item: ListsTreeItem
-        private let card: DragModel.Indicator.Card
+        private let card: DragModel.IndicatorCard
 
-        init(_ item: ListsTreeItem, _ card: DragModel.Indicator.Card) {
+        init(_ item: ListsTreeItem, _ card: DragModel.IndicatorCard) {
             self.item = item
             self.card = card
         }

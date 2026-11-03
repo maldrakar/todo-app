@@ -246,7 +246,7 @@ private struct DraggedTree {
     private var slotHeight: CGFloat {
         switch module.model.drag.look {
         case .slot(let slot, _): slot.height
-        case .indicator(let indicator): indicator.height
+        case .indicator(let indicator, _): indicator.height
         }
     }
 

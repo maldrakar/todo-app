@@ -5,8 +5,9 @@ import DesignSystem
 /// How it opens is the platform's, a long press on what it belongs to, a secondary click, or a press of the button that
 /// holds it.
 public struct MenuModel<Action: Equatable & Sendable>: Equatable, Sendable {
-    /// An item of the menu: its title, its icon, whether it destroys something, which a platform draws as such, the
-    /// keys that choose it, and the action choosing it sends.
+    /// An item of the menu: its title, the line under it where it has one, its icon, whether it destroys something,
+    /// which a platform draws as such, whether it can be chosen, the keys that choose it, and the action choosing it
+    /// sends.
     public struct Item: Equatable, Sendable {
         /// The keys of an item on a platform with a keyboard, which shows them beside the item: a key pressed with the
         /// modifiers held, ⇧⌘N as `n` with the shift and command keys. They choose the item where the platform answers
@@ -30,18 +31,33 @@ public struct MenuModel<Action: Equatable & Sendable>: Equatable, Sendable {
         }
 
         public let title: String
+
+        /// The line under the title, finished, such as why the item cannot be chosen, and nil for an item with none.
+        public let subtitle: String?
+
         public let icon: DesignSystem.Icon
         public let isDestructive: Bool
+
+        /// Whether the item is shown but cannot be chosen, as Show as's Columns is for a list with one block and no
+        /// grouping, which has no columns to show (list screen spec, section 5).
+        public let isDisabled: Bool
 
         /// The keys that choose the item, and nil for an item with none.
         public let shortcut: Shortcut?
 
         public let action: Action
 
-        public init(title: String, icon: DesignSystem.Icon, isDestructive: Bool, shortcut: Shortcut?, action: Action) {
+        /// An item with no line under its title can be chosen unless it says otherwise, so that the menus that have
+        /// neither build their items without naming them.
+        public init(
+            title: String, subtitle: String? = nil, icon: DesignSystem.Icon, isDestructive: Bool,
+            isDisabled: Bool = false, shortcut: Shortcut?, action: Action
+        ) {
             self.title = title
+            self.subtitle = subtitle
             self.icon = icon
             self.isDestructive = isDestructive
+            self.isDisabled = isDisabled
             self.shortcut = shortcut
             self.action = action
         }

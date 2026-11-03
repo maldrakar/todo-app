@@ -35,6 +35,10 @@ import Testing
     #expect(Font(.barLabel) == .system(.subheadline, design: .default, weight: .semibold))
     #expect(Font(.hint) == .system(.footnote, design: .default, weight: .regular))
     #expect(Font(.search) == .system(.body, design: .default, weight: .regular))
+    #expect(Font(.addRow) == .system(.subheadline, design: .default, weight: .medium))
+    #expect(Font(.notes) == .system(.subheadline, design: .default, weight: .regular))
+    #expect(Font(.pill) == .system(.footnote, design: .default, weight: .semibold))
+    #expect(Font(.emptyScreenTitle) == .system(.title3, design: .rounded, weight: .heavy))
 }
 
 /// Each weight of the look renders as SwiftUI's weight of its name, bold among them, which only a glyph's model takes,
@@ -56,14 +60,31 @@ import Testing
     #expect(Animation(.pushPop) == .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.32).delay(0))
     #expect(Animation(.popover) == .spring(duration: 0.2).delay(0))
     #expect(Animation(.quickEntry) == .spring(duration: 0.42).delay(0))
+    #expect(Animation(.cardOpens) == .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.26).delay(0))
+    #expect(Animation(.drop) == .spring(duration: 0.32).delay(0))
+    #expect(Animation(.swipe) == .timingCurve(0.2, 0.8, 0.2, 1, duration: 0.25).delay(0))
+    #expect(Animation(.fold) == .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.22).delay(0))
+    #expect(Animation(.fresh) == .timingCurve(0.25, 0.1, 0.25, 1, duration: 1.6).delay(0))
 }
 
 /// A symbol that does not exist draws nothing and says nothing, so the system is asked for the symbol of every icon,
-/// the default glyph's and the chrome's among them.
+/// the default glyph's and the chrome's among them, the list screen's six too.
 @Test func everyIconNamesASymbolThisSystemHas() {
     for icon in DesignSystem.Icon.allCases {
         let name = Image.systemName(for: icon)
         #expect(NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil, "\(name)")
+    }
+}
+
+/// The list screen's glyphs draw the symbols looked up for them in `name_availability.plist`, each on iOS 17, macOS 14
+/// and watchOS 10, so that a symbol that exists but is not the one checked, a filled flag for the flag, fails here.
+@Test func everyListScreenGlyphDrawsTheSymbolCheckedForIt() {
+    let symbols: [DesignSystem.Icon: String] = [
+        .flag: "flag", .hash: "number", .note: "note.text", .expand: "arrow.up.left.and.arrow.down.right",
+        .columns: "rectangle.split.3x1", .chevronLeft: "chevron.left",
+    ]
+    for (icon, symbol) in symbols {
+        #expect(Image.systemName(for: icon) == symbol, "\(icon)")
     }
 }
 
