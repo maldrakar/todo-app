@@ -340,14 +340,14 @@ private let chevron = AccessoryModel<Action>.Chevron(
 )
 
 private func blockHeader(
-    title: TextModel = text, date: TextModel? = nil, titleToDate: Double = 8, field: TextFieldModel<Action>? = nil,
+    title: TextModel = text, subtitle: TextModel? = nil, titleToSubtitle: Double = 8, field: TextFieldModel<Action>? = nil,
     chevron: AccessoryModel<Action>.Chevron = chevron, chevronHit: Double = 44, rule: StrokeModel? = stroke,
     height: Double = 44, topMargin: Double = 6, trailingMargin: Double = 6, bottomMargin: Double = 2,
     leadingMargin: Double = 12, topPadding: Double = 13, horizontalPadding: Double = 8, bottomPadding: Double = 0,
     cornerRadius: Double = 0, titleTapped: Action = .first
 ) -> BlockHeaderModel<Action> {
     BlockHeaderModel(
-        title: title, date: date, titleToDate: titleToDate, field: field, chevron: chevron, chevronHit: chevronHit,
+        title: title, subtitle: subtitle, titleToSubtitle: titleToSubtitle, field: field, chevron: chevron, chevronHit: chevronHit,
         rule: rule, height: height, topMargin: topMargin, trailingMargin: trailingMargin, bottomMargin: bottomMargin,
         leadingMargin: leadingMargin, topPadding: topPadding, horizontalPadding: horizontalPadding,
         bottomPadding: bottomPadding, cornerRadius: cornerRadius, titleTapped: titleTapped
@@ -357,8 +357,8 @@ private func blockHeader(
 @Test func aBlockHeaderModelComparesEveryProperty() {
     expectEveryPropertyCompared({ blockHeader() }, [
         "title": blockHeader(title: TextModel(text: "Work", font: .sectionTitle, color: .ink)),
-        "date": blockHeader(date: TextModel(text: "Tomorrow", font: .areaLabel, color: .ink2)),
-        "titleToDate": blockHeader(titleToDate: 6),
+        "subtitle": blockHeader(subtitle: TextModel(text: "Tomorrow", font: .areaLabel, color: .ink2)),
+        "titleToSubtitle": blockHeader(titleToSubtitle: 6),
         "field": blockHeader(field: field("New list")),
         "chevron": blockHeader(chevron: AccessoryModel.Chevron(
             icon: chevron.icon, rotation: -90, animation: .fold, accessibilityLabel: "Unfold", action: .second

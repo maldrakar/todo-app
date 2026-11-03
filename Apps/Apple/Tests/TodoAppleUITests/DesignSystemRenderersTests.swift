@@ -38,7 +38,7 @@ import Testing
     #expect(Font(.addRow) == .system(.subheadline, design: .default, weight: .medium))
     #expect(Font(.notes) == .system(.subheadline, design: .default, weight: .regular))
     #expect(Font(.pill) == .system(.footnote, design: .default, weight: .semibold))
-    #expect(Font(.emptyStateTitle) == .system(.title3, design: .rounded, weight: .heavy))
+    #expect(Font(.emptyScreenTitle) == .system(.title3, design: .rounded, weight: .heavy))
 }
 
 /// Each weight of the look renders as SwiftUI's weight of its name, bold among them, which only a glyph's model takes,

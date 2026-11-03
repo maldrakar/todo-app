@@ -1,10 +1,10 @@
-// Sources/DesignSystemComponents/EmptyStateModel.swift
+// Sources/DesignSystemComponents/EmptyScreenModel.swift
 
-/// What a list with nothing in it shows in place of its blocks (`Phone.dc.html`, the empty state): its tile, its title
-/// `tileToTitle` under the tile and a line that says what to do `titleToText` under the title, centred, `topPadding`
-/// below what stands above it and `horizontalPadding` in from either side, the line at most `maxWidth` wide, in
-/// points.
-public struct EmptyStateModel: Equatable, Sendable {
+/// What a screen with nothing in it shows in place of its content (`Phone.dc.html`, the list screen's empty state): a
+/// tile, a title `tileToTitle` under the tile and a line that says what to do `titleToText` under the title, centred,
+/// `topPadding` below what stands above it and `horizontalPadding` in from either side, the line at most `maxWidth`
+/// wide, in points.
+public struct EmptyScreenModel: Equatable, Sendable {
     public let tile: TileModel
     public let title: TextModel
     public let text: TextModel

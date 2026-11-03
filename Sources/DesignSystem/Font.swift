@@ -7,7 +7,7 @@ extension DesignSystem {
     /// The look's fonts are its static members, the canvas's type (`Main.dc.html`, `Phone.dc.html`) as text styles.
     /// At the iPhone's default text size each is the canvas's size but the large title, 34 pt against 32, the meta, 12
     /// against 12.5 (the owner's review of #151), and the pill, 13 against 13.5; the Mac's text styles are smaller. The
-    /// large and section titles, an area's caption and the empty state's title are the rounded face; the rest is the
+    /// large and section titles, an area's caption and an empty screen's title are the rounded face; the rest is the
     /// system face.
     public struct Font: Equatable, Sendable {
         public enum TextStyle: Sendable {
@@ -64,8 +64,8 @@ extension DesignSystem {
         /// iPhone's default text size.
         public static let pill = Font(style: .footnote, weight: .semibold, rounded: false)
 
-        /// The title of a list with nothing in it, the canvas's 20 pt 800 in `ui-rounded`, the third title's size at
+        /// The title of a screen with nothing in it, the canvas's 20 pt 800 in `ui-rounded`, the third title's size at
         /// the iPhone's default text size, which no other style comes near.
-        public static let emptyStateTitle = Font(style: .title3, weight: .heavy, rounded: true)
+        public static let emptyScreenTitle = Font(style: .title3, weight: .heavy, rounded: true)
     }
 }
