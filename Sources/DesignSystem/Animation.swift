@@ -4,8 +4,8 @@ extension DesignSystem {
     /// How a change moves: its curve, how long it runs and how long it waits before it starts, both in seconds. A
     /// platform renders it as its own animation.
     ///
-    /// The look's motions are its static members, the canvas's (`Main.dc.html`). Reduce Motion is the views' to
-    /// honour: where the setting is on, a view draws the change without its animation.
+    /// The look's motions are its static members, the canvas's (`Main.dc.html`, `Phone.dc.html`). Reduce Motion is the
+    /// views' to honour: where the setting is on, a view draws the change without its animation.
     public struct Animation: Equatable, Sendable {
         /// A spring, an ease-in, or the cubic Bézier curve with the control points (x1, y1) and (x2, y2), as CSS's
         /// `cubic-bezier` writes it.
@@ -30,8 +30,31 @@ extension DesignSystem {
         public static let rowLeaves = Animation(curve: .easeIn, duration: 0.32, delay: 0.7)
 
         /// Push and pop, on the curve (.2, .8, .2, 1).
-        public static let pushPop = Animation(curve: .bezier(x1: 0.2, y1: 0.8, x2: 0.2, y2: 1), duration: 0.32)
+        public static let pushPop = Animation(curve: settle, duration: 0.32)
         public static let popover = Animation(curve: .spring, duration: 0.2)
         public static let quickEntry = Animation(curve: .spring, duration: 0.42)
+
+        /// A task's card opening in place of its row, over 0.26 s (`Phone.dc.html`, `xIn`).
+        public static let cardOpens = Animation(curve: settle, duration: 0.26)
+
+        /// A card landing where it was dropped, over 0.32 s on the spring the check pops on (`Phone.dc.html`,
+        /// `cardDrop`).
+        public static let drop = Animation(curve: .spring, duration: 0.32)
+
+        /// A row sliding aside for its Delete and back, over 0.25 s (`Phone.dc.html`, the row's `translateX`).
+        public static let swipe = Animation(curve: settle, duration: 0.25)
+
+        /// A chevron turning as a block or the Done strip folds or opens, over 0.22 s (`Phone.dc.html`, the chevrons'
+        /// `transition`).
+        public static let fold = Animation(curve: ease, duration: 0.22)
+
+        /// A dropped row's highlight fading from the fresh colour, over 1.6 s (`Phone.dc.html`, `.row-fresh`).
+        public static let fresh = Animation(curve: ease, duration: 1.6)
+
+        /// The curve a screen, a card and a row settle on, (.2, .8, .2, 1), quick and then slow.
+        private static let settle = Curve.bezier(x1: 0.2, y1: 0.8, x2: 0.2, y2: 1)
+
+        /// CSS's `ease`, (.25, .1, .25, 1), on which the canvas turns its chevrons and fades a dropped row.
+        private static let ease = Curve.bezier(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1)
     }
 }

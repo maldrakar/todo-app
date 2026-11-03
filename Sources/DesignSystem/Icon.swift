@@ -20,5 +20,10 @@ extension DesignSystem {
         /// grip of a row in edit mode, the search's magnifier and microphone, a window with a "+", a check in a circle,
         /// and a rectangle split by a line, which stands for an area and the top level.
         case ellipsis, plus, check, chevron, grip, magnifier, microphone, newWindow, checkCircle, divider
+
+        /// The list screen's glyphs, each named for what it draws: a flag, which marks a task's deadline, a hash,
+        /// which marks a tag, a note, which says a task has notes, the arrows that open a card full screen, columns,
+        /// which stand for the board, and the chevron pointing back. The pills' sun is the list's `sun`.
+        case flag, hash, note, expand, columns, chevronLeft
     }
 }

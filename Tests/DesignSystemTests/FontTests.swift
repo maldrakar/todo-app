@@ -33,3 +33,14 @@ private typealias Font = DesignSystem.Font
 @Test func anAreasCaptionIsTheCaptionHeavyAndRounded() {
     #expect(Font.areaCaption == Font(style: .caption, weight: .heavy, rounded: true))
 }
+
+/// The list screen's add rows are the subheadline in medium and the card's notes and subtasks the subheadline in
+/// regular, the canvas's 15 pt 500 and 400; its pills the footnote in semibold, 13 pt against the canvas's 13.5 600;
+/// and its empty state's title the third title in heavy and the rounded face, the canvas's 20 pt 800 in `ui-rounded`,
+/// each at the iPhone's default text size.
+@Test func theListScreensAddRowsNotesPillsAndEmptyStateTitle() {
+    #expect(Font.addRow == Font(style: .subheadline, weight: .medium, rounded: false))
+    #expect(Font.notes == Font(style: .subheadline, weight: .regular, rounded: false))
+    #expect(Font.pill == Font(style: .footnote, weight: .semibold, rounded: false))
+    #expect(Font.emptyStateTitle == Font(style: .title3, weight: .heavy, rounded: true))
+}

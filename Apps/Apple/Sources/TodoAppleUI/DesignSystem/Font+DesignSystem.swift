@@ -16,6 +16,7 @@ extension Font.TextStyle {
     fileprivate init(_ style: DesignSystem.Font.TextStyle) {
         self = switch style {
         case .largeTitle: .largeTitle
+        case .title3: .title3
         case .headline: .headline
         case .body: .body
         case .callout: .callout

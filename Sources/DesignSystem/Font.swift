@@ -4,12 +4,14 @@ extension DesignSystem {
     /// A font as the look names it: a text style, whose size follows the one a person sets (Dynamic Type), a weight,
     /// and whether the face is rounded. A platform renders it as its own font of that style.
     ///
-    /// The look's fonts are its static members, the canvas's type (`Main.dc.html`) as text styles. At the iPhone's
-    /// default text size each is the canvas's size but the large title, 34 pt against 32, and the meta, 12 against
-    /// 12.5 (the owner's review of #151); the Mac's text styles are smaller. The large and section titles are the
-    /// rounded face; the rest is the system face.
+    /// The look's fonts are its static members, the canvas's type (`Main.dc.html`, `Phone.dc.html`) as text styles.
+    /// At the iPhone's default text size each is the canvas's size but the large title, 34 pt against 32, the meta, 12
+    /// against 12.5 (the owner's review of #151), and the pill, 13 against 13.5; the Mac's text styles are smaller. The
+    /// large and section titles and the empty state's title are the rounded face; the rest is the system face.
     public struct Font: Equatable, Sendable {
-        public enum TextStyle: Sendable { case largeTitle, headline, body, callout, subheadline, footnote, caption }
+        public enum TextStyle: Sendable {
+            case largeTitle, title3, headline, body, callout, subheadline, footnote, caption
+        }
         public enum Weight: Sendable { case regular, medium, semibold, bold, heavy }
         public let style: TextStyle
         public let weight: Weight
@@ -49,5 +51,20 @@ extension DesignSystem {
 
         /// A search field's placeholder, 17 pt at the iPhone's default text size.
         public static let search = Font(style: .body, weight: .regular, rounded: false)
+
+        /// The words of a row that adds, "Add task" and "Add list", the canvas's 15 pt medium at the iPhone's default
+        /// text size.
+        public static let addRow = Font(style: .subheadline, weight: .medium, rounded: false)
+
+        /// A card's notes and its subtasks' titles, the canvas's 15 pt at the iPhone's default text size.
+        public static let notes = Font(style: .subheadline, weight: .regular, rounded: false)
+
+        /// The words on a card's pills, its day, its deadline and its tags, the canvas's 13.5 pt semibold, 13 at the
+        /// iPhone's default text size.
+        public static let pill = Font(style: .footnote, weight: .semibold, rounded: false)
+
+        /// The title of a list with nothing in it, the canvas's 20 pt 800 in `ui-rounded`, the third title's size at
+        /// the iPhone's default text size, which no other style comes near.
+        public static let emptyStateTitle = Font(style: .title3, weight: .heavy, rounded: true)
     }
 }

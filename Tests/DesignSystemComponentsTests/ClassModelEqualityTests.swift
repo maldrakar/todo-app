@@ -198,3 +198,138 @@ private func picker(
         "disabledOpacity": picker(disabledOpacity: 0.5),
     ])
 }
+
+private func check(isChecked: Bool = false) -> CheckModel<Action> {
+    CheckModel(
+        diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+        colors: DesignSystem.Color.Components.Tile.blue.check, isChecked: isChecked, animation: .check,
+        accessibilityLabel: "Complete", action: .first
+    )
+}
+
+private let swipe = SwipeModel<Action>(
+    threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
+    buttonCornerRadius: 12, button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), background: .red,
+    animation: .swipe, action: .second
+)
+
+private let lift = LiftModel(
+    scale: 1.03, cornerRadius: 14, background: .surface, shadow: .lifted,
+    slot: StrokeModel(color: .accent, width: 2, dash: []), slotDot: 8, slotHeight: 10, slotLeading: 52,
+    slotTrailing: 20
+)
+
+private func taskRow(
+    check: CheckModel<Action> = check(), title: TextModel = text, isStruck: Bool = false,
+    meta: [MetaItemModel] = [], titleToMeta: Double = 3, metaSpacing: Double = 10, metaLineSpacing: Double = 3,
+    verticalPadding: Double = 11, titleLeading: Double = 2, titleTrailing: Double = 4, leading: Double = 8,
+    trailing: Double = 12, minimumHeight: Double = 44, cornerRadius: Double = 0, swipe: SwipeModel<Action>? = nil,
+    lift: LiftModel? = nil, fresh: DesignSystem.Color? = nil, freshAnimation: DesignSystem.Animation = .fresh,
+    tap: Action = .first, menu: MenuModel<Action>? = nil
+) -> TaskRowModel<Action> {
+    TaskRowModel(
+        check: check, title: title, isStruck: isStruck, meta: meta, titleToMeta: titleToMeta,
+        metaSpacing: metaSpacing, metaLineSpacing: metaLineSpacing, verticalPadding: verticalPadding,
+        titleLeading: titleLeading, titleTrailing: titleTrailing, leading: leading, trailing: trailing,
+        minimumHeight: minimumHeight, cornerRadius: cornerRadius, swipe: swipe, lift: lift, fresh: fresh,
+        freshAnimation: freshAnimation, tap: tap, menu: menu
+    )
+}
+
+@Test func aTaskRowModelComparesEveryProperty() {
+    expectEveryPropertyCompared({ taskRow() }, [
+        "check": taskRow(check: check(isChecked: true)),
+        "title": taskRow(title: TextModel(text: "Call the plumber", font: .rowTitle, color: .ink)),
+        "isStruck": taskRow(isStruck: true),
+        "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, capsule: nil)]),
+        "titleToMeta": taskRow(titleToMeta: 2),
+        "metaSpacing": taskRow(metaSpacing: 8),
+        "metaLineSpacing": taskRow(metaLineSpacing: 2),
+        "verticalPadding": taskRow(verticalPadding: 9),
+        "titleLeading": taskRow(titleLeading: 4),
+        "titleTrailing": taskRow(titleTrailing: 0),
+        "leading": taskRow(leading: 4),
+        "trailing": taskRow(trailing: 10),
+        "minimumHeight": taskRow(minimumHeight: 36),
+        "cornerRadius": taskRow(cornerRadius: 9),
+        "swipe": taskRow(swipe: swipe),
+        "lift": taskRow(lift: lift),
+        "fresh": taskRow(fresh: .fresh),
+        "freshAnimation": taskRow(freshAnimation: .drop),
+        "tap": taskRow(tap: .second),
+        "menu": taskRow(menu: menu),
+    ])
+}
+
+private let pill = PillModel(
+    icon: IconModel(icon: .flag, size: 15, weight: .medium, color: .red), text: text, background: .fill, height: 32,
+    cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6
+)
+
+private let addSubtask = AddRowModel<Action>(
+    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2), iconCell: 40,
+    title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 44, width: nil, cornerRadius: 0,
+    leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
+    action: .first
+)
+
+private let expand = ButtonModel<Action>(
+    label: ButtonLabelModel(
+        icon: IconModel(icon: .expand, size: 19, weight: .medium, color: .ink2), title: nil,
+        accessibilityLabel: "Open full screen", fill: .container
+    ),
+    action: .first
+)
+
+private func card(
+    check: CheckModel<Action> = check(), title: TextFieldModel<Action> = field("Call the plumber"),
+    notes: TextFieldModel<Action> = field(""), subtasks: [SubtaskRowModel<Action>] = [],
+    subtaskField: TextFieldModel<Action>? = nil, addSubtask: AddRowModel<Action> = addSubtask,
+    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, expandHit: Double = 44,
+    background: DesignSystem.Color = .surface, cornerRadius: Double = 18, topMargin: Double = 6,
+    horizontalMargin: Double = 10, bottomMargin: Double = 10, bodyLeading: Double = 46, bodyTrailing: Double = 14,
+    bodyBottom: Double = 14, subtasksToPills: Double = 10, pillSpacing: Double = 6,
+    shadow: DesignSystem.Shadow = .raised, animation: DesignSystem.Animation = .cardOpens,
+    backgroundTapped: Action = .first
+) -> CardModel<Action> {
+    CardModel(
+        check: check, title: title, notes: notes, subtasks: subtasks, subtaskField: subtaskField,
+        addSubtask: addSubtask, pills: pills, expand: expand, expandHit: expandHit, background: background,
+        cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
+        bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing, bodyBottom: bodyBottom,
+        subtasksToPills: subtasksToPills, pillSpacing: pillSpacing, shadow: shadow, animation: animation,
+        backgroundTapped: backgroundTapped
+    )
+}
+
+@Test func aCardModelComparesEveryProperty() {
+    expectEveryPropertyCompared({ card() }, [
+        "check": card(check: check(isChecked: true)),
+        "title": card(title: field("Call the plumber today")),
+        "notes": card(notes: field("Ask about the boiler")),
+        "subtasks": card(subtasks: [SubtaskRowModel(check: check(), title: text, isStruck: false, height: 44)]),
+        "subtaskField": card(subtaskField: field("")),
+        "addSubtask": card(addSubtask: AddRowModel(
+            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2), iconCell: 30,
+            title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 30, width: nil,
+            cornerRadius: 7, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0,
+            leadingMargin: 0, trailingMargin: 0, action: .first
+        )),
+        "pills": card(pills: [pill]),
+        "expand": card(expand: ButtonModel(label: expand.label, action: .second)),
+        "expandHit": card(expandHit: 30),
+        "background": card(background: .fill),
+        "cornerRadius": card(cornerRadius: 14),
+        "topMargin": card(topMargin: 4),
+        "horizontalMargin": card(horizontalMargin: 0),
+        "bottomMargin": card(bottomMargin: 8),
+        "bodyLeading": card(bodyLeading: 38),
+        "bodyTrailing": card(bodyTrailing: 12),
+        "bodyBottom": card(bodyBottom: 12),
+        "subtasksToPills": card(subtasksToPills: 8),
+        "pillSpacing": card(pillSpacing: 5),
+        "shadow": card(shadow: .lifted),
+        "animation": card(animation: .pushPop),
+        "backgroundTapped": card(backgroundTapped: .second),
+    ])
+}
