@@ -3,12 +3,14 @@ import DesignSystem
 
 /// A row that adds, "+ Add task" at the end of a block or a column, "Add subtask" in a card and "+ Add list" after the
 /// blocks or the columns (`Phone.dc.html`): `height` high and `width` wide, with corners of `cornerRadius`,
-/// `leadingPadding` in from its leading edge its glyph, centred in a cell `iconCell` wide, as a row's check is in its
-/// tap area, so that the plus stands under the checks, then its title, `trailingPadding` short of its trailing edge;
-/// `topMargin` below what stands before it and `leadingMargin` and `trailingMargin` in from the sides, in points.
+/// `topPadding` under its top edge and `leadingPadding` in from its leading edge its glyph, centred in a cell
+/// `iconCell` wide, as a row's check is in its tap area, so that the plus stands under the checks, then `spacing`
+/// after the cell its title, `trailingPadding` short of its trailing edge; `topMargin` below what stands before it
+/// and `leadingMargin` and `trailingMargin` in from the sides, in points.
 public struct AddRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
     public let iconCell: Double
+    public let spacing: Double
     public let title: TextModel
     public let height: Double
 
@@ -17,6 +19,7 @@ public struct AddRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let width: Double?
 
     public let cornerRadius: Double
+    public let topPadding: Double
     public let leadingPadding: Double
     public let trailingPadding: Double
 
@@ -37,10 +40,12 @@ public struct AddRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public init(
         icon: IconModel,
         iconCell: Double,
+        spacing: Double,
         title: TextModel,
         height: Double,
         width: Double?,
         cornerRadius: Double,
+        topPadding: Double,
         leadingPadding: Double,
         trailingPadding: Double,
         dash: StrokeModel?,
@@ -52,10 +57,12 @@ public struct AddRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     ) {
         self.icon = icon
         self.iconCell = iconCell
+        self.spacing = spacing
         self.title = title
         self.height = height
         self.width = width
         self.cornerRadius = cornerRadius
+        self.topPadding = topPadding
         self.leadingPadding = leadingPadding
         self.trailingPadding = trailingPadding
         self.dash = dash

@@ -1,15 +1,5 @@
 // Sources/DesignSystem/Color+Components.swift
 
-// The C library for `pow`, which a check's mark needs for WCAG's luminance and the standard library does not have; the
-// platform's own, on each platform the look is built for.
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(WASILibc)
-import WASILibc
-#endif
-
 extension DesignSystem.Color {
     /// The colours of the components every platform draws, each component's under its own name, so that a component's
     /// model takes only the colours its component may use (ADR-0007, amendment of 2026-10-26).
@@ -39,20 +29,19 @@ extension DesignSystem.Color.Components {
 
         /// The check of a task in this colour (`Phone.dc.html`, `paint`): its ring the base mixed 20 % toward the ink
         /// in the light and 18 % toward white in the dark, its fill the base in the light and the base mixed 8 % toward
-        /// white in the dark, and its mark on the fill of the same appearance.
+        /// white in the dark, and its mark the same in both appearances.
         public var check: DesignSystem.Color.Components.Check {
-            let fill = DesignSystem.Color(light: base, dark: base.mixed(toward: .white, by: 0.08))
-            return DesignSystem.Color.Components.Check(
+            DesignSystem.Color.Components.Check(
                 ring: DesignSystem.Color(
                     light: base.mixed(toward: DesignSystem.Color.ink.light, by: 0.2),
                     dark: base.mixed(toward: .white, by: 0.18)),
-                fill: fill,
-                mark: DesignSystem.Color(light: Self.mark(on: fill.light), dark: Self.mark(on: fill.dark)))
+                fill: DesignSystem.Color(light: base, dark: base.mixed(toward: .white, by: 0.08)),
+                mark: DesignSystem.Color(light: mark, dark: mark))
         }
 
         /// The base of each tile colour (`Phone.dc.html`, `COLORS`), from which the canvas's `paint` rule draws its
-        /// background, its glyph and its check, so that those are the canvas's and not 110 shades worked out by hand.
-        /// A `switch` without a `default`, so a colour added here stops this compiling until it has a base.
+        /// background, its glyph and its check's ring and fill, so that those are the canvas's and not 88 shades worked
+        /// out by hand. A `switch` without a `default`, so a colour added here stops this compiling until it has one.
         private var base: DesignSystem.RGB {
             switch self {
             case .blue: DesignSystem.RGB(hex: 0x3E6EC5)
@@ -69,10 +58,17 @@ extension DesignSystem.Color.Components {
             }
         }
 
-        /// The mark on a check's fill, by the canvas's rule: white, unless white's contrast on the fill is under 3,
-        /// when it is the light ink in either appearance, since the dark ink is nearly white. Amber alone is under 3.
-        private static func mark(on fill: DesignSystem.RGB) -> DesignSystem.RGB {
-            DesignSystem.RGB.white.contrast(with: fill) >= 3 ? .white : DesignSystem.Color.ink.light
+        /// The mark on the check's fill, written down as the canvas's rule gives it (`Phone.dc.html`, `paint`): white,
+        /// unless white's contrast on the fill is under 3 by WCAG, when it is the light ink, in either appearance,
+        /// since the dark ink is nearly white. Amber alone is under 3, at 2.61 in the light and 2.41 in the dark. It is
+        /// written and not worked out because the contrast needs `pow`, which the standard library does not have, and
+        /// this target depends on nothing; a test works the rule out on every fill and holds this to it. A `switch`
+        /// without a `default`, so a colour added here stops this compiling until its mark is written down.
+        private var mark: DesignSystem.RGB {
+            switch self {
+            case .amber: DesignSystem.Color.ink.light
+            case .blue, .rose, .green, .stone, .indigo, .teal, .pink, .orange, .violet, .sky: .white
+            }
         }
     }
 
@@ -83,22 +79,5 @@ extension DesignSystem.Color.Components {
         public let ring: DesignSystem.Color
         public let fill: DesignSystem.Color
         public let mark: DesignSystem.Color
-    }
-}
-
-extension DesignSystem.RGB {
-    /// The contrast between this colour and `other` as WCAG 2 defines it and the canvas works it out (`contrast`),
-    /// from 1, none, to 21, black on white. Opacity plays no part.
-    fileprivate func contrast(with other: DesignSystem.RGB) -> Double {
-        let (lighter, darker) = (max(luminance, other.luminance), min(luminance, other.luminance))
-        return (lighter + 0.05) / (darker + 0.05)
-    }
-
-    /// WCAG 2's relative luminance, each channel turned linear with the canvas's threshold of 0.03928 (`lum`).
-    private var luminance: Double {
-        func linear(_ channel: Double) -> Double {
-            channel <= 0.03928 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
-        }
-        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
     }
 }

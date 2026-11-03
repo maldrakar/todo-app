@@ -220,7 +220,7 @@ private let lift = LiftModel(
 )
 
 private func taskRow(
-    check: CheckModel<Action> = check(), title: TextModel = text, isStruck: Bool = false,
+    check: CheckModel<Action> = check(), title: TextModel = text, strike: DesignSystem.Color? = nil,
     meta: [MetaItemModel] = [], titleToMeta: Double = 3, metaSpacing: Double = 10, metaLineSpacing: Double = 3,
     verticalPadding: Double = 11, titleLeading: Double = 2, titleTrailing: Double = 4, leading: Double = 8,
     trailing: Double = 12, minimumHeight: Double = 44, cornerRadius: Double = 0, swipe: SwipeModel<Action>? = nil,
@@ -228,7 +228,7 @@ private func taskRow(
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> TaskRowModel<Action> {
     TaskRowModel(
-        check: check, title: title, isStruck: isStruck, meta: meta, titleToMeta: titleToMeta,
+        check: check, title: title, strike: strike, meta: meta, titleToMeta: titleToMeta,
         metaSpacing: metaSpacing, metaLineSpacing: metaLineSpacing, verticalPadding: verticalPadding,
         titleLeading: titleLeading, titleTrailing: titleTrailing, leading: leading, trailing: trailing,
         minimumHeight: minimumHeight, cornerRadius: cornerRadius, swipe: swipe, lift: lift, fresh: fresh,
@@ -240,8 +240,8 @@ private func taskRow(
     expectEveryPropertyCompared({ taskRow() }, [
         "check": taskRow(check: check(isChecked: true)),
         "title": taskRow(title: TextModel(text: "Call the plumber", font: .rowTitle, color: .ink)),
-        "isStruck": taskRow(isStruck: true),
-        "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, capsule: nil)]),
+        "strike": taskRow(strike: .ink3),
+        "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, spacing: 3, capsule: nil)]),
         "titleToMeta": taskRow(titleToMeta: 2),
         "metaSpacing": taskRow(metaSpacing: 8),
         "metaLineSpacing": taskRow(metaLineSpacing: 2),
@@ -267,10 +267,10 @@ private let pill = PillModel(
 )
 
 private let addSubtask = AddRowModel<Action>(
-    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2), iconCell: 40,
+    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2), iconCell: 40, spacing: 0,
     title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 44, width: nil, cornerRadius: 0,
-    leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
-    action: .first
+    topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
+    trailingMargin: 0, action: .first
 )
 
 private let expand = ButtonModel<Action>(
@@ -307,13 +307,13 @@ private func card(
         "check": card(check: check(isChecked: true)),
         "title": card(title: field("Call the plumber today")),
         "notes": card(notes: field("Ask about the boiler")),
-        "subtasks": card(subtasks: [SubtaskRowModel(check: check(), title: text, isStruck: false, height: 44)]),
+        "subtasks": card(subtasks: [SubtaskRowModel(check: check(), title: text, strike: nil, height: 44)]),
         "subtaskField": card(subtaskField: field("")),
         "addSubtask": card(addSubtask: AddRowModel(
-            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2), iconCell: 30,
+            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2), iconCell: 30, spacing: 0,
             title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 30, width: nil,
-            cornerRadius: 7, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0,
-            leadingMargin: 0, trailingMargin: 0, action: .first
+            cornerRadius: 7, topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil,
+            topMargin: 0, leadingMargin: 0, trailingMargin: 0, action: .first
         )),
         "pills": card(pills: [pill]),
         "expand": card(expand: ButtonModel(label: expand.label, action: .second)),
@@ -331,5 +331,49 @@ private func card(
         "shadow": card(shadow: .lifted),
         "animation": card(animation: .pushPop),
         "backgroundTapped": card(backgroundTapped: .second),
+    ])
+}
+
+private let chevron = AccessoryModel<Action>.Chevron(
+    icon: IconModel(icon: .chevron, size: 18, weight: .semibold, color: .ink3), rotation: 0, animation: .fold,
+    accessibilityLabel: "Fold", action: .second
+)
+
+private func blockHeader(
+    title: TextModel = text, date: TextModel? = nil, titleToDate: Double = 8, field: TextFieldModel<Action>? = nil,
+    chevron: AccessoryModel<Action>.Chevron = chevron, chevronHit: Double = 44, rule: StrokeModel? = stroke,
+    height: Double = 44, topMargin: Double = 6, trailingMargin: Double = 6, bottomMargin: Double = 2,
+    leadingMargin: Double = 12, topPadding: Double = 13, horizontalPadding: Double = 8, bottomPadding: Double = 0,
+    cornerRadius: Double = 0, titleTapped: Action = .first
+) -> BlockHeaderModel<Action> {
+    BlockHeaderModel(
+        title: title, date: date, titleToDate: titleToDate, field: field, chevron: chevron, chevronHit: chevronHit,
+        rule: rule, height: height, topMargin: topMargin, trailingMargin: trailingMargin, bottomMargin: bottomMargin,
+        leadingMargin: leadingMargin, topPadding: topPadding, horizontalPadding: horizontalPadding,
+        bottomPadding: bottomPadding, cornerRadius: cornerRadius, titleTapped: titleTapped
+    )
+}
+
+@Test func aBlockHeaderModelComparesEveryProperty() {
+    expectEveryPropertyCompared({ blockHeader() }, [
+        "title": blockHeader(title: TextModel(text: "Work", font: .sectionTitle, color: .ink)),
+        "date": blockHeader(date: TextModel(text: "Tomorrow", font: .areaLabel, color: .ink2)),
+        "titleToDate": blockHeader(titleToDate: 6),
+        "field": blockHeader(field: field("New list")),
+        "chevron": blockHeader(chevron: AccessoryModel.Chevron(
+            icon: chevron.icon, rotation: -90, animation: .fold, accessibilityLabel: "Unfold", action: .second
+        )),
+        "chevronHit": blockHeader(chevronHit: 30),
+        "rule": blockHeader(rule: nil),
+        "height": blockHeader(height: 34),
+        "topMargin": blockHeader(topMargin: 14),
+        "trailingMargin": blockHeader(trailingMargin: 0),
+        "bottomMargin": blockHeader(bottomMargin: 0),
+        "leadingMargin": blockHeader(leadingMargin: 4),
+        "topPadding": blockHeader(topPadding: 9),
+        "horizontalPadding": blockHeader(horizontalPadding: 6),
+        "bottomPadding": blockHeader(bottomPadding: 9),
+        "cornerRadius": blockHeader(cornerRadius: 7),
+        "titleTapped": blockHeader(titleTapped: .second),
     ])
 }

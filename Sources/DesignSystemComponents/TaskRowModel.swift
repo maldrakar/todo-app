@@ -3,16 +3,16 @@ import DesignSystem
 
 /// A task's row as every platform draws it (`Phone.dc.html`, the list screen's row; `Mac.dc.html`, the pane's row), and
 /// a card of a column in the card look: `leading` in from its leading edge its check, then its title, `titleLeading`
-/// after the check's tap area and `titleTrailing` short of the row's `trailing`, with `verticalPadding` above and
-/// below it, struck through where the task is done; under the title, `titleToMeta` below it, the meta line, its items
-/// `metaSpacing` apart and its lines `metaLineSpacing` apart where it wraps; at least `minimumHeight` high, with what
-/// it draws under itself rounded by `cornerRadius`, in points. The model holds every value its platform needs to draw
-/// it, so a view decides nothing but what is the platform's: the gestures, the swipe and the lift as they move, focus
-/// and Reduce Motion (ADR-0007, amendment of 2026-10-30). It holds no id of the store's: the feature module's row
+/// after the check's tap area and `titleTrailing` short of the row's `trailing`, with `verticalPadding` above and below
+/// it, struck through in `strike` where the task is done; under the title, `titleToMeta` below it, the meta line, its
+/// items `metaSpacing` apart and its lines `metaLineSpacing` apart where it wraps; at least `minimumHeight` high, with
+/// what it draws under itself rounded by `cornerRadius`, in points. The model holds every value its platform needs to
+/// draw it, so a view decides nothing but what is the platform's: the gestures, the swipe and the lift as they move,
+/// focus and Reduce Motion (ADR-0007, amendment of 2026-10-30). It holds no id of the store's: the feature module's row
 /// carries the task's id beside it.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block holds many, every comparison of the screen's
-/// model compares them, and inline, its check, swipe and lift with it, a row is some 1,070 bytes on wasm32. Its `==`
+/// model compares them, and inline, its check, swipe and lift with it, a row is some 1,160 bytes on wasm32. Its `==`
 /// compares every stored property, and a test changes them one at a time.
 public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let check: CheckModel<Action>
@@ -20,8 +20,9 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     /// The title, in its colour, the done colour where the task is done.
     public let title: TextModel
 
-    /// Whether a line is drawn through the title, as it is through a done task's.
-    public let isStruck: Bool
+    /// The colour of the line through the title, the canvas's ink 3 through a done task's (`.tt-done`), and nil for a
+    /// title with no line through it.
+    public let strike: DesignSystem.Color?
 
     /// The items of the meta line in the order they stand, and none for a row with no meta line.
     public let meta: [MetaItemModel]
@@ -62,7 +63,7 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     public init(
         check: CheckModel<Action>,
         title: TextModel,
-        isStruck: Bool,
+        strike: DesignSystem.Color?,
         meta: [MetaItemModel],
         titleToMeta: Double,
         metaSpacing: Double,
@@ -83,7 +84,7 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     ) {
         self.check = check
         self.title = title
-        self.isStruck = isStruck
+        self.strike = strike
         self.meta = meta
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing
@@ -107,7 +108,7 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         if lhs === rhs { return true }
         return lhs.check == rhs.check
             && lhs.title == rhs.title
-            && lhs.isStruck == rhs.isStruck
+            && lhs.strike == rhs.strike
             && lhs.meta == rhs.meta
             && lhs.titleToMeta == rhs.titleToMeta
             && lhs.metaSpacing == rhs.metaSpacing

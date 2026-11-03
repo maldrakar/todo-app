@@ -1,6 +1,16 @@
 import Testing
 @testable import DesignSystem
 
+// The C library for `pow`, which the canvas's luminance needs and the standard library does not have: the test works
+// the contrast rule out that the look writes down, since the look's target depends on nothing.
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(WASILibc)
+import WASILibc
+#endif
+
 private typealias RGB = DesignSystem.RGB
 private typealias Tile = DesignSystem.Color.Components.Tile
 
@@ -87,6 +97,35 @@ private let canvas: [Tile: (light: Resolved, dark: Resolved)] = [
         let want = tile == .amber ? RGB(hex: 0x1F1D1A) : RGB(hex: 0xFFFFFF)
         #expect(tile.check.mark.light == want, "\(tile)")
         #expect(tile.check.mark.dark == want, "\(tile)")
+    }
+}
+
+/// WCAG 2's relative luminance as the canvas works it out (`lum`), each channel turned linear with its threshold of
+/// 0.03928.
+private func luminance(_ color: RGB) -> Double {
+    func linear(_ channel: Double) -> Double {
+        channel <= 0.03928 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * linear(color.red) + 0.7152 * linear(color.green) + 0.0722 * linear(color.blue)
+}
+
+/// The contrast between two colours as WCAG 2 defines it and the canvas works it out (`contrast`).
+private func contrast(_ first: RGB, _ second: RGB) -> Double {
+    let (a, b) = (luminance(first), luminance(second))
+    return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+}
+
+/// Every tile's mark, which the look writes down, is the one the canvas's rule gives on its fill in either appearance:
+/// white, unless white's contrast on the fill is under 3, when the light ink.
+@Test func everyTilesMarkIsWhatTheContrastRuleGivesOnItsFill() {
+    let white = RGB(hex: 0xFFFFFF)
+    let ink = RGB(hex: 0x1F1D1A)
+    for tile in Tile.allCases {
+        let check = tile.check
+        let appearances = [("light", check.fill.light, check.mark.light), ("dark", check.fill.dark, check.mark.dark)]
+        for (name, fill, mark) in appearances {
+            #expect(mark == (contrast(white, fill) < 3 ? ink : white), "\(tile) \(name)")
+        }
     }
 }
 

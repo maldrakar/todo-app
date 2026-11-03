@@ -15,7 +15,7 @@ import DesignSystem
 /// beside it.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block holds it among its rows, every comparison of
-/// the screen's model compares it, and inline, with its three fields, it is some 2,030 bytes on wasm32. Its `==`
+/// the screen's model compares it, and inline, with its three fields, it is some 2,070 bytes on wasm32. Its `==`
 /// compares every stored property, and a test changes them one at a time.
 public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let check: CheckModel<Action>
