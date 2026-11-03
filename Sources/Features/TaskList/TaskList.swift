@@ -123,6 +123,13 @@ public final class TaskList: Routable {
         /// over the list, nil when none does, which the list takes back as its destination (navigation state spec,
         /// section 2).
         case notOpened(StoreError, stillOpen: TaskScreen.Route?)
+
+        /// The device's day, which the root hands every screen of its window when the window's view reports a new one,
+        /// at midnight, in a new time zone or on waking on another day: an event of the world that no view can send
+        /// (spec section 8; ADR-0006, amendment of 2026-11-01). Which tasks a view selects can depend on the day, so a
+        /// new one rereads them; the day the list already has reads nothing. Neither is a gesture on the list, so the
+        /// sentence on screen and the destination stay.
+        case dayChanged(DeviceDay)
     }
 
     public enum Output: Equatable, Sendable {
@@ -156,18 +163,22 @@ public final class TaskList: Routable {
     /// back only the tasks, and each read of a view reads the table of views whole (`Store.view(_:)`): a list made
     /// reads that table twice, tens of rows in this epic.
     ///
+    /// The day is the device's, which the window's stack hands the list when it makes it, the day its root has then, so
+    /// that a list made after midnight starts on the new day (spec section 8). It has no default, as the root's has
+    /// none: the day is the platform's to say (`docs/style.md`, "A lower layer holds no policy of its client").
+    ///
     /// Throws when the view or its tasks cannot be read, a view that is gone among them, which is refused with
     /// `.notFound` and the view's id: a list that came up empty would look like a view with nothing in it,
     /// and the stack keeps what was open while the list's opener says so (navigation state spec, section 2). A task
     /// that cannot be made does not stop the list: a link to a task that is gone opens the view it names, and the
     /// stack tells the list, which says why with no task open, which is what still exists (spec section 3, the
     /// fourth flow).
-    public init(store: Store, route: Route) throws(StoreError) {
+    public init(store: Store, route: Route, day: DeviceDay) throws(StoreError) {
         guard let view = try store.view(route.head) else { throw .notFound(route.head) }
-        let rows = try TaskList.rows(of: store, in: route.head)
+        let rows = try TaskList.rows(of: store, in: route.head, today: day.day)
         self.head = route.head
         self.store = store
-        self.state = State(title: view.title, rows: rows, destination: Destination(), problem: nil)
+        self.state = State(title: view.title, rows: rows, day: day, destination: Destination(), problem: nil)
         setDestination(route.task)
     }
 
@@ -225,7 +236,9 @@ public final class TaskList: Routable {
                     guard let view = try store.view(head) else { return .closeRequested }
                     state.title = view.title
                 }
-                if TaskList.rereads(on: changes, of: head) { state.rows = try TaskList.rows(of: store, in: head) }
+                if TaskList.rereads(on: changes, of: head) {
+                    state.rows = try TaskList.rows(of: store, in: head, today: state.day.day)
+                }
             } catch {
                 // Neither the rows on screen nor the title is cleared, since each is assigned only after its own read
                 // succeeded, and a list emptied by a failed read would take with it the only thing left to act on.
@@ -236,6 +249,18 @@ public final class TaskList: Routable {
             }
             // The destination stays: the task screen over the list reads the change itself, handed it by the window,
             // and asks to be closed when its task is gone.
+            return nil
+        case .dayChanged(let day):
+            // The day is kept whether or not the read below holds, since it is what the world says and every later
+            // read of the rows is by it. A read that fails leaves the rows and says so only when nothing is on screen,
+            // as a change's reread does: the day answers for nobody.
+            guard day != state.day else { return nil }
+            state.day = day
+            do {
+                state.rows = try TaskList.rows(of: store, in: head, today: day.day)
+            } catch {
+                if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
+            }
             return nil
         }
     }
@@ -261,17 +286,13 @@ public final class TaskList: Routable {
 
     /// The view's tasks as one read of the store answers them, in the query's order.
     ///
-    /// `today` is the UTC day of the machine's clock, read again at every read: a view such as Today selects by
-    /// the day the query is made, and the list has no time zone to make a local day with, since a feature
-    /// target may not import the Foundation that holds one (ADR-0001). It departs from spec section 10, which
-    /// hands the list its day at creation the way the command-line demo passes it: a day handed once goes
-    /// stale in a list left open past midnight, and the day changing is an event of the world, M4's, which
-    /// will bring the platform's own day with it. Until then a list away from UTC is a day off for the hours
-    /// in which its own date and UTC's differ, and a list left open across midnight UTC catches up at the next
-    /// change that rereads it.
-    private static func rows(of store: Store, in view: ViewID) throws(StoreError) -> [Model.Row] {
-        let today = Day(millisSinceEpoch: Store.systemNow())
-        return try store.tasks(in: view, today: today).map { Model.Row(id: $0.id, title: $0.title) }
+    /// `today` is the device's day, handed in: a view such as Today selects by the day the query is made, and the list
+    /// has no time zone to tell the day by, since a feature target may not import the Foundation that holds one
+    /// (ADR-0001). The platform, which has one, reads the day and hands it in when the list is made and again when it
+    /// changes (`.dayChanged`), so the list draws the device's own day and catches up at midnight with no change to
+    /// the store (spec section 8; ADR-0006, amendment of 2026-11-01).
+    private static func rows(of store: Store, in view: ViewID, today: Day) throws(StoreError) -> [Model.Row] {
+        try store.tasks(in: view, today: today).map { Model.Row(id: $0.id, title: $0.title) }
     }
 
     /// The sentence a task that could not be made reads as. `.notFound` is the task being gone, which is what a link
@@ -285,15 +306,17 @@ public final class TaskList: Routable {
         }
     }
 
-    /// Everything the list holds between two events: the view's title and the rows as the last reads produced them,
-    /// what it declared over them, and the sentence a person was last told. One value, moved field by field, and the one place any of it
-    /// is kept: the model is computed from it on every read (owner's reviews of #77 and #101).
+    /// Everything the list holds between two events: the view's title and the rows as the last reads produced them, the
+    /// device's day they were read by, what it declared over them, and the sentence a person was last told. One value,
+    /// moved field by field, and the one place any of it is kept: the model is computed from it on every read (owner's
+    /// reviews of #77 and #101).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
     private struct State {
         var title: String
         var rows: [Model.Row]
+        var day: DeviceDay
         var destination: Destination<TaskScreen.Route>
         var problem: String?
 

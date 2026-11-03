@@ -9,9 +9,10 @@ import SQLiteKit
 private let inbox = BuiltInTaskViews.inbox
 
 /// The model of a list made now on a view, with nothing declared over it, which is what a list is compared with
-/// after an event: the rows as a read now answers them and no sentence.
-private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
-    try TaskList(store: store, route: .init(head: view)).model
+/// after an event: the rows as a read now answers them on the day, the test's unless another is named, and no
+/// sentence.
+private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay) throws -> TaskList.Model {
+    try TaskList(store: store, route: .init(head: view), day: day).model
 }
 
 /// The rows are the query's answer in the query's order, which is the rank and not the order the tasks were
@@ -22,8 +23,8 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let second = try store.createTask(NewTask(title: "Second"))
     let third = try store.createTask(NewTask(title: "Third"), at: .start)
     try store.createTask(NewTask(title: "Someday", when: Day(year: 2030, month: 1, day: 1)))
-    let list = try TaskList(store: store, route: .init(head: inbox))
-    let query = try store.tasks(in: inbox, today: Day(millisSinceEpoch: Store.systemNow()))
+    let list = try TaskList(store: store, route: .init(head: inbox), day: testDay)
+    let query = try store.tasks(in: inbox, today: testDay.day)
     #expect(list.model.rows.map(\.id) == query.map(\.id))
     #expect(list.model.rows.map(\.id) == [third, first, second], "a task with a day is not the Inbox's")
     #expect(list.model.rows.map(\.title) == ["Third", "First", "Second"])
@@ -37,8 +38,8 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
 @Test func aListIsTitledByItsView() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
-    #expect(try TaskList(store: store, route: .init(head: inbox)).model.title == "Inbox")
-    #expect(try TaskList(store: store, route: .init(head: work)).model.title == "Work")
+    #expect(try TaskList(store: store, route: .init(head: inbox), day: testDay).model.title == "Inbox")
+    #expect(try TaskList(store: store, route: .init(head: work), day: testDay).model.title == "Work")
 }
 
 /// A list on a view that is gone is not made, and its `init` says which view it looked for: the stack keeps what
@@ -47,9 +48,9 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.delete(view: gone)
-    #expect(throws: StoreError.notFound(gone)) { try TaskList(store: store, route: .init(head: gone)) }
+    #expect(throws: StoreError.notFound(gone)) { try TaskList(store: store, route: .init(head: gone), day: testDay) }
     let unknown = ViewID()
-    #expect(throws: StoreError.notFound(unknown)) { try TaskList(store: store, route: .init(head: unknown)) }
+    #expect(throws: StoreError.notFound(unknown)) { try TaskList(store: store, route: .init(head: unknown), day: testDay) }
 }
 
 /// A link to a task, or a window restored onto one, makes the list with the task declared over it, which the
@@ -59,7 +60,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let route = TaskList.Route(head: inbox, task: .init(head: id))
-    let list = try TaskList(store: store, route: route)
+    let list = try TaskList(store: store, route: route, day: testDay)
     #expect(list.destination.pushed == route.task)
     #expect(list.model == (try listOn(inbox, in: store)), "the rows and no sentence: the task is the stack's to make")
     #expect(list.route == route)
@@ -75,9 +76,9 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     try store.createTask(NewTask(title: "Call the bank"))
-    let list = try TaskList(store: store, route: .init(head: inbox))
+    let list = try TaskList(store: store, route: .init(head: inbox), day: testDay)
     #expect(list.send(.action(.rowTapped(id))) == nil)
-    let linked = try TaskList(store: store, route: .init(head: inbox, task: .init(head: id)))
+    let linked = try TaskList(store: store, route: .init(head: inbox, task: .init(head: id)), day: testDay)
     #expect(list.destination.pushed == TaskScreen.Route(head: id))
     #expect(list.model == linked.model, "what a tap opens and what a link opens are one thing")
     #expect(list.route == linked.route)
@@ -90,7 +91,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
 @Test func aTapOnARowNotInTheListOpensNothing() throws {
     let store = try makeStore()
     let gone = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)), day: testDay)
     try store.delete(task: gone)
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     let told = list.model
@@ -111,7 +112,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)), day: testDay)
     _ = list.send(.route(.init(head: inbox, task: .init(head: gone))))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: .init(head: open)))
     #expect(list.destination.pushed == .init(head: open), "the screen that was open stays; this is the setup")
@@ -133,7 +134,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let other = try store.createTask(NewTask(title: "Call the bank"))
     let gone = try store.createTask(NewTask(title: "File the expenses"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)), day: testDay)
     _ = list.send(.route(.init(head: inbox, task: .init(head: gone))))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: .init(head: open)))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
@@ -162,7 +163,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let kept = try store.createTask(NewTask(title: "Call the bank"))
     let gone = try store.createTask(NewTask(title: "File the expenses"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)), day: testDay)
     _ = list.send(.route(.init(head: inbox, task: .init(head: gone))))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: .init(head: open)))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
@@ -187,9 +188,9 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
-    let tapped = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
-    let linked = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)))
-    let unread = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)))
+    let tapped = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)), day: testDay)
+    let linked = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)), day: testDay)
+    let unread = try TaskList(store: store, route: .init(head: inbox, task: .init(head: open)), day: testDay)
     try store.delete(task: gone)
     #expect(tapped.send(.action(.rowTapped(gone))) == nil)
     #expect(tapped.destination.pushed == .init(head: gone), "the tap declared the task; this is the setup")
@@ -213,7 +214,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)))
+    let list = try TaskList(store: store, route: .init(head: inbox, task: .init(head: gone)), day: testDay)
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Write it down")) }
     #expect(list.send(.changed(created)) == nil)
@@ -226,7 +227,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
 
 @Test func aChangeNamingATaskRereadsTheRows() throws {
     let store = try makeStore()
-    let list = try TaskList(store: store, route: .init(head: inbox))
+    let list = try TaskList(store: store, route: .init(head: inbox), day: testDay)
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Buy milk")) }
     #expect(list.send(.changed(created)) == nil)
     #expect(list.model == (try listOn(inbox, in: store)))
@@ -237,7 +238,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
 /// its place: a list that read on any change would have seen the task.
 @Test func aChangeNamingOnlyAnotherViewReadsNothing() throws {
     let store = try makeStore()
-    let list = try TaskList(store: store, route: .init(head: inbox))
+    let list = try TaskList(store: store, route: .init(head: inbox), day: testDay)
     let before = list.model
     try store.createTask(NewTask(title: "Buy milk"))
     let other = try changeSet(of: store) { try store.createView(NewTaskView(title: "Work")) }
@@ -251,7 +252,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: .init(head: work))
+    let list = try TaskList(store: store, route: .init(head: work), day: testDay)
     let renamed = try changeSet(of: store) { try store.update(view: work, [.title("Office")]) }
     #expect(list.send(.changed(renamed)) == nil)
     #expect(list.model.title == "Office")
@@ -265,7 +266,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: .init(head: work))
+    let list = try TaskList(store: store, route: .init(head: work), day: testDay)
     let before = list.model
     #expect(list.send(.changed(try unreadableFilter(on: work, in: store, renamedTo: "Office"))) == nil)
     #expect(list.model.title == "Office")
@@ -280,7 +281,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let errand = try store.createTag(title: "Errand")
     let errands = try store.createView(NewTaskView(title: "Errands", filter: .hasTag(errand)))
     let id = try store.createTask(NewTask(title: "Buy milk", tags: [errand]))
-    let list = try TaskList(store: store, route: .init(head: errands))
+    let list = try TaskList(store: store, route: .init(head: errands), day: testDay)
     #expect(list.model.rows.map(\.id) == [id], "the tag is what puts the task in the view; this is the setup")
     let deleted = try changeSet(of: store) { try store.delete(tag: errand) }
     #expect(deleted.tasks.isEmpty && deleted.views.isEmpty, "the change names the tag and nothing else")
@@ -295,7 +296,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: .init(head: work, task: .init(head: id)))
+    let list = try TaskList(store: store, route: .init(head: work, task: .init(head: id)), day: testDay)
     let before = list.model
     let peer = Store.newDeviceID()
     let later = HLC(millis: 1_800_000_000_000, counter: 0)
@@ -317,7 +318,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: .init(head: work, task: .init(head: id)))
+    let list = try TaskList(store: store, route: .init(head: work, task: .init(head: id)), day: testDay)
     let before = list.model
     #expect(list.send(.changed(try unreadableFilter(on: work, in: store))) == nil, "the view is there, so the list stays")
     #expect(list.model.rows == before.rows)
@@ -336,7 +337,7 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let gone = try store.createTask(NewTask(title: "Buy milk"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: .init(head: work))
+    let list = try TaskList(store: store, route: .init(head: work), day: testDay)
     _ = list.send(.route(.init(head: work, task: .init(head: gone))))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
@@ -345,6 +346,77 @@ private func listOn(_ view: ViewID, in store: Store) throws -> TaskList.Model {
     #expect(list.model == told)
 }
 
+/// A list reads its view's tasks by the day it is given, the device's, and never by a clock of its own (spec section
+/// 8): a task due on the test's day is Today's on that day, and on the day before it is tomorrow's, which Today does
+/// not select.
+@Test func aListReadsItsTasksByTheDayItIsGiven() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Call the bank", when: testDay.day))
+    let today = BuiltInTaskViews.today
+    #expect(try listOn(today, in: store).rows.map(\.title) == ["Call the bank"])
+    #expect(try listOn(today, in: store, on: deviceDay(testDay.day.advanced(by: -1))).rows.isEmpty)
+}
+
+/// A new day rereads the tasks, since which tasks a view selects can depend on the day, and moves nothing else: the
+/// list is the one made on the new day, and the task declared over it stays declared. It answers nothing.
+@Test func aNewDayRereadsTheTasks() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "Call the bank", when: testDay.day))
+    let route = TaskList.Route(head: BuiltInTaskViews.today, task: .init(head: id))
+    let list = try TaskList(store: store, route: route, day: deviceDay(testDay.day.advanced(by: -1)))
+    #expect(list.model.rows.isEmpty, "the task is tomorrow's; this is the setup")
+    #expect(list.send(.dayChanged(testDay)) == nil)
+    #expect(list.model == (try listOn(BuiltInTaskViews.today, in: store)))
+    #expect(list.model.rows.map(\.title) == ["Call the bank"])
+    #expect(list.destination.pushed == route.task)
+}
+
+/// A new day answers nobody, so the sentence on screen stays while the rows are read again: here the one a link to a
+/// task that is gone left, which answered something the person did.
+@Test func aNewDayLeavesTheSentenceOnScreen() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Call the bank", when: testDay.day))
+    let gone = try store.createTask(NewTask(title: "Buy milk"))
+    try store.delete(task: gone)
+    let today = BuiltInTaskViews.today
+    let list = try TaskList(store: store, route: .init(head: today), day: deviceDay(testDay.day.advanced(by: -1)))
+    _ = list.send(.route(.init(head: today, task: .init(head: gone))))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
+    #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.model.rows.isEmpty, "the task is tomorrow's; this is the setup")
+    #expect(list.send(.dayChanged(testDay)) == nil)
+    #expect(list.model.rows.map(\.title) == ["Call the bank"])
+    #expect(list.model.problem == "The task is gone.")
+}
+
+/// The day the list already has, told again, reads nothing: a task written since, with no change sent, stays out of
+/// the rows, where a list made anew reads it, so a reread would have shown it. A new day then reads it.
+@Test func theSameDayAgainReadsNothing() throws {
+    let store = try makeStore()
+    let list = try TaskList(store: store, route: .init(head: inbox), day: testDay)
+    let before = list.model
+    try store.createTask(NewTask(title: "Buy milk"))
+    #expect(list.send(.dayChanged(testDay)) == nil)
+    #expect(list.model == before)
+    #expect(list.model != (try listOn(inbox, in: store)), "a list made anew reads the task")
+    let next = deviceDay(testDay.day.advanced(by: 1))
+    #expect(list.send(.dayChanged(next)) == nil)
+    #expect(list.model == (try listOn(inbox, in: store, on: next)))
+}
+
+/// A new day whose read fails leaves the rows on screen, as a change's reread that fails does, and says they may be
+/// out of date, since no sentence was on screen.
+@Test func aNewDayWhoseReadFailsKeepsTheRowsAndSaysSo() throws {
+    let store = try makeStore()
+    let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
+    try store.createTask(NewTask(title: "Buy milk"))
+    let list = try TaskList(store: store, route: .init(head: work), day: testDay)
+    let before = list.model
+    _ = try unreadableFilter(on: work, in: store)
+    #expect(list.send(.dayChanged(deviceDay(testDay.day.advanced(by: 1)))) == nil)
+    #expect(list.model.rows == before.rows)
+    #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.")
+}
 
 /// A view and a task as the command line prints their ids, the lowercase UUID string of `EntityID`. Fixed, so
 /// that a refusal can name them and a failure reads the same on every run.

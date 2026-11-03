@@ -18,7 +18,7 @@ private func on(_ view: ViewID, task: TaskID? = nil) -> TaskViewList.Route {
 /// rows as a read now answers them, the highlight on the view where a row holds it, and no sentence. Not private,
 /// since the rows' tests compare with it too, where a fold has moved the highlight.
 func sidebarOn(_ view: ViewID, in store: Store) throws -> TaskViewList.Model {
-    try TaskViewList(store: store, route: on(view), width: .narrow, capabilities: iPhone).model
+    try TaskViewList(store: store, route: on(view), width: .narrow, day: testDay, capabilities: iPhone).model
 }
 
 /// What a row is called on screen, read over its kind as a view reads it: a list's title, and an area's label, nil
@@ -32,7 +32,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func initialModelListsTheBuiltInViewsInRankOrderWithInboxSelected() throws {
     let model = try TaskViewList(
-        store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone
+        store: try makeStore(), route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     ).model
     #expect(model.rows.map(title(of:)) == ["Inbox", "Today", "Upcoming", "Logbook", "Trash"])
     #expect(model.rows.allSatisfy { $0.depth == 0 })
@@ -47,7 +47,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     try store.createView(NewTaskView(title: "Notes", parent: folder))
     try store.createView(NewTaskView(title: "Deep", parent: reviews))
     let rows = try TaskViewList(
-        store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone
+        store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     ).model.rows.dropFirst(5)
     #expect(rows.map(title(of:)) == ["Work", "Reviews", "Deep", "Notes"], "past the five built-in views, depth first and siblings by rank")
     #expect(rows.map(\.depth) == [0, 1, 2, 1])
@@ -60,7 +60,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     let store = try makeStore()
     let folder = try store.createView(NewTaskView(title: "Work"))
     try store.createView(NewTaskView(title: "Reviews", parent: folder))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     let before = list.model
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
@@ -81,7 +81,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let list = try TaskViewList(
-        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, day: testDay, capabilities: iPhone
     )
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox, task: id).list, "the task is declared with the list; this is the setup")
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.inbox))) == nil)
@@ -98,7 +98,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 @Test func aListThatCouldNotBeOpenedTakesBackTheHighlightAndSaysSo() throws {
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     let open = list.model
     try store.delete(view: gone)
     #expect(list.send(.action(.rowSelected(gone))) == nil)
@@ -110,10 +110,12 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     #expect(list.model.problem == "The list could not be opened.")
     #expect(list.route == on(BuiltInTaskViews.inbox))
 
-    let made = try TaskViewList(store: store, route: on(gone), width: .narrow, capabilities: iPhone)
+    let made = try TaskViewList(store: store, route: on(gone), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(made.destination.pushed == on(gone).list, "a link to a view that is gone declares its list all the same")
     #expect(
-        made.model == (try TaskViewList(store: store, route: on(ViewID()), width: .narrow, capabilities: iPhone)).model,
+        made.model == (try TaskViewList(
+            store: store, route: on(ViewID()), width: .narrow, day: testDay, capabilities: iPhone
+        )).model,
         "on no row, so nothing is highlighted"
     )
     #expect(highlighted(in: made.model).isEmpty)
@@ -136,7 +138,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
     let list = try TaskViewList(
-        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, day: testDay, capabilities: iPhone
     )
     try store.delete(view: gone)
     _ = list.send(.action(.rowSelected(gone)))
@@ -150,7 +152,9 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     #expect(highlighted(in: list.model).isEmpty)
     #expect(list.model.problem == nil)
     #expect(list.route == .init(list: nil))
-    let renaming = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let renaming = try TaskViewList(
+        store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
+    )
     _ = renaming.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
     _ = renaming.send(.action(.titleFieldChanged(" ")))
     _ = renaming.send(.action(.titleFieldSubmitted))
@@ -166,13 +170,13 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// list again and a link does too, each a write the stack follows by pushing the list (#107, #113).
 @Test func aClickOrARouteAfterBeingUncoveredDeclaresTheListAgain() throws {
     let store = try makeStore()
-    let clicked = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let clicked = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     _ = clicked.send(.uncovered)
     #expect(clicked.send(.action(.rowSelected(BuiltInTaskViews.inbox))) == nil)
     #expect(clicked.destination.pushed == on(BuiltInTaskViews.inbox).list)
     #expect(clicked.model == (try sidebarOn(BuiltInTaskViews.inbox, in: store)))
     #expect(clicked.route == on(BuiltInTaskViews.inbox))
-    let linked = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let linked = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     _ = linked.send(.uncovered)
     #expect(linked.send(.route(on(BuiltInTaskViews.inbox))) == nil)
     #expect(linked.destination.pushed == on(BuiltInTaskViews.inbox).list)
@@ -186,7 +190,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// takes away is a declaration on no row. The answer is no gesture, so the sentence stays.
 @Test func theListsAnswerToCloseTakesTheHighlight() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     _ = list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
     _ = list.send(.action(.titleFieldChanged(" ")))
     _ = list.send(.action(.titleFieldSubmitted))
@@ -207,14 +211,16 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// list of the view it starts on in its `init`, as the task list declares its task in its own. Nothing moves, the
 /// declaration and the sentence included, since being created answers nothing a person was told.
 @Test func createdAnswersNothingAndMovesNothing() throws {
-    let list = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: try makeStore(), route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
+    )
     let before = list.model
     #expect(list.send(.created) == nil)
     #expect(list.model == before)
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list)
     // Sent after a refusal, which is not where a parent sends it, so that there is a sentence to lose.
     let refused = try TaskViewList(
-        store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone
+        store: try makeStore(), route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     )
     _ = refused.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = refused.send(.action(.titleFieldChanged(" ")))
@@ -227,7 +233,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func changedWithAViewRereadsTheTree() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
     let created = try changeSet(of: store) { try store.createView(NewTaskView(title: "Docs")) }
     #expect(list.send(.changed(created)) == nil)
@@ -243,7 +249,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// an id no row carries, so a client drawing row by row never lights two rows, or a row for a list it does not draw.
 @Test func theHighlightIsOnTheDeclaredListsRow() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(highlighted(in: list.model) == [BuiltInTaskViews.inbox])
     #expect(list.send(.action(.rowSelected(BuiltInTaskViews.today))) == nil)
     #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
@@ -276,7 +282,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     }
     try store.apply(ops)
     let chain = try TaskViewList(
-        store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone
+        store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     ).model.rows.filter { $0.id.rawValue.hasPrefix("view-") }
     #expect(chain.map(\.id.rawValue) == ids, "parents before children, however deep the chain")
     #expect(chain.map(\.depth) == Array(0..<1_000))
@@ -284,7 +290,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func renameGoesThroughTheDraftIntoTheStore() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
     #expect(list.model.rows.first.flatMap(draft(of:)) == "Inbox", "the field opens on the title the person chose the menu item on")
     // Every keystroke is a round trip through the module, which is what says the draft is the model's and not
@@ -303,7 +309,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func cancelRenameLeavesTheTitleAndClosesTheField() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     let before = list.model
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today))) == nil)
     #expect(list.send(.action(.titleFieldChanged("Tomorrow"))) == nil)
@@ -315,7 +321,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func anEmptyTitleIsRefusedByTheModuleAndTheFieldStaysOpen() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
     for typed in [" \t ", ""] {
@@ -333,7 +339,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 @Test func aStoreRefusalLandsInTheProblemAndTheNextActionClearsIt() throws {
     let store = try makeStore()
     let folder = try store.createView(NewTaskView(title: "Work"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(folder))) == nil)
     #expect(list.send(.action(.titleFieldChanged("Work in progress"))) == nil)
     // The peer's delete arrives as a delete and not as a `.changed`: the list hears about it from the
@@ -352,7 +358,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 @Test func fieldActionsWithoutAnOpenRenameAreIgnored() throws {
     let store = try makeStore()
     let folder = try store.createView(NewTaskView(title: "Work"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     // A sentence on the model with no field left open: the refusal below closes the field itself, which is
     // the state these actions arrive in and the reason the model is left alone in it.
     #expect(list.send(.action(.renameMenuItemChosen(folder))) == nil)
@@ -381,7 +387,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// read it.
 @Test func aFieldReportingTheTextItHoldsLeavesTheSentence() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
     #expect(list.send(.action(.titleFieldChanged(""))) == nil)
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
@@ -397,7 +403,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func problemSurvivesAChangedEvent() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
     #expect(list.send(.action(.titleFieldChanged(" "))) == nil)
     #expect(list.send(.action(.titleFieldSubmitted)) == nil)
@@ -417,7 +423,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 @Test func aRenameEndsWhenThePeerDeletesTheRowItIsOn() throws {
     let store = try makeStore()
     let folder = try store.createView(NewTaskView(title: "Work"))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(folder))) == nil)
     #expect(list.send(.action(.titleFieldChanged("Work in progress"))) == nil)
     let deleted = try changeSet(of: store) { try store.delete(view: folder) }
@@ -437,7 +443,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func aFieldThatLosesFocusKeepsWhatWasTyped() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.logbook))) == nil)
     #expect(list.send(.action(.titleFieldChanged("Done"))) == nil)
     // Clicking away settles a name, the way it does in the Finder: the person wrote it and then went on
@@ -452,7 +458,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func aFieldThatLosesFocusOnAnEmptyTitleIsRefusedTheWayReturnIs() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     let written = try store.journal(after: 0).count
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
     #expect(list.send(.action(.titleFieldChanged("  "))) == nil)
@@ -469,7 +475,9 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// sets the sentence; the click's own `.rowSelected` follows. The highlight moves, the field stays open and
 /// empty where it was, and the sentence is still what explains it.
 @Test func choosingARowWhileAFieldIsOpenLeavesTheSentence() throws {
-    let list = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: try makeStore(), route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
+    )
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
     #expect(list.send(.action(.titleFieldChanged(""))) == nil)
     #expect(list.send(.action(.titleFieldLostFocus)) == nil)
@@ -481,7 +489,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     // The same state reached in the other order, the highlight moved before the refusal, compares the model
     // whole: nothing else moved.
     let reference = try TaskViewList(
-        store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone
+        store: try makeStore(), route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     )
     _ = reference.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = reference.send(.action(.rowSelected(BuiltInTaskViews.today)))
@@ -492,7 +500,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func choosingRenameOnASecondRowMovesTheFieldAndDropsTheFirstDraft() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox))) == nil)
     #expect(list.send(.action(.titleFieldChanged("Later"))) == nil)
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.trash))) == nil)
@@ -506,7 +514,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
 @Test func aDraftIsStoredWithoutTheWhitespaceAtItsEnds() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.upcoming))) == nil)
     #expect(list.send(.action(.titleFieldChanged("  Work in progress \t "))) == nil)
     // What the person typed is what the field shows, padding and all: the trim is about what the store
@@ -524,7 +532,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// the Inbox's list in its `init`, the way the task list declares the task its route names in its own.
 @Test func theSidebarCreatedFromNoListDeclaresInbox() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.destination.pushed == on(BuiltInTaskViews.inbox).list)
     #expect(list.model == (try sidebarOn(BuiltInTaskViews.inbox, in: store)), "the sidebar a link to the Inbox makes")
     #expect(highlighted(in: list.model) == [BuiltInTaskViews.inbox])
@@ -537,11 +545,13 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 @Test func theSidebarCreatedFromAListDeclaresIt() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskViewList(store: store, route: on(BuiltInTaskViews.today), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.today), width: .narrow, day: testDay, capabilities: iPhone
+    )
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
     #expect(highlighted(in: list.model) == [BuiltInTaskViews.today])
     let linked = try TaskViewList(
-        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, day: testDay, capabilities: iPhone
     )
     #expect(linked.destination.pushed == on(BuiltInTaskViews.inbox, task: id).list)
     #expect(linked.model == (try sidebarOn(BuiltInTaskViews.inbox, in: store)), "the task is the list's to declare, and draws nothing here")
@@ -553,7 +563,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 @Test func theSidebarCreatedWithNoInboxDeclaresNothing() throws {
     let store = try makeStore()
     try store.delete(view: BuiltInTaskViews.inbox)
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.destination.pushed == nil)
     #expect(list.model.rows.map(title(of:)) == ["Today", "Upcoming", "Logbook", "Trash"])
     #expect(highlighted(in: list.model).isEmpty)
@@ -575,7 +585,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
     let store = try makeStore()
     let linked = ViewID()
-    let list = try TaskViewList(store: store, route: on(linked), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: on(linked), width: .narrow, day: testDay, capabilities: iPhone)
     _ = list.send(.notOpened(.notFound(linked), stillOpen: nil))
     #expect(list.destination.pushed == nil, "no view, no list; this is the setup")
     let synced = try changeSet(of: store) {
@@ -590,7 +600,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 
     let bare = try makeStore()
     try bare.delete(view: BuiltInTaskViews.inbox)
-    let fallback = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let fallback = try TaskViewList(store: bare, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(fallback.destination.pushed == nil, "the Inbox is gone before launch; this is the setup")
     let restored = try changeSet(of: bare) { _ = try bare.apply(written(BuiltInTaskViews.inbox, [("deleted", Value(false))])) }
     #expect(fallback.send(.changed(restored)) == nil)
@@ -603,7 +613,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// goes onto its view, so the module ends where a link to the view would have made it.
 @Test func aRouteDeclaresItsListAndHighlightsIt() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.route(on(BuiltInTaskViews.today))) == nil)
     #expect(list.destination.pushed == on(BuiltInTaskViews.today).list)
     #expect(list.model == (try sidebarOn(BuiltInTaskViews.today, in: store)), "the module a link to Today would have created")
@@ -618,7 +628,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
     try store.delete(view: gone)
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.send(.route(on(gone))) == nil)
     _ = list.send(.notOpened(.notFound(gone), stillOpen: on(BuiltInTaskViews.inbox).list))
     #expect(list.model.problem == "The list could not be opened.", "the sentence is the setup; without it this proves nothing")
@@ -641,7 +651,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     #expect(highlighted(in: list.model) == [BuiltInTaskViews.upcoming])
     // The same state reached with the highlight on Upcoming before the refusal compares the model whole.
     let reference = try TaskViewList(
-        store: store, route: on(BuiltInTaskViews.upcoming), width: .narrow, capabilities: iPhone
+        store: store, route: on(BuiltInTaskViews.upcoming), width: .narrow, day: testDay, capabilities: iPhone
     )
     _ = reference.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = reference.send(.action(.titleFieldChanged(" ")))
@@ -655,7 +665,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 @Test func aListThatCannotBeOpenedSpeaksOverAnOpenFieldsSentence() throws {
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     _ = list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = list.send(.action(.titleFieldChanged(" ")))
     _ = list.send(.action(.titleFieldSubmitted))
@@ -679,7 +689,9 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// not open the other (spec section 2).
 @Test func aRouteToAViewThatIsGoneLeavesTheHighlightAndTheListAndSaysSo() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: on(BuiltInTaskViews.today), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.today), width: .narrow, day: testDay, capabilities: iPhone
+    )
     let before = list.model
     let gone = ViewID()
     #expect(list.send(.route(on(gone))) == nil)
@@ -700,7 +712,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let list = try TaskViewList(
-        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, capabilities: iPhone
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, day: testDay, capabilities: iPhone
     )
     let before = list.model
     #expect(list.send(.route(.init(list: nil))) == nil)
@@ -714,7 +726,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
     try store.delete(view: gone)
-    let list = try TaskViewList(store: store, route: on(gone), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: on(gone), width: .narrow, day: testDay, capabilities: iPhone)
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     let sentence = try #require(list.model.problem, "the sentence is the setup; without it this proves nothing")
     let created = try changeSet(of: store) { try store.createView(NewTaskView(title: "Docs")) }
@@ -731,7 +743,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// its list too, until the stack hands back the list that stays.
 @Test func theRouteIsWhatItDeclared() throws {
     let store = try makeStore()
-    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone)
     #expect(list.route == on(BuiltInTaskViews.inbox), "the module's own first choice")
     _ = list.send(.action(.rowSelected(BuiltInTaskViews.today)))
     #expect(list.route == on(BuiltInTaskViews.today))
@@ -746,7 +758,9 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// its own route with the list on it, and moves nothing of its own, the highlight, an open field and its sentence
 /// included: what the request becomes is the root's to decide, by the rule of bubbling (spec section 4).
 @Test func openInNewWindowAsksTheRootAndMovesNothing() throws {
-    let list = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: try makeStore(), route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
+    )
     _ = list.send(.action(.renameMenuItemChosen(BuiltInTaskViews.inbox)))
     _ = list.send(.action(.titleFieldChanged(" ")))
     _ = list.send(.action(.titleFieldSubmitted))
@@ -760,7 +774,9 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 /// The menu item is on a row, and a row the list no longer holds is no view to open, the way the Rename menu
 /// item on one opens no field.
 @Test func openInNewWindowForAViewNotInTheRowsAnswersNothing() throws {
-    let list = try TaskViewList(store: try makeStore(), route: .init(list: nil), width: .narrow, capabilities: iPhone)
+    let list = try TaskViewList(
+        store: try makeStore(), route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
+    )
     let before = list.model
     #expect(list.send(.action(.openInNewWindowMenuItemChosen(ViewID()))) == nil)
     #expect(list.model == before)

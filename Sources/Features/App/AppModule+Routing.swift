@@ -76,10 +76,12 @@ extension AppModule {
             }
         }
 
-        /// What the root hands an element: an action its view sent, or a change the store committed.
+        /// What the root hands an element: an action its view sent, a change the store committed, or the device's
+        /// new day.
         enum Event {
             case action(ScreenAction)
             case changed(ChangeSet)
+            case dayChanged(DeviceDay)
         }
 
         /// What a screen of the stack answers, which the stack hands its opener.
@@ -113,8 +115,10 @@ extension AppModule {
             switch (self, event) {
             case (.list(let list), .action(.list(let action))): list.send(.action(action)).map(Output.list)
             case (.list(let list), .changed(let changes)): list.send(.changed(changes)).map(Output.list)
+            case (.list(let list), .dayChanged(let day)): list.send(.dayChanged(day)).map(Output.list)
             case (.task(let task), .changed(let changes)): task.send(.changed(changes)).map(Output.task)
-            case (.task, .action(.list)): nil
+            // The task screen draws no day, so it has no event for one and is handed nothing.
+            case (.task, .action(.list)), (.task, .dayChanged): nil
             }
         }
 

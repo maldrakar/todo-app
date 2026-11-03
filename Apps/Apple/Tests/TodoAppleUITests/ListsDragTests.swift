@@ -203,7 +203,7 @@ private struct DraggedTree {
         h = try store.createView(NewTaskView(title: "H", kind: .area))
         f = try store.createView(NewTaskView(title: "F", parent: h))
         module = try TaskViewList(
-            store: store, route: TaskViewList.Route(list: nil), width: width, capabilities: capabilities
+            store: store, route: TaskViewList.Route(list: nil), width: width, day: testDay, capabilities: capabilities
         )
         _ = module.send(.action(.editMenuItemChosen))
     }

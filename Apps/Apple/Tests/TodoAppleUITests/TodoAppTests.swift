@@ -55,7 +55,7 @@ import TodoCore
         weak var releasedRoot: TodoApp?
         do {
             let app = try TodoApp.launch(environment: ["TODO_DB": database])
-            let window = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
+            let window = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac)
             released = window.host
             releasedRoot = app
         }
@@ -68,7 +68,7 @@ import TodoCore
 @Test @MainActor func aWindowMadeFromNoPathIsTheDefaultWindow() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let host = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         #expect(host.route.path == defaultWindow)
     }
 }
@@ -78,7 +78,7 @@ import TodoCore
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: path, width: .wide, capabilities: mac).host
+        let host = try app.makeWindow(path: path, width: .wide, day: testDay, capabilities: mac).host
         #expect(host.route.path == path)
     }
 }
@@ -90,7 +90,7 @@ import TodoCore
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)/task"
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: path, width: .wide, capabilities: mac).host
+        let host = try app.makeWindow(path: path, width: .wide, day: testDay, capabilities: mac).host
         #expect(host.route.path == defaultWindow)
         #expect(host.model.problem == nil)
     }
@@ -123,8 +123,8 @@ import TodoCore
     try withFreshDatabase { database in
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
         let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": path])
-        #expect(try app.makeWindow(path: nil, width: .wide, capabilities: mac).host.route.path == path)
-        let next = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
+        #expect(try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host.route.path == path)
+        let next = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac)
         #expect(next.host.route.path == defaultWindow)
     }
 }
@@ -135,9 +135,9 @@ import TodoCore
     try withFreshDatabase { database in
         let restored = "/view/\(BuiltInTaskViews.today)"
         let app = try TodoApp.launch(environment: ["TODO_DB": database, "TODO_ROUTE": "/?quick-entry"])
-        let first = try app.makeWindow(path: restored, width: .wide, capabilities: mac)
+        let first = try app.makeWindow(path: restored, width: .wide, day: testDay, capabilities: mac)
         #expect(first.host.route.path == restored)
-        let next = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
+        let next = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac)
         #expect(next.host.route.path == defaultWindow)
     }
 }
@@ -184,8 +184,8 @@ import TodoCore
 @Test @MainActor func aLinkOpensItsRouteInItsOwnWindow() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let linked = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
-        let other = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
+        let linked = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac)
+        let other = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac)
         let path = "/view/\(BuiltInTaskViews.today)?quick-entry"
         linked.open(try #require(URL(string: "todo://" + path)))
         #expect(linked.host.route.path == path)
@@ -199,8 +199,8 @@ import TodoCore
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
         let path = "/view/\(BuiltInTaskViews.today)"
-        let linked = try app.makeWindow(path: path, width: .wide, capabilities: mac)
-        let other = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
+        let linked = try app.makeWindow(path: path, width: .wide, day: testDay, capabilities: mac)
+        let other = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac)
         linked.open(try #require(URL(string: "todo://view/\(BuiltInTaskViews.today)")))
         #expect(linked.host.model.problem == "The link could not be opened.")
         #expect(linked.host.route.path == path)
@@ -214,7 +214,7 @@ import TodoCore
 @Test @MainActor func aWindowMadeNarrowIsLaidOutNarrow() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let model = try app.makeWindow(path: nil, width: .narrow, capabilities: iPhone).host.model
+        let model = try app.makeWindow(path: nil, width: .narrow, day: testDay, capabilities: iPhone).host.model
         guard case .narrow(let path) = model.layout else {
             Issue.record("a window made narrow is laid out narrow, and is \(model.layout)")
             return
@@ -235,7 +235,7 @@ import TodoCore
         for opensWindowsBeside in [true, false] {
             for hasEditMode in [true, false] {
                 let capabilities = WindowCapabilities(opensWindowsBeside: opensWindowsBeside, hasEditMode: hasEditMode)
-                let host = try app.makeWindow(path: nil, width: .wide, capabilities: capabilities).host
+                let host = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: capabilities).host
                 let rows = host.model.taskViewList.rows
                 #expect(!rows.isEmpty, "the built-in lists")
                 #expect(rows.allSatisfy { offersANewWindow($0) } == opensWindowsBeside, "\(capabilities)")
@@ -255,7 +255,7 @@ import TodoCore
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
         for capabilities in [mac, iPhone] {
-            let host = try app.makeWindow(path: nil, width: .wide, capabilities: capabilities).host
+            let host = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: capabilities).host
             let published = AppScene.AddMenu(of: host)
             #expect(published.menu == host.model.taskViewList.addMenu)
             let shortcuts = published.menu.sections.flatMap(\.items).map(\.shortcut)
@@ -276,8 +276,8 @@ import TodoCore
 @Test @MainActor func theWindowsWidthReachesItsHost() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let widened = try app.makeWindow(path: nil, width: .narrow, capabilities: iPhone)
-        let other = try app.makeWindow(path: nil, width: .narrow, capabilities: iPhone).host
+        let widened = try app.makeWindow(path: nil, width: .narrow, day: testDay, capabilities: iPhone)
+        let other = try app.makeWindow(path: nil, width: .narrow, day: testDay, capabilities: iPhone).host
         let before = widened.host.model
         let otherBefore = other.model
         guard case .narrow(let path) = before.layout, let list = path.first else {
@@ -292,6 +292,71 @@ import TodoCore
     }
 }
 
+/// The device's day a window's view reports goes to that window's host alone, through its world entrance, as the width
+/// does (list screen spec, section 8): of two windows on Today made the day before a task is due, the one told the new
+/// day lists the task, its route as it was, and the other stays on the day it was made on.
+@Test @MainActor func theWindowsDayReachesItsHost() throws {
+    try withFreshDatabase { database in
+        do {
+            let store = try Store.open(path: database, device: Store.newDeviceID(), now: Store.systemNow)
+            try store.createTask(NewTask(title: "Call the bank", when: testDay.day))
+        }
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        let path = "/view/\(BuiltInTaskViews.today)"
+        let dayBefore = DeviceDay(day: testDay.day.advanced(by: -1), began: testDay.began - 86_400_000)
+        let told = try app.makeWindow(path: path, width: .wide, day: dayBefore, capabilities: mac)
+        let other = try app.makeWindow(path: path, width: .wide, day: dayBefore, capabilities: mac).host
+        let otherBefore = other.model
+        #expect(listTitles(told.host.model) == [], "the task is tomorrow's; this is the setup")
+        told.dayChanged(testDay)
+        #expect(listTitles(told.host.model) == ["Call the bank"])
+        #expect(told.host.route.path == path)
+        #expect(other.model == otherBefore)
+    }
+}
+
+/// A device's day is the day its calendar's time zone puts the instant on, and the instant that day began there, in the
+/// clock's milliseconds (list screen spec, section 8). At 20:00 UTC on 31 October 2026 it is already 1 November in
+/// Tokyo, which began at 15:00 UTC the day before. At noon on 1 November 2026 in Los Angeles, the day summer time ended
+/// there, the day began at midnight summer time, 07:00 UTC, and not at 08:00, where the zone's offset after the change
+/// would put it.
+@Test func aDeviceDayIsTheCalendarsDayAndItsStart() throws {
+    let firstOfNovember = Day(year: 2026, month: 11, day: 1)
+    #expect(
+        DeviceDay(at: Date(timeIntervalSince1970: 1_793_476_800), in: try calendar(.gregorian, in: "Asia/Tokyo"))
+            == DeviceDay(day: firstOfNovember, began: 1_793_458_800_000)
+    )
+    #expect(
+        DeviceDay(
+            at: Date(timeIntervalSince1970: 1_793_563_200), in: try calendar(.gregorian, in: "America/Los_Angeles")
+        ) == DeviceDay(day: firstOfNovember, began: 1_793_516_400_000)
+    )
+}
+
+/// `Day` is a date of the Gregorian calendar, so a device on another calendar, Buddhist, Japanese, Hebrew or Islamic,
+/// has its day read in the Gregorian calendar in its own time zone: the day and the start a Gregorian device in the same
+/// zone has, and not the other calendar's year or month, which `Day` would take for another date.
+@Test func aDeviceDayIsGregorianWhateverTheDevicesCalendar() throws {
+    let now = Date(timeIntervalSince1970: 1_793_476_800)
+    let gregorian = DeviceDay(at: now, in: try calendar(.gregorian, in: "Asia/Tokyo"))
+    for identifier in [Calendar.Identifier.buddhist, .japanese, .hebrew, .islamicUmmAlQura] {
+        #expect(DeviceDay(at: now, in: try calendar(identifier, in: "Asia/Tokyo")) == gregorian, "\(identifier)")
+    }
+}
+
+/// The device's clock is data from outside (`docs/style.md`, "Data from outside"), so a reading far past
+/// `Date.distantFuture` reads as that date's day, and one before the epoch as the epoch's, as `Store.systemNow()` reads
+/// such a clock. Unbounded, the calendar read the first as a day in the year 506713 and the second as 1 January 4713,
+/// a year before Christ, which `Day` took for one after.
+@Test func aClockPastEitherEndReadsAsThatEndsDay() throws {
+    let tokyo = try calendar(.gregorian, in: "Asia/Tokyo")
+    #expect(DeviceDay(at: Date(timeIntervalSince1970: 1e15), in: tokyo) == DeviceDay(at: .distantFuture, in: tokyo))
+    #expect(
+        DeviceDay(at: Date(timeIntervalSince1970: -1e15), in: tokyo)
+            == DeviceDay(at: Date(timeIntervalSince1970: 0), in: tokyo)
+    )
+}
+
 /// One store per process and a host per window: a write through one window's action reaches every window, the
 /// windows made before the writer and after it and the writer itself, and each then draws what a window opened
 /// after the write draws. The write is quick entry's, through the window made second, so that the writer's list
@@ -300,13 +365,13 @@ import TodoCore
 @Test @MainActor func everyLiveHostOverOneStoreReceivesAChange() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let first = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
-        let writer = try app.makeWindow(path: "/?quick-entry", width: .wide, capabilities: mac).host
-        let third = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let first = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
+        let writer = try app.makeWindow(path: "/?quick-entry", width: .wide, day: testDay, capabilities: mac).host
+        let third = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         let before = first.model
         writer.send(.quickEntry(.titleFieldChanged("Milk")))
         writer.send(.quickEntry(.addButtonTapped))
-        let opened = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let opened = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         #expect(opened.model != before, "the write moved what a window draws")
         #expect(first.model == opened.model, "the window made before the writer")
         #expect(writer.model == opened.model, "the writer, its quick entry closed")
@@ -320,8 +385,8 @@ import TodoCore
 @Test @MainActor func anIdleHostTakesAChangeInsideAnotherHostsEvent() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let first = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
-        let second = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let first = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
+        let second = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         let order = Order()
         withObservationTracking { _ = second.model } onChange: {
             MainActor.assumeIsolated { order.steps.append(.secondModelMoved) }
@@ -339,7 +404,7 @@ import TodoCore
 @Test @MainActor func aHostInFlightQueuesTheChange() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let host = try app.makeWindow(path: "/?quick-entry", width: .wide, capabilities: mac).host
+        let host = try app.makeWindow(path: "/?quick-entry", width: .wide, day: testDay, capabilities: mac).host
         host.send(.quickEntry(.titleFieldChanged("Milk")))
         let publications = Publications(by: host)
         host.send(.quickEntry(.addButtonTapped))
@@ -354,16 +419,16 @@ import TodoCore
 @Test @MainActor func aClosedWindowsHostIsReleasedAndReceivesNothing() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let writer = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let writer = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         weak var closed: ModuleHost<AppModule>?
         do {
-            let window = try app.makeWindow(path: nil, width: .wide, capabilities: mac)
+            let window = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac)
             closed = window.host
         }
-        let later = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let later = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         #expect(closed == nil)
         writer.send(.taskViewList(.newListMenuItemChosen(in: nil)))
-        let opened = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let opened = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         #expect(later.model == opened.model, "the fan-out after the closed window reached the window after it")
     }
 }
@@ -382,7 +447,7 @@ import TodoCore
 @Test @MainActor func aWindowMakesOneHost() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
-        let writer = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+        let writer = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
         let redraws = [Redraws(), Redraws()]
         let windows = redraws.map { redraws in
             hostInAWindow(ContentClosure(writer: writer, redraws: redraws) {
@@ -496,6 +561,19 @@ private let defaultWindow = "/view/\(BuiltInTaskViews.inbox)"
 private let mac = WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
 private let iPhone = WindowCapabilities(opensWindowsBeside: false, hasEditMode: true)
 
+/// The device's day the tests make their windows and sidebars on, 2 November 2026 as a device on UTC reads it, begun at
+/// its midnight: a fixed day, since a window's day is the platform's reading and a test spells the one it means. Not
+/// private, since the drag's tests make a sidebar on it too.
+let testDay = DeviceDay(day: Day(year: 2026, month: 11, day: 2), began: 1_793_577_600_000)
+
+/// A calendar of the kind in a time zone, both named, so that what a day reads as does not depend on the machine the
+/// tests run on.
+private func calendar(_ identifier: Calendar.Identifier, in zone: String) throws -> Calendar {
+    var calendar = Calendar(identifier: identifier)
+    calendar.timeZone = try #require(TimeZone(identifier: zone))
+    return calendar
+}
+
 /// A scene's content closure in miniature: its body hands the window a new value of its content on every run, and
 /// it runs again on every model the writer publishes.
 private struct ContentClosure<Content: View>: View {
@@ -597,7 +675,7 @@ private struct ContentClosure<Content: View>: View {
 /// over the same file is the only one open.
 @MainActor private func launchAndCreateAList(_ environment: [String: String]) throws -> ViewID {
     let app = try TodoApp.launch(environment: environment)
-    let host = try app.makeWindow(path: nil, width: .wide, capabilities: mac).host
+    let host = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
     let before = Set(host.model.taskViewList.rows.map(\.id))
     host.send(.taskViewList(.newListMenuItemChosen(in: nil)))
     return try #require(Set(host.model.taskViewList.rows.map(\.id)).subtracting(before).first)

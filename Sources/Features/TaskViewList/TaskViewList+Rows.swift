@@ -181,15 +181,6 @@ extension TaskViewList {
         while ancestor.depth > clamped, let parent = ancestor.parent.flatMap({ rowsByID[$0] }) { ancestor = parent }
         return (ancestor.parent, .after(ancestor.id))
     }
-
-    /// The number of open tasks each view selects, which the store answers for every view in one call and which is
-    /// read beside every read of the rows, since a change to any task can move any count (Lists screen spec, section
-    /// 4). `today` is the UTC day of the machine's clock, read again at every read, as the task list reads its own
-    /// rows (`TaskList.rows(of:in:)`): a count that depends on the day is stale across midnight until the next read,
-    /// until the event that tells a module the day has changed exists (Lists screen spec, "Risks").
-    static func counts(of store: Store) throws(StoreError) -> [ViewID: Int] {
-        try store.taskCounts(today: Day(millisSinceEpoch: Store.systemNow()))
-    }
 }
 
 extension TaskViewList.ReadRow {

@@ -24,6 +24,11 @@ import TodoCore
 /// when it is wide the first of them as the detail column's root and the rest as its path. The screens stand in the
 /// stack whichever the shape, so a window that narrows or widens keeps them, with their state.
 ///
+/// It hands the window's modules the device's day (spec section 8; ADR-0006, amendment of 2026-11-01). The window's
+/// view reports the day and the instant it began as an event of the world, at the window's start and whenever it
+/// changes; the root hands it to the sidebar and to every screen standing over it, as it hands a change the store
+/// committed, and makes every list on the day it has then, so no module reads a clock for its day.
+///
 /// It is a routable module (spec section 4), and its route is the route of the window: what a link carries, what
 /// a window is restored from and what the web's address bar shows, each through the route's one text form, `path`
 /// (spec section 2).
@@ -99,7 +104,7 @@ public final class AppModule: Routable {
 
     /// Everything that reaches the root: an action a view sent, a change the store committed, which the root
     /// hands to every module of the window, the two events of a routable module, `.created` and `.route` (spec
-    /// section 3), a link that could not be read, and the window's width class.
+    /// section 3), a link that could not be read, the window's width class and the device's day.
     public enum Event: RoutedEvent {
         /// What a view sent, lifted by the host.
         case action(UserAction)
@@ -132,6 +137,17 @@ public final class AppModule: Routable {
         /// handed (Lists screen spec, sections 8 and 9), and nothing else: no screen is made or dropped, no sentence
         /// moves and the route stays, so the width the window already has moves nothing.
         case widthChanged(WindowWidth)
+        /// The device's day as the window's view reports it, at the window's start and whenever it changes, at
+        /// midnight, in a new time zone or when the app wakes on another day, delivered by the composition root through
+        /// the entrance the width takes (spec section 8; ADR-0006, amendment of 2026-11-01). It is an event of the
+        /// world and not a `UserAction`, as the width is: nobody pressed anything, and the core, which has no time
+        /// zone, cannot tell the day itself (ADR-0001).
+        ///
+        /// It moves the day the root makes its lists on, and is handed to the sidebar and to every screen standing over
+        /// it, each of which reads again what it draws by the day, the sidebar its counts and a list its tasks, and
+        /// reads nothing for the day it already has. No screen is made or dropped, no sentence moves and the layout and
+        /// the route stay.
+        case dayChanged(DeviceDay)
     }
 
     /// What the root asks of the platform, since there is no module above it.
@@ -177,28 +193,36 @@ public final class AppModule: Routable {
     /// sections 7 and 8). It does not change while the app runs, so no event moves it, and it has no default, for the
     /// reason the width has none.
     ///
+    /// The day is the device's when the window is made, as the window's view reads it, so that the window's first
+    /// frame counts and lists by it (spec section 8); the sidebar is made with it, and every list the stack makes is
+    /// made with the day the root has then. It has no default, for the reason the width has none: the core has no time
+    /// zone to choose a day by (ADR-0001), and a default would be a day the core chose for its client.
+    ///
     /// Throws what the sidebar's `init` throws and nothing else, as M2's root did: a window is not made around a
     /// sidebar the store cannot read, and refusing the launch is the composition root's. A screen of the stack that
     /// cannot be made is its opener's to say, and quick entry cannot fail to be made.
     public init(
-        store: Store, route: Route = .default, width: WindowWidth, capabilities: WindowCapabilities
+        store: Store, route: Route = .default, width: WindowWidth, day: DeviceDay, capabilities: WindowCapabilities
     ) throws(StoreError) {
         let taskViewList = try TaskViewList(
-            store: store, route: route.sidebar, width: width, capabilities: capabilities
+            store: store, route: route.sidebar, width: width, day: day, capabilities: capabilities
         )
         // The stack and the seat are built once, here, each with the way to make what it holds: a closure over the
         // `init` of the kind the route names that captures the store and never this root. The root holds both in its
         // state, so a closure holding the root would close a cycle, root to state to stack or seat to closure to
-        // root, and none of them would ever be released (`ScreenStack.init`, `Seat.init`). The stack's closure names
-        // its error, the screens' `Failure`; the seat's throws nothing, so it is applied without `try`.
+        // root, and none of them would ever be released (`ScreenStack.init`, `Seat.init`). The stack's closure
+        // captures the window's day the same way, in the reference the root keeps it in (`Today`), and reads it when
+        // it makes a list. The stack's closure names its error, the screens' `Failure`; the seat's throws nothing, so
+        // it is applied without `try`.
+        let today = Today(day)
         let stack = ScreenStack<Screen>(base: taskViewList) { route throws(StoreError) in
             switch route {
-            case .list(let list): return .list(try TaskList(store: store, route: list))
+            case .list(let list): return .list(try TaskList(store: store, route: list, day: today.day))
             case .task(let task): return .task(try TaskScreen(store: store, route: task))
             }
         }
         let quickEntry = Seat<QuickEntry, Never> { route in QuickEntry(store: store, route: route) }
-        self.state = State(stack: stack, quickEntry: quickEntry, width: width)
+        self.state = State(stack: stack, quickEntry: quickEntry, width: width, today: today)
         // The sidebar answers being created with nothing, and the one output it could give, a window to open,
         // needs a person to ask for it, so nothing is dropped here.
         _ = react(to: state.stack.send(.created))
@@ -234,20 +258,12 @@ public final class AppModule: Routable {
             openQuickEntry()
             return nil
         case .changed(let changes):
-            // Every module of the window gets the change and decides for itself whether it reads it: the sidebar
-            // first, then each screen standing over it, bottom up, as the path stood when the change arrived, which
-            // is read before the sidebar takes it (navigation state spec, section 8, the third flow). A screen whose
-            // subject is gone asks to be closed, its opener empties its destination, and the walk drops it with what
-            // stands over it, whose id the loop then finds gone and hands nothing. The root reads the store for
-            // nothing of its own (spec section 3, ADR-0006, amendment of 2026-10-14), and its sentence stays: a
-            // change answers nothing a person was told. Of what the sidebar answers the root returns the first drawn,
-            // as the stack does within one call.
-            let path = state.stack.path
-            var output = react(to: state.stack.send(.changed(changes)))
-            for id in path {
-                let answer = react(to: state.stack.send(.changed(changes), to: id))
-                output = output ?? answer
-            }
+            // Every module of the window gets the change and decides for itself whether it reads it, the stack's
+            // modules first and quick entry last (navigation state spec, section 8, the third flow). A screen whose
+            // subject is gone asks to be closed, which the walk after it follows. The root reads the store for nothing
+            // of its own (spec section 3, ADR-0006, amendment of 2026-10-14), and its sentence stays: a change answers
+            // nothing a person was told.
+            let output = sendToTheSidebarAndEveryScreen(sidebar: .changed(changes), screens: .changed(changes))
             react(to: state.quickEntry.send(.changed(changes)))
             return output
         case .created:
@@ -277,7 +293,34 @@ public final class AppModule: Routable {
             // written and moves nothing. The same width again moves nothing in either.
             state.width = width
             return react(to: state.stack.send(.widthChanged(width)))
+        case .dayChanged(let day):
+            // Every screen of the stack is handed the day and decides for itself what it reads by it, the day it has
+            // already reading nothing; the task screen draws none, so its case of `Screen` hands it nothing, and quick
+            // entry, which draws none either, is not handed it. Unlike the width, which the sidebar alone draws, the
+            // day is drawn by the sidebar's counts and by every list over it (spec section 8). It is kept first, so
+            // that a screen the walk after it makes starts on it, as every screen made later does. The layout, the
+            // route and the root's sentence stay: the day answers nothing a person was told.
+            state.today.day = day
+            return sendToTheSidebarAndEveryScreen(sidebar: .dayChanged(day), screens: .dayChanged(day))
         }
+    }
+
+    /// Hands an event of the world to the sidebar, in the sidebar's words, and then to each screen standing over it, in
+    /// the screens' words, bottom up, as the path stood when the event arrived, which is read before the sidebar takes
+    /// it: a screen the walk after one of them drops, with what stands over it, is a screen whose id the loop then
+    /// finds gone and hands nothing. Of what the sidebar answers the root returns the first drawn, as the stack does
+    /// within one call. One walk for every event the sidebar and every screen are handed, `.changed` and `.dayChanged`,
+    /// so that the two reach the same modules in the same order. The event is spelled twice, since the sidebar and the
+    /// screens each have an enum of their own, and the labels put the two spellings side by side at the call, where a
+    /// pair that does not match shows.
+    private func sendToTheSidebarAndEveryScreen(sidebar: TaskViewList.Event, screens: Screen.Event) -> Output? {
+        let path = state.stack.path
+        var output = react(to: state.stack.send(sidebar))
+        for id in path {
+            let answer = react(to: state.stack.send(screens, to: id))
+            output = output ?? answer
+        }
+        return output
     }
 
     /// What the sidebar asked for, whichever event drew it out, which the stack hands the root as the flow's owner.
@@ -319,8 +362,8 @@ public final class AppModule: Routable {
     }
 
     /// Everything the root holds between two events: the window's stack, the seat of quick entry, the root's
-    /// sentence and the window's width class. One value, moved by the cases of `send`, from which the model, its
-    /// layout included, and the route are computed on every read (owner's reviews of #77 and #101).
+    /// sentence, the window's width class and the device's day. One value, moved by the cases of `send`, from which the
+    /// model, its layout included, and the route are computed on every read (owner's reviews of #77 and #101).
     ///
     /// The sidebar is the stack's base and not an element or a seat. A window always has it and nothing replaces it,
     /// so the root makes it and hands it to the stack, which keeps it to itself: the root reads its model through
@@ -334,6 +377,10 @@ public final class AppModule: Routable {
         /// The class the window's view reported last, or the one the window was made with, which the layout is cut
         /// by and nothing else reads: the sidebar is handed the same class and keeps its own.
         var width: WindowWidth
+        /// The device's day as the window's view reported it last, or the one the window was made with, which the
+        /// stack makes a list on and nothing else reads: the sidebar and every list are handed the same day and keep
+        /// their own. A reference, which `send` writes through, and the one place the root keeps the day (`Today`).
+        let today: Today
 
         /// The model the root view draws: the sidebar's and each screen's, as each computes it, the layout of the
         /// screens over the sidebar, quick entry's, and the root's sentence.
@@ -364,6 +411,24 @@ public final class AppModule: Routable {
             case .wide(let column?, _): [column] + written
             case .narrow, .wide(nil, _): written
             }
+        }
+    }
+
+    /// The device's day as the window's view reported it last, or the one the window was made with: the day the stack
+    /// makes a list on, so that a list made after midnight starts on the new day (spec section 8).
+    ///
+    /// A reference, and not a value of the state, because the stack's closure is built once, in `init`, before the
+    /// state exists, and has to read the day a list is made on when the list is made, not the day the window was made
+    /// with. It captures this, as it captures the store, and never the root: the root holds the stack in its state, so
+    /// a closure holding the root would close a cycle, root to state to stack to closure to root, and none of them
+    /// would ever be released (`ScreenStack.init`). This holds nothing but the day, so the closure that holds it closes
+    /// no cycle. The state holds it too, as its day, so that it is the one place the root keeps the day and `send`
+    /// writes it there; a value beside it would be a second copy of the same day.
+    private final class Today {
+        var day: DeviceDay
+
+        init(_ day: DeviceDay) {
+            self.day = day
         }
     }
 

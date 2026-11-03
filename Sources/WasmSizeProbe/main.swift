@@ -24,18 +24,18 @@ import WASILibc
 /// bar, and drives every module of the window — a selection, a rename, a new list, a list made inside it, a fold, a new
 /// area, Move to… into it, a drop back to the root, edit mode and Done, a delete asked and cancelled, and New task in
 /// the sidebar, a link applied as `.route` through the window's stack, quick entry creating a task, a tap in the list
-/// sent to its element of the stack, which pushes the task, the way back as the shorter path, the window narrowing,
-/// Cancel, and Open in New Window, whose path it writes down — with the change each write produced, and a path the
-/// routes refuse, and it reads the layout the root cuts for the window's width and the sidebar's component models,
-/// its rows with the numbers of that width, its bar in and out of edit mode and the bar of a root made with no edit
-/// mode, as the Mac's window is, the confirmation, the picker and the look of the drag in both widths, each through the
-/// switches their views have. Beside that it calls the core's public API directly, and each group of calls has a client
-/// that ships it. The writes, the reads, a page and search are what the modules M3 adds will call. The filter codec and
-/// the journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in them ("Goals and
-/// non-goals"). The snapshot is what a web page persists, reopened under the platform clock a web entry point passes. A
-/// group dropped because no module makes its calls would take out code the web client still ships. What a client calls
-/// is what the linker has to keep, so the number the job prints is the root module and the core a web client cannot
-/// dead-strip its way out of shipping.
+/// sent to its element of the stack, which pushes the task, the way back as the shorter path, the window narrowing, the
+/// day turning, Cancel, and Open in New Window, whose path it writes down — with the change each write produced, and a
+/// path the routes refuse, and it reads the layout the root cuts for the window's width and the sidebar's component
+/// models, its rows with the numbers of that width, its bar in and out of edit mode and the bar of a root made with no
+/// edit mode, as the Mac's window is, the confirmation, the picker and the look of the drag in both widths, each
+/// through the switches their views have. Beside that it calls the core's public API directly, and each group of calls
+/// has a client that ships it. The writes, the reads, a page and search are what the modules M3 adds will call. The
+/// filter codec and the journal exchange are the web host's own, which is where the spec leaves the gaps #23 found in
+/// them ("Goals and non-goals"). The snapshot is what a web page persists, reopened under the platform clock a web
+/// entry point passes. A group dropped because no module makes its calls would take out code the web client still
+/// ships. What a client calls is what the linker has to keep, so the number the job prints is the root module and the
+/// core a web client cannot dead-strip its way out of shipping.
 ///
 /// Every value it produces reaches a `print`. A result nobody reads is a call the optimizer may delete, and
 /// a deleted call is a measurement of a binary nobody will ship.
@@ -141,13 +141,16 @@ private enum WasmSizeProbe {
         // Made wide, as a browser window opens, and narrowed further down, so that the layout the root cuts by the
         // width, and the sidebar's numbers, are in the measurement in both their shapes; told a window can open beside
         // it, so that the menus are in it with every item they can hold, and that it has edit mode, so that the edit
-        // bar is in it too. A second root, made as the Mac's window is, with no edit mode, has the other bar.
+        // bar is in it too. A second root, made as the Mac's window is, with no edit mode, has the other bar. Both
+        // open on a fixed day, `today` begun at midnight UTC, as the stores open on a fixed clock: the day is the
+        // platform's reading, and the probe has no platform to read it from.
+        let day = DeviceDay(day: today, began: 1_789_862_400_000)
         let app = try AppModule(
-            store: appStore, route: try AppModule.Route(path: "/"), width: .wide,
+            store: appStore, route: try AppModule.Route(path: "/"), width: .wide, day: day,
             capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: true)
         )
         let withoutEditMode = try AppModule(
-            store: appStore, width: .wide,
+            store: appStore, width: .wide, day: day,
             capabilities: WindowCapabilities(opensWindowsBeside: true, hasEditMode: false)
         )
         @discardableResult
@@ -204,10 +207,10 @@ private enum WasmSizeProbe {
         // A link, read from its path and followed through the window's stack, with quick entry up over the Inbox;
         // quick entry files a task, whose change reaches the list; a tap on the list's element, in the column,
         // pushes the task, and the way back, the detail's path one shorter, which is empty, pops it and leaves the
-        // list; the window narrows, which moves the layout alone; quick entry opened again is cancelled; and a view
-        // asks for a window of its own, whose route is written down. The layout is read for what stands over the
-        // sidebar, each id and its screen's model, and printed through one switch over its shapes, as the root view
-        // draws it.
+        // list; the window narrows, which moves the layout alone; the day turns, which the sidebar's counts and the
+        // list read again; quick entry opened again is cancelled; and a view asks for a window of its own, whose route
+        // is written down. The layout is read for what stands over the sidebar, each id and its screen's model, and
+        // printed through one switch over its shapes, as the root view draws it.
         perform(.route(try AppModule.Route(path: "/view/\(BuiltInTaskViews.inbox)?quick-entry")))
         perform(.action(.quickEntry(.titleFieldChanged("Buy milk"))))
         perform(.action(.quickEntry(.addButtonTapped)))
@@ -218,6 +221,7 @@ private enum WasmSizeProbe {
         let opened = label(idsOverTheSidebar(in: app.model.layout).last.flatMap { app.model.screens[$0] })
         perform(.action(.wentBack(to: [])))
         perform(.widthChanged(.narrow))
+        perform(.dayChanged(DeviceDay(day: today.advanced(by: 1), began: day.began + 86_400_000)))
         let narrowSidebar = sidebarLine(of: app.model)
         let narrowDrag = dragLine(of: app.model)
         perform(.action(.quickEntryButtonTapped))
