@@ -48,7 +48,7 @@ extension Store {
         return try groups(of: view, from: try tasks(selectedByAnyOf: rules, sort: view.sort, today: today)).flatMap(\.tasks)
     }
 
-    /// A page: the view's own section first, then every list inside it as a section in rank order, which is the
+    /// A page: the view's own section first, then every child view as a section in rank order, which is the
     /// product's order of a list (ADR-0004, amendment of 2026-11-01). One level deep — a child's own children
     /// flatten into the child's section here and become sections of their own when that child is the page being
     /// opened.
@@ -80,25 +80,23 @@ extension Store {
         return TaskViewPage(view: view, sections: [TaskViewPage.Section(view: nil, groups: try groups(of: view, from: own))] + sections)
     }
 
-    /// The view a read is of, a page, its done tasks or the flat list, or the list a group's view is made from, found
-    /// among the views the call read once. It has to be there, and one this app cannot read is reported and not
-    /// evaluated, because a filter with a condition dropped is a list missing exactly the rows that condition selected.
+    /// The view a read is of, a page, its done tasks or the flat list, found among the views the read read once. It
+    /// has to be there, and one this app cannot read is reported and not evaluated, because a filter with a condition
+    /// dropped is a list missing exactly the rows that condition selected.
     static func readableView(_ id: ViewID, among views: [TaskView]) throws(StoreError) -> TaskView {
         guard let view = views.first(where: { $0.id == id }) else { throw .notFound(id) }
         if let kind = view.needsNewerApp { throw .viewNeedsNewerApp(view.id, kind: kind) }
         return view
     }
 
-    /// Every child of kind `list` of a view in rank order, as `children(ofView:)` lists them, from the views the read
-    /// read once, with the rules its section of the page holds the tasks of: a list's own rule, or the rules of a
-    /// folder's lists, gathered as its count gathers them (`gatheredRules(of:)`); none for a child this app cannot read
-    /// and for a folder with nothing under it to select. The page reads them, and the done read lifts them. A child of
-    /// another kind is no section and claims nothing: a group's view is a screen over its list and not a block on it
-    /// (ADR-0004, amendment of 2026-11-01), and an area is never a child in a read.
+    /// Every child of a view in rank order, as `children(ofView:)` lists them, from the views the read read once,
+    /// with the rules its section of the page holds the tasks of: a list's own rule, or the rules of a folder's
+    /// lists, gathered as its count gathers them (`gatheredRules(of:)`); none for a child this app cannot read and
+    /// for a folder with nothing under it to select. The page reads them, and the done read lifts them.
     static func childSections(of viewID: ViewID, among views: [TaskView]) -> [(view: TaskView, rules: [Filter])] {
         var gathered: [ViewID: [Filter]] = [:]
         for (view, rules) in gatheredRules(of: views) { gathered[view.id] = rules }
-        return views.filter { $0.parent == viewID && $0.kind == .list }.map { ($0, gathered[$0.id] ?? []) }
+        return views.filter { $0.parent == viewID }.map { ($0, gathered[$0.id] ?? []) }
     }
 
     /// The tasks any of `rules` selects, each once, in `sort`: every read of a view's tasks is read here. A list's

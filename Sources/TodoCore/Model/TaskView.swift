@@ -2,8 +2,7 @@
 
 /// A view as read from the store: a filter over tasks, a place in the sidebar tree, and how its results are
 /// sorted and grouped. `parent` is effective, by the rule the task tree follows — a link to a missing,
-/// deleted or circular parent reads as no link and the view shows at the root, and so does a link to a group's
-/// view, which holds no lists.
+/// deleted or circular parent reads as no link and the view shows at the root.
 ///
 /// A view with no filter has no results of its own and serves as a folder; a heading inside a project is the
 /// same mechanism, a child view whose filter is "listed in this view". `needsNewerApp` carries the kind this
@@ -13,12 +12,10 @@
 ///
 /// `kind`, `color` and `icon` are read by the rules of the Lists screen spec, section 2. An `area` stored on a
 /// view with an effective parent or a filter reads as a list, since an area stands only at the root and selects
-/// nothing. A `group` reads as one under a view that is there and is no group, and with a filter, and as gone
-/// anywhere else, since the rule that lifts the child of a missing parent to the root would stand a list named
-/// "Tomorrow" there (ADR-0004, amendment of 2026-11-01). A colour this app has no name for reads as none; an icon
-/// is the name of a glyph in the app's own set as text, and a name this app does not know is read by the feature
-/// module that builds the tile, which gives it the default glyph (ADR-0007, amendment of 2026-10-26). A view
-/// written before the three existed reads as a plain list with no tile.
+/// nothing; a colour this app has no name for reads as none; an icon is the name of a glyph in the app's own
+/// set as text, and a name this app does not know is read by the feature module that builds the tile, which
+/// gives it the default glyph (ADR-0007, amendment of 2026-10-26). A view written before the three existed
+/// reads as a plain list with no tile.
 public struct TaskView: Equatable, Sendable {
     public let id: ViewID
     public let title: String
@@ -35,13 +32,12 @@ public struct TaskView: Equatable, Sendable {
     public let updatedAt: Int64
 }
 
-/// What a view is for: a list, which opens and shows tasks; an area, a line across the root of the tree that
-/// groups the lists under it and itself opens nothing and selects nothing (ADR-0004, amendment of 2026-10-25); or
-/// a group, the view of one group of a list opened as a screen of its own, which stands under its list, holds no
-/// lists, and is no section of its list's page, no row of the sidebar and no count (ADR-0004, amendment of
-/// 2026-11-01). It is written when the view is made and never changes afterwards, so no `TaskViewChange` sets it.
+/// What a view is for: a list, which opens and shows tasks, or an area, a line across the root of the tree that
+/// groups the lists under it and itself opens nothing and selects nothing (ADR-0004, amendment of 2026-10-25).
+/// It is written when the view is made and never changes afterwards, so no `TaskViewChange` sets it. A group of a
+/// list opened as a screen is no row, and so has no kind (ADR-0004, amendment of 2026-11-02).
 public enum TaskViewKind: String, Equatable, Sendable {
-    case list, area, group
+    case list, area
 }
 
 /// The colour of a list's tile, by name: the eleven the canvas's tiles use. The names are the core's, and what a
@@ -53,8 +49,7 @@ public enum TaskViewColor: String, Equatable, Sendable, CaseIterable {
 
 /// What a caller knows about a view before it exists. Everything but the title has a default, and the id, the
 /// rank and the timestamps are the store's to mint, the way `NewTask` leaves them. A view is a list unless it
-/// is asked to be an area, and an area is made at the root with no filter or not at all (`Store.createView`); a
-/// group is made from its list by `Store.groupView(of:condition:titled:)` and by nothing else.
+/// is asked to be an area, and an area is made at the root with no filter or not at all (`Store.createView`).
 public struct NewTaskView: Sendable {
     public let title: String
     public let parent: ViewID?

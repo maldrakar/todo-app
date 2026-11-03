@@ -9,7 +9,7 @@ extension TaskViewList {
     struct ReadRow {
         let id: ViewID
         let title: String
-        let kind: Kind
+        let kind: TaskViewKind
 
         /// The store's names of the list's colour and icon, kept as the store gives them: a new list made inside this
         /// one takes its colour by the store's name, and the tile reads both as the design system's when the model is
@@ -24,22 +24,6 @@ extension TaskViewList {
         /// The depth the row is drawn at (`Model.Row.depth`).
         let depth: Int
         let hasChildren: Bool
-
-        /// What the row is: a list's row or an area's line, the two the sidebar draws. A group's view is a screen over
-        /// its list and no row here (ADR-0004, amendment of 2026-11-01), so the read leaves it out (`rows(of:)`), and a
-        /// switch over a row's kind has the sidebar's two cases and no third it never meets.
-        enum Kind {
-            case list, area
-
-            /// The kind of a view's row, and nil for a group's view, which has none.
-            fileprivate init?(_ kind: TaskViewKind) {
-                switch kind {
-                case .list: self = .list
-                case .area: self = .area
-                case .group: return nil
-                }
-            }
-        }
     }
 
     /// The tree as one read produced it. `views()` answers parents before children with the effective parent
@@ -52,21 +36,18 @@ extension TaskViewList {
     /// not an indent says which area a list belongs to, and their lists one deeper (Lists screen spec, section 3). The
     /// store reads an area that is nested as a list, so the walk meets an area only at the root. In tree order a row's
     /// first child follows it at once, so a row has lists inside it exactly when the next row's parent is this row.
-    ///
-    /// A group's view has no row, and is left out before the walk, so that a list whose only child is a group has no
-    /// lists inside it and draws no chevron (ADR-0004, amendment of 2026-11-01).
     static func rows(of store: Store) throws(StoreError) -> [ReadRow] {
-        let views = try store.views().compactMap { view in ReadRow.Kind(view.kind).map { (view: view, kind: $0) } }
+        let views = try store.views()
         var passed: [ViewID: (depth: Int, isArea: Bool)] = [:]
         return views.indices.map { index in
-            let (view, kind) = views[index]
+            let view = views[index]
             let parent = view.parent.flatMap { id in passed[id].map { (id: id, row: $0) } }
             let depth = parent.map { $0.row.isArea ? $0.row.depth : $0.row.depth + 1 } ?? 0
-            passed[view.id] = (depth, kind == .area)
+            passed[view.id] = (depth, view.kind == .area)
             return ReadRow(
-                id: view.id, title: view.title, kind: kind, color: view.color, icon: view.icon,
+                id: view.id, title: view.title, kind: view.kind, color: view.color, icon: view.icon,
                 parent: parent?.id, depth: depth,
-                hasChildren: views.indices.contains(index + 1) && views[index + 1].view.parent == view.id
+                hasChildren: views.indices.contains(index + 1) && views[index + 1].parent == view.id
             )
         }
     }
