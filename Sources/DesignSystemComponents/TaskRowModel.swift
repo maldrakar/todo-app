@@ -46,7 +46,7 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     public let swipe: SwipeModel<Action>?
 
     /// How the row looks while it is lifted to be moved, and nil for a row that cannot be.
-    public let lift: LiftModel?
+    public let lift: TaskLiftModel?
 
     /// The colour under the row where it was just dropped, which fades out over `freshAnimation` from the moment it
     /// lands, and nil under any other row. The motion is held while the colour is nil too, so the fade does not stop
@@ -76,7 +76,7 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         minimumHeight: Double,
         cornerRadius: Double,
         swipe: SwipeModel<Action>?,
-        lift: LiftModel?,
+        lift: TaskLiftModel?,
         fresh: DesignSystem.Color?,
         freshAnimation: DesignSystem.Animation,
         tap: Action,

@@ -6,8 +6,8 @@ import DesignSystem
 /// `trailingMargin`, `bottomMargin` and `leadingMargin` from what stands round it; its title, or the field in its place
 /// while the list is being named, and `titleToSubtitle` after the title its subtitle where it has one, `topPadding`
 /// below its top, `horizontalPadding` in from either side and `bottomPadding` above its bottom; the chevron that folds
-/// and opens the block, centred in a cell `chevronHit` across; its rule along its bottom where it has one; and what it
-/// draws under itself, the pointer's tint, rounded by `cornerRadius`, in points.
+/// and opens the block, centred in a square cell `chevronHitSide` on a side; its rule along its bottom where it has
+/// one; and what it draws under itself, the pointer's tint, rounded by `cornerRadius`, in points.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block and a column each hold one, every comparison
 /// of the screen's model compares it, and inline, its field and chevron with it, it is some 770 bytes on wasm32. Its
@@ -25,7 +25,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
     public let field: TextFieldModel<Action>?
 
     public let chevron: AccessoryModel<Action>.Chevron
-    public let chevronHit: Double
+    public let chevronHitSide: Double
 
     /// The rule under the header, across its width, whose width is how thick it is, and nil for a header with none, as
     /// a column's is.
@@ -50,7 +50,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         titleToSubtitle: Double,
         field: TextFieldModel<Action>?,
         chevron: AccessoryModel<Action>.Chevron,
-        chevronHit: Double,
+        chevronHitSide: Double,
         rule: StrokeModel?,
         height: Double,
         topMargin: Double,
@@ -68,7 +68,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         self.titleToSubtitle = titleToSubtitle
         self.field = field
         self.chevron = chevron
-        self.chevronHit = chevronHit
+        self.chevronHitSide = chevronHitSide
         self.rule = rule
         self.height = height
         self.topMargin = topMargin
@@ -89,7 +89,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
             && lhs.titleToSubtitle == rhs.titleToSubtitle
             && lhs.field == rhs.field
             && lhs.chevron == rhs.chevron
-            && lhs.chevronHit == rhs.chevronHit
+            && lhs.chevronHitSide == rhs.chevronHitSide
             && lhs.rule == rhs.rule
             && lhs.height == rhs.height
             && lhs.topMargin == rhs.topMargin

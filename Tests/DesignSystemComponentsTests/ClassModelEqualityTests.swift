@@ -137,22 +137,22 @@ private func drag(
     DragModel(indent: indent, animation: animation, look: look)
 }
 
-private let indicator = DragModel.Indicator(
+private let indicator = DropIndicatorModel(
     height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
     trailingGap: 18, circleDiameter: 10, circleOffset: -6, circleRing: StrokeModel(color: .accent, width: 2, dash: []),
-    circleFill: .sidebar,
-    card: .init(
-        width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted, rotation: -1.2,
-        opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5, glyphSize: 12,
-        titleFont: .rowTitle
-    )
+    circleFill: .sidebar
+)
+
+private let indicatorCard = DragModel.IndicatorCard(
+    width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted, rotation: -1.2,
+    opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5, glyphSize: 12, titleFont: .rowTitle
 )
 
 @Test func aDragComparesEveryStoredProperty() {
     expectEveryPropertyCompared({ drag() }, [
         "indent": drag(indent: IndentModel(start: 20, step: 24)),
         "animation": drag(animation: .check),
-        "look": drag(look: .indicator(indicator)),
+        "look": drag(look: .indicator(indicator, indicatorCard)),
     ])
     #expect(drag(look: .slot(slot, card)) != drag(look: .slot(DragModel.Slot(
         height: 50, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft, stroke: stroke
@@ -213,10 +213,13 @@ private let swipe = SwipeModel<Action>(
     animation: .swipe, action: .second
 )
 
-private let lift = LiftModel(
+private let lift = TaskLiftModel(
     scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
-    slot: StrokeModel(color: .accent, width: 2, dash: []), slotDot: 8, slotHeight: 10, slotLeading: 52,
-    slotTrailing: 20
+    indicator: DropIndicatorModel(
+        height: 10, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
+        trailingGap: 20, circleDiameter: 8, circleOffset: 52,
+        circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .paper
+    )
 )
 
 private func taskRow(
@@ -224,7 +227,7 @@ private func taskRow(
     meta: [MetaItemModel] = [], titleToMeta: Double = 3, metaSpacing: Double = 10, metaLineSpacing: Double = 3,
     verticalPadding: Double = 11, titleLeading: Double = 2, titleTrailing: Double = 4, leading: Double = 8,
     trailing: Double = 12, minimumHeight: Double = 44, cornerRadius: Double = 0, swipe: SwipeModel<Action>? = nil,
-    lift: LiftModel? = nil, fresh: DesignSystem.Color? = nil, freshAnimation: DesignSystem.Animation = .fresh,
+    lift: TaskLiftModel? = nil, fresh: DesignSystem.Color? = nil, freshAnimation: DesignSystem.Animation = .fresh,
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> TaskRowModel<Action> {
     TaskRowModel(
@@ -267,7 +270,7 @@ private let pill = PillModel(
 )
 
 private let addSubtask = AddRowModel<Action>(
-    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2), iconCell: 40, spacing: 0,
+    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2), iconCellWidth: 40, spacing: 0,
     title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 44, width: nil, cornerRadius: 0,
     topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
     trailingMargin: 0, action: .first
@@ -285,7 +288,7 @@ private func card(
     check: CheckModel<Action> = check(), title: TextFieldModel<Action> = field("Call the plumber"),
     notes: TextFieldModel<Action> = field(""), subtasks: [SubtaskRowModel<Action>] = [],
     subtaskField: TextFieldModel<Action>? = nil, addSubtask: AddRowModel<Action> = addSubtask,
-    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, expandHit: Double = 44,
+    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, expandHitSide: Double = 44,
     background: DesignSystem.Color = .surface, cornerRadius: Double = 18, topMargin: Double = 6,
     horizontalMargin: Double = 10, bottomMargin: Double = 10, bodyLeading: Double = 46, bodyTrailing: Double = 14,
     bodyBottom: Double = 14, subtasksToPills: Double = 10, pillSpacing: Double = 6,
@@ -294,7 +297,7 @@ private func card(
 ) -> CardModel<Action> {
     CardModel(
         check: check, title: title, notes: notes, subtasks: subtasks, subtaskField: subtaskField,
-        addSubtask: addSubtask, pills: pills, expand: expand, expandHit: expandHit, background: background,
+        addSubtask: addSubtask, pills: pills, expand: expand, expandHitSide: expandHitSide, background: background,
         cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
         bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing, bodyBottom: bodyBottom,
         subtasksToPills: subtasksToPills, pillSpacing: pillSpacing, shadow: shadow, animation: animation,
@@ -310,14 +313,14 @@ private func card(
         "subtasks": card(subtasks: [SubtaskRowModel(check: check(), title: text, strike: nil, height: 44)]),
         "subtaskField": card(subtaskField: field("")),
         "addSubtask": card(addSubtask: AddRowModel(
-            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2), iconCell: 30, spacing: 0,
+            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2), iconCellWidth: 30, spacing: 0,
             title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 30, width: nil,
             cornerRadius: 7, topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil,
             topMargin: 0, leadingMargin: 0, trailingMargin: 0, action: .first
         )),
         "pills": card(pills: [pill]),
         "expand": card(expand: ButtonModel(label: expand.label, action: .second)),
-        "expandHit": card(expandHit: 30),
+        "expandHitSide": card(expandHitSide: 30),
         "background": card(background: .fill),
         "cornerRadius": card(cornerRadius: 14),
         "topMargin": card(topMargin: 4),
@@ -340,17 +343,19 @@ private let chevron = AccessoryModel<Action>.Chevron(
 )
 
 private func blockHeader(
-    title: TextModel = text, subtitle: TextModel? = nil, titleToSubtitle: Double = 8, field: TextFieldModel<Action>? = nil,
-    chevron: AccessoryModel<Action>.Chevron = chevron, chevronHit: Double = 44, rule: StrokeModel? = stroke,
+    title: TextModel = text, subtitle: TextModel? = nil, titleToSubtitle: Double = 8,
+    field: TextFieldModel<Action>? = nil, chevron: AccessoryModel<Action>.Chevron = chevron,
+    chevronHitSide: Double = 44, rule: StrokeModel? = stroke,
     height: Double = 44, topMargin: Double = 6, trailingMargin: Double = 6, bottomMargin: Double = 2,
     leadingMargin: Double = 12, topPadding: Double = 13, horizontalPadding: Double = 8, bottomPadding: Double = 0,
     cornerRadius: Double = 0, titleTapped: Action = .first
 ) -> BlockHeaderModel<Action> {
     BlockHeaderModel(
-        title: title, subtitle: subtitle, titleToSubtitle: titleToSubtitle, field: field, chevron: chevron, chevronHit: chevronHit,
-        rule: rule, height: height, topMargin: topMargin, trailingMargin: trailingMargin, bottomMargin: bottomMargin,
-        leadingMargin: leadingMargin, topPadding: topPadding, horizontalPadding: horizontalPadding,
-        bottomPadding: bottomPadding, cornerRadius: cornerRadius, titleTapped: titleTapped
+        title: title, subtitle: subtitle, titleToSubtitle: titleToSubtitle, field: field, chevron: chevron,
+        chevronHitSide: chevronHitSide, rule: rule, height: height, topMargin: topMargin,
+        trailingMargin: trailingMargin, bottomMargin: bottomMargin, leadingMargin: leadingMargin, topPadding: topPadding,
+        horizontalPadding: horizontalPadding, bottomPadding: bottomPadding, cornerRadius: cornerRadius,
+        titleTapped: titleTapped
     )
 }
 
@@ -363,7 +368,7 @@ private func blockHeader(
         "chevron": blockHeader(chevron: AccessoryModel.Chevron(
             icon: chevron.icon, rotation: -90, animation: .fold, accessibilityLabel: "Unfold", action: .second
         )),
-        "chevronHit": blockHeader(chevronHit: 30),
+        "chevronHitSide": blockHeader(chevronHitSide: 30),
         "rule": blockHeader(rule: nil),
         "height": blockHeader(height: 34),
         "topMargin": blockHeader(topMargin: 14),

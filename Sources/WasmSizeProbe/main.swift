@@ -416,8 +416,7 @@ private enum WasmSizeProbe {
         switch drag.look {
         case .slot(let slot, let card):
             return "a slot \(slot.height) pt from \(tile - slot.inset), its card at \(card.scale)"
-        case .indicator(let indicator):
-            let card = indicator.card
+        case .indicator(let indicator, let card):
             return "a line \(indicator.line.width) pt from \(tile + indicator.lineOffset), its card \(card.width) wide"
         }
     }

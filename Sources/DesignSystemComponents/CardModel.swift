@@ -4,11 +4,11 @@ import DesignSystem
 /// A task's card, its row opened in place (`Phone.dc.html`, the open card; `Mac.dc.html`, the pane's): `topMargin`
 /// below what stands before it, `horizontalMargin` in from either side and `bottomMargin` above what follows, on
 /// `background` with corners of `cornerRadius`, casting `shadow`, opening on `animation`. Along its top stand its
-/// check, its title's field and the button that opens it full screen, centred in a cell `expandHit` across; under
-/// them its body, `bodyLeading` in from its leading edge, under the title, and `bodyTrailing` from its trailing edge,
-/// ending `bodyBottom` above its bottom: the notes' field, the subtasks, the field of the subtask being typed where
-/// there is one, the row that adds a subtask, and `subtasksToPills` under them its pills, `pillSpacing` apart, in
-/// points.
+/// check, its title's field and the button that opens it full screen, centred in a square cell `expandHitSide` on a
+/// side; under them its body, `bodyLeading` in from its leading edge, under the title, and `bodyTrailing` from its
+/// trailing edge, ending `bodyBottom` above its bottom: the notes' field, the subtasks, the field of the subtask being
+/// typed where there is one, the row that adds a subtask, and `subtasksToPills` under them its pills, `pillSpacing`
+/// apart, in points.
 ///
 /// The actions the typed text of its three fields sends are not here, as no field's is (`TextFieldModel`): a card's
 /// view takes them beside the model. It holds no id of the store's: the feature module's row carries the task's id
@@ -36,7 +36,7 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
     /// The button that opens the task full screen.
     public let expand: ButtonModel<Action>
 
-    public let expandHit: Double
+    public let expandHitSide: Double
     public let background: DesignSystem.Color
     public let cornerRadius: Double
     public let topMargin: Double
@@ -62,7 +62,7 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
         addSubtask: AddRowModel<Action>,
         pills: [PillModel],
         expand: ButtonModel<Action>,
-        expandHit: Double,
+        expandHitSide: Double,
         background: DesignSystem.Color,
         cornerRadius: Double,
         topMargin: Double,
@@ -85,7 +85,7 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
         self.addSubtask = addSubtask
         self.pills = pills
         self.expand = expand
-        self.expandHit = expandHit
+        self.expandHitSide = expandHitSide
         self.background = background
         self.cornerRadius = cornerRadius
         self.topMargin = topMargin
@@ -111,7 +111,7 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
             && lhs.addSubtask == rhs.addSubtask
             && lhs.pills == rhs.pills
             && lhs.expand == rhs.expand
-            && lhs.expandHit == rhs.expandHit
+            && lhs.expandHitSide == rhs.expandHitSide
             && lhs.background == rhs.background
             && lhs.cornerRadius == rhs.cornerRadius
             && lhs.topMargin == rhs.topMargin
