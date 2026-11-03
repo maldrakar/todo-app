@@ -48,7 +48,7 @@ extension Store {
         return try groups(of: view, from: try tasks(selectedByAnyOf: rules, sort: view.sort, today: today)).flatMap(\.tasks)
     }
 
-    /// A page: the view's own section first, then every list inside it as a section in rank order, which is the
+    /// A page: the view's own section first, then every child view as a section in rank order, which is the
     /// product's order of a list (ADR-0004, amendment of 2026-11-01). One level deep — a child's own children
     /// flatten into the child's section here and become sections of their own when that child is the page being
     /// opened.
