@@ -76,6 +76,18 @@ import Testing
     }
 }
 
+/// The list screen's glyphs draw the symbols looked up for them in `name_availability.plist`, each on iOS 17, macOS 14
+/// and watchOS 10, so that a symbol that exists but is not the one checked, a filled flag for the flag, fails here.
+@Test func everyListScreenGlyphDrawsTheSymbolCheckedForIt() {
+    let symbols: [DesignSystem.Icon: String] = [
+        .flag: "flag", .hash: "number", .note: "note.text", .expand: "arrow.up.left.and.arrow.down.right",
+        .columns: "rectangle.split.3x1", .chevronLeft: "chevron.left",
+    ]
+    for (icon, symbol) in symbols {
+        #expect(Image.systemName(for: icon) == symbol, "\(icon)")
+    }
+}
+
 /// The chrome's glyphs draw the symbols the Lists screen drew before its component models named them (Task 7), so
 /// that the screen looks as it did: the bar's, the menus', a row's, a line's and the picker's.
 @Test func everyChromeGlyphDrawsTheSymbolTheScreenDrew() {

@@ -129,6 +129,17 @@ private func contrast(_ first: RGB, _ second: RGB) -> Double {
     }
 }
 
+/// A column a dragged card would drop into is tinted with its list's colour (`Phone.dc.html`, `tint`): the base at
+/// 10 % in the light and 20 % in the dark, its channels the tile's own, as blue's #3E6EC5 shows.
+@Test func everyTilesDropTintIsItsBaseAtTenPercentLightAndTwentyDark() {
+    #expect(Tile.blue.dropTint.light == RGB(hex: 0x3E6EC5, opacity: 0.1))
+    #expect(Tile.blue.dropTint.dark == RGB(hex: 0x3E6EC5, opacity: 0.2))
+    for tile in Tile.allCases {
+        #expect(tile.dropTint.light == tile.background.light.withOpacity(0.1), "\(tile)")
+        #expect(tile.dropTint.dark == tile.background.dark.withOpacity(0.2), "\(tile)")
+    }
+}
+
 /// The glass under the list screen's round buttons, its hairline and a just-landed row's highlight are the canvas's
 /// (`Phone.dc.html`, `--glass`, `--glassline`, `--fresh`): white and #322F2B at 72 %, the ink and white at 8 %, and the
 /// default accent at 12 % and white at 8 %.

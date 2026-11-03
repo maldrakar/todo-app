@@ -7,7 +7,8 @@ extension DesignSystem {
     /// The look's fonts are its static members, the canvas's type (`Main.dc.html`, `Phone.dc.html`) as text styles.
     /// At the iPhone's default text size each is the canvas's size but the large title, 34 pt against 32, the meta, 12
     /// against 12.5 (the owner's review of #151), and the pill, 13 against 13.5; the Mac's text styles are smaller. The
-    /// large and section titles and the empty state's title are the rounded face; the rest is the system face.
+    /// large and section titles, an area's caption and the empty state's title are the rounded face; the rest is the
+    /// system face.
     public struct Font: Equatable, Sendable {
         public enum TextStyle: Sendable {
             case largeTitle, title3, headline, body, callout, subheadline, footnote, caption

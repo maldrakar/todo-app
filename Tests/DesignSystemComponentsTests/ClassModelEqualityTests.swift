@@ -214,7 +214,7 @@ private let swipe = SwipeModel<Action>(
 )
 
 private let lift = LiftModel(
-    scale: 1.03, cornerRadius: 14, background: .surface, shadow: .lifted,
+    scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
     slot: StrokeModel(color: .accent, width: 2, dash: []), slotDot: 8, slotHeight: 10, slotLeading: 52,
     slotTrailing: 20
 )

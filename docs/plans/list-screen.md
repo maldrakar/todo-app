@@ -78,10 +78,10 @@ from.
 | `Sources/Features/TaskList/TaskList+Edits.swift` | 7 | completing and the strip, the card and its drafts, adding a task and a list, deleting, the reorder and the drop |
 | `Sources/TodoCore/Storage/Store+Views.swift` | 7 | `pin(tasks:in:at:)`, several pins in one transaction |
 | `Package.swift` | 6 | `TaskListFeature` and its tests depend on `DesignSystem` and `DesignSystemComponents` |
-| `Sources/DesignSystem/Color.swift`, `Color+Components.swift` | 4 | `Color.glass`, `glassLine`, `fresh`; `Color.Components.Check` per tile colour, ring, fill and mark |
-| `Sources/DesignSystem/Font.swift`, `Animation.swift`, `Icon.swift` | 4 | `Font.addRow`, `notes`, `pill`, `emptyStateTitle`, and `Font.TextStyle.title3`; `Animation.cardOpens`, `drop`, `swipe`, `fold`, `fresh`; `Icon.flag`, `hash`, `note`, `expand`, `columns`, `chevronLeft`, the pills' sun being the existing `Icon.sun` |
+| `Sources/DesignSystem/Color.swift`, `Color+Components.swift` | 4 | `Color.glass`, `glassLine`, `fresh`; `Color.Components.Check` per tile colour, ring, fill and mark, the mark written down per tile; `Tile.dropTint` |
+| `Sources/DesignSystem/Font.swift`, `Animation.swift`, `Icon.swift`, `Shadow.swift` | 4 | `Font.addRow`, `notes`, `pill`, `emptyStateTitle`, and `Font.TextStyle.title3`; `Animation.cardOpens`, `drop`, `swipe`, `fold`, `fresh`; `Icon.flag`, `hash`, `note`, `expand`, `columns`, `chevronLeft`, the pills' sun being the existing `Icon.sun`; `Shadow.resting`, a column's card at rest |
 | `Sources/DesignSystemComponents/CheckModel.swift`, `TaskRowModel.swift`, `MetaItemModel.swift`, `SwipeModel.swift`, `LiftModel.swift`, `CardModel.swift`, `SubtaskRowModel.swift`, `PillModel.swift`, `BlockHeaderModel.swift`, `TagChipModel.swift`, `TagBarModel.swift`, `AddRowModel.swift`, `DoneStripModel.swift`, `ColumnModel.swift`, `EmptyStateModel.swift`, `GlassButtonModel.swift`, `FloatingButtonModel.swift`, `ScreenHeaderModel.swift`, `MenuModel.swift` | 4 | the screen's component models; `MenuModel.Item.isDisabled` and `subtitle` |
-| `Apps/Apple/Sources/TodoAppleUI/DesignSystem/Image+DesignSystem.swift`, `Font+DesignSystem.swift`, `Animation+DesignSystem.swift`, `MenuItems.swift` | 4 | the new icons' symbols, fonts and motions rendered; a menu item's subtitle and its disabled state drawn |
+| `Apps/Apple/Sources/TodoAppleUI/DesignSystem/Image+DesignSystem.swift`, `Font+DesignSystem.swift`, `MenuItems.swift` | 4 | the new icons' symbols and the third title rendered; a menu item's subtitle and its disabled state drawn |
 | `Apps/Apple/Sources/TodoAppleUI/TodoApp.swift`, `WindowView.swift` | 3 | `Window.dayChanged`; the day read from `Calendar.current` at the window's start, on the day's change, on a time zone change and on waking |
 | `Apps/Apple/Sources/TodoAppleUI/TaskListView.swift` | 6, 7 | adapted to the model, minimally, until Task 8 replaces it |
 | `Apps/Apple/Sources/TodoAppleUI/RootView.swift` | 8, 9 | the `.list` case draws `ListScreen` (8) and `ListPane` (9); the list's toolbar button goes |
@@ -94,8 +94,8 @@ from.
 | `Tests/TaskViewListFeatureTests/*` | 2, 3, #182 | no group row (2), removed with the kind (#182); counts by the day (3) |
 | `Tests/TaskListFeatureTests/TaskListTests.swift`, new `TaskListPageTests.swift`, `TaskListDayTests.swift`, `TaskListComponentsTests.swift` | 6 | adapted; the blocks; the formats; the models |
 | `Tests/TaskListFeatureTests/TaskListRuleTests.swift`, `TaskListEditsTests.swift` | 7 | a rule as edits and the drop table; every write |
-| `Tests/DesignSystemTests/CheckColorTests.swift`, `IconTests.swift`, `FontTests.swift`, `AnimationTests.swift`; `Tests/DesignSystemComponentsTests/*` | 4 | the check's colours against the canvas; the counts; every model and every class model's `==` |
-| `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`, `DesignSystemRenderersTests.swift`, new `RowLiftTests.swift` | 3, 4, 8 | the day reaching the host (3); the new symbols (4); the lift's reading on the host (8) |
+| `Tests/DesignSystemTests/CheckColorTests.swift`, `IconTests.swift`, `FontTests.swift`, `AnimationTests.swift`, `ShadowTests.swift`; `Tests/DesignSystemComponentsTests/ClassModelEqualityTests.swift`, new `MenuModelTests.swift` | 4 | the check's colours and the drop tint against the canvas, the written-down marks against the contrast rule, the glass, line and fresh shades; the icons' count and names; the new fonts, motions and shadow; a menu item's two new fields and their defaults; every class model's `==`, a task's row, its card and a block's header among them. A model whose `init` only stores its arguments gets no read-back test |
+| `Apps/Apple/Tests/TodoAppleUITests/TodoAppTests.swift`, `DesignSystemRenderersTests.swift`, new `RowLiftTests.swift` | 3, 4, 8 | the day reaching the host (3); the new symbols and their names, the fonts and the motions (4); the lift's reading on the host (8) |
 | `README.md`, `CHANGELOG.md` | every task | the changelog line; the README where behaviour a person sees changes (8, 9) |
 
 ## Tasks
@@ -659,19 +659,19 @@ struct RowLift: Equatable { enum Phase { case began(CGPoint), changed(CGPoint), 
 
 | Part | Values |
 | ---- | ------ |
-| Glass buttons | 44 pt circles at the top corners, 14 pt from the edges, back chevron 24 pt stroke 2.2, "…" 22 pt; a 108 pt fade of paper under them |
+| Glass buttons | 44 pt circles at the top corners, 14 pt from the edges, back chevron 24 pt stroke 2.2 set 2 pt left of centre, "…" 22 pt; a 108 pt fade of paper under them |
 | Header | 20 pt side padding; tile 38 pt, radius 11, glyph 23; title `largeTitle`; subtitle `count` (14) in ink2, 6 pt under, indented 50 |
-| Tag bar | 7 pt under the header; chips 30 pt high, padding 10 / 12, `pill` text, hash 13 pt, gap 6, a 44 pt tap target, fades 16 in and 28 out; lit: the list's check fill with its mark colour; unlit: fill with ink and ink2 |
-| Block header | 44 pt, margins 6 6 2 12, a 1 pt rule of line under it; title `sectionTitle` in the list's glyph colour; date `areaLabel` in ink2; chevron 18 pt in a 44 pt hit, turned −90° when folded, `fold` |
-| Row | padding 0 12 0 8; check hit 44 pt, check 24 pt with a 1.75 pt ring, mark 15 pt stroke 2.8, `check`; title `rowTitle` with padding 11 4 11 2; meta `meta` in ink2, 3 pt under, gaps 3 and 10, icons 13 pt; struck title in ink2 |
+| Tag bar | 7 pt under the header; the bar 20 pt past the content's sides with its row padded 20; chips 30 pt high, padding 10 / 12, `pill` text, hash 13 pt 5 before the title, gap 6, a 44 pt tap target, fades 16 in and 28 out; lit: the list's check fill with its mark colour; unlit: fill with ink and ink2 |
+| Block header | 44 pt, margins 6 6 2 12, a 1 pt rule of line under it; title `sectionTitle` in the list's glyph colour; date `areaLabel` in ink2, 8 after the title; header padding 13 8 0; chevron 18 pt in a 44 pt hit, turned −90° when folded, `fold` |
+| Row | padding 0 12 0 8; check hit 44 pt, check 24 pt with a 1.75 pt ring, mark 15 pt stroke 2.8, `check`; title `rowTitle` with padding 11 4 11 2; meta `meta` in ink2, 3 pt under, gaps 3 and 10, icons 13 pt 3 before their text; struck title in ink2 with its line in ink3 |
 | Swipe | threshold 40 pt leftward, the row shifts −88, `swipe`; Delete 78 pt wide, radius 12, inset 3 / 10, `barLabel` white on red |
-| Lift and slot | scale 1.03, radius 14, surface, `lifted` shadow; slot 10 pt high, dot 8 pt with a 2 pt ring and a 2 pt line in the list's check fill, margins 0 20 0 52 |
-| Fresh | the `fresh` colour fading over `drop` after a card lands |
+| Lift and slot | scale 1.03, opaque, radius 14, surface, `lifted` shadow (a column's card instead dims to .35 where it is dragged from); slot 10 pt high, dot 8 pt with a 2 pt ring and a 2 pt line in the list's check fill, margins 0 20 0 52 |
+| Fresh | the `fresh` colour fading over the `fresh` motion, 1.6 s on CSS's `ease`, after a card lands |
 | Card | margins 6 10 10, radius 18, surface, `raised` shadow, `cardOpens`; title field 44 pt `rowTitleEmphasized`; body padding 0 14 14 46; notes `notes` in ink2; subtask check 18 pt ring 1.5 mark 12 in a 40 × 44 hit, title `notes`; "Add subtask" 44 pt `notes` ink2 plus 17; pills 32 pt, radius 99, fill, `pill`, gap 6, 10 pt above, sun 16 flag 15 hash 14; Open full screen 19 pt in a 44 pt hit |
-| Add rows | "+ Add task" 40 pt, `addRow` ink2, plus 18 in a 44 pt hit, radius 12; "+ Add list" 44 pt `barLabel` ink2 over a 1 pt rule, margins 10 6 0 12 |
-| Board | gap 10, padding 0 16 24, snaps; column 296 pt, radius 18, fill; header padding 13 14 9; card radius 13, surface, a 0.5 pt glass line ring; card check 22 in 42 × 44; card title `callout` size; column "+ Add task" 44 pt; "+ Add list" a 200 pt dashed column, 1.5 pt line, button 52 pt `barLabel`; drop target tinted with the list's colour at .1 / .2 and an inset 2 pt ring of its check fill |
+| Add rows | "+ Add task" 40 pt, `addRow` ink2, plus 18 in a 44 pt hit, radius 12; "+ Add list" 44 pt `barLabel` ink2 over a 1 pt rule, 4 under it, margins 10 6 0 12 |
+| Board | gap 10, padding 0 16 24, snaps; column 296 pt, radius 18, fill; header padding 13 14 9; card radius 13, surface, a 0.5 pt glass line ring, the `resting` shadow; card check 22 in 42 × 44; card title `callout` size; column "+ Add task" 44 pt, radius 13, padding 11 / 12, the plus 6 before its title; "+ Add list" a 200 pt dashed column, 1.5 pt line, button 52 pt `barLabel`; drop target tinted with the list's `dropTint`, its colour at .1 / .2, and an inset 2 pt ring of its check fill |
 | Done strip | padding 20 16 0 14; capsule 36 pt, radius 99, fill, `barLabel` ink2, glyph 18 in the list's glyph colour, chevron 15 turned 180° open, `fold`; its rows as the list's, struck |
-| Empty state | padding 84 40 0; tile 64 pt radius 18 glyph 32; title 20 heavy rounded; text `notes` ink2, 270 pt wide at most |
+| Empty state | padding 84 40 0; tile 64 pt radius 18 glyph 32; title `emptyStateTitle`, 20 heavy rounded, 18 under the tile; text `notes` ink2, 6 under the title, 270 pt wide at most |
 | Floating "+" | 48 pt accent circle, white plus 22 stroke 2.4, `raised` shadow, 16 pt from the right and 30 from the bottom |
 
 **Tests.**
@@ -705,16 +705,16 @@ struct RowLift: Equatable { enum Phase { case began(CGPoint), changed(CGPoint), 
 
 | Part | Values |
 | ---- | ------ |
-| Pane | content 780 pt wide at most, centred, padding 62 48 140; nav row 52 pt, padding 14, gap 8; back glass 34 pt chevron 19 stroke 2.2; capsule 34 pt high radius 99 padding 3 with 30 × 28 items, "+" 17 stroke 2.1, a 1 × 16 divider, "…" 18 |
+| Pane | content 780 pt wide at most, centred, padding 62 48 140; nav row 52 pt, padding 14, gap 8; back glass 34 pt chevron 19 stroke 2.2 set 1 pt left of centre; capsule 34 pt high radius 99 padding 3 with 30 × 28 items, "+" 17 stroke 2.1, a 1 × 16 divider, "…" 18 |
 | Header | tile 40 pt radius 11 glyph 24; title 30 heavy rounded; subtitle 13.5 ink2 indented 52 |
-| Tag bar | margins 10 −12 0 40; chips 26 pt, padding 8 / 10, 12 pt text, hash 12, tap target 32; fades 12 / 24 |
+| Tag bar | margins 10 −12 0 40, the row padded 12; chips 26 pt, padding 8 / 10, 12 pt text, hash 12, tap target 32; fades 12 / 24 |
 | Block header | 34 pt, margins 14 0 2 4, padding 9 6 0, radius 7; title 15 heavy rounded; date 12.5; chevron 15 in a 30 pt hit |
-| Row | 36 pt, padding 0 10 0 4, radius 9, hover; check 18 pt ring 1.5 mark 12 in a 32 × 36 hit; title 14 in one line; meta trailing on the line, 12 medium ink2, gap 8: note 13, subtasks, tags as 20 pt capsules of fill, deadline |
+| Row | 36 pt, padding 0 10 0 4, radius 9, hover; check 18 pt ring 1.5 mark 12 in a 32 × 36 hit; title 14 in one line; meta trailing on the line, 12 medium ink2, gap 8: note 13, subtasks, tags as 20 pt capsules of fill padded 8, deadline |
 | Add task | 32 pt, padding 0 12 0 4, radius 8, 13.5 medium, plus 15 in a 32 pt hit |
 | Card | margins 6 0 10, radius 14; check hit 32 × 40; title field 40 pt 15 semibold; body padding 0 14 14 38; notes 13.5; subtask check 15 ring 1.5 mark 10 in a 30 pt hit, title 13.5; "Add subtask" 30 pt radius 7 13.5 plus 14; pills 26 pt gap 5 padding 8 / 10 12.5, sun 14 flag 13 hash 12 |
 | Board | gap 12, padding 0 24 24, no snap; column 288 pt radius 14; header padding 11 12 7 title 14.5 date 12; cards radius 10 with a hover shadow, check hit 34 × 36, title 13.5, meta 11.5 icons 12; column "+ Add task" 32 pt 13 |
 | Done strip | padding 22 0 0 6; capsule 30 pt gap 7 padding 9 / 12, 13 semibold, glyph 16, chevron 13; rows 36 pt |
-| Empty state | padding 90 40 0; tile 60 pt radius 17 glyph 30; title 19; text 14, 300 pt at most |
+| Empty state | padding 90 40 0; tile 60 pt radius 17 glyph 30; title 19, 16 under the tile; text 14, 300 pt at most |
 
 **Tests.**
 

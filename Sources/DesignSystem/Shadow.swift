@@ -24,5 +24,9 @@ extension DesignSystem {
         /// What a control raised off what it stands on casts: 12 %, 12 and 5, the canvas's small shadow (`Mac.dc.html`
         /// and `Phone.dc.html`, `--shadow`) as Task 7 drew it under the bar's controls.
         public static let raised = Shadow(opacity: 0.12, radius: 12, y: 5)
+
+        /// What a card at rest in a column casts: 6 %, 1 and 1, the canvas's `0 1px 2px rgba(0,0,0,.06)` under it
+        /// (`Phone.dc.html`, `.card`), its 2 px blur halved into the platform's radius, as Sketch hands a blur to iOS.
+        public static let resting = Shadow(opacity: 0.06, radius: 1, y: 1)
     }
 }

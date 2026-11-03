@@ -27,6 +27,12 @@ extension DesignSystem.Color.Components {
                 dark: base.mixed(toward: .white, by: 0.3))
         }
 
+        /// A column of the board in this colour while a dragged card would drop into it (`Phone.dc.html`, `tint`): its
+        /// base at 10 % opacity in the light and 20 % in the dark.
+        public var dropTint: DesignSystem.Color {
+            DesignSystem.Color(light: base.withOpacity(0.1), dark: base.withOpacity(0.2))
+        }
+
         /// The check of a task in this colour (`Phone.dc.html`, `paint`): its ring the base mixed 20 % toward the ink
         /// in the light and 18 % toward white in the dark, its fill the base in the light and the base mixed 8 % toward
         /// white in the dark, and its mark the same in both appearances.
@@ -40,8 +46,9 @@ extension DesignSystem.Color.Components {
         }
 
         /// The base of each tile colour (`Phone.dc.html`, `COLORS`), from which the canvas's `paint` rule draws its
-        /// background, its glyph and its check's ring and fill, so that those are the canvas's and not 88 shades worked
-        /// out by hand. A `switch` without a `default`, so a colour added here stops this compiling until it has one.
+        /// background, its glyph, its check's ring and fill and its drop tint, so that those are the canvas's and not
+        /// 110 shades worked out by hand. A `switch` without a `default`, so a colour added here stops this compiling
+        /// until it has one.
         private var base: DesignSystem.RGB {
             switch self {
             case .blue: DesignSystem.RGB(hex: 0x3E6EC5)
