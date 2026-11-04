@@ -12,8 +12,8 @@ protocol DriverWeighing {
     /// The walk of one rule of a folder past the conditions every rule of it asks for, `shared`, while the rules are
     /// grouped by the condition that drives each.
     func walk(ofRule conditions: [Filter], sharing shared: [Filter]) -> Walk
-    /// The walk of a branch of a disjunction, inside the walk around the disjunction.
-    func walk(ofBranch conditions: [Filter], within around: Walk) -> Walk
+    /// The walk of a branch of `disjunction`, inside the walk around the disjunction, which holds the disjunction too.
+    func walk(ofBranch conditions: [Filter], of disjunction: Filter, within around: Walk) -> Walk
     /// Whether any condition of the conjunction may drive it at all.
     func admitsADriver(_ conditions: [Filter]) -> Bool
     /// Whether a tag drives in this walk.
@@ -21,8 +21,9 @@ protocol DriverWeighing {
     /// Whether a range of days that a day's index can search, but that is too wide to drive by itself, an empty day
     /// among them, drives in this walk.
     func rangeDrives(_ condition: Filter, in walk: Walk) -> Bool
-    /// Whether a disjunction drives, given the condition that drives each of its branches and each branch's walk.
-    func disjunctionDrives(_ branches: [(driver: Filter, walk: Walk)], in walk: Walk) -> Bool
+    /// Whether `disjunction` drives in the walk of the conjunction it is a condition of, given the condition that drives
+    /// each of its branches and each branch's walk.
+    func disjunctionDrives(_ disjunction: Filter, branches: [(driver: Filter, walk: Walk)], in walk: Walk) -> Bool
     /// Whether a disjunction that a project drives in every branch is written with the projects' parents compared
     /// plainly, rather than each as the list of its children.
     var writesProjectsPlainly: Bool { get }
@@ -149,7 +150,7 @@ struct DriverChooser<Weighing: DriverWeighing> {
             return SQLFragment(sql: "t.id IN (SELECT p.id FROM task_tree p WHERE p.parent = ?)", params: [.text(parent.rawValue)])
         case .or:
             let branches = condition.disjuncts.map { branch in
-                (conditions: branch.conjuncts, walk: weighing.walk(ofBranch: branch.conjuncts, within: walk))
+                (conditions: branch.conjuncts, walk: weighing.walk(ofBranch: branch.conjuncts, of: condition, within: walk))
             }
             let projectsPlainly = weighing.writesProjectsPlainly && branches.allSatisfy { branch in
                 guard let position = driverPosition(in: branch.conditions, inDisjunction: true, walk: branch.walk),
@@ -206,11 +207,11 @@ struct DriverChooser<Weighing: DriverWeighing> {
             var drivers: [(driver: Filter, walk: Weighing.Walk)] = []
             for branch in branches {
                 let conditions = branch.conjuncts
-                let branchWalk = weighing.walk(ofBranch: conditions, within: walk)
+                let branchWalk = weighing.walk(ofBranch: conditions, of: condition, within: walk)
                 guard let position = driverPosition(in: conditions, inDisjunction: true, walk: branchWalk) else { return nil }
                 drivers.append((conditions[position], branchWalk))
             }
-            return weighing.disjunctionDrives(drivers, in: walk) ? .disjunction : nil
+            return weighing.disjunctionDrives(condition, branches: drivers, in: walk) ? .disjunction : nil
         case .status, .trashed, .and, .not:
             return nil
         }
@@ -245,7 +246,7 @@ extension Filter {
     /// and its index then walks them all: in #153's measurement at 50,000 tasks, `when` from a year ago to two months
     /// ahead counted 2.8 times slower driven by the day index than by the walk of the open tasks, while every range it
     /// measured up to 29 days long was faster driven. A month is a judgement between the two, not a crossover.
-    static let widestDrivingRange: Int64 = 31
+    private static let widestDrivingRange: Int64 = 31
 
     /// Whether the filter is a range of days that drives a statement by itself, one shorter than `widestDrivingRange`. A
     /// range over more days than an `Int64` counts is as wide as a range gets.

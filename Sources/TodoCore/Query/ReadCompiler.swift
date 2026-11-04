@@ -34,7 +34,7 @@ struct ReadCompiler {
             self.read = read
         }
 
-        subscript(_ size: Size) -> Int64? {
+        fileprivate subscript(_ size: Size) -> Int64? {
             read.first { $0.size == size }?.tasks
         }
     }
@@ -67,7 +67,7 @@ struct ReadCompiler {
         let conditions = chooser.conditions(ofAnyOf: rules.flatMap(Self.excludingTheTrash))
         if let driven = chooser.driven(conditions) { return driven }
         let held = rules.flatMap(FilterCompiler.tags(of:)).reduce(0.0) { $0 + Double(weighing.sizes[.tag($1)] ?? 0) }
-        let listed = held > 0 && held < Self.listedShare * max(weighing.walk(ofStatement: conditions).tested, 1)
+        let listed = held > 0 && held < Self.listedShare * max(weighing.walk(ofStatement: conditions).tested(besides: nil), 1)
         return FilterCompiler.whereClause(anyOf: rules, today: today, form: listed ? .tagListsLast : .plain)
     }
 
@@ -93,7 +93,12 @@ struct ReadCompiler {
                 return walkedConditions(of: condition)
             }
         }
-        let offersARange = inDisjunctions.contains { searchable($0) && $0 != .when(.empty) && $0 != .deadline(.empty) }
+        let offersARange = inDisjunctions.contains { condition in
+            switch condition {
+            case .when(let day), .deadline(let day): return day != .empty && searchable(condition)
+            case .status, .hasTag, .parent, .listedIn, .trashed, .and, .or, .not: return false
+            }
+        }
         guard !tags.isEmpty || offersARange else { return [] }
         var statuses: Set<TaskStatus> = []
         var sizes: [Size] = [.tasks]
@@ -151,16 +156,35 @@ struct ReadCompiler {
             /// task, a tag of 1,488 tasks beside the 487 deadlines more than 20 days past drove the read in 2.09 ms where
             /// the walk of the range took 0.57, in #155's measurement.
             let rows: Double
-            /// S, the rows of the walk SQLite tests a tag on: the walk around it scaled by the rows the conjunction walks,
-            /// and by the share of the store each other condition keeps, as its index holds them, a day SQLite
-            /// searches by its own and a day that is not empty as all but the empty ones; none where a condition rejects
-            /// most rows (`Filter.narrows`) and no index says how many. Beside a condition that keeps a third of the
-            /// store or more, a share of the walk alone left a read 3 to 7 times slower than driven: Articles, a tag
-            /// and a day that is not empty, 14.23 ms where the tag drives it in 4.92.
-            let tested: Double
+            /// S, the rows of the walk SQLite tests a tag on, but for `disjunctions`: the walk around it scaled by the rows
+            /// the conjunction walks, and by the share of the store each other condition keeps, as its index holds them, a
+            /// day SQLite searches by its own and a day that is not empty as all but the empty ones; none where a
+            /// condition rejects most rows (`Filter.narrows`) and no index says how many. Beside a condition that keeps
+            /// a third of the store or more, a share of the walk alone left a read 3 to 7 times slower than driven:
+            /// Articles, a tag and a day that is not empty, 14.23 ms where the tag drives it in 4.92.
+            private let tested: Double
+            /// The disjunctions of the conjunction that reject most rows, every branch of each by a condition SQLite tests
+            /// before a tag (`Filter.narrows`), and whose share no index gives. Each leaves no rows to test the conditions
+            /// beside it on, a tag or another disjunction, which a choice of projects or of days would otherwise let a tag
+            /// of thousands of tasks drive in their place; but not itself, nor its own branches, which are weighed against
+            /// the walk around it, as #155's sweeps measured them.
+            private let disjunctions: [Filter]
             /// Whether the conjunction is a branch of a disjunction, or one of a folder's rules, around which SQLite
             /// walks every task. A range a day's index can search then drives a branch that has no better driver.
             let aroundEveryTask: Bool
+
+            init(rows: Double, tested: Double, disjunctions: [Filter], aroundEveryTask: Bool) {
+                self.rows = rows
+                self.tested = tested
+                self.disjunctions = disjunctions
+                self.aroundEveryTask = aroundEveryTask
+            }
+
+            /// S for a condition of the conjunction, `disjunction` or, for any other, nil: none beside a disjunction of
+            /// `disjunctions` other than it.
+            func tested(besides disjunction: Filter?) -> Double {
+                disjunctions.contains { $0 != disjunction } ? 0 : tested
+            }
         }
 
         let sizes: Sizes
@@ -185,15 +209,16 @@ struct ReadCompiler {
 
         func walk(ofStatement conditions: [Filter]) -> Walk {
             let tasks = Double(sizes[.tasks] ?? 0)
-            return walk(of: conditions, within: Walk(rows: tasks, tested: tasks, aroundEveryTask: false), branch: false)
+            return walk(of: conditions, rows: tasks, tested: tasks, branch: false)
         }
 
         func walk(ofRule conditions: [Filter], sharing shared: [Filter]) -> Walk {
-            walk(ofBranch: conditions, within: walk(ofStatement: shared))
+            let around = walk(ofStatement: shared)
+            return walk(of: conditions, rows: around.rows, tested: around.tested(besides: nil), branch: true)
         }
 
-        func walk(ofBranch conditions: [Filter], within around: Walk) -> Walk {
-            walk(of: conditions, within: around, branch: true)
+        func walk(ofBranch conditions: [Filter], of disjunction: Filter, within around: Walk) -> Walk {
+            walk(of: conditions, rows: around.rows, tested: around.tested(besides: disjunction), branch: true)
         }
 
         func admitsADriver(_ conditions: [Filter]) -> Bool {
@@ -202,7 +227,7 @@ struct ReadCompiler {
 
         func tagDrives(_ tag: TagID, in walk: Walk) -> Bool {
             guard let held = sizes[.tag(tag)] else { return false }
-            return Self.drives(Double(held), share: Self.tagShare, of: walk)
+            return Self.drives(Double(held), share: Self.tagShare, rows: walk.rows, tested: walk.tested(besides: nil))
         }
 
         /// A range a day's index can search drives a branch under a walk of every task, by its index: Urgent, a tag or
@@ -214,13 +239,13 @@ struct ReadCompiler {
         }
 
         /// A disjunction whose branches no tag and no range drives walks nothing a share could weigh, and drives.
-        func disjunctionDrives(_ branches: [(driver: Filter, walk: Walk)], in walk: Walk) -> Bool {
+        func disjunctionDrives(_ disjunction: Filter, branches: [(driver: Filter, walk: Walk)], in walk: Walk) -> Bool {
             var held = 0.0
             var rows = 0.0
             var tested = 0.0
             for branch in branches {
                 rows += branch.walk.rows
-                tested += branch.walk.tested
+                tested += branch.walk.tested(besides: nil)
                 switch branch.driver {
                 case .hasTag(let tag): held += Double(sizes[.tag(tag)] ?? 0)
                 case .when, .deadline: held += Double(sizes[.condition(branch.driver)] ?? 0)
@@ -228,7 +253,7 @@ struct ReadCompiler {
                 }
             }
             guard held > 0 else { return true }
-            return Self.drives(held, share: Self.disjunctionShare, of: Walk(rows: min(rows, walk.rows), tested: min(tested, walk.tested), aroundEveryTask: false))
+            return Self.drives(held, share: Self.disjunctionShare, rows: min(rows, walk.rows), tested: min(tested, walk.tested(besides: disjunction)))
         }
 
         /// A read has no status of its own to compete with a disjunction of parents, and SQLite reads them compared
@@ -236,15 +261,16 @@ struct ReadCompiler {
         /// as the list of its children and 0.143 before #155, in #155's measurement.
         var writesProjectsPlainly: Bool { true }
 
-        /// Whether tasks held by a driver drive a walk: fewer than `walkShare` of its rows and `share` of those it tests.
-        private static func drives(_ held: Double, share: Double, of walk: Walk) -> Bool {
-            held < walkShare * walk.rows + share * walk.tested
+        /// Whether tasks held by a driver drive a walk of `rows`, `tested` of which it tests: while they are fewer than
+        /// `walkShare` of the rows and `share` of those tested, added up.
+        private static func drives(_ held: Double, share: Double, rows: Double, tested: Double) -> Bool {
+            held < walkShare * rows + share * tested
         }
 
-        /// The walk of a conjunction inside the walk around it; `branch` says that it is a branch of a disjunction or a
-        /// folder's rule.
-        private func walk(of conditions: [Filter], within around: Walk, branch: Bool) -> Walk {
-            var rows = around.rows
+        /// The walk of a conjunction inside a walk around it of `aroundRows`, `aroundTested` of which are tested; `branch`
+        /// says that it is a branch of a disjunction or a folder's rule.
+        private func walk(of conditions: [Filter], rows aroundRows: Double, tested aroundTested: Double, branch: Bool) -> Walk {
+            var rows = aroundRows
             var source: [Filter] = conditions.filter { if case .status = $0 { true } else { false } }
             for case .status(let named) in source {
                 rows = min(rows, Set(named).reduce(0.0) { $0 + Double(sizes[.status($1)] ?? 0) })
@@ -256,16 +282,19 @@ struct ReadCompiler {
                     source = [condition]
                 }
             }
-            var tested = around.rows > 0 ? around.tested * rows / around.rows : 0
+            var tested = aroundRows > 0 ? aroundTested * rows / aroundRows : 0
+            var disjunctions: [Filter] = []
             for condition in conditions where !source.contains(condition) {
                 switch condition {
-                case .hasTag, .listedIn, .trashed, .and, .or:
+                case .hasTag, .listedIn, .trashed, .and:
                     continue
+                case .or:
+                    if condition.narrows { disjunctions.append(condition) }
                 case .status, .when, .deadline, .parent, .not:
                     if let kept = share(keptBy: condition) { tested *= kept } else if condition.narrows { tested = 0 }
                 }
             }
-            return Walk(rows: rows, tested: tested, aroundEveryTask: branch && around.rows >= Double(sizes[.tasks] ?? 0))
+            return Walk(rows: rows, tested: tested, disjunctions: disjunctions, aroundEveryTask: branch && aroundRows >= Double(sizes[.tasks] ?? 0))
         }
 
         /// The share of the store a condition keeps, as its index holds it: a condition SQLite searches by its own rows,

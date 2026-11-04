@@ -71,10 +71,11 @@ struct CountCompiler {
     /// condition left on its index SQLite compares the two constants before the loop and reads no row, which no
     /// driver could beat. A range of days wider than a month, or open at one end, never drives a count.
     private struct Weighing: DriverWeighing {
-        /// Whether #144 rejects most open tasks before it probes a tag in the conjunction (`Filter.narrows`), which
-        /// lowers a tag's share to `narrowedShare`. A rule of a folder is weighed as though nothing narrowed it while the
-        /// rules are grouped, and a branch of a disjunction as the conjunction around it.
-        typealias Walk = Bool
+        /// What a count knows of the walk around a conjunction: whether #144 rejects most open tasks before it probes a
+        /// tag in it (`Filter.narrows`), which lowers a tag's share to `narrowedShare`. A rule of a folder is weighed as
+        /// though nothing narrowed it while the rules are grouped, and a branch of a disjunction as the conjunction around
+        /// it, the disjunction's own narrowing among it.
+        typealias Narrowed = Bool
 
         /// The tasks each tag a rule could be driven by holds, done, trashed and deleted ones among them, as `Store`
         /// counted them for this call. A tag that is not in it is no driver.
@@ -110,15 +111,15 @@ struct CountCompiler {
         /// of them, so that no day a rule names makes a count slower than #144's.
         static let narrowedShare = 0.03
 
-        func walk(ofStatement conditions: [Filter]) -> Bool {
+        func walk(ofStatement conditions: [Filter]) -> Narrowed {
             conditions.contains(where: \.narrows)
         }
 
-        func walk(ofRule conditions: [Filter], sharing shared: [Filter]) -> Bool {
+        func walk(ofRule conditions: [Filter], sharing shared: [Filter]) -> Narrowed {
             false
         }
 
-        func walk(ofBranch conditions: [Filter], within narrowed: Bool) -> Bool {
+        func walk(ofBranch conditions: [Filter], of disjunction: Filter, within narrowed: Narrowed) -> Narrowed {
             narrowed
         }
 
@@ -126,15 +127,15 @@ struct CountCompiler {
             !conditions.contains(where: CountCompiler.excludesOpen)
         }
 
-        func tagDrives(_ tag: TagID, in narrowed: Bool) -> Bool {
+        func tagDrives(_ tag: TagID, in narrowed: Narrowed) -> Bool {
             holdFewerTasks(than: narrowed ? Self.narrowedShare : Self.tagShare, [tag])
         }
 
-        func rangeDrives(_ condition: Filter, in narrowed: Bool) -> Bool {
+        func rangeDrives(_ condition: Filter, in narrowed: Narrowed) -> Bool {
             false
         }
 
-        func disjunctionDrives(_ branches: [(driver: Filter, walk: Bool)], in narrowed: Bool) -> Bool {
+        func disjunctionDrives(_ disjunction: Filter, branches: [(driver: Filter, walk: Narrowed)], in narrowed: Narrowed) -> Bool {
             let tags = branches.compactMap { branch -> TagID? in
                 guard case .hasTag(let tag) = branch.driver else { return nil }
                 return tag

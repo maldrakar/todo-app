@@ -135,7 +135,7 @@ extension Store {
         try sql { () throws(SQLiteError) in
             var sizes: [(size: ReadCompiler.Size, tasks: Int64)] = []
             for read in Store.readSizeStatements(for: sections, today: today) {
-                if let tasks = try db.rows(read.sql, read.params).first?.first?.int64 { sizes.append((read.size, tasks)) }
+                if let tasks = try counted(read.sql, read.params) { sizes.append((read.size, tasks)) }
             }
             return ReadCompiler.Sizes(sizes)
         }
@@ -168,9 +168,6 @@ extension Store {
             }
         }
     }
-
-    /// The tasks the status index holds of one status, the trashed and the deleted among them, counted on the index alone.
-    private static let statusSizeQuery = "SELECT count(*) FROM tasks WHERE status = ?"
 
     /// The groups of one section, from the tasks the view's sort brought back. A section with no tasks has no
     /// groups, and that is answered here, where the read it saves is: `group(_:by:manual:)` below is given a

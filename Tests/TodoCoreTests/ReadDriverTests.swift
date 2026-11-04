@@ -12,7 +12,8 @@ private func readStatement(_ store: Store, _ rules: [Filter], sort: [SortKey] = 
 }
 
 /// The statement the same read ran before #155, which every rewritten read is held to: the rules as
-/// `FilterCompiler.whereClause(anyOf:today:)` writes them, which #155 does not touch, in the query `taskQuery` assembles.
+/// `FilterCompiler.whereClause(anyOf:today:)` writes them in its `.plain` form, which is the text it wrote before #155, as
+/// `FilterTests`' literal assertions hold it, in the query `taskQuery` assembles.
 private func todaysStatement(_ rules: [Filter], sort: [SortKey] = []) -> (sql: String, params: [Value]) {
     let clause = FilterCompiler.whereClause(anyOf: rules, today: today)
     return (Store.taskQuery(where: clause.sql, orderBy: FilterCompiler.orderBy(sort), limit: nil), clause.params)
@@ -93,7 +94,9 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
 /// the parent index, its parents compared plainly, which SQLite reads as one search for all of them; an Urgent-shaped
 /// rule, a tag or a deadline that has passed, by both indexes. A tag beside a range of deadlines that holds fewer tasks
 /// than the tag stays on the range, and a closed status with a tag stays on the status index while nothing has that
-/// status and goes to the tag once much does. None of these reads walks every task.
+/// status and goes to the tag once much does. A tag beside a choice of projects or of days, which SQLite tests before
+/// the tag and which no index says the share of, stays on the parent's or the day's index. None of these reads walks
+/// every task.
 @Test func aReadIsDrivenByItsRulesOwnIndex() throws {
     let store = try makeStore()
     let small = try store.createTag(title: "small")
@@ -106,7 +109,8 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
     for i in 0..<98 {
         let tags: Set<TagID> = i < 5 || i == 50 ? [small] : i < 25 ? [medium] : i < 85 ? [big] : []
         let deadline = (90..<93).contains(i) ? today.advanced(by: -30) : nil
-        let task = try store.createTask(NewTask(title: "task \(i)", deadline: deadline, parent: i < 3 ? projects[0] : i < 5 ? projects[1] : nil, tags: tags))
+        let when = (5..<8).contains(i) ? today : i == 8 ? today.advanced(by: 1) : nil
+        let task = try store.createTask(NewTask(title: "task \(i)", when: when, deadline: deadline, parent: i < 3 ? projects[0] : i < 6 ? projects[1] : nil, tags: tags))
         if (93..<96).contains(i) { try store.pin(task: task, in: manual) }
         all.append(task)
     }
@@ -117,6 +121,8 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
             ("project", [.parent(projects[0])]), ("tag", [.hasTag(small)]), ("manual", [.listedIn(manual)]),
             ("projects", [.parent(projects[0]), .parent(projects[1])]), ("urgent", [.or([.hasTag(small), .deadline(.onOrBefore(-1))])]),
             ("beside a range", [.and([.hasTag(medium), .deadline(.onOrBefore(-20))])]), ("done", doneAndSmall),
+            ("beside projects", [.and([.hasTag(medium), .or([.parent(projects[0]), .parent(projects[1])])])]),
+            ("beside days", [.and([.hasTag(medium), .or([.when(.on(0)), .when(.on(1))])])]),
         ]
         for (name, rules) in rules {
             let statement = try readStatement(store, rules, sort: [SortKey(.title)])
@@ -140,6 +146,8 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
     #expect(urgent.contains("SEARCH x USING COVERING INDEX task_tags_tag (tag_id=?)") && urgent.contains("SEARCH t USING INDEX tasks_deadline (deadline_day<?)"), "\(urgent)")
     #expect(before["beside a range"]?.plan.first == "SEARCH t USING INDEX tasks_deadline (deadline_day<?)", "\(before["beside a range"]?.plan ?? [])")
     #expect(before["done"]?.plan.first == "SEARCH t USING INDEX tasks_status (status=?)", "\(before["done"]?.plan ?? [])")
+    #expect(before["beside projects"]?.plan.first == "SEARCH tt USING INDEX task_tree_parent (parent=?)", "\(before["beside projects"]?.plan ?? [])")
+    #expect(before["beside days"]?.plan.first == "SEARCH t USING INDEX tasks_when (when_day=?)", "\(before["beside days"]?.plan ?? [])")
     for (name, read) in before { #expect(!scans(read.plan), "\(name) walks every task: \(read.plan)") }
 
     for task in all[40..<90] { try store.update(task: task, [.status(.done)]) }
@@ -211,6 +219,8 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
         ("two tags", .or([.hasTag(a), .hasTag(b)]), .driven),
         ("urgent", .or([.hasTag(a), .deadline(.onOrBefore(-1))]), .driven),
         ("tag or tomorrow, due soon", .and([.or([.hasTag(a), .when(.on(1))]), .deadline(.onOrBefore(3))]), .driven),
+        ("tag beside projects", .and([.hasTag(a), .or([.parent(projects[0]), .parent(projects[1])])]), .driven),
+        ("tag beside days", .and([.hasTag(a), .or([.when(.on(0)), .when(.on(1))])]), .driven),
         ("binned and pinned", .and([.trashed(true), .listedIn(manual)]), .driven),
         ("pinned and big", .and([.listedIn(manual), .hasTag(big)]), .driven),
         ("the last two days", .deadline(.between(.max - 1, .max)), .driven),
@@ -328,6 +338,17 @@ private func shapesStore() throws -> (store: Store, small: [TagID], big: TagID, 
     try expectRead(store, [.and([.status([.open]), .or([.hasTag(tag("H")), .deadline(.onOrBefore(-20))])])], is: .listed, "under the open status")
 }
 
+/// A disjunction every branch of which narrows the read is weighed against the walk around it, as its branches are, and
+/// not against its own narrowing, which only the conditions beside it are tested after (#155): a tag of 12 tasks among
+/// the 30 deadlines, or the day, drives at 12 against 3.3 + 0.5 × 30 = 18.3, and its tag drives its branch at 12 against
+/// 0.9 + 0.4 × 30 = 12.9.
+@Test func aDisjunctionThatNarrowsIsWeighedAgainstTheWalkAroundIt() throws {
+    let (store, tag, _) = try thresholdStore()
+    let rule = Filter.or([.and([.hasTag(tag("C")), .deadline(.onOrBefore(-20))]), .when(.on(0))])
+    try expectRead(store, [rule], is: .driven, "a tag beside a range, or the day")
+    #expect(try plan(store, try readStatement(store, [rule])).first == "MULTI-INDEX OR")
+}
+
 /// An undriven read writes its tags as lists, last in their conjunction, while they hold fewer than four times the rows
 /// they are tested on (#155), and is today's statement from there on. The list is written after the conditions SQLite
 /// tests first, which it would otherwise build before them.
@@ -392,6 +413,7 @@ private func expectSides(_ store: Store, _ rules: [Filter], adding tag: TagID, t
     let none: [[Filter]] = [
         [.parent(project)], [.listedIn(ViewID("v"))], [.when(.on(0))], [.deadline(.between(0, 7))], [.parent(project), .parent(TaskID("q"))],
         [.or([.when(.on(0)), .parent(project)])], [.deadline(.onOrBefore(-1))], [.and([.status([.open]), .when(.onOrAfter(1)), .parent(nil)])],
+        [.or([.parent(nil), .parent(project)])], [.and([.parent(nil), .when(.empty)]), .parent(project)],
     ]
     for rules in none { #expect(Store.readSizeStatements(for: [rules], today: today).isEmpty, "\(rules)") }
     #expect(Store.readSizeStatements(for: none + [[.hasTag(tag)], [.hasTag(tag)]], today: today).map(\.size) == [.tasks, .tag(tag)], "each size once")

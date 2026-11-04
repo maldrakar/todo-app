@@ -187,7 +187,15 @@ enum FilterCompiler {
     /// A group's parts compiled and joined, in the order written, or with the parts that name a tag last where `form`
     /// writes its tags last.
     private static func combine(_ parts: [Filter], separator: String, empty: String, today: Day, form: Form) -> SQLFragment {
-        let ordered = form == .tagListsLast ? parts.filter { tags(of: $0).isEmpty } + parts.filter { !tags(of: $0).isEmpty } : parts
+        var ordered = parts
+        if form == .tagListsLast {
+            var untagged: [Filter] = []
+            var tagged: [Filter] = []
+            for part in parts {
+                if tags(of: part).isEmpty { untagged.append(part) } else { tagged.append(part) }
+            }
+            ordered = untagged + tagged
+        }
         return joined(ordered.map { compile($0, today: today, form: form) }, separator: separator, empty: empty)
     }
 
