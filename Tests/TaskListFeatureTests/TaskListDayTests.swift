@@ -53,7 +53,7 @@ private func row(_ row: TaskList.Model.Row) -> TaskRowModel<TaskList.UserAction>
 
 /// A day's block is titled "Today", "Tomorrow", or the weekday's full name for every other day, past or future, at
 /// any distance, with the date under it short with its weekday for today and tomorrow and without it for every other
-/// day; a day in another year needs no year (canvas, `dayTitle` and `dayDate`; the controller's ruling R61).
+/// day; a day in another year needs no year (canvas, `dayTitle` and `dayDate`; the controller's ruling on #175, 2026-11-04).
 @Test func aDaysBlockIsTitledTodayTomorrowOrItsWeekdayAtAnyDistance() throws {
     let store = try makeStore()
     let byDay = try store.createView(NewTaskView(title: "By day", filter: .status([.open]), sort: [SortKey(.when)], groupBy: .whenDay))
@@ -70,7 +70,7 @@ private func row(_ row: TaskList.Model.Row) -> TaskRowModel<TaskList.UserAction>
 
 /// The due text at every distance: "Overdue 1 day" in the singular and "Overdue N days", "Due today", the weekday's
 /// short name through six days ahead with no "Due tomorrow", and the month and the day from seven days on (canvas,
-/// `dueText`; the controller's ruling R62).
+/// `dueText`; the controller's ruling on #175, 2026-11-04).
 @Test func theDueTextAtEveryDistance() throws {
     let store = try makeStore()
     let cases: [(Int, String)] = [

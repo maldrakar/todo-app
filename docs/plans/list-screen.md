@@ -586,6 +586,15 @@ extension TaskList.UserAction {   // the cases Task 7 adds to the enum
     case deleteSwiped(TaskID), deleteMenuItemChosen(TaskID)
     case rowDropped(TaskID, in: Model.BlockID, after: TaskID?)
 }
+extension TaskList.Model {   // the members Task 7 adds, which Task 6 left out with no value to give them
+    public let done: DoneStripModel<UserAction>?           // nil for Logbook, Trash and a day with nothing done
+    public let addTask: FloatingButtonModel<UserAction>?   // the floating "+", nil where no task can be added
+    public let addList: AddRowModel<UserAction>?           // "+ Add list", nil on a group's screen, in Logbook and Trash
+    // in Board:  public let addList: AddRowModel<UserAction>?   the dashed last column
+    // in Block:  public let addTask: AddRowModel<UserAction>?   "+ Add task", nil where the block's rule refuses
+    //            public let drop: Bool?                         nil where the block takes no drop
+    // in Row:    case card(TaskID, CardModel<UserAction>)       the open card in place of its row
+}
 // TaskList+Rule.swift, internal to the module
 struct Edits: Equatable {
     var when: Day??          // nil: no edit; .some(nil): no day; .some(day): that day
@@ -632,7 +641,7 @@ struct Edits: Equatable {
 
 **Goal.** The list screen as the canvas draws it on iPhone, in both layouts and both appearances, drawn from the module's models: the glass back and "…" over the content, the header, the tag bar, the blocks with their rows, the card in place with its fields and the keyboard, the Done strip, the add rows, the floating "+", the empty state, the swipe to Delete, the long press that lifts a row or a card and the drop between blocks and columns, the board that snaps (spec sections 1 to 7, 11; the spike's answer).
 
-**Files.** New `Apps/Apple/Sources/TodoAppleUI/ListScreen/ListScreen.swift`, `BlockView.swift`, `TaskRowView.swift`, `TaskCardView.swift`, `TagBarView.swift`, `DoneStripView.swift`, `BoardView.swift`, `ColumnView.swift`, `GlassButton.swift`, `FloatingButton.swift`, `SwipeToDelete.swift`, `RowLiftGesture.swift`, `EmptyScreenView.swift`; new `Apps/Apple/Sources/TodoAppleUI/DesignSystem/DropIndicator.swift`, out of `ListsScreen/ListsDragGesture.swift`; `Apps/Apple/Sources/TodoAppleUI/RootView.swift`; `TaskListView.swift` deleted; `Sources/Features/TaskList/TaskList+Components.swift` for the columns' metrics; new `Apps/Apple/Tests/TodoAppleUITests/RowLiftTests.swift`; `README.md`, `CHANGELOG.md`.
+**Files.** New `Apps/Apple/Sources/TodoAppleUI/ListScreen/ListScreen.swift`, `BlockView.swift`, `TaskRowView.swift`, `TaskCardView.swift`, `TagBarView.swift`, `DoneStripView.swift`, `BoardView.swift`, `ColumnView.swift`, `GlassButton.swift`, `FloatingButton.swift`, `SwipeToDelete.swift`, `RowLiftGesture.swift`, `EmptyScreenView.swift`; new `Apps/Apple/Sources/TodoAppleUI/DesignSystem/DropIndicator.swift`, out of `ListsScreen/ListsDragGesture.swift`; `Apps/Apple/Sources/TodoAppleUI/RootView.swift`; `TaskListView.swift` deleted; `Sources/Features/TaskList/TaskList+Components.swift` for the columns' metrics, carried by Task 6 and tuned by the hand check; new `Apps/Apple/Tests/TodoAppleUITests/RowLiftTests.swift`; `README.md`, `CHANGELOG.md`.
 
 **Interface.** Everything is `internal` to `TodoAppleUI`; the module's model is the contract.
 
@@ -655,6 +664,7 @@ struct RowLift: Equatable { enum Phase { case began(CGPoint), changed(CGPoint), 
 - The card's fields are `TitleField`'s pattern with `changed` closures and `@FocusState`; the title is focused when a card appears with an empty title, which is the view's own focus; Esc on an iPad keyboard sends `escapeKeyPressed` through `.onKeyPress(.escape)` (iOS 17); a tap outside the card on the screen's background sends `backgroundTapped`. The keyboard rises with the field and the scroll view keeps the card in view, checked by hand (spec, "Risks").
 - The board is a horizontal `ScrollView` with `.scrollTargetLayout()` and `.scrollTargetBehavior(.viewAligned)`, each column a vertical `ScrollView` of cards; a column's cards are the block's rows drawn in the card look, its `TaskRowModel` sized by the module for the column.
 - Show as is a `Menu` from the glass "…" with `MenuItems`, which draws the disabled item and its subtitle; the canvas's own popover is not reproduced.
+- Show as's "Show as" heading and the current item's check arrive here with their drawing: `MenuModel` gains a heading and `MenuModel.Item` a checked state, which Task 6's `showAs` fills (as #161 left the Mac capsule to Task 9).
 - `RootView.screen(_:)` draws `.list` as `ListScreen` in the narrow layout and keeps `TaskListView`'s spot in the wide one for Task 9; the list's `.toolbar { quickEntryButton }` goes, since the screen's "+" adds inline and quick entry stays the Lists screen's (spec section 10).
 - The numbers are the canvas's (`Phone.dc.html`, 2026-11-01), carried into the module's `Metrics.phone` and `Metrics.phoneColumns` in `TaskList+Components.swift`, the view holding none of its own:
 

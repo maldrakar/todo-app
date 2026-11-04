@@ -137,7 +137,7 @@ private func phoneRow(
 }
 
 /// A block's header carries the phone's numbers, and its chevron turns a quarter left when the block folds, saying what
-/// a tap will do (Task 8's table; the controller's ruling R66).
+/// a tap will do (Task 8's table; the controller's ruling on #175, 2026-11-04).
 @Test func aBlocksChevronTurnsAndSaysWhatATapDoes() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk", when: day(1)))
@@ -217,7 +217,7 @@ private func phoneRow(
 /// bottom, snapping; a column 296 wide, rounded 18 on the fill, its cards 8 apart and 8 in, each rounded 13 on the
 /// surface with a 0.5 hairline of the glass line and the resting shadow; its header 44 high, padded 13 14 9, with no
 /// rule and no chevron; a card's check 22 across in a 42 by 44 hit and its title callout-sized (Task 8's table; the
-/// controller's ruling R50). A column does not take a drop until Task 7 reads a block's rule.
+/// controller's ruling on #175, 2026-11-04). A column does not take a drop until Task 7 reads a block's rule.
 @Test func aColumnCarriesTheBoardsNumbers() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk", when: day(1)))

@@ -541,15 +541,23 @@ private func offersANewWindow(_ row: TaskViewList.Model.Row) -> Bool {
 }
 
 /// The titles of the list standing first over the sidebar in a window's model, read as the root view reads it, the
-/// first id of the layout, the narrow path's first or the wide column, and its screen's model, and nil when no list
-/// stands there.
+/// first id of the layout, the narrow path's first or the wide column, and its screen's model, its blocks' rows in
+/// turn, and nil when no list stands there.
 private func listTitles(_ model: AppModule.Model) -> [String]? {
     let first = switch model.layout {
     case .narrow(let path): path.first
     case .wide(let column, _): column
     }
     guard let first, case .list(let list)? = model.screens[first] else { return nil }
-    return list.rows.map(\.title)
+    let blocks = switch list.layout {
+    case .list(let blocks): blocks
+    case .columns(let board): board.columns
+    }
+    return blocks.flatMap(\.rows).map { row in
+        switch row {
+        case .task(_, let task): task.title.text
+        }
+    }
 }
 
 /// The default window's path: the Inbox's list, which the sidebar chooses itself, nothing open in it and no quick

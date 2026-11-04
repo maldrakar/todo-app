@@ -6,10 +6,10 @@ import TodoCore
 /// day (`Weekday`), and no other module formats one yet, so the names live here, as the canvas spells them (canvas,
 /// section 0); a day in another year is named without its year, as the canvas names none.
 ///
-/// A day a peer wrote can lie anywhere a `Day` holds, while measuring two days apart and naming a date work in an `Int`,
-/// which is 32 bits on wasm32 and leaves it for a day near either end (`Day.-`, the civil date). So every day this
-/// names or measures is first drawn into the days `earliest` to `latest`, some two million years either side of now,
-/// and a distance from a link or a filter is clamped to land in them: a day past them is named and measured as the
+/// A day a peer wrote can lie anywhere a `Day` holds, while measuring two days apart and naming a date work in an
+/// `Int`, which is 32 bits on wasm32 and leaves it for a day near either end (`Day.-`, the civil date). So every day
+/// this names or measures is first drawn into the days `earliest` to `latest`, some two million years either side of
+/// now, and a distance from a link or a filter is clamped to land in them: a day past them is named and measured as the
 /// nearest one in them, and nothing traps (`docs/style.md`, "A trap is a bug").
 extension TaskList {
     /// "Saturday, October 24": the weekday's and the month's names in full, and the day.
@@ -19,7 +19,7 @@ extension TaskList {
     }
 
     /// "Sat, Oct 24": the weekday's and the month's short names, and the day.
-    static func shortDate(_ day: Day) -> String {
+    private static func shortDate(_ day: Day) -> String {
         let day = Self.drawnIn(day)
         return "\(shortWeekdayNames[day.weekday.rawValue]), \(monthDate(day))"
     }
@@ -106,5 +106,7 @@ extension TaskList {
         "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
         "December",
     ]
-    private static let shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    private static let shortMonthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
 }

@@ -184,7 +184,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 
 /// A list grouped by tag, by parent or by status titles each block as its group's screen is titled, with no subtitle,
 /// and the group with no key by what it lacks; a day group with no day is "No date". A parent is read once for its
-/// group, and one that does not read is titled as no parent is (the controller's ruling R55).
+/// group, and one that does not read is titled as no parent is (the controller's ruling on #175, 2026-11-04).
 @Test func theOtherGroupingsBlocksAreTitledAsTheirGroups() throws {
     let store = try makeStore()
     let errand = try store.createTag(title: "errand")
@@ -272,7 +272,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 }
 
 /// A task two sibling lists both select is drawn in both blocks and counted once on the bar, and a tag on every task is
-/// over the same tasks (the controller's ruling R53).
+/// over the same tasks (the controller's ruling on #175, 2026-11-04).
 @Test func aTaskTwoBlocksSelectCountsOnceOnTheTagBar() throws {
     let store = try makeStore()
     let home = try store.createTag(title: "home")
@@ -341,7 +341,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 }
 
 /// A picked tag whose chip leaves the bar, after a change or on a new day, stops filtering and is dropped from the
-/// picks, so that it comes back unlit (the controller's ruling R63).
+/// picks, so that it comes back unlit (the controller's ruling on #175, 2026-11-04).
 @Test func aPickWhoseChipLeavesTheBarIsDropped() throws {
     let store = try makeStore()
     let home = try store.createTag(title: "home")
@@ -379,7 +379,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 }
 
 /// A block is folded under its group's key whatever the grouping, a list inside under its view's, and the own block of
-/// a list that groups by nothing has no header and nothing to fold (the controller's ruling R54).
+/// a list that groups by nothing has no header and nothing to fold (the controller's ruling on #175, 2026-11-04).
 @Test func everyBlockFoldsUnderItsGroupsKey() throws {
     let store = try makeStore()
     let errand = try store.createTag(title: "errand")
@@ -440,7 +440,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 
 /// In columns every block is a column headed as its block is, with no chevron, and the block itself has no header;
 /// the own block of a list that groups by nothing but has lists inside is a column titled with the list's own title,
-/// whose title opens nothing (canvas, section 9; the controller's ruling R60).
+/// whose title opens nothing (canvas, section 9; the controller's ruling on #175, 2026-11-04).
 @Test func aColumnIsHeadedAsItsBlockWithNoChevron() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
@@ -531,7 +531,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 
 /// A group's screen is one block with no header, has no lists inside and no columns to offer: Show as's Columns is
 /// disabled with the reason the canvas gives, and a choice of it moves nothing, whatever the list keeps for itself
-/// (the controller's rulings R58 and R59).
+/// (the controller's rulings on #175, 2026-11-04).
 @Test func aGroupsScreenIsOneBlockWithNoColumnsAndNoAddList() throws {
     let store = try makeStore()
     let (week, _, _) = try week(in: store)
@@ -610,7 +610,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 }
 
 /// A live group's screen whose group stops naming anything, its tag deleted or its list grouped another way, asks to
-/// be closed, as a list whose view is gone does (the controller's ruling R57).
+/// be closed, as a list whose view is gone does (the controller's ruling on #175, 2026-11-04).
 @Test func aGroupWhoseTagIsDeletedAsksToClose() throws {
     let store = try makeStore()
     let errand = try store.createTag(title: "errand")
@@ -669,7 +669,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
 
 /// The empty state stands when no block has a row, after the tag bar's filter, and the page has no lists inside, a
 /// group's screen included; it says what the list is, in the list's own tile (canvas, section 1; the controller's
-/// ruling R64).
+/// ruling on #175, 2026-11-04).
 @Test func theEmptyStateSaysWhatTheListIs() throws {
     let store = try makeStore()
     let errand = try store.createTag(title: "errand")

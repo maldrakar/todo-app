@@ -12,9 +12,9 @@ import TodoCore
 /// pane beside it on the Mac. A tap on a row declares the task screen over it, and a tap on a block's title the list
 /// inside that the block is, or the list's own group the block is, opened as a screen of its own, which is this module
 /// on another route; the window's stack makes, keeps and drops what the list declared (ADR-0009, amendments of
-/// 2026-10-22, 2026-11-01 and 2026-11-02): the list holds no screen and draws none, and hears what a screen over it asks
-/// for as `.destinationAnswered`. Neither the sidebar nor the root learns what a list opens, and their code does not grow
-/// when it learns to open something (navigation state spec, section 2).
+/// 2026-10-22, 2026-11-01 and 2026-11-02): the list holds no screen and draws none, and hears what a screen over it
+/// asks for as `.destinationAnswered`. Neither the sidebar nor the root learns what a list opens, and their code does
+/// not grow when it learns to open something (navigation state spec, section 2).
 ///
 /// A group's screen is the list it belongs to read for one of its own groups: the module reads the list's page and
 /// draws that group's block of it, so the two always agree, and nothing stores the group or writes when it opens
@@ -102,10 +102,10 @@ public final class TaskList: Routable {
         /// The word before a list's view's id in a window's path.
         private static let word = "view"
 
-        /// Reads the path it is handed whole: `view/<id>` from the front, then, as often as they come, `view/<id>` for a
-        /// list over the one before or a group's word and key for one of that list's own groups over it, then the task
-        /// screen's part when what follows begins with its word. An id reads whole and in either case through the core
-        /// (`EntityID(uuidString:)`). After a group only the task screen's part may follow, since a group holds no
+        /// Reads the path it is handed whole: `view/<id>` from the front, then, as often as they come, `view/<id>` for
+        /// a list over the one before or a group's word and key for one of that list's own groups over it, then the
+        /// task screen's part when what follows begins with its word. An id reads whole and in either case through the
+        /// core (`EntityID(uuidString:)`). After a group only the task screen's part may follow, since a group holds no
         /// lists, so `view` or a second group's word there is out of place; whatever is left after the task screen's
         /// part is refused too, a word this route or the task screen's knows as out of place and anything else as
         /// unknown, the empty segment a doubled or trailing slash leaves included. Read from the left, so the first
@@ -210,7 +210,8 @@ public final class TaskList: Routable {
         /// its opener (ADR-0009, amendment of 2026-10-22, point 2).
         case destinationAnswered(Route.Over.Answer)
 
-        /// The person went back to this list, and the screen over it is gone already (navigation state spec, section 3).
+        /// The person went back to this list, and the screen over it is gone already (navigation state spec, section
+        /// 3).
         case uncovered
 
         /// What the list declared could not be made, the task screen or a list: why, and the route of what still stands
@@ -220,16 +221,17 @@ public final class TaskList: Routable {
 
         /// The device's day, which the root hands every screen of its window when the window's view reports a new one,
         /// at midnight, in a new time zone or on waking on another day: an event of the world that no view can send
-        /// (spec section 8; ADR-0006, amendment of 2026-11-01). Which tasks a list selects, which day each of its blocks
-        /// is and which group a group's screen shows depend on the day, so a new one rereads the page; the day the list
-        /// already has reads nothing. Neither is a gesture on the list, so the sentence on screen and the destination
-        /// stay.
+        /// (spec section 8; ADR-0006, amendment of 2026-11-01). Which tasks a list selects, which day each of its
+        /// blocks is and which group a group's screen shows depend on the day, so a new one rereads the page; the day
+        /// the list already has reads nothing. Neither is a gesture on the list, so the sentence on screen and the
+        /// destination stay.
         case dayChanged(DeviceDay)
     }
 
     public enum Output: Equatable, Sendable {
         /// The view is gone, or the group of a group's screen names nothing any more, so the list asks its opener to
-        /// close it (spec section 3; the controller's ruling R57); the stack drops what stands over it with it.
+        /// close it (spec section 3; the controller's ruling on #175, 2026-11-04); the stack drops what stands over it
+        /// with it.
         case closeRequested
     }
 
@@ -274,8 +276,8 @@ public final class TaskList: Routable {
         self.store = store
         self.state = State(
             head: route.head, title: read.page.view.title, read: read, day: day,
-            folded: isGroup ? [] : try TaskList.folded(in: store, of: route.head.view),
-            layout: isGroup ? .list : try TaskList.layout(in: store, of: route.head.view), picks: [],
+            folded: isGroup ? [] : try TaskList.keptFolds(in: store, of: route.head.view),
+            layout: isGroup ? .list : try TaskList.keptLayout(in: store, of: route.head.view), picks: [],
             destination: Destination(), problem: nil
         )
         setDestination(route.over)
@@ -321,11 +323,11 @@ public final class TaskList: Routable {
         case .action(.blockChevronTapped(let id)):
             // Only a block the model draws with a chevron folds, which no column has. The fold is the one thing that
             // moves: it is the device's state and no answer to anything a person was told, so the sentence stays.
-            let model = model
-            guard TaskList.blocks(in: model.layout).contains(where: { $0.header?.chevron?.action == .blockChevronTapped(id) }),
+            let blocks = TaskList.blocks(in: model.layout)
+            guard blocks.contains(where: { $0.header?.chevron?.action == .blockChevronTapped(id) }),
                   let key = TaskList.foldKey(of: id)
             else { return nil }
-            let drawn = Set(TaskList.blocks(in: model.layout).compactMap { TaskList.foldKey(of: $0.id) })
+            let drawn = Set(blocks.compactMap { TaskList.foldKey(of: $0.id) })
             setFolded(state.folded.intersection(drawn).symmetricDifference([key]))
             return nil
         case .action(.tagChipTapped(let tag)):
@@ -397,7 +399,8 @@ public final class TaskList: Routable {
                 // moved this page is the page's to say.
                 let read = try TaskList.read(store, head: state.head, today: state.day.day)
                 // A group's screen whose group names nothing any more, its tag or its parent gone or its list grouped
-                // another way, asks to be closed, as a list whose view is gone does (the controller's ruling R57).
+                // another way, asks to be closed, as a list whose view is gone does (the controller's ruling on #175,
+                // 2026-11-04).
                 if let group = state.head.group, TaskList.refusal(of: group, in: read) != nil { return .closeRequested }
                 take(read)
             } catch {
@@ -428,9 +431,11 @@ public final class TaskList: Routable {
     }
 
     /// Takes a read of the store as the page on screen, its view's title the header's, and drops the picks whose chips
-    /// are no longer on the bar, which stop filtering and come back unlit (the controller's ruling R63).
+    /// are no longer on the bar, which stop filtering and come back unlit (the controller's ruling on #175,
+    /// 2026-11-04).
     private func take(_ read: Read) {
-        let chips = TaskList.chips(in: TaskList.blocks(of: read, head: state.head, today: state.day.day), tags: read.tags)
+        let blocks = TaskList.blocks(of: read, head: state.head, today: state.day.day)
+        let chips = TaskList.chips(in: blocks, tags: read.tags)
         state.read = read
         state.title = read.page.view.title
         state.picks.formIntersection(chips.map(\.id))
@@ -465,12 +470,12 @@ public final class TaskList: Routable {
     /// The folded blocks of the view as the device's state keeps them, by their keys (`foldKey(of:)`). What was kept
     /// is the device's and may be stale: a key no block has now draws nothing, and the next fold writes the set back
     /// without it. A value that does not decode as a list of texts reads as nothing folded, which the store decides.
-    private static func folded(in store: Store, of view: ViewID) throws(StoreError) -> Set<String> {
+    private static func keptFolds(in store: Store, of view: ViewID) throws(StoreError) -> Set<String> {
         Set(try store.deviceState(foldedKey(of: view), as: [String].self) ?? [])
     }
 
     /// The layout the device keeps for the view, and the list when it keeps none.
-    private static func layout(in store: Store, of view: ViewID) throws(StoreError) -> Model.Layout.Kind {
+    private static func keptLayout(in store: Store, of view: ViewID) throws(StoreError) -> Model.Layout.Kind {
         try store.deviceState(layoutKey(of: view), as: Model.Layout.Kind.self) ?? .list
     }
 
@@ -486,7 +491,8 @@ public final class TaskList: Routable {
     /// peer's delete has not yet reached, looks like from here: the task, the list inside, or a group's tag or parent.
     /// A group refused as `.invalid` names a grouping its list does not have, a link that outlived the grouping it
     /// names (ADR-0009, amendment of 2026-11-02). Anything else is the store failing to read what may well be there,
-    /// and calling that "gone" would put on screen something that is not true (the controller's ruling R52).
+    /// and calling that "gone" would put on screen something that is not true (the controller's ruling on #175,
+    /// 2026-11-04).
     private static func problem(_ error: StoreError, declared: Route.Over?) -> Problem {
         switch (declared, error) {
         case (.list(let route)?, .notFound): route.head.group == nil ? .listIsGone : .groupIsGone
@@ -500,8 +506,8 @@ public final class TaskList: Routable {
     /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
     /// it even when the page's read fails; the store's read the blocks, the tile and the rule are read from; the
     /// device's day it was read by; the folds and the layout the device keeps, and the picked tags this session keeps;
-    /// what it declared over itself; and the sentence a person was last told. One value, moved field by field, and the one place any of it is kept: the model is computed
-    /// from it on every read (owner's reviews of #77 and #101).
+    /// what it declared over itself; and the sentence a person was last told. One value, moved field by field, and the
+    /// one place any of it is kept: the model is computed from it on every read (owner's reviews of #77 and #101).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
@@ -573,7 +579,7 @@ extension TaskList.Route.Group {
 
     /// The group's part of a window's path, its word and its key: a distance signed, `0` today, an id as its
     /// `rawValue`, a status by its name, or `none` for the group with no key.
-    var segments: [String] {
+    fileprivate var segments: [String] {
         let key = switch self {
         case .day(let distance), .deadline(let distance): distance.map(Self.key(of:)) ?? Self.none
         case .tag(let id): id?.rawValue ?? Self.none
@@ -587,7 +593,7 @@ extension TaskList.Route.Group {
     /// `+n`, `0` or `-n`, so that a link has one spelling, and one a day offset of `Int32` holds; an id whole through
     /// the core, as every id is read; a status by its name; `none` for the group with no key, which a status has not.
     /// A key that does not read is refused as written, an id as every id is.
-    init(_ word: Word, reading path: inout ArraySlice<String>) throws(RouteError) {
+    fileprivate init(_ word: Word, reading path: inout ArraySlice<String>) throws(RouteError) {
         switch word {
         case .day: self = .day(try Self.distance(reading: &path))
         case .deadline: self = .deadline(try Self.distance(reading: &path))
@@ -600,8 +606,8 @@ extension TaskList.Route.Group {
         }
     }
 
-    /// The key of the group with no key: no day, no tag, no parent.
-    private static let none = "none"
+    /// The key of the group with no key: no day, no tag, no parent, in a window's path and in a fold's key.
+    static let none = "none"
 
     /// A distance as a key: `0`, or its sign and its digits.
     private static func key(of distance: Int32) -> String {

@@ -112,9 +112,12 @@ sentence in the sheet, and Cancel or Esc closes it and writes nothing.
 Open in New Window, in a list's context menu, opens that view in a window of its own, every time, on the view a window
 shows too; every window shows what the others write.
 `TODO_ROUTE` is the route the first window opens, in the text form a link carries after `todo://`: a path,
-`/view/<id>` or `/view/<id>/task/<id>`, with `?quick-entry` after it to open quick entry too. One that does not
-read opens the Inbox, as no `TODO_ROUTE` does, and one naming a view that is gone opens no list and says so under
-the sidebar. The executable has no bundle, so no `todo://` link reaches it while it runs, and macOS does not
+`/view/<id>` or `/view/<id>/task/<id>`, with a list opened over the list before the task, `/view/<id>/view/<id>`, or
+one of the list's own groups, `/view/<id>/day/+1` (`day` and `deadline` with a distance from today, `+1`, `0`, `-2`
+or `none`; `tag` and `parent` with an id or `none`; `status` with `open`, `done` or `canceled`), and `?quick-entry`
+after it to open quick entry too. One that does not read opens the Inbox, as no `TODO_ROUTE` does, one naming a view
+that is gone opens no list and says so under the sidebar, and a group its list is not grouped by opens the list and
+says so under it. The executable has no bundle, so no `todo://` link reaches it while it runs, and macOS does not
 restore its windows after a relaunch. No bundled Mac app exists in this milestone: the Xcode shell (#96) builds the
 iPhone and iPad app, and the Mac stays on `todo-mac`.
 

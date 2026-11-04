@@ -5,12 +5,13 @@ import TodoCore
 extension TaskList {
     /// What a view draws: the screen's header, the tag bar, the blocks in the layout the list is shown as, Show as, the
     /// empty state and the sentence, each a model of the design system's components with every size, colour and word
-    /// finished, so that a platform draws them and decides nothing but its containers, its gestures, scrolling and focus
-    /// (spec sections 1, 2, 5 and 7; ADR-0007, amendment of 2026-10-30). It is computed from the module's state on every
-    /// read and never kept beside it (owner's review of #101).
+    /// finished, so that a platform draws them and decides nothing but its containers, its gestures, scrolling and
+    /// focus (spec sections 1, 2, 5 and 7; ADR-0007, amendment of 2026-10-30). It is computed from the module's state
+    /// on every read and never kept beside it (owner's review of #101).
     public struct Model: Equatable, Sendable {
         /// The list's tile and title, and under them its date where its rule names one day, Today's; on a group's
-        /// screen the list's tile, the group's name, and the list's title with the group's date (spec sections 1 and 2).
+        /// screen the list's tile, the group's name, and the list's title with the group's date (spec sections 1 and
+        /// 2).
         public let header: ScreenHeaderModel
 
         /// The tags of the list's open tasks, the most used first, and nil when no chip would show (spec section 7).

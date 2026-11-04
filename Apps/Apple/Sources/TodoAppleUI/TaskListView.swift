@@ -2,12 +2,13 @@
 import SwiftUI
 import TaskListFeature
 
-/// The tasks of one view, drawn as the list assembled them, a row's tap sent as the one action its control is named
-/// for (`docs/style.md`). It is the root of the stack in a wide window's detail column, and a screen pushed over the
-/// views in a narrow window's one stack, and the task the list declared is pushed over it either way, drawn by the
-/// root view's one destination for the window's stack, so the list draws nothing of it (navigation state spec,
-/// section 6). What opens is the list's to decide, so a row reports the tap and nothing else. The screen's title is the
-/// view's, which names the list in the back button's menu over the task (#126).
+/// The blocks of one list, drawn as plain sections of their rows' titles until the list screen draws the components'
+/// models (list screen plan, Task 8), a row's tap sent as the action its model carries (`docs/style.md`). It is the
+/// root of the stack in a wide window's detail column, and a screen pushed over the views in a narrow window's one
+/// stack, and what the list declared over itself, a task or another list, is pushed over it either way, drawn by the
+/// root view's one destination for the window's stack, so the list draws nothing of it (navigation state spec, section
+/// 6). What opens is the list's to decide, so a row and a block's title report the tap and nothing else. The screen's
+/// title is the header's, which names the list in the back button's menu over what stands on it (#126).
 struct TaskListView: View {
     private let model: TaskList.Model
     private let send: (TaskList.UserAction) -> Void
@@ -19,25 +20,53 @@ struct TaskListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            List(model.rows) { row in
-                // The whole row is the button, its title at the leading edge and the rest of the row a place to
-                // click too: as a bordered button on the Mac the row answered only on the bezel around its title.
-                Button {
-                    send(.rowTapped(row.id))
-                } label: {
-                    Text(row.title)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(.rect)
+            List(blocks) { block in
+                Section {
+                    ForEach(block.rows) { row in
+                        rowView(row)
+                    }
+                } header: {
+                    // A block's header in the list, or its column's in columns, which this view draws as the same
+                    // sections until the board is drawn (Task 8); its title opens what the block is.
+                    if let header = block.header ?? block.column?.header {
+                        Button(header.title.text) { send(header.titleTapped) }
+                            .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
             }
-            // Under the rows, as the sidebar draws its own. A sentence written while a task covered the list, a
-            // link to a task that is gone among them, is first seen when the task is popped (`TaskList`).
+            // Under the rows, as the sidebar draws its own. A sentence written while a screen covered the list, a link
+            // to a task that is gone among them, is first seen when the screen is popped (`TaskList`).
             if let problem = model.problem {
                 Text(problem)
                     .padding()
             }
         }
-        .navigationTitle(model.title)
+        .navigationTitle(model.header.title.text)
+    }
+
+    /// The blocks the layout holds, the list's or the board's columns, drawn alike here: the one switch over the
+    /// layout's shapes (`docs/style.md`, "Views").
+    private var blocks: [TaskList.Model.Block] {
+        switch model.layout {
+        case .list(let blocks): blocks
+        case .columns(let board): board.columns
+        }
+    }
+
+    /// A row of a block, by its kind: the one switch over a row's kinds (`docs/style.md`, "Views"). The whole row is
+    /// the button, its title at the leading edge and the rest of the row a place to click too: as a bordered button on
+    /// the Mac the row answered only on the bezel around its title.
+    @ViewBuilder private func rowView(_ row: TaskList.Model.Row) -> some View {
+        switch row {
+        case .task(_, let task):
+            Button {
+                send(task.tap)
+            } label: {
+                Text(task.title.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
