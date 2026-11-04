@@ -102,11 +102,20 @@ public final class TaskList: Routable {
         /// The word before a list's view's id in a window's path.
         private static let word = "view"
 
-        /// Reads the path it is handed whole: `view/<id>` from the front, then, as often as they come, `view/<id>` for
-        /// a list over the one before or a group's word and key for one of that list's own groups over it, then the
-        /// task screen's part when what follows begins with its word. An id reads whole and in either case through the
-        /// core (`EntityID(uuidString:)`). After a group only the task screen's part may follow, since a group holds no
-        /// lists, so `view` or a second group's word there is out of place; whatever is left after the task screen's
+        /// The most lists a chain holds, the first included, a group's screen over its list counting as one. A path is
+        /// data from outside, and the stack makes a screen for every list of the chain, each reading its page, while
+        /// comparing two chains (the synthesized `==`) and releasing one walk the chain by recursion, so the chain is
+        /// bounded where a person never goes, as a filter is bounded for the walks over it (`maximumDepth`, which the
+        /// store refuses a deeper filter by): past the bound the word that would make one more list has no place
+        /// (the controller's ruling on #175, 2026-11-04).
+        private static let longestChain = 32
+
+        /// Reads the path it is handed whole: `view/<id>` from the front, then, as long as the chain holds fewer lists
+        /// than `longestChain`, `view/<id>` for a list over the one before or a group's word and key for one of that
+        /// list's own groups over it, then the task screen's part when what follows begins with its word. An id reads
+        /// whole and in either case through the core (`EntityID(uuidString:)`). After a group only the task screen's
+        /// part may follow, since a group holds no lists, so `view` or a second group's word there is out of place, as
+        /// is the word that would make a chain longer than `longestChain`; whatever is left after the task screen's
         /// part is refused too, a word this route or the task screen's knows as out of place and anything else as
         /// unknown, the empty segment a doubled or trailing slash leaves included. Read from the left, so the first
         /// offence is the one named.
@@ -128,7 +137,7 @@ public final class TaskList: Routable {
                 }
                 let groupWord = Group.Word(rawValue: next)
                 guard next == Route.word || groupWord != nil else { throw Route.refusal(of: next) }
-                guard last.group == nil else { throw .segmentOutOfPlace(next) }
+                guard last.group == nil, heads.count < Route.longestChain else { throw .segmentOutOfPlace(next) }
                 path.removeFirst()
                 last = if let groupWord {
                     Head(view: last.view, group: try Group(groupWord, reading: &path))

@@ -562,11 +562,12 @@ private func group(_ group: TaskList.Route.Group, of view: ViewID, task: TaskID?
     #expect(throws: RouteError.unknownSegment("edit")) { try read(["view", view.rawValue, "task", task.rawValue, "edit"]) }
 }
 
-/// A path is data from outside, so a chain of lists as long as a link makes is read and written by loops over the path
-/// and the chain, never a recursion over them (`docs/style.md`): two hundred lists over a list, a task over the last,
-/// read and walked from the base to the top, and written back as the path.
+/// A path is data from outside, so a chain of lists is read and written by loops over the path and the chain, never a
+/// recursion over them (`docs/style.md`): the longest chain a route holds, thirty-two lists with the first, a task over
+/// the last, read and walked from the base to the top, and written back as the path; and the same with a group of the
+/// thirty-first list as the thirty-second.
 @Test func aChainOfListsIsReadAndWrittenWithoutRecursion() throws {
-    let lists = (0..<200).map { _ in ViewID() }
+    let lists = (0..<31).map { _ in ViewID() }
     let path = ["view", view.rawValue] + lists.flatMap { ["view", $0.rawValue] } + ["task", task.rawValue]
     let chain = try read(path)
     #expect(chain.segments == path)
@@ -578,6 +579,20 @@ private func group(_ group: TaskList.Route.Group, of view: ViewID, task: TaskID?
     }
     #expect(heads == [view] + lists)
     #expect(over == .task(.init(head: task)))
+}
+
+/// A chain holds at most thirty-two lists, the first included and a group's screen counting as one, since the stack
+/// makes a screen for each and comparing and releasing a chain walk it by recursion: the word that would make the
+/// thirty-third, a list's or a group's, has no place there (the controller's ruling on #175, 2026-11-04, after the
+/// filter's bound, `maximumDepth`).
+@Test func aChainLongerThanTheBoundIsRefused() throws {
+    let lists = (0..<31).map { _ in ViewID() }
+    let longest = ["view", view.rawValue] + lists.flatMap { ["view", $0.rawValue] }
+    #expect(try read(longest).segments == longest, "thirty-two lists read")
+    #expect(throws: RouteError.segmentOutOfPlace("view")) { try read(longest + ["view", other.rawValue]) }
+    #expect(throws: RouteError.segmentOutOfPlace("day")) { try read(longest + ["day", "+1"]) }
+    let grouped = Array(longest.dropLast(2)) + ["day", "+1"]
+    #expect(try read(grouped).segments == grouped, "a group as the thirty-second list reads")
 }
 
 /// A group's address is its grouping's word and its key after its list's `view/<id>`, written alone since its view is

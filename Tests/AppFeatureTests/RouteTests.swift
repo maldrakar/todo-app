@@ -75,15 +75,18 @@ private let table: [(route: Route, path: String)] = [
 }
 
 /// Each route reads its own part of the path and refuses what it cannot read, and the window refuses with what it
-/// threw: here the list's route, which finds `task` before a view, a third word after the task, a list after a group
-/// and a word it does not know, a group's key that does not read, the task screen's route, which finds no id after
-/// `task`, and the core's reading of an id, which reads one only whole.
+/// threw: here the list's route, which finds `task` before a view, a third word after the task, a list after a group,
+/// a thirty-third list in a chain and a word it does not know, a group's key that does not read, the task screen's
+/// route, which finds no id after `task`, and the core's reading of an id, which reads one only whole.
 @Test func whatARouteRefusesInThePathIsWhatTheWindowRefuses() {
     #expect(throws: RouteError.segmentOutOfPlace("task")) { try Route(path: "/task/\(task)") }
     #expect(throws: RouteError.segmentOutOfPlace("view")) { try Route(path: "/view/\(view)/task/\(task)/view/\(view)") }
     #expect(throws: RouteError.segmentOutOfPlace("day")) { try Route(path: "/view/\(view)/task/\(task)/day/+1") }
     #expect(throws: RouteError.segmentOutOfPlace("view")) { try Route(path: "/view/\(view)/day/+1/view/\(other)") }
     #expect(throws: RouteError.unknownSegment("1")) { try Route(path: "/view/\(view)/day/1") }
+    #expect(throws: RouteError.segmentOutOfPlace("view")) {
+        try Route(path: "/view/\(view)" + String(repeating: "/view/\(other)", count: 32))
+    }
     #expect(throws: RouteError.unknownSegment("edit")) { try Route(path: "/view/\(view)/task/\(task)/edit") }
     #expect(throws: RouteError.notAnID("42")) { try Route(path: "/view/\(view)/task/42") }
     #expect(throws: RouteError.notAnID("inbox")) { try Route(path: "/view/inbox") }
