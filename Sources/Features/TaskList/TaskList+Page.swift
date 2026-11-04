@@ -11,12 +11,13 @@ import TodoCore
 extension TaskList {
     /// What one read of the store gives the list, kept whole until the next read replaces it: the view's page; every
     /// tag, whose titles the chips, the meta lines and the headers of a grouping by tag name and whose order the meta
-    /// lines keep; and the titles of the parents the page's groups by parent are of, and the group's own on a group's
-    /// screen by parent, each read once, never per row (spec section 9; the controller's ruling on #175, 2026-11-04).
+    /// lines keep; and the title of each parent task a group by parent stands for, by the parent's id, the page's
+    /// groups' and the group's own on a group's screen by parent, each read once, never per row, which the header of
+    /// such a group shows (spec section 9; the controller's ruling on #175, 2026-11-04).
     struct PageSnapshot {
         let page: TaskViewPage
         let tags: [Tag]
-        let parents: [TaskID: String]
+        let parentTitles: [TaskID: String]
     }
 
     /// A block as the page gives it, before the tag bar's filter, the folds and the look: what it is, its tasks, what
@@ -58,11 +59,11 @@ extension TaskList {
             }
         }
         if case .parent(let id?)? = head.group { wanted.append(id) }
-        var parents: [TaskID: String] = [:]
-        for id in wanted where parents[id] == nil {
-            if let task = try store.task(id) { parents[id] = task.title }
+        var titles: [TaskID: String] = [:]
+        for id in wanted where titles[id] == nil {
+            if let task = try store.task(id) { titles[id] = task.title }
         }
-        return PageSnapshot(page: page, tags: try store.tags(), parents: parents)
+        return PageSnapshot(page: page, tags: try store.tags(), parentTitles: titles)
     }
 
     /// Why a group names nothing of its list as the read found it, and nil when it names a group: a word that is not
@@ -77,7 +78,7 @@ extension TaskList {
         }
         switch group {
         case .tag(let id?) where !snapshot.tags.contains(where: { $0.id == id }): return .notFound(id)
-        case .parent(let id?) where snapshot.parents[id] == nil: return .notFound(id)
+        case .parent(let id?) where snapshot.parentTitles[id] == nil: return .notFound(id)
         case .day, .deadline, .tag, .parent, .status: return nil
         }
     }
@@ -207,7 +208,7 @@ extension TaskList {
         case .tag(let tag):
             Heading(title: tag.flatMap { tag in snapshot.tags.first { $0.id == tag }?.title } ?? "No tag", subtitle: nil)
         case .parent(let parent):
-            Heading(title: parent.flatMap { snapshot.parents[$0] } ?? "No parent", subtitle: nil)
+            Heading(title: parent.flatMap { snapshot.parentTitles[$0] } ?? "No parent", subtitle: nil)
         case .status(let status):
             Heading(title: statusTitles[status] ?? status.name, subtitle: nil)
         }

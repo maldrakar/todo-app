@@ -19,7 +19,7 @@ private let task = TaskID("0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a")
 /// the shape every row of the text form's table reads as.
 private func pane(_ view: ViewID, task: TaskID? = nil, quickEntry: Bool = false) -> Route {
     Route(
-        sidebar: .init(list: .init(head: .init(view: view), over: task.map { .task(TaskScreen.Route(head: $0)) })),
+        sidebar: .init(list: .init(head: .init(view: view), tail: task.map { .task(TaskScreen.Route(head: $0)) })),
         quickEntry: quickEntry ? QuickEntry.Route() : nil
     )
 }
@@ -29,7 +29,7 @@ private func pane(_ view: ViewID, task: TaskID? = nil, quickEntry: Bool = false)
 private func chain(_ view: ViewID, over: TaskList.Route.Head, task: TaskID) -> Route {
     Route(
         sidebar: .init(list: .init(
-            head: .init(view: view), over: .list(.init(head: over, over: .task(TaskScreen.Route(head: task))))
+            head: .init(view: view), tail: .list(.init(head: over, tail: .task(TaskScreen.Route(head: task))))
         )),
         quickEntry: nil
     )

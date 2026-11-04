@@ -11,7 +11,7 @@ private let inbox = BuiltInTaskViews.inbox
 /// The route of a list on a view, with the task screen declared over it when a task is named: what a link to the list
 /// or to a task in it carries.
 private func on(_ view: ViewID, task: TaskID? = nil) -> TaskList.Route {
-    TaskList.Route(head: .init(view: view), over: task.map { .task(TaskScreen.Route(head: $0)) })
+    TaskList.Route(head: .init(view: view), tail: task.map { .task(TaskScreen.Route(head: $0)) })
 }
 
 /// The ids of the rows a model draws, in their order.
@@ -77,13 +77,13 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let route = on(inbox, task: id)
     let list = try TaskList(store: store, route: route, day: testDay)
-    #expect(list.destination.pushed == route.over)
+    #expect(list.destination.pushed == route.tail)
     #expect(list.model == (try listOn(inbox, in: store)), "the rows and no sentence: the task is the stack's to make")
     #expect(list.route == route)
     let before = list.model
     #expect(list.send(.created) == nil)
     #expect(list.model == before)
-    #expect(list.destination.pushed == route.over)
+    #expect(list.destination.pushed == route.tail)
 }
 
 /// A tap on a row declares the row's task, the route a link to it declares, so what a tap opens and what a link
@@ -230,16 +230,16 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func aListCreatedWithAListOverItDeclaresIt() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
-    let route = TaskList.Route(head: .init(view: inbox), over: .list(on(work)))
+    let route = TaskList.Route(head: .init(view: inbox), tail: .list(on(work)))
     let list = try TaskList(store: store, route: route, day: testDay)
     #expect(list.destination.pushed == .list(on(work)))
     #expect(list.route == route)
     #expect(list.model == (try listOn(inbox, in: store)), "what stands over the list is the stack's to make")
     let grouped = TaskList.Route(
         head: .init(view: BuiltInTaskViews.upcoming),
-        over: .list(TaskList.Route(head: .init(view: BuiltInTaskViews.upcoming, group: .day(1))))
+        tail: .list(TaskList.Route(head: .init(view: BuiltInTaskViews.upcoming, group: .day(1))))
     )
-    #expect(try TaskList(store: store, route: grouped, day: testDay).destination.pushed == grouped.over)
+    #expect(try TaskList(store: store, route: grouped, day: testDay).destination.pushed == grouped.tail)
 }
 
 /// A list opened over this one asks to be closed when its view is gone, and the stack hands the answer to this list,
@@ -247,7 +247,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func theListOverTheListAnswersToCloseAndEmptiesTheDestination() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
-    let list = try TaskList(store: store, route: TaskList.Route(head: .init(view: inbox), over: .list(on(work))), day: testDay)
+    let list = try TaskList(store: store, route: TaskList.Route(head: .init(view: inbox), tail: .list(on(work))), day: testDay)
     let before = list.model
     #expect(list.send(.destinationAnswered(.list(.closeRequested))) == nil)
     #expect(list.destination.pushed == nil)
@@ -262,9 +262,9 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let gone = ViewID()
     let list = try TaskList(store: store, route: on(inbox), day: testDay)
-    let overAList = TaskList.Route(head: .init(view: inbox), over: .list(on(gone)))
+    let overAList = TaskList.Route(head: .init(view: inbox), tail: .list(on(gone)))
     let overAGroup = TaskList.Route(
-        head: .init(view: inbox), over: .list(TaskList.Route(head: .init(view: inbox, group: .day(1))))
+        head: .init(view: inbox), tail: .list(TaskList.Route(head: .init(view: inbox, group: .day(1))))
     )
     let cases: [(declared: TaskList.Route, error: StoreError, sentence: String)] = [
         (overAList, .notFound(gone), "The list is gone."),
@@ -430,7 +430,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     #expect(list.send(.dayChanged(testDay)) == nil)
     #expect(list.model == (try listOn(BuiltInTaskViews.today, in: store)))
     #expect(titles(of: list.model) == ["Call the bank"])
-    #expect(list.destination.pushed == route.over)
+    #expect(list.destination.pushed == route.tail)
 }
 
 /// A new day answers nobody, so the sentence on screen stays while the rows are read again: here the one a link to a
@@ -498,7 +498,7 @@ private func read(_ segments: [String]) throws(RouteError) -> TaskList.Route {
 private func group(_ group: TaskList.Route.Group, of view: ViewID, task: TaskID? = nil) -> TaskList.Route {
     TaskList.Route(
         head: .init(view: view),
-        over: .list(TaskList.Route(head: .init(view: view, group: group), over: task.map { .task(.init(head: $0)) }))
+        tail: .list(TaskList.Route(head: .init(view: view, group: group), tail: task.map { .task(.init(head: $0)) }))
     )
 }
 
@@ -519,11 +519,11 @@ private func group(_ group: TaskList.Route.Group, of view: ViewID, task: TaskID?
 @Test func theRouteReadsAListOverAList() throws {
     let path = ["view", view.rawValue, "view", other.rawValue]
     let chain = try read(path)
-    #expect(chain == TaskList.Route(head: .init(view: view), over: .list(on(other))))
+    #expect(chain == TaskList.Route(head: .init(view: view), tail: .list(on(other))))
     #expect(chain.segments == path)
-    #expect(chain.over?.head == .list(.init(view: other)))
+    #expect(chain.tail?.head == .list(.init(view: other)))
     let grouped = ["view", view.rawValue, "view", other.rawValue, "day", "+1"]
-    #expect(try read(grouped) == TaskList.Route(head: .init(view: view), over: .list(group(.day(1), of: other))))
+    #expect(try read(grouped) == TaskList.Route(head: .init(view: view), tail: .list(group(.day(1), of: other))))
     #expect(try read(grouped).segments == grouped, "a group stands over the list before it, the inner one")
 }
 
@@ -532,7 +532,7 @@ private func group(_ group: TaskList.Route.Group, of view: ViewID, task: TaskID?
 @Test func theRouteReadsATaskOverAListOverAList() throws {
     let path = ["view", view.rawValue, "view", other.rawValue, "task", task.rawValue]
     let chain = try read(path)
-    #expect(chain == TaskList.Route(head: .init(view: view), over: .list(on(other, task: task))))
+    #expect(chain == TaskList.Route(head: .init(view: view), tail: .list(on(other, task: task))))
     #expect(chain.segments == path)
 }
 
@@ -558,13 +558,13 @@ private func group(_ group: TaskList.Route.Group, of view: ViewID, task: TaskID?
     let chain = try read(path)
     #expect(chain.segments == path)
     var heads: [ViewID] = [chain.head.view]
-    var over = chain.over
-    while case .list(let route)? = over {
+    var tail = chain.tail
+    while case .list(let route)? = tail {
         heads.append(route.head.view)
-        over = route.over
+        tail = route.tail
     }
     #expect(heads == [view] + lists)
-    #expect(over == .task(.init(head: task)))
+    #expect(tail == .task(.init(head: task)))
 }
 
 /// A chain holds at most thirty-two lists, the first included and a group's screen counting as one, since the stack

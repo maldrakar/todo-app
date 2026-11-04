@@ -72,18 +72,18 @@ extension AppModule {
                 return route
             }
 
-            /// The route as what a list declares over itself, the task screen or another list: the part of a route a
-            /// list reads, as what stands over it.
-            fileprivate var over: TaskList.Route.Over {
+            /// The route as a list's tail, what it declares over itself, the task screen or another list, case for
+            /// case: the part of a route a list reads, as what stands over it.
+            fileprivate var tail: TaskList.Route.Tail {
                 switch self {
                 case .list(let route): .list(route)
                 case .task(let route): .task(route)
                 }
             }
 
-            /// What a list declared over itself, as a route of a screen of the stack.
-            fileprivate init(_ over: TaskList.Route.Over) {
-                switch over {
+            /// A list's tail, what it declared over itself, as a route of a screen of the stack, case for case.
+            fileprivate init(_ tail: TaskList.Route.Tail) {
+                switch tail {
                 case .list(let route): self = .list(route)
                 case .task(let route): self = .task(route)
                 }
@@ -138,7 +138,7 @@ extension AppModule {
 
         /// A notice of the stack, in each module's own terms: `.declared` reaches a kept screen as its `.route`, and
         /// the rest as the events of the same names, a list hearing the answer of the task screen or of a list over it
-        /// as its own `Route.Over.Answer` and what still stands over it as its `Route.Over`. The task screen declares
+        /// as its own `Route.Tail.Answer` and what still stands over it as its `Route.Tail`. The task screen declares
         /// nothing, so nothing stands over it to answer it, be gone from over it or be refused it.
         func take(_ notice: StackNotice<Screen>) -> Output? {
             switch (self, notice) {
@@ -150,7 +150,7 @@ extension AppModule {
                 list.send(.destinationAnswered(.list(output))).map(Output.list)
             case (.list(let list), .uncovered): list.send(.uncovered).map(Output.list)
             case (.list(let list), .notOpened(let error, let stillOpen)):
-                list.send(.notOpened(error, stillOpen: stillOpen?.over)).map(Output.list)
+                list.send(.notOpened(error, stillOpen: stillOpen?.tail)).map(Output.list)
             case (.task(let task), .created): task.send(.created).map(Output.task)
             case (.task(let task), .declared(.task(let route))): task.send(.route(route)).map(Output.task)
             case (.list, .declared(.task)), (.task, .declared(.list)):
@@ -164,7 +164,7 @@ extension AppModule {
         /// screen's own, since nothing stands over it.
         func route(over above: Route?) -> Route {
             switch self {
-            case .list(let list): .list(TaskList.Route(head: list.route.head, over: above?.over))
+            case .list(let list): .list(TaskList.Route(head: list.route.head, tail: above?.tail))
             case .task(let task): .task(task.route)
             }
         }

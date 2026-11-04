@@ -492,7 +492,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     let module = try list(projects, in: store)
     #expect(module.send(.action(.blockTitleTapped(.list(house)))) == nil)
     #expect(module.destination.pushed == .list(TaskList.Route(head: .init(view: house))))
-    #expect(module.route == TaskList.Route(head: .init(view: projects), over: .list(TaskList.Route(head: .init(view: house)))))
+    #expect(module.route == TaskList.Route(head: .init(view: projects), tail: .list(TaskList.Route(head: .init(view: house)))))
     let before = module.model
     #expect(module.send(.action(.blockTitleTapped(.list(ViewID())))) == nil, "a block the list does not hold")
     #expect(module.model == before)
@@ -597,7 +597,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
         guard case .invalid = error else { Issue.record("refused with \(error)"); return }
     }
     let upcomingList = try list(upcoming, in: store)
-    _ = upcomingList.send(.route(TaskList.Route(head: .init(view: upcoming), over: .list(screen(.deadline(1), of: upcoming)))))
+    _ = upcomingList.send(.route(TaskList.Route(head: .init(view: upcoming), tail: .list(screen(.deadline(1), of: upcoming)))))
     _ = upcomingList.send(.notOpened(.invalid("not grouped by deadline"), stillOpen: nil))
     #expect(upcomingList.model.problem == "This list is not grouped that way, so the group could not be opened.")
 }

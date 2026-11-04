@@ -484,7 +484,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
 @Test func aNewListOpensItsFieldAndDeclaresNoList() throws {
     let store = try makeStore()
     let task = try store.createTask(NewTask(title: "Buy milk"))
-    let route = TaskViewList.Route(list: .init(head: .init(view: inbox), over: .task(TaskScreen.Route(head: task))))
+    let route = TaskViewList.Route(list: .init(head: .init(view: inbox), tail: .task(TaskScreen.Route(head: task))))
     let list = try TaskViewList(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
     let before = list.model
     let written = try store.journal(after: 0).count
@@ -682,7 +682,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
     try store.createView(NewTaskView(title: "Errands"))
     let task = try store.createTask(NewTask(title: "Buy seeds"))
-    let route = TaskViewList.Route(list: .init(head: .init(view: garden), over: .task(TaskScreen.Route(head: task))))
+    let route = TaskViewList.Route(list: .init(head: .init(view: garden), tail: .task(TaskScreen.Route(head: task))))
     let list = try TaskViewList(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
     let open = list.model
     #expect(highlighted(in: open) == [garden], "the open list's row is lit; this is the setup")
@@ -774,14 +774,14 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects, filter: .status([.open])))
     let overAList = TaskViewList.Route(
-        list: .init(head: .init(view: projects), over: .list(.init(head: .init(view: home))))
+        list: .init(head: .init(view: projects), tail: .list(.init(head: .init(view: home))))
     )
     let list = try TaskViewList(store: store, route: overAList, width: .narrow, day: testDay, capabilities: iPhone)
     #expect(highlighted(in: list.model) == [projects])
     #expect(list.model == (try sidebarOn(projects, in: store)))
     let upcoming = BuiltInTaskViews.upcoming
     let overAGroup = TaskViewList.Route(
-        list: .init(head: .init(view: upcoming), over: .list(.init(head: .init(view: upcoming, group: .day(1)))))
+        list: .init(head: .init(view: upcoming), tail: .list(.init(head: .init(view: upcoming, group: .day(1)))))
     )
     let grouped = try TaskViewList(store: store, route: overAGroup, width: .narrow, day: testDay, capabilities: iPhone)
     #expect(highlighted(in: grouped.model) == [upcoming])

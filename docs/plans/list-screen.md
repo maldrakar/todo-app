@@ -67,9 +67,10 @@ from.
 | `docs/adr/0004-flat-model-of-tasks-tags-and-filter-defined-views.md` | 2, #182 | the amendment's sentence on a group's row living and dying with its list (2); the amendment of 2026-11-02, a group opened as a screen is no row (#182) |
 | `docs/adr/0009-every-screen-is-a-child-of-its-opener-addressed-by-a-route.md`, `docs/specs/list-screen.md` | #182 | the amendment of 2026-11-02, a group's address; the spec amended the same day |
 | `Sources/TodoCore/Model/DeviceDay.swift` | 3 | `DeviceDay`, the device's day and the instant it began |
-| `Sources/Features/App/AppModule.swift`, `AppModule+Routing.swift` | 3, 6 | `init(store:route:width:day:capabilities:)`, `Event.dayChanged`, forwarded to the base and every element (3); `Screen.destination`, `take` and `route(over:)` over `TaskList.Route.Over` (6) |
+| `Sources/Features/App/AppModule.swift`, `AppModule+Routing.swift` | 3, 6 | `init(store:route:width:day:capabilities:)`, `Event.dayChanged`, forwarded to the base and every element (3); `Screen.destination`, `take` and `route(over:)` over `TaskList.Route.Tail` (6) |
 | `Sources/Features/TaskViewList/TaskViewList.swift`, `TaskViewList+Rows.swift` | 2, 3, #182 | rows of kind `group` skipped, the row's own two-case kind (2), the skip gone with the kind (#182); `init(…day:)`, `Event.dayChanged`, counts by the device's day (3) |
-| `Sources/Features/TaskList/TaskList.swift` | 3, 6, 7 | `init(store:route:day:)`, `Event.dayChanged` (3); `Route.Head` with a group, `Route.Group`, `Route.Over`, the module's events, outputs, actions and state (6, 7) |
+| `Sources/Features/TaskList/TaskList.swift` | 3, 6, 7 | `init(store:route:day:)`, `Event.dayChanged` (3); the module's events, outputs, actions and state (6, 7) |
+| `Sources/Features/TaskList/TaskList+Routing.swift` | 6 | `Route`, its `Head` with a group, `Route.Group` and its spelling, `Route.Tail` (moved out of `TaskList.swift` in the owner's review of #188) |
 | `Sources/Features/TaskList/TaskList+Model.swift` | 6, 7 | `Model`, `Layout`, `Block`, `Row`, `BlockID` |
 | `Sources/Features/TaskList/TaskList+Page.swift` | 6 | the page read into blocks, the tag bar's chips and filter, the folds and the layout, a group's screen read from its list's page, the lists inside |
 | `Sources/Features/TaskList/TaskList+Day.swift` | 6 | the day's formats: titles, dates, "Tomorrow", "Due Tue", a group's screen's title |
