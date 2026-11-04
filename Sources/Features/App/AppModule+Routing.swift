@@ -28,8 +28,9 @@ extension AppModule {
     ///
     /// Every mapping is a `switch` over the cases with no `default`, and decides nothing: a pairing that cannot
     /// occur, a task's answer handed to the sidebar, an action for a list sent to a task, answers nothing. A list
-    /// stands only on the sidebar and a task only on a list, so the sidebar declares only a list and the list only a
-    /// task, and neither hears the other's answer. The root learns from it which kinds of screen its window can hold
+    /// stands on the sidebar or on a list, and a task only on a list, so the sidebar declares only a list and a list a
+    /// task or another list, a list inside it or one of its own groups, and hears the answer of either (ADR-0009,
+    /// amendments of 2026-11-01 and 2026-11-02). The root learns from it which kinds of screen its window can hold
     /// and never which opens which, which stays in the openers' destinations.
     ///
     /// The task screen declares nothing over it, so its destination is an empty one, which the stack follows once,
@@ -44,13 +45,15 @@ extension AppModule {
         case task(TaskScreen)
 
         /// The route of a screen of the stack, whose head tells the kinds apart, so that the stack compares a
-        /// declaration with what stands by head alone.
+        /// declaration with what stands by head alone. A list's head is its view and, on a group's screen, the group,
+        /// so a group declared over its own list is pushed over it and not kept in its place (ADR-0009, amendment of
+        /// 2026-11-02).
         enum Route: RouteValue {
             case list(TaskList.Route)
             case task(TaskScreen.Route)
 
             enum Head: Equatable, Sendable {
-                case list(ViewID)
+                case list(TaskList.Route.Head)
                 case task(TaskID)
             }
 
@@ -69,10 +72,21 @@ extension AppModule {
                 return route
             }
 
-            /// The task screen's route, nil for a list's: the part of a route a list reads.
-            fileprivate var task: TaskScreen.Route? {
-                guard case .task(let route) = self else { return nil }
-                return route
+            /// The route as what a list declares over itself, the task screen or another list: the part of a route a
+            /// list reads, as what stands over it.
+            fileprivate var over: TaskList.Route.Over {
+                switch self {
+                case .list(let route): .list(route)
+                case .task(let route): .task(route)
+                }
+            }
+
+            /// What a list declared over itself, as a route of a screen of the stack.
+            fileprivate init(_ over: TaskList.Route.Over) {
+                switch over {
+                case .list(let route): self = .list(route)
+                case .task(let route): self = .task(route)
+                }
             }
         }
 
@@ -106,7 +120,7 @@ extension AppModule {
 
         var destination: Destination<Route> {
             switch self {
-            case .list(let list): list.destination.map(Route.task)
+            case .list(let list): list.destination.map(Route.init)
             case .task: Destination()
             }
         }
@@ -123,29 +137,34 @@ extension AppModule {
         }
 
         /// A notice of the stack, in each module's own terms: `.declared` reaches a kept screen as its `.route`, and
-        /// the rest as the events of the same names. The task screen declares nothing, so nothing stands over it to
-        /// answer it, be gone from over it or be refused it.
+        /// the rest as the events of the same names, a list hearing the answer of the task screen or of a list over it
+        /// as its own `Route.Over.Answer` and what still stands over it as its `Route.Over`. The task screen declares
+        /// nothing, so nothing stands over it to answer it, be gone from over it or be refused it.
         func take(_ notice: StackNotice<Screen>) -> Output? {
             switch (self, notice) {
             case (.list(let list), .created): list.send(.created).map(Output.list)
             case (.list(let list), .declared(.list(let route))): list.send(.route(route)).map(Output.list)
             case (.list(let list), .destinationAnswered(.task(let output))):
-                list.send(.destinationAnswered(output)).map(Output.list)
+                list.send(.destinationAnswered(.task(output))).map(Output.list)
+            case (.list(let list), .destinationAnswered(.list(let output))):
+                list.send(.destinationAnswered(.list(output))).map(Output.list)
             case (.list(let list), .uncovered): list.send(.uncovered).map(Output.list)
             case (.list(let list), .notOpened(let error, let stillOpen)):
-                list.send(.notOpened(error, stillOpen: stillOpen?.task)).map(Output.list)
+                list.send(.notOpened(error, stillOpen: stillOpen?.over)).map(Output.list)
             case (.task(let task), .created): task.send(.created).map(Output.task)
             case (.task(let task), .declared(.task(let route))): task.send(.route(route)).map(Output.task)
-            case (.list, .declared(.task)), (.list, .destinationAnswered(.list)), (.task, .declared(.list)):
+            case (.list, .declared(.task)), (.task, .declared(.list)):
                 nil
             case (.task, .destinationAnswered), (.task, .uncovered), (.task, .notOpened):
                 nil
             }
         }
 
+        /// A list's route with whatever stands over it, the task screen or another list, as its tail; the task
+        /// screen's own, since nothing stands over it.
         func route(over above: Route?) -> Route {
             switch self {
-            case .list(let list): .list(TaskList.Route(head: list.route.head, task: above?.task))
+            case .list(let list): .list(TaskList.Route(head: list.route.head, over: above?.over))
             case .task(let task): .task(task.route)
             }
         }

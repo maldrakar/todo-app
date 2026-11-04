@@ -230,7 +230,7 @@ public final class TaskViewList: Routable {
             rows: rows, counts: counts, collapsedViews: collapsedViews, width: width, day: day,
             capabilities: capabilities, destination: Destination()
         )
-        setDestination(route.list ?? inbox.map { TaskList.Route(head: $0) })
+        setDestination(route.list ?? inbox.map { TaskList.Route(head: .init(view: $0)) })
     }
 
     public func send(_ event: Event) -> Output? {
@@ -277,7 +277,7 @@ public final class TaskViewList: Routable {
             // included. Any other id is declared without asking the rows, as before.
             guard !state.rows.contains(where: { $0.id == id && $0.kind == .area }) else { return nil }
             if state.rename == nil { state.problem = nil }
-            setDestination(TaskList.Route(head: id))
+            setDestination(TaskList.Route(head: .init(view: id)))
             return nil
         case .action(.renameMenuItemChosen(let id)):
             openTitleField(on: id)
@@ -321,7 +321,7 @@ public final class TaskViewList: Routable {
             // there asks for nothing, the way the Rename menu item on one opens no field, and neither does an area's
             // line, since an area never opens (Lists screen spec, section 2).
             guard state.rows.contains(where: { $0.id == id && $0.kind == .list }) else { return nil }
-            return .openInWindow(Route(list: TaskList.Route(head: id)))
+            return .openInWindow(Route(list: TaskList.Route(head: .init(view: id))))
         case .action(.newListMenuItemChosen(let id)):
             // Where the list goes is the module's to decide (Lists screen spec, section 3): inside the list or the
             // area whose menu it came from, and from "+" or the bar in the last area of the root, so that it stands
@@ -868,7 +868,11 @@ public final class TaskViewList: Routable {
         /// whether they are in edit mode; the bar for the platform's edit mode, as edit mode has it, and its "+" menu;
         /// the look of the drag for the width; the dialog up, if any; and the sentence, if any.
         var model: Model {
-            let shown = TaskViewList.unfolded(rows, collapsedViews: collapsedViews, declared: destination.pushed?.head)
+            // The declared list's view, the base of the chain of lists the stack holds over it: a list inside it or one
+            // of its groups opened over it leaves the light on the list this module opened (spec section 9).
+            let shown = TaskViewList.unfolded(
+                rows, collapsedViews: collapsedViews, declared: destination.pushed?.head.view
+            )
             // Read off the drawn rows and not copied from the destination or the walk: `.rowSelected` and `.route`
             // declare the list of an id without asking the rows, and an id no list's row carries, an area's line's
             // among them, highlights nothing, so no row is drawn highlighted for it. A rename on a row a fold hides

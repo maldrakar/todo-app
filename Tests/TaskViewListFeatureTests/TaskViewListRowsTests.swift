@@ -484,7 +484,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
 @Test func aNewListOpensItsFieldAndDeclaresNoList() throws {
     let store = try makeStore()
     let task = try store.createTask(NewTask(title: "Buy milk"))
-    let route = TaskViewList.Route(list: .init(head: inbox, task: TaskScreen.Route(head: task)))
+    let route = TaskViewList.Route(list: .init(head: .init(view: inbox), over: .task(TaskScreen.Route(head: task))))
     let list = try TaskViewList(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
     let before = list.model
     let written = try store.journal(after: 0).count
@@ -515,7 +515,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     #expect(made.depth == 0)
     #expect(draft(of: made) == "")
     #expect(try stored(made.id, in: store) == ["", nil, "area", nil, nil])
-    #expect(list.destination.pushed == .init(head: inbox))
+    #expect(list.destination.pushed == .init(head: .init(view: inbox)))
     let reference = try TaskViewList(
         store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     )
@@ -563,14 +563,14 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", kind: .area))
     let list = try TaskViewList(
-        store: store, route: .init(list: .init(head: BuiltInTaskViews.upcoming)), width: .narrow, day: testDay,
+        store: store, route: .init(list: .init(head: .init(view: BuiltInTaskViews.upcoming))), width: .narrow, day: testDay,
         capabilities: iPhone
     )
     refusingAName(list)
     let before = list.model
     #expect(list.send(.action(.rowSelected(work))) == nil)
     #expect(list.model == before)
-    #expect(list.destination.pushed == .init(head: BuiltInTaskViews.upcoming))
+    #expect(list.destination.pushed == .init(head: .init(view: BuiltInTaskViews.upcoming)))
     #expect(list.send(.action(.openInNewWindowMenuItemChosen(work))) == nil)
     #expect(list.model == before)
 }
@@ -585,7 +585,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let before = list.model
     #expect(list.send(.action(.newTaskMenuItemChosen)) == .newTaskRequested)
     #expect(list.model == before)
-    #expect(list.destination.pushed == .init(head: inbox))
+    #expect(list.destination.pushed == .init(head: .init(view: inbox)))
 }
 
 /// The folds are the device's, so two windows of one device share them: a fold made in one is read by the other at its
@@ -682,7 +682,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let garden = try store.createView(NewTaskView(title: "Garden", parent: home))
     try store.createView(NewTaskView(title: "Errands"))
     let task = try store.createTask(NewTask(title: "Buy seeds"))
-    let route = TaskViewList.Route(list: .init(head: garden, task: TaskScreen.Route(head: task)))
+    let route = TaskViewList.Route(list: .init(head: .init(view: garden), over: .task(TaskScreen.Route(head: task))))
     let list = try TaskViewList(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
     let open = list.model
     #expect(highlighted(in: open) == [garden], "the open list's row is lit; this is the setup")
@@ -711,7 +711,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let contracts = try store.createView(NewTaskView(title: "Contracts", parent: acme))
     try store.createView(NewTaskView(title: "Billing", parent: work))
     let list = try TaskViewList(
-        store: store, route: .init(list: .init(head: contracts)), width: .narrow, day: testDay, capabilities: iPhone
+        store: store, route: .init(list: .init(head: .init(view: contracts))), width: .narrow, day: testDay, capabilities: iPhone
     )
     let open = list.model
     #expect(highlighted(in: open) == [contracts], "the open list's row is lit; this is the setup")
@@ -720,7 +720,7 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     #expect(list.send(.action(.disclosureTapped(clients))) == nil)
     #expect(highlighted(in: list.model) == [clients])
     #expect(list.model == (try sidebarOn(clients, in: store)))
-    #expect(list.destination.pushed == .init(head: contracts))
+    #expect(list.destination.pushed == .init(head: .init(view: contracts)))
     #expect(list.send(.action(.disclosureTapped(clients))) == nil)
     #expect(list.send(.action(.disclosureTapped(acme))) == nil)
     #expect(list.model == open)
@@ -733,13 +733,13 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let projects = try store.createView(NewTaskView(title: "Projects"))
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
     let list = try TaskViewList(
-        store: store, route: .init(list: .init(head: home)), width: .narrow, day: testDay, capabilities: iPhone
+        store: store, route: .init(list: .init(head: .init(view: home))), width: .narrow, day: testDay, capabilities: iPhone
     )
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
     #expect(highlighted(in: list.model) == [projects], "the fold lit Projects; this is the setup")
     #expect(list.send(.action(.rowSelected(projects))) == nil)
-    #expect(list.destination.pushed == .init(head: projects))
-    #expect(list.route == .init(list: .init(head: projects)))
+    #expect(list.destination.pushed == .init(head: .init(view: projects)))
+    #expect(list.route == .init(list: .init(head: .init(view: projects))))
     #expect(list.send(.action(.disclosureTapped(projects))) == nil)
     #expect(list.model == (try sidebarOn(projects, in: store)), "unfolded, Projects is lit and Home is not")
 }
@@ -763,4 +763,28 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     #expect(list.send(.changed(deleted)) == nil)
     #expect(listRow(shopping, in: list.model).map(drawnCount) == "")
     #expect(list.model == reference.model, "the count moved, and Docs is missing")
+}
+
+/// The list a person chose stays lit while a list inside it, or one of its own groups, stands over it: the chain is the
+/// pane's history, and the sidebar lights what it opened, the base of the chain (spec section 9). A route with a list
+/// over a list, and one with a group over its list, each light the base list's row, as a sidebar declared on that list
+/// alone does.
+@Test func theHighlightStaysOnTheBaseOfAChain() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects, filter: .status([.open])))
+    let overAList = TaskViewList.Route(
+        list: .init(head: .init(view: projects), over: .list(.init(head: .init(view: home))))
+    )
+    let list = try TaskViewList(store: store, route: overAList, width: .narrow, day: testDay, capabilities: iPhone)
+    #expect(highlighted(in: list.model) == [projects])
+    #expect(list.model == (try sidebarOn(projects, in: store)))
+    let upcoming = BuiltInTaskViews.upcoming
+    let overAGroup = TaskViewList.Route(
+        list: .init(head: .init(view: upcoming), over: .list(.init(head: .init(view: upcoming, group: .day(1)))))
+    )
+    let grouped = try TaskViewList(store: store, route: overAGroup, width: .narrow, day: testDay, capabilities: iPhone)
+    #expect(highlighted(in: grouped.model) == [upcoming])
+    #expect(grouped.model == (try sidebarOn(upcoming, in: store)))
+    #expect(grouped.route == overAGroup, "the chain is the sidebar's route, whole")
 }

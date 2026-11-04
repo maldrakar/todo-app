@@ -11,7 +11,7 @@ import SQLiteKit
 /// The route of a sidebar whose list is on a view, with the task open in it when there is one; its `list` is what
 /// such a sidebar declares over it.
 private func on(_ view: ViewID, task: TaskID? = nil) -> TaskViewList.Route {
-    .init(list: .init(head: view, task: task.map { TaskScreen.Route(head: $0) }))
+    .init(list: .init(head: .init(view: view), over: task.map { .task(TaskScreen.Route(head: $0)) }))
 }
 
 /// The model of a sidebar made now on a view, which is what the sidebar is compared with after an event: the
