@@ -63,12 +63,14 @@ extension TaskList {
         _ blocks: [PageBlock], title: String, folded: Set<String>, today: Day, tags: TagNames, _ metrics: Metrics.Blocks
     ) -> Model.Layout {
         switch metrics {
-        case .list(let headerMetrics, let rowMetrics):
+        case .list(let headerMetrics, let chevronMetrics, let rowMetrics):
             return .list(blocks.map { block in
                 let isFolded = block.heading != nil && foldKey(of: block.id).map(folded.contains) == true
                 return Model.Block(
                     id: block.id,
-                    header: block.heading.map { blockHeader($0, of: block, isFolded: isFolded, headerMetrics) },
+                    header: block.heading.map {
+                        blockHeader($0, of: block, isFolded: isFolded, headerMetrics, chevron: chevronMetrics)
+                    },
                     rows: isFolded ? [] : block.tasks.map {
                         .task($0.id, row($0, block.color, today: today, tags: tags, rowMetrics))
                     },
@@ -99,13 +101,19 @@ extension TaskList {
     /// on #175, 2026-11-04: the canvas keeps "Fold" and carries the state in `aria-expanded`, which the model has no
     /// field for).
     private static func blockHeader(
-        _ heading: Heading, of block: PageBlock, isFolded: Bool, _ metrics: Metrics.BlockHeader
+        _ heading: Heading, of block: PageBlock, isFolded: Bool, _ metrics: Metrics.BlockHeader,
+        chevron: Metrics.Chevron
     ) -> BlockHeaderModel<UserAction> {
-        blockHeader(heading, of: block, chevron: AccessoryModel.Chevron(
-            icon: IconModel(icon: .chevron, size: metrics.chevronSize, weight: .semibold, color: .ink3),
-            rotation: isFolded ? -90 : 0, animation: .fold,
-            accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title, action: .blockChevronTapped(block.id)
-        ), metrics)
+        let fold = BlockHeaderModel<UserAction>.Fold(
+            chevron: AccessoryModel.Chevron(
+                icon: IconModel(icon: .chevron, size: chevron.size, weight: .semibold, color: .ink3),
+                rotation: isFolded ? -90 : 0, animation: .fold,
+                accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
+                action: .blockChevronTapped(block.id)
+            ),
+            hitSide: chevron.hitSide
+        )
+        return blockHeader(heading, of: block, fold: fold, metrics)
     }
 
     /// A block's column (Task 8's table, Board): its header as a block's but with no rule and no chevron, since columns
@@ -116,7 +124,7 @@ extension TaskList {
         _ heading: Heading, of block: PageBlock, _ metrics: Metrics.Board
     ) -> ColumnModel<UserAction> {
         ColumnModel(
-            header: blockHeader(heading, of: block, chevron: nil, metrics.header), width: metrics.columnWidth,
+            header: blockHeader(heading, of: block, fold: nil, metrics.header), width: metrics.columnWidth,
             cornerRadius: metrics.columnCornerRadius, cardSpacing: metrics.cardSpacing, padding: metrics.columnPadding,
             fill: .fill, dropTint: block.color.dropTint, isDropTarget: false,
             dropRing: StrokeModel(color: block.color.check.fill, width: metrics.dropRingWidth, dash: []),
@@ -125,16 +133,14 @@ extension TaskList {
         )
     }
 
-    /// The header of a block or a column, with the chevron it is given or none: what both share.
+    /// The header of a block or a column, with the fold it is given or none: what both share.
     private static func blockHeader(
-        _ heading: Heading, of block: PageBlock, chevron: AccessoryModel<UserAction>.Chevron?,
-        _ metrics: Metrics.BlockHeader
+        _ heading: Heading, of block: PageBlock, fold: BlockHeaderModel<UserAction>.Fold?, _ metrics: Metrics.BlockHeader
     ) -> BlockHeaderModel<UserAction> {
         BlockHeaderModel(
             title: TextModel(text: heading.title, font: .sectionTitle, color: block.color.glyph),
             subtitle: heading.subtitle.map { TextModel(text: $0, font: .areaLabel, color: .ink2) },
-            titleToSubtitle: metrics.titleToSubtitle, field: nil, chevron: chevron,
-            chevronHitSide: metrics.chevronHitSide, rule: metrics.rule, height: metrics.height,
+            titleToSubtitle: metrics.titleToSubtitle, field: nil, fold: fold, rule: metrics.rule, height: metrics.height,
             topMargin: metrics.topMargin, trailingMargin: metrics.trailingMargin, bottomMargin: metrics.bottomMargin,
             leadingMargin: metrics.leadingMargin, topPadding: metrics.topPadding,
             horizontalPadding: metrics.horizontalPadding, bottomPadding: metrics.bottomPadding, cornerRadius: 0,
@@ -172,14 +178,14 @@ extension TaskList {
 
     /// A row's meta line, in the spec's order (spec section 3; canvas, section 5; the controller's ruling on #175,
     /// 2026-11-04): the deadline of an open task after the flag, red from the day it is due; each tag as "#name" in the
-    /// tags' order; the subtasks done over all after the subtasks' glyph; and the notes' glyph alone, which
-    /// `MetaItemModel` holds as an empty text with no gap after the glyph.
+    /// tags' order; the subtasks done over all after the subtasks' glyph; and the notes' glyph alone, with no text.
+    /// Every item carries the meta line's gap between a glyph and a text, which stands only where it has both.
     private static func meta(of task: TodoTask, today: Day, tags: TagNames, _ metrics: Metrics.Row) -> [MetaItemModel] {
-        func item(_ icon: DesignSystem.Icon?, _ text: String, color: DesignSystem.Color = .ink2) -> MetaItemModel {
+        func item(_ icon: DesignSystem.Icon?, _ text: String?, color: DesignSystem.Color = .ink2) -> MetaItemModel {
             MetaItemModel(
                 icon: icon.map { IconModel(icon: $0, size: metrics.metaIconSize, weight: .regular, color: color) },
-                text: TextModel(text: text, font: .meta, color: color),
-                spacing: text.isEmpty ? 0 : metrics.metaIconSpacing, capsule: nil
+                text: text.map { TextModel(text: $0, font: .meta, color: color) }, spacing: metrics.metaIconSpacing,
+                capsule: nil
             )
         }
         var items: [MetaItemModel] = []
@@ -189,14 +195,14 @@ extension TaskList {
         }
         items += tags.titles(of: task.tags).map { item(nil, "#\($0)") }
         if task.subtasks > 0 { items.append(item(.list, "\(task.subtasksDone)/\(task.subtasks)")) }
-        if task.hasNotes { items.append(item(.note, "")) }
+        if task.hasNotes { items.append(item(.note, nil)) }
         return items
     }
 
     /// The empty state (Task 8's table, Empty state): the list's own tile at the state's size, the title in the empty
     /// screen's title, and the line under it in the notes' font and ink 2.
     static func empty(
-        _ words: Heading, color: Tile, icon: DesignSystem.Icon, _ metrics: Metrics.Empty
+        _ words: EmptyWords, color: Tile, icon: DesignSystem.Icon, _ metrics: Metrics.Empty
     ) -> EmptyScreenModel {
         EmptyScreenModel(
             tile: TileModel(
@@ -204,7 +210,7 @@ extension TaskList {
                 glyphSize: metrics.glyphSize
             ),
             title: TextModel(text: words.title, font: .emptyScreenTitle, color: .ink),
-            text: TextModel(text: words.subtitle ?? "", font: .notes, color: .ink2), tileToTitle: metrics.tileToTitle,
+            text: TextModel(text: words.text, font: .notes, color: .ink2), tileToTitle: metrics.tileToTitle,
             titleToText: metrics.titleToText, topPadding: metrics.topPadding,
             horizontalPadding: metrics.horizontalPadding, maxWidth: metrics.maxWidth
         )
@@ -284,7 +290,7 @@ extension TaskList {
         }
 
         /// A block's header or a column's: its height, margins and paddings, the gap between its title and its date,
-        /// its rule, nil for none, and the chevron's size and hit, which a column's header has none of.
+        /// and its rule, nil for none.
         struct BlockHeader {
             let height: Double
             let topMargin: Double
@@ -296,8 +302,13 @@ extension TaskList {
             let bottomPadding: Double
             let titleToSubtitle: Double
             let rule: StrokeModel?
-            let chevronSize: Double
-            let chevronHitSide: Double
+        }
+
+        /// The chevron that folds a block in the list: its glyph's size and its square hit's side. A column's header has
+        /// none, so the board carries none.
+        struct Chevron {
+            let size: Double
+            let hitSide: Double
         }
 
         /// A task's row, or a column's card: its insets, the check's sizes and hit, the title's font and paddings, the
@@ -355,9 +366,9 @@ extension TaskList {
             let card: Row
         }
 
-        /// The blocks' numbers in the layout: the list's header and row, or the board's.
+        /// The blocks' numbers in the layout: the list's header, its chevron and its row, or the board's.
         enum Blocks {
-            case list(header: BlockHeader, row: Row)
+            case list(header: BlockHeader, chevron: Chevron, row: Row)
             case columns(Board)
         }
 
@@ -387,8 +398,9 @@ extension TaskList {
                 header: BlockHeader(
                     height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13,
                     horizontalPadding: 8, bottomPadding: 0, titleToSubtitle: 8,
-                    rule: StrokeModel(color: .line, width: 1, dash: []), chevronSize: 18, chevronHitSide: 44
+                    rule: StrokeModel(color: .line, width: 1, dash: [])
                 ),
+                chevron: Chevron(size: 18, hitSide: 44),
                 row: Row(
                     leading: 8, trailing: 12, checkDiameter: 24, checkRingWidth: 1.75, markSize: 15,
                     markStrokeWidth: 1.75, checkHitWidth: 44, checkHitHeight: 44, title: .rowTitle, verticalPadding: 11,
@@ -413,8 +425,7 @@ extension TaskList {
                 columnCornerRadius: 18, columnPadding: 8, cardSpacing: 8, dropRingWidth: 2,
                 header: BlockHeader(
                     height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0, leadingMargin: 0, topPadding: 13,
-                    horizontalPadding: 14, bottomPadding: 9, titleToSubtitle: 8, rule: nil, chevronSize: 0,
-                    chevronHitSide: 0
+                    horizontalPadding: 14, bottomPadding: 9, titleToSubtitle: 8, rule: nil
                 ),
                 cardCornerRadius: 13, cardRingWidth: 0.5,
                 card: Row(

@@ -8,36 +8,11 @@ import TodoCore
 private typealias Action = TaskList.UserAction
 private typealias Tile = DesignSystem.Color.Components.Tile
 
-/// The day `offset` days from the test's, Wednesday, September 10, 2025.
-private func day(_ offset: Int) -> Day {
-    testDay.day.advanced(by: offset)
-}
-
-/// A list made now on a view, with nothing declared over it.
-private func list(_ view: ViewID, in store: Store) throws -> TaskList {
-    try TaskList(store: store, route: .init(head: .init(view: view)), day: testDay)
-}
-
-/// The blocks a model draws, whichever its layout.
-private func blocks(of model: TaskList.Model) -> [TaskList.Model.Block] {
-    switch model.layout {
-    case .list(let blocks): blocks
-    case .columns(let board): board.columns
-    }
-}
-
 /// The board a model draws in columns, nil in the list.
 private func board(of model: TaskList.Model) -> TaskList.Model.Board? {
     switch model.layout {
     case .list: nil
     case .columns(let board): board
-    }
-}
-
-/// The row's model, read over its kind as a view reads it.
-private func row(_ row: TaskList.Model.Row) -> TaskRowModel<Action> {
-    switch row {
-    case .task(_, let model): model
     }
 }
 
@@ -91,7 +66,7 @@ private func phoneRow(
 }
 
 /// The meta line's items carry the phone's numbers: 13 pt glyphs 3 before their text in the meta font, ink 2, red
-/// for a deadline that is due.
+/// for a deadline that is due; the notes' item is its glyph alone, with no text.
 @Test func aRowsMetaItemsCarryThePhonesNumbers() throws {
     let store = try makeStore()
     let errand = try store.createTag(title: "errand")
@@ -104,8 +79,7 @@ private func phoneRow(
         ),
         MetaItemModel(icon: nil, text: TextModel(text: "#errand", font: .meta, color: .ink2), spacing: 3, capsule: nil),
         MetaItemModel(
-            icon: IconModel(icon: .note, size: 13, weight: .regular, color: .ink2),
-            text: TextModel(text: "", font: .meta, color: .ink2), spacing: 0, capsule: nil
+            icon: IconModel(icon: .note, size: 13, weight: .regular, color: .ink2), text: nil, spacing: 3, capsule: nil
         ),
     ]
     #expect(blocks(of: model).first?.rows.map(row) == [phoneRow("Buy milk", id: id, colors: Tile.blue.check, meta: meta)])
@@ -147,12 +121,15 @@ private func phoneRow(
         BlockHeaderModel(
             title: TextModel(text: "Tomorrow", font: .sectionTitle, color: Tile.rose.glyph),
             subtitle: TextModel(text: "Thu, Sep 11", font: .areaLabel, color: .ink2), titleToSubtitle: 8, field: nil,
-            chevron: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, size: 18, weight: .semibold, color: .ink3),
-                rotation: isFolded ? -90 : 0, animation: .fold,
-                accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id)
+            fold: BlockHeaderModel.Fold(
+                chevron: AccessoryModel.Chevron(
+                    icon: IconModel(icon: .chevron, size: 18, weight: .semibold, color: .ink3),
+                    rotation: isFolded ? -90 : 0, animation: .fold,
+                    accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id)
+                ),
+                hitSide: 44
             ),
-            chevronHitSide: 44, rule: StrokeModel(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
+            rule: StrokeModel(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
             trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
             bottomPadding: 0, cornerRadius: 0, titleTapped: .blockTitleTapped(id)
         )
@@ -233,7 +210,7 @@ private func phoneRow(
         header: BlockHeaderModel(
             title: TextModel(text: "Tomorrow", font: .sectionTitle, color: Tile.rose.glyph),
             subtitle: TextModel(text: "Thu, Sep 11", font: .areaLabel, color: .ink2), titleToSubtitle: 8, field: nil,
-            chevron: nil, chevronHitSide: 0, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
+            fold: nil, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
             leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0,
             titleTapped: .blockTitleTapped(blockID)
         ),

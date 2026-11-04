@@ -1045,6 +1045,23 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     #expect(app.route.path == "/view/\(upcoming)/day/+1/task/\(id)")
 }
 
+/// A link to a group its list is not grouped by names nothing: the stack cannot make the group's screen, so the list
+/// stands alone, says why, and the window's route names the list alone (ADR-0009, amendment of 2026-11-02).
+@Test func aLinkToAGroupItsListIsNotGroupedByOpensTheListAndSaysWhy() throws {
+    let store = try makeStore()
+    let upcoming = BuiltInTaskViews.upcoming
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(upcoming)/deadline/+1"), width: .narrow, day: testDay,
+        capabilities: iPhone
+    )
+    #expect(idsOverTheSidebar(in: app.model).count == 1)
+    let list = try firstList(in: app)
+    #expect(list.header.title.text == "Upcoming")
+    #expect(list.problem == "This list is not grouped that way, so the group could not be opened.")
+    #expect(app.route.path == "/view/\(upcoming)")
+    #expect(app.model.taskViewList == (try sidebarOn(upcoming, in: store, width: .narrow)))
+}
+
 /// The window's route is written from what stands, a chain of lists included: Back from the task leaves the two lists,
 /// Back again the outer one, each route naming what stood, and a relaunch from either opens it.
 @Test func theRouteIsWrittenFromWhatStandsInAChain() throws {
@@ -1085,7 +1102,7 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     let answered = try AppModule(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
     let deleted = try changeSet(of: store) { try store.delete(view: home) }
     #expect(answered.send(.changed(deleted)) == nil)
-    #expect(idsOverTheSidebar(in: answered.model) == [idsOverTheSidebar(in: answered.model)[0]])
+    #expect(idsOverTheSidebar(in: answered.model).count == 1)
     #expect(try standing(in: answered) == [listOn(projects, in: store)])
     #expect(answered.route.path == "/view/\(projects)")
 }

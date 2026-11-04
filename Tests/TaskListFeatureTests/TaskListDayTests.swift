@@ -5,26 +5,6 @@ import SQLiteKit
 import TaskListFeature
 import TodoCore
 
-/// The day `offset` days from the test's, Wednesday, September 10, 2025.
-private func day(_ offset: Int) -> Day {
-    testDay.day.advanced(by: offset)
-}
-
-/// The blocks a list's model draws in the list layout.
-private func blocks(of model: TaskList.Model) -> [TaskList.Model.Block] {
-    switch model.layout {
-    case .list(let blocks): blocks
-    case .columns(let board): board.columns
-    }
-}
-
-/// The row's model, read over its kind as a view reads it.
-private func row(_ row: TaskList.Model.Row) -> TaskRowModel<TaskList.UserAction> {
-    switch row {
-    case .task(_, let model): model
-    }
-}
-
 /// Today's subtitle is its date written long, the weekday's and the month's names in full, on any day of any month
 /// (spec section 8); the canvas's "Saturday, October 24".
 @Test func theLongDateNamesTheWeekdayTheMonthAndTheDay() throws {
@@ -80,7 +60,7 @@ private func row(_ row: TaskList.Model.Row) -> TaskRowModel<TaskList.UserAction>
     ]
     for (offset, _) in cases { try store.createTask(NewTask(title: "Due \(offset)", deadline: day(offset))) }
     let rows = try #require(blocks(of: try TaskList(store: store, route: .init(head: .init(view: BuiltInTaskViews.inbox)), day: testDay).model).first).rows
-    #expect(rows.map { row($0).meta.first?.text.text } == cases.map(\.1))
+    #expect(rows.map { row($0).meta.first?.text?.text } == cases.map(\.1))
 }
 
 /// A group's screen is titled by its group: the day the distance falls on today, with the list's title and that
@@ -140,7 +120,7 @@ private func row(_ row: TaskList.Model.Row) -> TaskRowModel<TaskList.UserAction>
     let module = try TaskList(store: store, route: .init(head: .init(view: byDay)), day: testDay)
     let model = module.model
     #expect(blocks(of: model).compactMap(\.header).count == 2)
-    #expect(blocks(of: model).flatMap(\.rows).map { row($0).meta.first?.text.text.hasPrefix("Overdue") } == [true, false])
+    #expect(blocks(of: model).flatMap(\.rows).map { row($0).meta.first?.text?.text.hasPrefix("Overdue") } == [true, false])
     for block in blocks(of: model) { _ = module.send(.action(.blockChevronTapped(block.id))) }
     #expect(try store.deviceState("taskList.folded.\(byDay)", as: [String].self)?.count == 2)
     for block in blocks(of: model) { _ = module.send(.action(.blockTitleTapped(block.id))) }

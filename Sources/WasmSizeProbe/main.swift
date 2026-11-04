@@ -476,7 +476,7 @@ private enum WasmSizeProbe {
         }
         switch list.layout {
         case .list(let blocks):
-            let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.chevron?.accessibilityLabel ?? "")" } }
+            let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.fold?.chevron.accessibilityLabel ?? "")" } }
             shape = "\(blocks.count) blocks, \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/"))"
         case .columns(let board):
             let headers = board.columns.compactMap { $0.column.map { "\($0.header.title.text) \($0.width) wide" } }
@@ -484,7 +484,8 @@ private enum WasmSizeProbe {
         }
         let first = rows.first.map { row in
             switch row {
-            case .task(_, let task): "\(task.check.accessibilityLabel) [\(task.meta.map(\.text.text).joined(separator: " "))]"
+            case .task(_, let task):
+                "\(task.check.accessibilityLabel) [\(task.meta.map { $0.text?.text ?? "glyph" }.joined(separator: " "))]"
             }
         } ?? "no row"
         let disabled = list.showAs.menu.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)

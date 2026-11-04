@@ -6,9 +6,9 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 7.125 MiB. The probe measures 7,142,799 bytes with Swift 6.4.0 as this is written, so the budget is that with four
+# 7.125 MiB. The probe measures 7,146,002 bytes with Swift 6.4.0 as this is written, so the budget is that with four
 # percent to spare, rounded up to a whole 64 KiB. What has moved the reading since is the code: 6,933,573 bytes on the
-# `main` this was measured beside, d6ed078, and the other 209,226 once the task list read its view's page into blocks
+# `main` this was measured beside, d6ed078, and the other 212,429 once the task list read its view's page into blocks
 # built from the design system's component models, in a list and as columns, with the tag bar, the folds and the layout
 # the device keeps and the days named in English, and its route read and wrote a chain of lists and a group's address,
 # and the probe drove a chain, a group across a day, a pick, a fold and both layouts through the switches the list's

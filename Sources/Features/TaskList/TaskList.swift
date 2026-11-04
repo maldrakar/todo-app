@@ -1,5 +1,4 @@
 // Sources/Features/TaskList/TaskList.swift
-import DesignSystem
 import FeatureModule
 import TaskScreenFeature
 import TodoCore
@@ -333,7 +332,7 @@ public final class TaskList: Routable {
             // Only a block the model draws with a chevron folds, which no column has. The fold is the one thing that
             // moves: it is the device's state and no answer to anything a person was told, so the sentence stays.
             let blocks = TaskList.blocks(in: model.layout)
-            guard blocks.contains(where: { $0.header?.chevron?.action == .blockChevronTapped(id) }),
+            guard blocks.contains(where: { $0.header?.fold?.chevron.action == .blockChevronTapped(id) }),
                   let key = TaskList.foldKey(of: id)
             else { return nil }
             let drawn = Set(blocks.compactMap { TaskList.foldKey(of: $0.id) })
@@ -411,7 +410,7 @@ public final class TaskList: Routable {
                 // another way, asks to be closed, as a list whose view is gone does (the controller's ruling on #175,
                 // 2026-11-04).
                 if let group = state.head.group, TaskList.refusal(of: group, in: read) != nil { return .closeRequested }
-                take(read)
+                try take(read)
             } catch {
                 // Neither the blocks on screen nor the title is cleared, since each is assigned only after its own read
                 // succeeded, and a list emptied by a failed read would take with it the only thing left to act on.
@@ -431,7 +430,7 @@ public final class TaskList: Routable {
             guard day != state.day else { return nil }
             state.day = day
             do {
-                take(try TaskList.read(store, head: state.head, today: day.day))
+                try take(try TaskList.read(store, head: state.head, today: day.day))
             } catch {
                 if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
@@ -439,14 +438,20 @@ public final class TaskList: Routable {
         }
     }
 
-    /// Takes a read of the store as the page on screen, its view's title the header's, and drops the picks whose chips
-    /// are no longer on the bar, which stop filtering and come back unlit (the controller's ruling on #175,
-    /// 2026-11-04).
-    private func take(_ read: Read) {
+    /// Takes a read of the store as the page on screen, its view's title the header's, with the folds the device keeps
+    /// read again beside it, so that a fold another window of this device made since is drawn here and kept by the next
+    /// fold made here, as the sidebar reads its folds with its rows (ADR-0010); a group's screen keeps none. The layout
+    /// is not read again: it is one value, the last one chosen wins, and a window would change its layout on a change
+    /// to anything. It drops the picks whose chips are no longer on the bar, which stop filtering and come back unlit
+    /// (the controller's ruling on #175, 2026-11-04). The folds are read before anything is assigned, so a read that
+    /// fails leaves what is on screen.
+    private func take(_ read: Read) throws(StoreError) {
+        let folded = state.head.group == nil ? try TaskList.keptFolds(in: store, of: state.head.view) : []
         let blocks = TaskList.blocks(of: read, head: state.head, today: state.day.day)
         let chips = TaskList.chips(in: blocks, tags: read.tags)
         state.read = read
         state.title = read.page.view.title
+        state.folded = folded
         state.picks.formIntersection(chips.map(\.id))
     }
 

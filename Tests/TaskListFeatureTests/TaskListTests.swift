@@ -14,20 +14,6 @@ private func on(_ view: ViewID, task: TaskID? = nil) -> TaskList.Route {
     TaskList.Route(head: .init(view: view), over: task.map { .task(TaskScreen.Route(head: $0)) })
 }
 
-/// The rows a model draws, block by block and flattened, as their ids and their titles: what most tests here read of
-/// a list, since what it lists is the subject and the look is the components' tests'.
-private func rows(of model: TaskList.Model) -> [(id: TaskID, title: String)] {
-    let blocks = switch model.layout {
-    case .list(let blocks): blocks
-    case .columns(let board): board.columns
-    }
-    return blocks.flatMap(\.rows).map { row in
-        switch row {
-        case .task(let id, let model): (id, model.title.text)
-        }
-    }
-}
-
 /// The ids of the rows a model draws, in their order.
 private func ids(of model: TaskList.Model) -> [TaskID] {
     rows(of: model).map(\.id)

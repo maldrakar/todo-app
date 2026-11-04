@@ -10,32 +10,9 @@ import TodoCore
 private let inbox = BuiltInTaskViews.inbox
 private let upcoming = BuiltInTaskViews.upcoming
 
-/// The day `offset` days from the test's, Wednesday, September 10, 2025.
-private func day(_ offset: Int) -> Day {
-    testDay.day.advanced(by: offset)
-}
-
-/// A list made now on the route, on the day, the test's unless another is named.
-private func list(_ route: TaskList.Route, in store: Store, on day: DeviceDay = testDay) throws -> TaskList {
-    try TaskList(store: store, route: route, day: day)
-}
-
-/// A list made now on a view, with nothing declared over it.
-private func list(_ view: ViewID, in store: Store, on day: DeviceDay = testDay) throws -> TaskList {
-    try list(TaskList.Route(head: .init(view: view)), in: store, on: day)
-}
-
 /// The route of one of a list's own groups, its screen.
 private func screen(_ group: TaskList.Route.Group, of view: ViewID) -> TaskList.Route {
     TaskList.Route(head: .init(view: view, group: group))
-}
-
-/// The blocks a model draws, whichever its layout: a list's, or the board's columns.
-private func blocks(of model: TaskList.Model) -> [TaskList.Model.Block] {
-    switch model.layout {
-    case .list(let blocks): blocks
-    case .columns(let board): board.columns
-    }
 }
 
 /// Whether the model is in the list layout.
@@ -49,13 +26,6 @@ private func isList(_ model: TaskList.Model) -> Bool {
 /// The ids of the blocks a model draws.
 private func ids(of model: TaskList.Model) -> [TaskList.Model.BlockID] {
     blocks(of: model).map(\.id)
-}
-
-/// The row's model, read over its kind as a view reads it.
-private func row(_ row: TaskList.Model.Row) -> TaskRowModel<TaskList.UserAction> {
-    switch row {
-    case .task(_, let model): model
-    }
 }
 
 /// The titles of a block's rows, in their order.
@@ -232,7 +202,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     let rows = try #require(blocks(of: model).first).rows
     #expect(rows.map(\.id).first == id)
     let meta = row(rows[0]).meta
-    #expect(meta.map(\.text.text) == ["Due Fri", "#errand", "#home", "1/2", ""])
+    #expect(meta.map { $0.text?.text } == ["Due Fri", "#errand", "#home", "1/2", nil], "the notes' glyph alone")
     #expect(meta.map { $0.icon?.icon } == [.flag, nil, nil, .list, .note])
     #expect(row(rows[1]).meta.isEmpty, "a task with nothing to say has no meta line")
 }
@@ -247,7 +217,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     let done = try store.createTask(NewTask(title: "Done", deadline: day(-1)))
     try store.update(task: done, [.status(.done)])
     let rows = try #require(blocks(of: try list(inbox, in: store).model).first).rows
-    #expect(rows.map { row($0).meta.first?.text.color } == [.red, .red, .ink2])
+    #expect(rows.map { row($0).meta.first?.text?.color } == [.red, .red, .ink2])
     #expect(rows.map { row($0).meta.first?.icon?.color } == [.red, .red, .ink2])
     let logbook = try #require(blocks(of: try list(BuiltInTaskViews.logbook, in: store).model).first).rows
     #expect(logbook.map { row($0).title.text } == ["Done"])
@@ -269,6 +239,20 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     #expect(chips(of: model) == ["home", "alpha", "errand"])
     #expect(model.tagBar?.chips.map(\.icon.icon) == [.hash, .hash, .hash])
     #expect(model.tagBar?.chips.map(\.action) == [.tagChipTapped(home), .tagChipTapped(alpha), .tagChipTapped(errand)])
+}
+
+/// Chips tied on their count stand by title as a person reads it, whatever its case, and two titles that read the same
+/// stand by their characters, so that the order is always the same (canvas, `localeCompare`; the controller's ruling on
+/// #175, 2026-11-04).
+@Test func chipsTiedOnTheirCountStandByTitleWhateverItsCase() throws {
+    let store = try makeStore()
+    let zebra = try store.createTag(title: "Zebra")
+    let apple = try store.createTag(title: "apple")
+    let upper = try store.createTag(title: "Apple")
+    try store.createTask(NewTask(title: "One", tags: [zebra]))
+    try store.createTask(NewTask(title: "Two", tags: [apple]))
+    try store.createTask(NewTask(title: "Three", tags: [upper]))
+    #expect(chips(of: try list(inbox, in: store).model) == ["Apple", "apple", "Zebra"])
 }
 
 /// A task two sibling lists both select is drawn in both blocks and counted once on the bar, and a tag on every task is
@@ -378,6 +362,28 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     #expect(try store.deviceState("taskList.folded.\(upcoming)", as: [String].self) == [])
 }
 
+/// The folds are the device's, so two windows of one device share them: a fold made in one is read by the other at its
+/// next read of the page, which every change brings, and a fold the other makes then writes the set with the first
+/// window's fold in it, as the sidebar's folds are (ADR-0010).
+@Test func aFoldMadeInAnotherWindowIsReadAtTheNextReread() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Buy milk", when: day(1)))
+    try store.createTask(NewTask(title: "Call the bank", when: day(2)))
+    let first = try list(upcoming, in: store)
+    let second = try list(upcoming, in: store)
+    #expect(first.send(.action(.blockChevronTapped(.own(.day(day(1)))))) == nil)
+    #expect(blocks(of: second.model).map(\.isFolded) == [false, false], "nothing read yet; this is the setup")
+    let filed = try changeSet(of: store) { try store.createTask(NewTask(title: "Water the plants", when: day(3))) }
+    #expect(second.send(.changed(filed)) == nil)
+    #expect(second.model == (try list(upcoming, in: store).model))
+    #expect(blocks(of: second.model).map(\.isFolded) == [true, false, false])
+    #expect(second.send(.action(.blockChevronTapped(.own(.day(day(2)))))) == nil)
+    #expect(
+        try store.deviceState("taskList.folded.\(upcoming)", as: [String].self).map(Set.init)
+            == ["day/2025-09-11", "day/2025-09-12"]
+    )
+}
+
 /// A block is folded under its group's key whatever the grouping, a list inside under its view's, and the own block of
 /// a list that groups by nothing has no header and nothing to fold (the controller's ruling on #175, 2026-11-04).
 @Test func everyBlockFoldsUnderItsGroupsKey() throws {
@@ -451,7 +457,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     #expect(columns.map(\.id) == [.own(nil), .list(inside)])
     #expect(columns.map { $0.header == nil } == [true, true])
     #expect(columns.map(heading(of:)) == [["Projects", nil], ["Inside", nil]])
-    #expect(columns.map { $0.column?.header.chevron == nil } == [true, true])
+    #expect(columns.map { $0.column?.header.fold == nil } == [true, true])
     #expect(columns.map { $0.column?.header.titleTapped } == [.blockTitleTapped(.own(nil)), .blockTitleTapped(.list(inside))])
     #expect(module.send(.action(.blockTitleTapped(.own(nil)))) == nil)
     #expect(module.destination.pushed == nil, "the list has no group to open")

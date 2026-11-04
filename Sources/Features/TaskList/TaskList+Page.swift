@@ -29,9 +29,15 @@ extension TaskList {
     }
 
     /// What a header says: its title, and the line under it or after it, nil for none.
-    struct Heading: Equatable {
+    struct Heading {
         let title: String
         let subtitle: String?
+    }
+
+    /// What the empty state says: its title, and the line under it that says what to do.
+    struct EmptyWords {
+        let title: String
+        let text: String
     }
 
     /// A chip of the tag bar: its tag and the tag's title.
@@ -159,7 +165,8 @@ extension TaskList {
     }
 
     /// The tags the open tasks of the blocks carry, each task once however many blocks draw it, the most used first,
-    /// ties by title and then in the tags' own order, and a tag every one of those tasks carries left out, since it
+    /// ties by title as a person reads it, whatever its case, then by its characters, so that the order is always the
+    /// same (canvas, `localeCompare`), and a tag every one of those tasks carries left out, since it
     /// would filter nothing (spec section 7; the controller's ruling on #175, 2026-11-04). A tag the read does not
     /// hold, which the store's reading rule never leaves on a task, has no title to show and no chip.
     static func chips(in blocks: [PageBlock], tags: [Tag]) -> [Chip] {
@@ -175,6 +182,8 @@ extension TaskList {
         }
         return carried.sorted { lhs, rhs in
             if lhs.count != rhs.count { return lhs.count > rhs.count }
+            let (left, right) = (lhs.tag.title.lowercased(), rhs.tag.title.lowercased())
+            if left != right { return left < right }
             if lhs.tag.title != rhs.tag.title { return lhs.tag.title < rhs.tag.title }
             return lhs.index < rhs.index
         }
@@ -289,24 +298,24 @@ extension TaskList {
     /// Trash and Logbook their own, a manual list that a task is added or dragged in, a folder with no lists that lists
     /// go inside, a list of one tag the tag, and every other list and every group's screen that what its rule matches
     /// shows up.
-    private static func emptyWords(head: Route.Head, view: TaskView, tags: TagNames) -> Heading {
+    private static func emptyWords(head: Route.Head, view: TaskView, tags: TagNames) -> EmptyWords {
         let nothing = "Nothing here yet"
         let rule = "Tasks that match this list’s rule will show up here."
-        if head.group != nil { return Heading(title: nothing, subtitle: rule) }
+        if head.group != nil { return EmptyWords(title: nothing, text: rule) }
         switch (view.id, view.filter) {
         case (BuiltInTaskViews.trash, _):
-            return Heading(title: "Trash is empty", subtitle: "Deleted tasks wait here until you empty it.")
+            return EmptyWords(title: "Trash is empty", text: "Deleted tasks wait here until you empty it.")
         case (BuiltInTaskViews.logbook, _):
-            return Heading(title: "Nothing done yet", subtitle: rule)
+            return EmptyWords(title: "Nothing done yet", text: rule)
         case (_, .listedIn(let list)?) where list == view.id:
-            return Heading(title: nothing, subtitle: "Add a task here, or drag one in.")
+            return EmptyWords(title: nothing, text: "Add a task here, or drag one in.")
         case (_, nil):
-            return Heading(title: "A new list", subtitle: "Put lists inside it, or give it a rule here.")
+            return EmptyWords(title: "A new list", text: "Put lists inside it, or give it a rule here.")
         case (_, .hasTag(let tag)?):
             let tagged = tags[tag].map { "Tasks tagged #\($0.title) will show up here." }
-            return Heading(title: nothing, subtitle: tagged ?? rule)
+            return EmptyWords(title: nothing, text: tagged ?? rule)
         default:
-            return Heading(title: nothing, subtitle: rule)
+            return EmptyWords(title: nothing, text: rule)
         }
     }
 
@@ -321,7 +330,7 @@ extension TaskList {
             self.byID = byID
         }
 
-        subscript(_ id: TagID) -> (index: Int, title: String)? { byID[id] }
+        fileprivate subscript(_ id: TagID) -> (index: Int, title: String)? { byID[id] }
 
         /// The titles of the tags a task carries, in the tags' order; one the read does not hold is left out.
         func titles(of tags: Set<TagID>) -> [String] {

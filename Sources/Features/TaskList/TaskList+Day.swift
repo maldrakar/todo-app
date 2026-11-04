@@ -67,7 +67,8 @@ extension TaskList {
     }
 
     /// How many days `day` is after `today`, negative before it, each drawn into the days this names first, so that the
-    /// subtraction stays inside a 32-bit `Int`: two days in them are less than three billion days apart.
+    /// subtraction stays inside a 32-bit `Int`: two days in them are at most some 1.46 billion days apart, four million
+    /// years, under `Int32.max`.
     static func distance(to day: Day, from today: Day) -> Int {
         drawnIn(day) - drawnIn(today)
     }
