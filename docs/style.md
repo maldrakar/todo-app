@@ -31,7 +31,8 @@ Each rule names the review that set it.
   its part in a mechanism: `Destination`, held in a screen's
   `destination`, and not `Slot`; `.destinationAnswered` and not
   `.answered`, which says neither whose answer it is nor to what;
-  `setDestination(_:)` and not `declare(_:)`. (PR #120, #125)
+  `setDestination(_:)` and not `declare(_:)`; `PageSnapshot`, what one
+  read of the store gives a list, and not `Read`. (PR #120, #125, #188)
 - **A name the core exports is a name its consumers lose.** No exported
   type takes a name a module the consumers import already owns:
   `TodoTask` and not `Task`, which shadowed `_Concurrency.Task`;
@@ -85,7 +86,10 @@ value a peer wrote is as arbitrary as one a person typed.
   the model is read from it:
   `public var model: Model { state.model }`. A model kept beside the
   state is a second copy of the same values, and the two disagree
-  the moment one is moved without the other. (PR #77, #101)
+  the moment one is moved without the other. `State.model` assembles
+  the whole model in one place: it reads the state's fields itself
+  and calls the builders, and does not hand its fields one by one to
+  a function elsewhere that assembles it. (PR #77, #101, #188)
 - **A user action names the control and the gesture, never what the
   module does about it.** `rowTapped(id)`, `quickEntryButtonTapped`
   and `wentBack(to:)`, not `openTask(id)` or `taskScreenDismissed`:

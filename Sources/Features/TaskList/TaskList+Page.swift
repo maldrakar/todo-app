@@ -13,7 +13,7 @@ extension TaskList {
     /// tag, whose titles the chips, the meta lines and the headers of a grouping by tag name and whose order the meta
     /// lines keep; and the titles of the parents the page's groups by parent are of, and the group's own on a group's
     /// screen by parent, each read once, never per row (spec section 9; the controller's ruling on #175, 2026-11-04).
-    struct Read {
+    struct PageSnapshot {
         let page: TaskViewPage
         let tags: [Tag]
         let parents: [TaskID: String]
@@ -49,7 +49,7 @@ extension TaskList {
     /// Reads the page of the head's view by the device's day, every tag, and the title of each parent a group of the
     /// page's own section, or the head's group, is of; a parent that does not read has none, and is titled as no
     /// parent is. Throws what the reads throw, a view that is gone as `.notFound` with its id among it.
-    static func read(_ store: Store, head: Route.Head, today: Day) throws(StoreError) -> Read {
+    static func read(_ store: Store, head: Route.Head, today: Day) throws(StoreError) -> PageSnapshot {
         let page = try store.page(of: head.view, today: today)
         var wanted: [TaskID] = []
         for section in page.sections where section.view == nil {
@@ -62,7 +62,7 @@ extension TaskList {
         for id in wanted where parents[id] == nil {
             if let task = try store.task(id) { parents[id] = task.title }
         }
-        return Read(page: page, tags: try store.tags(), parents: parents)
+        return PageSnapshot(page: page, tags: try store.tags(), parents: parents)
     }
 
     /// Why a group names nothing of its list as the read found it, and nil when it names a group: a word that is not
@@ -70,60 +70,16 @@ extension TaskList {
     /// amendment of 2026-11-02). The group with no key, and a status, name a group whenever the grouping is the list's,
     /// since the screen reads its list's page and needs no condition of its own; on a given day such a group may hold
     /// no task, which is its block empty.
-    static func refusal(of group: Route.Group, in read: Read) -> StoreError? {
-        let view = read.page.view
+    static func refusal(of group: Route.Group, in snapshot: PageSnapshot) -> StoreError? {
+        let view = snapshot.page.view
         guard view.groupBy == group.groupBy else {
             return .invalid("“\(view.title)” is not grouped by \(group.word.rawValue)")
         }
         switch group {
-        case .tag(let id?) where !read.tags.contains(where: { $0.id == id }): return .notFound(id)
-        case .parent(let id?) where read.parents[id] == nil: return .notFound(id)
+        case .tag(let id?) where !snapshot.tags.contains(where: { $0.id == id }): return .notFound(id)
+        case .parent(let id?) where snapshot.parents[id] == nil: return .notFound(id)
         case .day, .deadline, .tag, .parent, .status: return nil
         }
-    }
-
-    /// The screen's model, computed from what the module holds on every read (`State.model`): the blocks of the page,
-    /// the chips of their open tasks and the rows the picked ones leave, the layout the list is shown as where Show as
-    /// offers Columns and the list otherwise, a block's fold where it has a header to fold by, and the header, Show as,
-    /// the empty state and the sentence.
-    ///
-    /// Columns are offered where the list groups or has more than one block, and never on a group's screen, which has
-    /// one block and no grouping (spec section 5; the controller's ruling on #175, 2026-11-04). The empty state stands
-    /// when no block has a row after the filter and the page has no lists inside (canvas, the empty state; the
-    /// controller's ruling on #175, 2026-11-04).
-    static func model(
-        head: Route.Head, title: String, read: Read, today: Day, folded: Set<String>, layout: Model.Layout.Kind,
-        picks: Set<TagID>, problem: String?
-    ) -> Model {
-        let view = read.page.view
-        let blocks = blocks(of: read, head: head, today: today)
-        let chips = chips(in: blocks, tags: read.tags)
-        let picked = picks.intersection(chips.map(\.id))
-        let shown = blocks.map { block in
-            picked.isEmpty ? block : PageBlock(
-                id: block.id, tasks: block.tasks.filter { !$0.tags.isDisjoint(with: picked) }, heading: block.heading,
-                color: block.color
-            )
-        }
-        let canBoard = head.group == nil && (view.groupBy != nil || blocks.count > 1)
-        let metrics = Metrics.of(canBoard ? layout : .list)
-        let color = tileColor(view.color)
-        let icon = tileIcon(view.icon)
-        let tags = TagNames(read.tags)
-        let hasListsInside = blocks.contains { if case .list = $0.id { true } else { false } }
-        let isEmpty = shown.allSatisfy(\.tasks.isEmpty) && !hasListsInside
-        return Model(
-            header: header(
-                screenHeading(head: head, title: title, rule: view.filter, read: read, today: today), color: color,
-                icon: icon, metrics.header
-            ),
-            tagBar: tagBar(chips, picked: picked, colors: color.check, metrics.tagBar),
-            layout: TaskList.layout(shown, title: title, folded: folded, today: today, tags: tags, metrics.blocks),
-            showAs: showAs(canBoard: canBoard),
-            empty: isEmpty
-                ? empty(emptyWords(head: head, view: view, tags: tags), color: color, icon: icon, metrics.empty) : nil,
-            problem: problem
-        )
     }
 
     /// The blocks of the page as it was read. A group's screen is one block, its list's own section's group of the
@@ -132,10 +88,10 @@ extension TaskList {
     /// blocks, a list that groups by nothing having one with no header, there whenever the list has a rule, empty or
     /// not, and a grouped list one per group that holds a task; then one block per list inside, headed by its title in
     /// its colour, its tasks the section's groups in their order, drawn when it is empty too (spec section 2).
-    static func blocks(of read: Read, head: Route.Head, today: Day) -> [PageBlock] {
-        let view = read.page.view
+    static func blocks(of snapshot: PageSnapshot, head: Route.Head, today: Day) -> [PageBlock] {
+        let view = snapshot.page.view
         let color = tileColor(view.color)
-        let own = read.page.sections.first { $0.view == nil }
+        let own = snapshot.page.sections.first { $0.view == nil }
         if let group = head.group {
             let key = groupKey(of: group, today: today)
             let tasks = own?.groups.first { $0.key == key }?.tasks ?? []
@@ -149,12 +105,12 @@ extension TaskList {
                 for group in own.groups {
                     blocks.append(PageBlock(
                         id: .own(group.key), tasks: group.tasks,
-                        heading: group.key.map { heading(of: $0, in: read, today: today) }, color: color
+                        heading: group.key.map { heading(of: $0, in: snapshot, today: today) }, color: color
                     ))
                 }
             }
         }
-        for section in read.page.sections {
+        for section in snapshot.page.sections {
             guard let child = section.view else { continue }
             blocks.append(PageBlock(
                 id: .list(child.id), tasks: section.groups.flatMap(\.tasks),
@@ -242,16 +198,16 @@ extension TaskList {
     /// group with no day, a tag's title or "No tag", a parent's title or "No parent", a status's name, with no line but
     /// a day's (the controller's ruling on #175, 2026-11-04). A tag or a parent the read does not hold is titled as the
     /// group with no key.
-    private static func heading(of key: GroupKey, in read: Read, today: Day) -> Heading {
+    private static func heading(of key: GroupKey, in snapshot: PageSnapshot, today: Day) -> Heading {
         switch key {
         case .day(let day?):
             Heading(title: dayTitle(day, today: today), subtitle: dayDate(day, today: today))
         case .day(nil):
             Heading(title: "No date", subtitle: nil)
         case .tag(let tag):
-            Heading(title: tag.flatMap { tag in read.tags.first { $0.id == tag }?.title } ?? "No tag", subtitle: nil)
+            Heading(title: tag.flatMap { tag in snapshot.tags.first { $0.id == tag }?.title } ?? "No tag", subtitle: nil)
         case .parent(let parent):
-            Heading(title: parent.flatMap { read.parents[$0] } ?? "No parent", subtitle: nil)
+            Heading(title: parent.flatMap { snapshot.parents[$0] } ?? "No parent", subtitle: nil)
         case .status(let status):
             Heading(title: statusTitles[status] ?? status.name, subtitle: nil)
         }
@@ -264,13 +220,13 @@ extension TaskList {
     /// condition gives where that condition is on a day or on or before one, Today's (engineer's call: the canvas gives
     /// Today its date and nothing names the built-in). A group's screen's: the group's name for its title, and under it
     /// the list's title with the group's date after it for a day, "This week · Oct 26" (spec section 2).
-    private static func screenHeading(
-        head: Route.Head, title: String, rule: Filter?, read: Read, today: Day
+    static func screenHeading(
+        head: Route.Head, title: String, rule: Filter?, snapshot: PageSnapshot, today: Day
     ) -> Heading {
         guard let group = head.group else {
             return Heading(title: title, subtitle: day(of: rule, today: today).map(longDate))
         }
-        let heading = heading(of: groupKey(of: group, today: today), in: read, today: today)
+        let heading = heading(of: groupKey(of: group, today: today), in: snapshot, today: today)
         return Heading(title: heading.title, subtitle: title + (heading.subtitle.map { " · " + $0 } ?? ""))
     }
 
@@ -298,7 +254,7 @@ extension TaskList {
     /// Trash and Logbook their own, a manual list that a task is added or dragged in, a folder with no lists that lists
     /// go inside, a list of one tag the tag, and every other list and every group's screen that what its rule matches
     /// shows up.
-    private static func emptyWords(head: Route.Head, view: TaskView, tags: TagNames) -> EmptyWords {
+    static func emptyWords(head: Route.Head, view: TaskView, tags: TagNames) -> EmptyWords {
         let nothing = "Nothing here yet"
         let rule = "Tasks that match this list’s rule will show up here."
         if head.group != nil { return EmptyWords(title: nothing, text: rule) }

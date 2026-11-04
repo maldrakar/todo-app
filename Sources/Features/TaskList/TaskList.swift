@@ -278,12 +278,12 @@ public final class TaskList: Routable {
     /// the view it names, and the stack tells the list, which says why with nothing open over it, which is what still
     /// exists (spec section 3, the fourth flow).
     public init(store: Store, route: Route, day: DeviceDay) throws(StoreError) {
-        let read = try TaskList.read(store, head: route.head, today: day.day)
-        if let group = route.head.group, let refusal = TaskList.refusal(of: group, in: read) { throw refusal }
+        let snapshot = try TaskList.read(store, head: route.head, today: day.day)
+        if let group = route.head.group, let refusal = TaskList.refusal(of: group, in: snapshot) { throw refusal }
         let isGroup = route.head.group != nil
         self.store = store
         self.state = State(
-            head: route.head, title: read.page.view.title, read: read, day: day,
+            head: route.head, title: snapshot.page.view.title, snapshot: snapshot, day: day,
             folded: isGroup ? [] : try TaskList.keptFolds(in: store, of: route.head.view),
             layout: isGroup ? .list : try TaskList.keptLayout(in: store, of: route.head.view), picks: [],
             destination: Destination(), problem: nil
@@ -320,7 +320,7 @@ public final class TaskList: Routable {
             case .list(let view):
                 declared = Route(head: .init(view: view))
             case .own(let key?):
-                let group = TaskList.address(of: key, by: state.read.page.view.groupBy, today: state.day.day)
+                let group = TaskList.address(of: key, by: state.snapshot.page.view.groupBy, today: state.day.day)
                 declared = Route(head: .init(view: state.head.view, group: group))
             case .own(nil):
                 return nil
@@ -405,12 +405,12 @@ public final class TaskList: Routable {
                 // moved because of it: a list made inside this one, or under a folder inside it, names itself alone,
                 // and a tag deleted empties a list filtered by it and names only the tag (`ChangeSet`). Which of them
                 // moved this page is the page's to say.
-                let read = try TaskList.read(store, head: state.head, today: state.day.day)
+                let snapshot = try TaskList.read(store, head: state.head, today: state.day.day)
                 // A group's screen whose group names nothing any more, its tag or its parent gone or its list grouped
                 // another way, asks to be closed, as a list whose view is gone does (the controller's ruling on #175,
                 // 2026-11-04).
-                if let group = state.head.group, TaskList.refusal(of: group, in: read) != nil { return .closeRequested }
-                try take(read)
+                if let group = state.head.group, TaskList.refusal(of: group, in: snapshot) != nil { return .closeRequested }
+                try take(snapshot)
             } catch {
                 // Neither the blocks on screen nor the title is cleared, since each is assigned only after its own read
                 // succeeded, and a list emptied by a failed read would take with it the only thing left to act on.
@@ -445,12 +445,12 @@ public final class TaskList: Routable {
     /// to anything. It drops the picks whose chips are no longer on the bar, which stop filtering and come back unlit
     /// (the controller's ruling on #175, 2026-11-04). The folds are read before anything is assigned, so a read that
     /// fails leaves what is on screen.
-    private func take(_ read: Read) throws(StoreError) {
+    private func take(_ snapshot: PageSnapshot) throws(StoreError) {
         let folded = state.head.group == nil ? try TaskList.keptFolds(in: store, of: state.head.view) : []
-        let blocks = TaskList.blocks(of: read, head: state.head, today: state.day.day)
-        let chips = TaskList.chips(in: blocks, tags: read.tags)
-        state.read = read
-        state.title = read.page.view.title
+        let blocks = TaskList.blocks(of: snapshot, head: state.head, today: state.day.day)
+        let chips = TaskList.chips(in: blocks, tags: snapshot.tags)
+        state.snapshot = snapshot
+        state.title = snapshot.page.view.title
         state.folded = folded
         state.picks.formIntersection(chips.map(\.id))
     }
@@ -518,17 +518,18 @@ public final class TaskList: Routable {
     }
 
     /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
-    /// it even when the page's read fails; the store's read the blocks, the tile and the rule are read from; the
-    /// device's day it was read by; the folds and the layout the device keeps, and the picked tags this session keeps;
-    /// what it declared over itself; and the sentence a person was last told. One value, moved field by field, and the
-    /// one place any of it is kept: the model is computed from it on every read (owner's reviews of #77 and #101).
+    /// it even when the page's read fails; the snapshot of the store the blocks, the tile and the rule are read from,
+    /// and the device's day it was taken by; the folds and the layout the device keeps, and the picked tags this
+    /// session keeps; what it declared over itself; and the sentence a person was last told. One value, moved field by
+    /// field, and the one place any of it is kept: the model is assembled from it on every read, in `model` and
+    /// nowhere else (owner's reviews of #77, #101 and #188).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
     private struct State {
         let head: Route.Head
         var title: String
-        var read: Read
+        var snapshot: PageSnapshot
         var day: DeviceDay
         var folded: Set<String>
         var layout: Model.Layout.Kind
@@ -536,10 +537,47 @@ public final class TaskList: Routable {
         var destination: Destination<Route.Over>
         var problem: String?
 
-        /// The model a view draws (`TaskList.model`).
+        /// The model a view draws, assembled here and nowhere else: the blocks of the page, the chips of their open
+        /// tasks and the rows the picked ones leave, the layout the list is shown as where Show as offers Columns and
+        /// the list otherwise, a block's fold where it has a header to fold by, and the header, Show as, the empty
+        /// state and the sentence.
+        ///
+        /// Columns are offered where the list groups or has more than one block, and never on a group's screen, which
+        /// has one block and no grouping (spec section 5; the controller's ruling on #175, 2026-11-04). The empty state
+        /// stands when no block has a row after the filter and the page has no lists inside (canvas, the empty state;
+        /// the controller's ruling on #175, 2026-11-04).
         var model: Model {
-            TaskList.model(
-                head: head, title: title, read: read, today: day.day, folded: folded, layout: layout, picks: picks,
+            let view = snapshot.page.view
+            let today = day.day
+            let blocks = TaskList.blocks(of: snapshot, head: head, today: today)
+            let chips = TaskList.chips(in: blocks, tags: snapshot.tags)
+            let picked = picks.intersection(chips.map(\.id))
+            let shown = blocks.map { block in
+                picked.isEmpty ? block : PageBlock(
+                    id: block.id, tasks: block.tasks.filter { !$0.tags.isDisjoint(with: picked) },
+                    heading: block.heading, color: block.color
+                )
+            }
+            let canBoard = head.group == nil && (view.groupBy != nil || blocks.count > 1)
+            let metrics = Metrics.of(canBoard ? layout : .list)
+            let color = TaskList.tileColor(view.color)
+            let icon = TaskList.tileIcon(view.icon)
+            let tags = TagNames(snapshot.tags)
+            let hasListsInside = blocks.contains { if case .list = $0.id { true } else { false } }
+            let heading = TaskList.screenHeading(
+                head: head, title: title, rule: view.filter, snapshot: snapshot, today: today
+            )
+            let empty = shown.allSatisfy(\.tasks.isEmpty) && !hasListsInside
+                ? TaskList.empty(
+                    TaskList.emptyWords(head: head, view: view, tags: tags), color: color, icon: icon, metrics.empty
+                )
+                : nil
+            return Model(
+                header: TaskList.header(heading, color: color, icon: icon, metrics.header),
+                tagBar: TaskList.tagBar(chips, picked: picked, colors: color.check, metrics.tagBar),
+                layout: TaskList.layout(shown, title: title, folded: folded, today: today, tags: tags, metrics.blocks),
+                showAs: TaskList.showAs(canBoard: canBoard),
+                empty: empty,
                 problem: problem
             )
         }
