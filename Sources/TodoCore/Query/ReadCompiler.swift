@@ -62,12 +62,20 @@ struct ReadCompiler {
     /// The exclusion becomes `.trashed(false)` among the conditions of each branch of each rule that does not name the
     /// Trash, before the rules are regrouped (`DriverChooser.conditions(ofAnyOf:)`), so that a folder whose rules all
     /// exclude it has it in front. It never drives, and it is written as it is, `tt.trashed = 0`, which no index serves.
+    ///
+    /// A read nothing drives lists its tags while they hold fewer than `listedShare` of the rows they are tested on,
+    /// each tag those of the walk besides the condition of the statement that holds it: inside a disjunction that
+    /// narrows the read, the walk around the disjunction, as for the disjunction itself; beside one, none. In #155's
+    /// sweep at 50,000 tasks, `(t0 AND deadline <= 30) OR (t1 AND when <= 7)` with 19,865 tasks of the two tags, which
+    /// nothing drives, read in 27.0 ms listed and in 34.9 as before.
     func compile(_ rules: [Filter]) -> SQLFragment {
         let chooser = DriverChooser(today: today, weighing: weighing)
         let conditions = chooser.conditions(ofAnyOf: rules.flatMap(Self.excludingTheTrash))
         if let driven = chooser.driven(conditions) { return driven }
         let held = rules.flatMap(FilterCompiler.tags(of:)).reduce(0.0) { $0 + Double(weighing.sizes[.tag($1)] ?? 0) }
-        let listed = held > 0 && held < Self.listedShare * max(weighing.walk(ofStatement: conditions).tested(besides: nil), 1)
+        let walk = weighing.walk(ofStatement: conditions)
+        let tested = conditions.filter { !FilterCompiler.tags(of: $0).isEmpty }.map { walk.tested(besides: $0) }.min() ?? walk.tested(besides: nil)
+        let listed = held > 0 && held < Self.listedShare * max(tested, 1)
         return FilterCompiler.whereClause(anyOf: rules, today: today, form: listed ? .tagListsLast : .plain)
     }
 
@@ -80,11 +88,15 @@ struct ReadCompiler {
 
     /// The sizes the choice of a driver for a read of `rules` weighs, each once, in the order they are read: none when
     /// no rule offers a candidate whose worth depends on the store, a tag, or a range of days in a branch of a
-    /// disjunction; otherwise every task, each status, each tag, and each condition SQLite searches an index for
+    /// disjunction, and none when a driver that needs no size drives the read whatever the store holds, a manual list, a
+    /// project, a day, a short range or a choice of them (`DriverChooser.drivesWithoutWeighing(_:)`), since no size could
+    /// change it then; otherwise every task, each status, each tag, and each condition SQLite searches an index for
     /// (`searchable`), with an empty day for a day that is not empty, that the conditions of any conjunction a walk is
-    /// taken of name. A read whose drivers are a project, a manual list, a day or a short range reads none, and is
-    /// driven all the same.
-    static func sizes(wantedBy rules: [Filter]) -> [Size] {
+    /// taken of name. A tag a read nothing drives would list counts towards the list's bound, so a tag beside a driver
+    /// that needs no size in a branch is read where another branch's driver is weighed. In #155's measurement at 50,000
+    /// tasks the two sizes of Garden, a tag and three weeks of days, which the days drive whatever the tag holds, cost
+    /// 0.20 to 0.25 ms of a 2 ms page, a tenth of it.
+    static func sizes(wantedBy rules: [Filter], today: Day) -> [Size] {
         let tags = rules.flatMap(FilterCompiler.tags(of:))
         let conditions = rules.flatMap(walkedConditions(of:))
         let inDisjunctions = rules.count > 1 ? conditions : rules.flatMap { rule in
@@ -100,6 +112,8 @@ struct ReadCompiler {
             }
         }
         guard !tags.isEmpty || offersARange else { return [] }
+        let chooser = DriverChooser(today: today, weighing: Weighing(sizes: Sizes([])))
+        guard !chooser.drivesWithoutWeighing(chooser.conditions(ofAnyOf: rules.flatMap(excludingTheTrash))) else { return [] }
         var statuses: Set<TaskStatus> = []
         var sizes: [Size] = [.tasks]
         var searched: [Size] = []
@@ -180,10 +194,10 @@ struct ReadCompiler {
                 self.aroundEveryTask = aroundEveryTask
             }
 
-            /// S for a condition of the conjunction, `disjunction` or, for any other, nil: none beside a disjunction of
-            /// `disjunctions` other than it.
-            func tested(besides disjunction: Filter?) -> Double {
-                disjunctions.contains { $0 != disjunction } ? 0 : tested
+            /// S for `condition`, one of the conjunction's conditions, or for none of them when it is nil: `tested`, but
+            /// none where a disjunction of `disjunctions` other than `condition` narrows the conjunction.
+            func tested(besides condition: Filter?) -> Double {
+                disjunctions.contains { $0 != condition } ? 0 : tested
             }
         }
 
@@ -260,6 +274,14 @@ struct ReadCompiler {
         /// plainly as one search of the parent index: the Projects folder in 0.120 ms, against 0.196 with each project
         /// as the list of its children and 0.143 before #155, in #155's measurement.
         var writesProjectsPlainly: Bool { true }
+
+        /// A choice of projects or of days drives a read before a tag beside it, as one project or one day does, where a
+        /// count weighs it after the tag in #153's order: SQLite reads it by the projects' or the days' own index, and a
+        /// tag under the floor of `walkShare` that drove it in its place lost to it. In #155's measurement at 50,000 tasks
+        /// a tag of 264 to 1,488 tasks beside two projects or two days drove the read 1.7 to 15.4 times slower than their
+        /// index, 0.09 to 0.14 ms, by up to 1.95 ms; and beside a tag of 25,000, which did not drive, the read ran 2.2
+        /// times faster driven by the choice but read two sizes for it, 0.54 ms, which left the call 3 to 5 times slower.
+        var disjunctionsThatNeedNoSizeOutrankTags: Bool { true }
 
         /// Whether tasks held by a driver drive a walk of `rows`, `tested` of which it tests: while they are fewer than
         /// `walkShare` of the rows and `share` of those tested, added up.

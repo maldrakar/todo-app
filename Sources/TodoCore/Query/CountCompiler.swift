@@ -71,11 +71,14 @@ struct CountCompiler {
     /// condition left on its index SQLite compares the two constants before the loop and reads no row, which no
     /// driver could beat. A range of days wider than a month, or open at one end, never drives a count.
     private struct Weighing: DriverWeighing {
-        /// What a count knows of the walk around a conjunction: whether #144 rejects most open tasks before it probes a
-        /// tag in it (`Filter.narrows`), which lowers a tag's share to `narrowedShare`. A rule of a folder is weighed as
-        /// though nothing narrowed it while the rules are grouped, and a branch of a disjunction as the conjunction around
-        /// it, the disjunction's own narrowing among it.
-        typealias Narrowed = Bool
+        /// What a count knows of the walk around a conjunction.
+        struct Walk {
+            /// Whether #144 rejects most open tasks before it probes a tag in the conjunction (`Filter.narrows`), which
+            /// lowers a tag's share to `narrowedShare`. A rule of a folder is weighed as though nothing narrowed it while
+            /// the rules are grouped, and a branch of a disjunction as the conjunction around it, the disjunction's own
+            /// narrowing among it.
+            let narrowed: Bool
+        }
 
         /// The tasks each tag a rule could be driven by holds, done, trashed and deleted ones among them, as `Store`
         /// counted them for this call. A tag that is not in it is no driver.
@@ -111,41 +114,44 @@ struct CountCompiler {
         /// of them, so that no day a rule names makes a count slower than #144's.
         static let narrowedShare = 0.03
 
-        func walk(ofStatement conditions: [Filter]) -> Narrowed {
-            conditions.contains(where: \.narrows)
+        func walk(ofStatement conditions: [Filter]) -> Walk {
+            Walk(narrowed: conditions.contains(where: \.narrows))
         }
 
-        func walk(ofRule conditions: [Filter], sharing shared: [Filter]) -> Narrowed {
-            false
+        func walk(ofRule conditions: [Filter], sharing shared: [Filter]) -> Walk {
+            Walk(narrowed: false)
         }
 
-        func walk(ofBranch conditions: [Filter], of disjunction: Filter, within narrowed: Narrowed) -> Narrowed {
-            narrowed
+        func walk(ofBranch conditions: [Filter], of disjunction: Filter, within around: Walk) -> Walk {
+            around
         }
 
         func admitsADriver(_ conditions: [Filter]) -> Bool {
             !conditions.contains(where: CountCompiler.excludesOpen)
         }
 
-        func tagDrives(_ tag: TagID, in narrowed: Narrowed) -> Bool {
-            holdFewerTasks(than: narrowed ? Self.narrowedShare : Self.tagShare, [tag])
+        func tagDrives(_ tag: TagID, in walk: Walk) -> Bool {
+            holdFewerTasks(than: walk.narrowed ? Self.narrowedShare : Self.tagShare, [tag])
         }
 
-        func rangeDrives(_ condition: Filter, in narrowed: Narrowed) -> Bool {
+        func rangeDrives(_ condition: Filter, in walk: Walk) -> Bool {
             false
         }
 
-        func disjunctionDrives(_ disjunction: Filter, branches: [(driver: Filter, walk: Narrowed)], in narrowed: Narrowed) -> Bool {
+        func disjunctionDrives(_ disjunction: Filter, branches: [(driver: Filter, walk: Walk)], in walk: Walk) -> Bool {
             let tags = branches.compactMap { branch -> TagID? in
                 guard case .hasTag(let tag) = branch.driver else { return nil }
                 return tag
             }
-            return holdFewerTasks(than: narrowed ? Self.narrowedShare : Self.disjunctionShare, tags)
+            return holdFewerTasks(than: walk.narrowed ? Self.narrowedShare : Self.disjunctionShare, tags)
         }
 
         /// A count's own `t.status` competes for the plan with a disjunction of parents, so a project in a disjunction
         /// is the list of its children there, which SQLite looks up by id beside every other branch's list (#153).
         var writesProjectsPlainly: Bool { false }
+
+        /// A count weighs every disjunction after a tag, in the order #153 measured, and keeps the statements it measured.
+        var disjunctionsThatNeedNoSizeOutrankTags: Bool { false }
 
         /// Whether the tags hold fewer tasks, added up, than `share` of the open ones. Summed and compared as `Double`,
         /// so that counts a store could hold never overflow on the way; a tag whose size was not read is no driver. No

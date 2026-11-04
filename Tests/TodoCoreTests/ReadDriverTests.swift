@@ -95,11 +95,12 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
 /// rule, a tag or a deadline that has passed, by both indexes. A tag beside a range of deadlines that holds fewer tasks
 /// than the tag stays on the range, and a closed status with a tag stays on the status index while nothing has that
 /// status and goes to the tag once much does. A tag beside a choice of projects or of days, which SQLite tests before
-/// the tag and which no index says the share of, stays on the parent's or the day's index. None of these reads walks
-/// every task.
+/// the tag and which no index says the share of, stays on the parent's or the day's index, a tag of one task as surely
+/// as one of twenty: the choice outranks a tag beside it. None of these reads walks every task.
 @Test func aReadIsDrivenByItsRulesOwnIndex() throws {
     let store = try makeStore()
     let small = try store.createTag(title: "small")
+    let tiny = try store.createTag(title: "tiny")
     let medium = try store.createTag(title: "medium")
     let big = try store.createTag(title: "big")
     let projects = [try store.createTask(NewTask(title: "p0")), try store.createTask(NewTask(title: "p1"))]
@@ -107,7 +108,7 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
     try store.update(view: manual, [.filter(.listedIn(manual))])
     var all: [TaskID] = []
     for i in 0..<98 {
-        let tags: Set<TagID> = i < 5 || i == 50 ? [small] : i < 25 ? [medium] : i < 85 ? [big] : []
+        let tags: Set<TagID> = Set(i < 5 || i == 50 ? [small] : i < 25 ? [medium] : i < 85 ? [big] : []).union(i == 5 ? [tiny] : [])
         let deadline = (90..<93).contains(i) ? today.advanced(by: -30) : nil
         let when = (5..<8).contains(i) ? today : i == 8 ? today.advanced(by: 1) : nil
         let task = try store.createTask(NewTask(title: "task \(i)", when: when, deadline: deadline, parent: i < 3 ? projects[0] : i < 6 ? projects[1] : nil, tags: tags))
@@ -123,6 +124,8 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
             ("beside a range", [.and([.hasTag(medium), .deadline(.onOrBefore(-20))])]), ("done", doneAndSmall),
             ("beside projects", [.and([.hasTag(medium), .or([.parent(projects[0]), .parent(projects[1])])])]),
             ("beside days", [.and([.hasTag(medium), .or([.when(.on(0)), .when(.on(1))])])]),
+            ("tiny beside projects", [.and([.hasTag(tiny), .or([.parent(projects[0]), .parent(projects[1])])])]),
+            ("tiny beside days", [.and([.hasTag(tiny), .or([.when(.on(0)), .when(.on(1))])])]),
         ]
         for (name, rules) in rules {
             let statement = try readStatement(store, rules, sort: [SortKey(.title)])
@@ -148,6 +151,8 @@ private let builtIns = [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInT
     #expect(before["done"]?.plan.first == "SEARCH t USING INDEX tasks_status (status=?)", "\(before["done"]?.plan ?? [])")
     #expect(before["beside projects"]?.plan.first == "SEARCH tt USING INDEX task_tree_parent (parent=?)", "\(before["beside projects"]?.plan ?? [])")
     #expect(before["beside days"]?.plan.first == "SEARCH t USING INDEX tasks_when (when_day=?)", "\(before["beside days"]?.plan ?? [])")
+    #expect(before["tiny beside projects"]?.plan.first == "SEARCH tt USING INDEX task_tree_parent (parent=?)", "\(before["tiny beside projects"]?.plan ?? [])")
+    #expect(before["tiny beside days"]?.plan.first == "SEARCH t USING INDEX tasks_when (when_day=?)", "\(before["tiny beside days"]?.plan ?? [])")
     for (name, read) in before { #expect(!scans(read.plan), "\(name) walks every task: \(read.plan)") }
 
     for task in all[40..<90] { try store.update(task: task, [.status(.done)]) }
@@ -392,6 +397,17 @@ private func expectSides(_ store: Store, _ rules: [Filter], adding tag: TagID, t
     try expectRead(store, rules, is: .listed, "\(comment), and one more", sourceLocation: sourceLocation)
 }
 
+/// An undriven read's tags are listed by the rows each is tested on (#155): inside a disjunction that narrows the read,
+/// the rows of the walk around it, its own narrowing left out, as for the disjunction itself; beside it, none. F's 29
+/// tasks among the 30 deadlines or G's 39 among the 50 days: no tag drives its branch, and the ranges add up to 80 against
+/// 2.4 + 40 = 42.4, so nothing drives, and the 68 tasks of the tags are under four times the 110 tasks around the
+/// disjunction. A's 47 tasks beside a disjunction of the same two ranges are tested on no rows SQLite counts.
+@Test func anUndrivenReadListsTheTagsInsideADisjunctionByTheWalkAroundIt() throws {
+    let (store, tag, _) = try thresholdStore()
+    try expectRead(store, [.or([.and([.hasTag(tag("F")), .deadline(.onOrBefore(-20))]), .and([.hasTag(tag("G")), .when(.onOrBefore(0))])])], is: .listed, "inside")
+    try expectRead(store, [.and([.hasTag(tag("A")), .or([.when(.onOrBefore(0)), .deadline(.onOrBefore(-20))])])], is: .asBefore, "beside")
+}
+
 /// The sizes a read is weighed by cost no table row (#155): every task is counted on an index, a status on the status
 /// index, a tag on its partial index, a day's condition on its day's index and the root on the tree's parent index, by
 /// the statements `readSizes` runs. A read with no tag and no range in a disjunction reads none.
@@ -410,7 +426,22 @@ private func expectSides(_ store: Store, _ rules: [Filter], adding tag: TagID, t
     }
 
     let project = TaskID("p")
-    let none: [[Filter]] = [
+    let other = TagID("u")
+    // A tag beside a driver that needs no size and outranks it: a short range (Garden), a project, a day, a manual list, in
+    // a folder's lists, in a disjunction's branches, and beside a choice of projects or of days. Sizes could decide
+    // nothing there: with each tag small enough to drive anywhere else, each writes the statement it writes with none.
+    let besideADriver: [[Filter]] = [
+        [.and([.hasTag(tag), .when(.between(-6, 14))])], [.and([.hasTag(tag), .parent(project)])], [.and([.hasTag(tag), .when(.on(0))])],
+        [.and([.hasTag(tag), .listedIn(ViewID("v"))])], [.and([.hasTag(tag), .parent(project)]), .and([.hasTag(other), .when(.on(1))])],
+        [.or([.and([.hasTag(tag), .listedIn(ViewID("v"))]), .and([.hasTag(other), .deadline(.between(0, 7))])])],
+        [.and([.hasTag(tag), .or([.parent(project), .parent(TaskID("q"))])])], [.and([.hasTag(tag), .or([.when(.on(0)), .when(.on(1))])])],
+    ]
+    let every = ReadCompiler.Sizes([(.tasks, 1000), (.tag(tag), 1), (.tag(other), 1)])
+    for rules in besideADriver {
+        let unweighed = Store.viewStatement(rules: rules, sort: [], today: today, sizes: ReadCompiler.Sizes([]))
+        #expect(Store.viewStatement(rules: rules, sort: [], today: today, sizes: every) == unweighed, "\(rules)")
+    }
+    let none: [[Filter]] = besideADriver + [
         [.parent(project)], [.listedIn(ViewID("v"))], [.when(.on(0))], [.deadline(.between(0, 7))], [.parent(project), .parent(TaskID("q"))],
         [.or([.when(.on(0)), .parent(project)])], [.deadline(.onOrBefore(-1))], [.and([.status([.open]), .when(.onOrAfter(1)), .parent(nil)])],
         [.or([.parent(nil), .parent(project)])], [.and([.parent(nil), .when(.empty)]), .parent(project)],

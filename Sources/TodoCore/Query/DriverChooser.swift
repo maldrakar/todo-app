@@ -27,6 +27,9 @@ protocol DriverWeighing {
     /// Whether a disjunction that a project drives in every branch is written with the projects' parents compared
     /// plainly, rather than each as the list of its children.
     var writesProjectsPlainly: Bool { get }
+    /// Whether a disjunction every branch of which a driver that needs no size drives, a manual list, a project, a day
+    /// or a short range, outranks a tag beside it, as each of those drivers does, rather than being weighed after it.
+    var disjunctionsThatNeedNoSizeOutrankTags: Bool { get }
 }
 
 /// Chooses which condition of a rule drives a statement over it, and writes the statement's condition so that
@@ -53,11 +56,21 @@ struct DriverChooser<Weighing: DriverWeighing> {
     /// What a condition can drive a statement by, best first: the fewer tasks its index gives for any store, the
     /// earlier. A manual list holds the tasks a person placed by hand, a project its own, a day one day's, a short
     /// range a few days', a tag and a wider range are only offered when the statement's weighing finds them small
-    /// enough, and a disjunction is read through each branch's.
+    /// enough, and a disjunction is read through each branch's: before a tag where every branch's driver needs no size
+    /// and the weighing ranks it so (`DriverWeighing.disjunctionsThatNeedNoSizeOutrankTags`), weighed after one
+    /// otherwise.
     private enum Driver: Int, Comparable {
-        case pins, project, day, days, tag, range, disjunction
+        case pins, project, day, days, unweighedDisjunction, tag, range, disjunction
 
         static func < (lhs: Driver, rhs: Driver) -> Bool { lhs.rawValue < rhs.rawValue }
+
+        /// Whether the driver drives whatever the store holds, so that no size is read to choose it.
+        var needsNoSize: Bool {
+            switch self {
+            case .pins, .project, .day, .days, .unweighedDisjunction: true
+            case .tag, .range, .disjunction: false
+            }
+        }
     }
 
     /// The conditions a statement over any of `rules` asks for all of: a list's rule, or the rules of the lists under a
@@ -71,6 +84,12 @@ struct DriverChooser<Weighing: DriverWeighing> {
     /// nil when none drives.
     func driven(_ conditions: [Filter]) -> SQLFragment? {
         driven(conditions, inDisjunction: false, walk: weighing.walk(ofStatement: conditions))
+    }
+
+    /// Whether a driver that needs no size drives the conjunction `conditions`, so that the statement over it is the
+    /// same whatever the store holds, and no size the weighing reads could change it.
+    func drivesWithoutWeighing(_ conditions: [Filter]) -> Bool {
+        best(in: conditions, inDisjunction: false, walk: weighing.walk(ofStatement: conditions))?.driver.needsNoSize ?? false
     }
 
     /// A disjunction of rules regrouped into one that selects the same tasks, so that a driver can be found for it.
@@ -100,7 +119,7 @@ struct DriverChooser<Weighing: DriverWeighing> {
         var drivers: [Filter?] = []
         var members: [[[Filter]]] = []
         for list in lists {
-            let driver = driverPosition(in: list, inDisjunction: true, walk: weighing.walk(ofRule: list, sharing: shared)).map { list[$0] }
+            let driver = best(in: list, inDisjunction: true, walk: weighing.walk(ofRule: list, sharing: shared)).map { list[$0.position] }
             if let driver, let group = drivers.firstIndex(of: driver) {
                 members[group].append(list)
             } else {
@@ -120,7 +139,7 @@ struct DriverChooser<Weighing: DriverWeighing> {
     /// or nil when it has no driver. `inDisjunction` says that it is a branch of a disjunction that drives, in which
     /// a project is written plainly where `projectsPlainly` says so.
     private func driven(_ conditions: [Filter], inDisjunction: Bool, walk: Weighing.Walk, projectsPlainly: Bool = false) -> SQLFragment? {
-        guard let chosen = driverPosition(in: conditions, inDisjunction: inDisjunction, walk: walk) else { return nil }
+        guard let chosen = best(in: conditions, inDisjunction: inDisjunction, walk: walk)?.position else { return nil }
         var written: [SQLFragment] = []
         for (position, condition) in conditions.enumerated() {
             guard position == chosen else {
@@ -153,7 +172,7 @@ struct DriverChooser<Weighing: DriverWeighing> {
                 (conditions: branch.conjuncts, walk: weighing.walk(ofBranch: branch.conjuncts, of: condition, within: walk))
             }
             let projectsPlainly = weighing.writesProjectsPlainly && branches.allSatisfy { branch in
-                guard let position = driverPosition(in: branch.conditions, inDisjunction: true, walk: branch.walk),
+                guard let position = best(in: branch.conditions, inDisjunction: true, walk: branch.walk)?.position,
                       case .parent(_?) = branch.conditions[position] else { return false }
                 return true
             }
@@ -168,16 +187,16 @@ struct DriverChooser<Weighing: DriverWeighing> {
         }
     }
 
-    /// Which of the conditions a conjunction asks for all of drives it: the first of the best driver, or none.
+    /// Which of the conditions a conjunction asks for all of drives it, and by what: the first of the best driver, or none.
     /// `inDisjunction` says that the conjunction is a branch of a disjunction that drives.
-    private func driverPosition(in conditions: [Filter], inDisjunction: Bool, walk: Weighing.Walk) -> Int? {
+    private func best(in conditions: [Filter], inDisjunction: Bool, walk: Weighing.Walk) -> (position: Int, driver: Driver)? {
         guard weighing.admitsADriver(conditions) else { return nil }
         var best: (position: Int, driver: Driver)?
         for (position, condition) in conditions.enumerated() {
             guard let driver = driver(condition, inDisjunction: inDisjunction, walk: walk) else { continue }
             if best.map({ driver < $0.driver }) ?? true { best = (position, driver) }
         }
-        return best?.position
+        return best
     }
 
     /// What a condition can drive a statement by, if anything. The root is an equality to SQLite and selects most of a
@@ -205,12 +224,15 @@ struct DriverChooser<Weighing: DriverWeighing> {
             let branches = condition.disjuncts
             guard !branches.isEmpty else { return nil }
             var drivers: [(driver: Filter, walk: Weighing.Walk)] = []
+            var needNoSize = true
             for branch in branches {
                 let conditions = branch.conjuncts
                 let branchWalk = weighing.walk(ofBranch: conditions, of: condition, within: walk)
-                guard let position = driverPosition(in: conditions, inDisjunction: true, walk: branchWalk) else { return nil }
-                drivers.append((conditions[position], branchWalk))
+                guard let best = best(in: conditions, inDisjunction: true, walk: branchWalk) else { return nil }
+                drivers.append((conditions[best.position], branchWalk))
+                needNoSize = needNoSize && best.driver.needsNoSize
             }
+            if needNoSize && weighing.disjunctionsThatNeedNoSizeOutrankTags { return .unweighedDisjunction }
             return weighing.disjunctionDrives(condition, branches: drivers, in: walk) ? .disjunction : nil
         case .status, .trashed, .and, .not:
             return nil

@@ -142,7 +142,7 @@ extension Store {
     }
 
     /// The statement of every size `readSizes` reads for `sections`, in the order it reads them: each size any of the
-    /// reads asks for (`ReadCompiler.sizes(wantedBy:)`), once. Every task is counted on the smallest index SQLite has
+    /// reads asks for (`ReadCompiler.sizes(wantedBy:today:)`), once. Every task is counted on the smallest index SQLite has
     /// of them, a status on the status index, a tag on its partial index, and a condition on its day's index or, for
     /// the root, on the tree's parent index.
     ///
@@ -151,7 +151,7 @@ extension Store {
     static func readSizeStatements(for sections: [[Filter]], today: Day) -> [(size: ReadCompiler.Size, sql: String, params: [Value])] {
         var sizes: [ReadCompiler.Size] = []
         for rules in sections {
-            for size in ReadCompiler.sizes(wantedBy: rules) where !sizes.contains(size) { sizes.append(size) }
+            for size in ReadCompiler.sizes(wantedBy: rules, today: today) where !sizes.contains(size) { sizes.append(size) }
         }
         return sizes.map { size in
             switch size {
