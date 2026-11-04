@@ -122,6 +122,20 @@ private func firstList(in app: AppModule) throws -> TaskList.Model {
 
 private struct FirstScreenIsNoList: Error {}
 
+/// The rows a list's model draws, block by block and flattened, as their ids and titles, read over the layout and a
+/// row's kind as the list's view reads them.
+private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
+    let blocks = switch list.layout {
+    case .list(let blocks): blocks
+    case .columns(let board): board.columns
+    }
+    return blocks.flatMap(\.rows).map { row in
+        switch row {
+        case .task(let id, let model): (id, model.title.text)
+        }
+    }
+}
+
 /// The default window names no view, so the sidebar chooses the Inbox itself and declares its list, which the
 /// window's stack makes: the root names no view of its own (ADR-0006, amendment of 2026-10-03).
 @Test func theDefaultWindowOpensTheListOnTheSidebarsChoice() throws {
@@ -130,7 +144,7 @@ private struct FirstScreenIsNoList: Error {}
     let app = try AppModule(store: store, width: .wide, day: testDay, capabilities: iPhone)
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
     #expect(try standing(in: app) == [listOn(inbox, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy milk"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy milk"])
     #expect(app.model.quickEntry == nil)
     #expect(app.model.problem == nil)
     #expect(app.route.path == "/view/\(inbox)")
@@ -293,7 +307,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.send(.changed(deleted)) == nil)
     #expect(app.model.layout == .wide(column: path[0], path: []))
     #expect(try standing(in: app) == [listOn(inbox, in: store)])
-    #expect(try firstList(in: app).rows.map(\.id) == [kept])
+    #expect(rows(of: try firstList(in: app)).map(\.id) == [kept])
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
     #expect(app.route.path == "/view/\(inbox)")
     let model = app.model
@@ -493,12 +507,12 @@ private struct FirstScreenIsNoList: Error {}
     let app = try AppModule(
         store: store, route: route, width: .wide, day: deviceDay(testDay.day.advanced(by: -1)), capabilities: iPhone
     )
-    #expect(try firstList(in: app).rows.isEmpty, "the task is tomorrow's; this is the setup")
+    #expect(rows(of: try firstList(in: app)).isEmpty, "the task is tomorrow's; this is the setup")
     let layout = app.model.layout
     #expect(app.send(.dayChanged(testDay)) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(today, in: store, width: .wide)))
     #expect(try standing(in: app) == [listOn(today, in: store), taskOn(id, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Call the bank"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Call the bank"])
     #expect(app.model.layout == layout)
     #expect(app.route == route)
 }
@@ -534,7 +548,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.send(.dayChanged(testDay)) == nil)
     #expect(app.send(.action(.taskViewList(.rowSelected(BuiltInTaskViews.today)))) == nil)
     #expect(try standing(in: app) == [listOn(BuiltInTaskViews.today, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Call the bank"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Call the bank"])
 }
 
 /// What the window's platform offers reaches the sidebar as the platform said it when the window was made (Lists
@@ -581,7 +595,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.send(.route(try Route(path: "/view/\(home.view)/task/\(milk)"))) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(home.view, in: store, width: .wide)))
     #expect(try standing(in: app) == [listOn(home.view, in: store), taskOn(milk, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy milk"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy milk"])
     #expect(idsOverTheSidebar(in: app.model).allSatisfy { !replaced.contains($0) })
     #expect(app.route.path == "/view/\(home.view)/task/\(milk)")
 }
@@ -599,7 +613,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.model.taskViewList == (try sidebarOn(work.view, in: store, width: .wide)))
     #expect(idsOverTheSidebar(in: app.model).count == 1)
     let list = try firstList(in: app)
-    #expect(list.rows.map(\.id) == [kept])
+    #expect(rows(of: list).map(\.id) == [kept])
     #expect(list.problem == "The task is gone.")
     #expect(app.route.path == "/view/\(work.view)")
 }
@@ -662,7 +676,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.model.taskViewList.rows.last.flatMap(title(of:)) == "Docs")
     #expect(idsOverTheSidebar(in: app.model) == path)
     #expect(try standing(in: app) == [listOn(inbox, in: store), taskOn(id, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy oat milk", "Water the plants"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy oat milk", "Water the plants"])
     #expect(app.model.quickEntry?.draft == "Call the")
 }
 
@@ -708,7 +722,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(try inboxTitles(of: store) == ["Buy milk"])
     #expect(app.send(.changed(created)) == nil)
     #expect(try standing(in: app) == [listOn(inbox, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy milk"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy milk"])
 }
 
 /// The sidebar's New task asks the root for quick entry, and the root opens it as its own toolbar button does, over
@@ -1211,7 +1225,7 @@ private let linkSentence = "The link could not be opened."
         #expect(app.send(event) == nil)
         #expect(twin.send(event) == nil)
     }
-    #expect(try firstList(in: twin).rows.map(\.title) == ["Buy milk"], "the change was read; this is the setup")
+    #expect(rows(of: try firstList(in: twin)).map(\.title) == ["Buy milk"], "the change was read; this is the setup")
     #expect(app.model.taskViewList == twin.model.taskViewList)
     #expect(app.model.layout == twin.model.layout)
     #expect(app.model.screens == twin.model.screens)

@@ -1,42 +1,29 @@
 // Sources/Features/TaskList/TaskList.swift
+import DesignSystem
 import FeatureModule
 import TaskScreenFeature
 import TodoCore
 
-/// The tasks of one view, by title, and the task declared open over them.
+/// The screen of one list: its tasks as the store's page of the view lays them out, the list's own tasks first in their
+/// groups and then one block per list inside it, with the tag bar, the folds and the layout the device keeps, and what
+/// it declared over itself (list screen spec, sections 1, 2, 5, 7 and 9).
 ///
 /// It is declared by the sidebar, by a choice there, and stands in its window's stack over the sidebar, drawn in the
-/// pane beside it on the Mac. A tap on a row declares the task screen over it in its destination, and the window's
-/// stack makes, keeps and drops that screen (ADR-0009, amendment of 2026-10-22): the list holds no screen and draws
-/// none, and hears what the screen asks for as `.destinationAnswered`. Neither the sidebar nor the root learns that a
-/// list opens a task, and their code does not grow when the task screen learns to open something (navigation state
-/// spec, section 2); the task screen's route reads and writes its own part of the window's path then, as this list's
-/// route does. What it holds is what makes the navigation real and nothing more; sections, grouping, ordering and
-/// completion are M4's (spec section 10).
+/// pane beside it on the Mac. A tap on a row declares the task screen over it, and a tap on a block's title the list
+/// inside that the block is, or the list's own group the block is, opened as a screen of its own, which is this module
+/// on another route; the window's stack makes, keeps and drops what the list declared (ADR-0009, amendments of
+/// 2026-10-22, 2026-11-01 and 2026-11-02): the list holds no screen and draws none, and hears what a screen over it asks
+/// for as `.destinationAnswered`. Neither the sidebar nor the root learns what a list opens, and their code does not grow
+/// when it learns to open something (navigation state spec, section 2).
 ///
-/// It is a routable module (spec section 4): its head is the view it lists, and its tail is the route of the task it
-/// declared, so that a link to a task declares the task over the list, and the route a window writes down names both.
+/// A group's screen is the list it belongs to read for one of its own groups: the module reads the list's page and
+/// draws that group's block of it, so the two always agree, and nothing stores the group or writes when it opens
+/// (ADR-0004, amendment of 2026-11-02). It has no lists inside, no columns, no folds and no layout of its own.
+///
+/// It is a routable module (spec section 4): its head is the view it lists and, on a group's screen, the group, and its
+/// tail is what it declared over itself, so that a link to a task or to a list inside declares it over the list, and
+/// the route a window writes down names the whole chain.
 public final class TaskList: Routable {
-    public struct Model: Equatable, Sendable {
-        /// One task of the view, as the last read of the view's tasks answered.
-        public struct Row: Equatable, Sendable, Identifiable {
-            public let id: TaskID
-            public let title: String
-        }
-
-        /// The title of the view the list is on, as the last read of that view answered, drawn as the screen's
-        /// title: the back button's menu names the list by it (#126).
-        public let title: String
-
-        /// The view's tasks, in the order the view's query gives them.
-        public let rows: [Row]
-
-        /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say:
-        /// `send` cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one
-        /// would be a view holding logic (spec section 2).
-        public let problem: String?
-    }
-
     /// The address of the list: the view it lists, with one of its own groups on a group's screen, and what it
     /// declared over itself as the tail (spec sections 2 and 9; ADR-0009, amendments of 2026-11-01 and 2026-11-02).
     ///
@@ -187,12 +174,21 @@ public final class TaskList: Routable {
         }
     }
 
-    /// What a view may send, each case named for the gesture and never for the operation it triggers (ADR-0006).
-    /// The way back from the task is not one: SwiftUI reports it only as the shorter path it wrote, which the root
-    /// view sends the window whole, and the stack tells the list `.uncovered` (navigation state spec, section 3).
+    /// What a view may send, each case named for the control and the gesture and never for the operation it triggers
+    /// (ADR-0006). The way back from a screen over the list is not one: SwiftUI reports it only as the shorter path it
+    /// wrote, which the root view sends the window whole, and the stack tells the list `.uncovered` (navigation state
+    /// spec, section 3).
     public enum UserAction: Equatable, Sendable {
-        /// A row of the list, tapped or clicked.
+        /// A row of a block, or its check until #176 gives the check its own action, tapped or clicked.
         case rowTapped(TaskID)
+        /// A block's title, in its header or its column's.
+        case blockTitleTapped(Model.BlockID)
+        /// A block's chevron, which folds and unfolds it.
+        case blockChevronTapped(Model.BlockID)
+        /// A chip of the tag bar.
+        case tagChipTapped(TagID)
+        /// An item of Show as, List or Columns.
+        case showAsChosen(Model.Layout.Kind)
     }
 
     public enum Event: RoutedEvent {
@@ -200,14 +196,14 @@ public final class TaskList: Routable {
         case changed(ChangeSet)
 
         /// The window's stack has just made this list: sent once, right after `init`. The list was made from a route
-        /// its opener declared and already knows, the task in it included, so it has nothing to report and answers
-        /// nothing.
+        /// its opener declared and already knows, what stands over it included, so it has nothing to report and
+        /// answers nothing.
         case created
 
         /// A route handed to the live list, which its opener declared again with this list's head, by a link or by a
-        /// click on the list's view: an event of the world that no view can send (ADR-0006, amendment of
-        /// 2026-10-14), which the stack hands the list once, as `.declared` (navigation state spec, section 2). The
-        /// head of a live list never changes, so it is the tail alone that the list reads.
+        /// click on the list's view: an event of the world that no view can send (ADR-0006, amendment of 2026-10-14),
+        /// which the stack hands the list once, as `.declared` (navigation state spec, section 2). The head of a live
+        /// list never changes, so it is the tail alone that the list reads.
         case route(Route)
 
         /// What the screen declared over this list answered, the task screen or a list, which the stack hands the list,
@@ -224,74 +220,131 @@ public final class TaskList: Routable {
 
         /// The device's day, which the root hands every screen of its window when the window's view reports a new one,
         /// at midnight, in a new time zone or on waking on another day: an event of the world that no view can send
-        /// (spec section 8; ADR-0006, amendment of 2026-11-01). Which tasks a view selects can depend on the day, so a
-        /// new one rereads them; the day the list already has reads nothing. Neither is a gesture on the list, so the
-        /// sentence on screen and the destination stay.
+        /// (spec section 8; ADR-0006, amendment of 2026-11-01). Which tasks a list selects, which day each of its blocks
+        /// is and which group a group's screen shows depend on the day, so a new one rereads the page; the day the list
+        /// already has reads nothing. Neither is a gesture on the list, so the sentence on screen and the destination
+        /// stay.
         case dayChanged(DeviceDay)
     }
 
     public enum Output: Equatable, Sendable {
-        /// The view is gone, so the list asks its opener to close it (spec section 3); the stack drops the task
-        /// screen over it with it.
+        /// The view is gone, or the group of a group's screen names nothing any more, so the list asks its opener to
+        /// close it (spec section 3; the controller's ruling R57); the stack drops what stands over it with it.
         case closeRequested
     }
 
-    /// What a view draws, computed from the state on every read and never kept beside it, so that what the
-    /// list holds is in one place and the model cannot disagree with it (owner's review of #101).
+    /// What a view draws, computed from the state on every read and never kept beside it, so that what the list holds
+    /// is in one place and the model cannot disagree with it (owner's review of #101).
     public var model: Model { state.model }
 
     /// The route the list is on, assembled and never kept beside its state (spec section 4): its own head, and as
-    /// the tail the task it declared. The window's stack writes the window down from what stands instead, so a
+    /// the tail what it declared. The window's stack writes the window down from what stands instead, so a
     /// declaration that has aged never reaches the text (navigation state spec, section 3).
-    public var route: Route { Route(head: head, over: state.destination.pushed) }
+    public var route: Route { Route(head: state.head, over: state.destination.pushed) }
 
     /// What the list declared over it, the task screen, a list or nothing, which the window's stack reads after every
     /// event and follows (ADR-0009, amendment of 2026-10-22, point 2).
     public var destination: Destination<Route.Over> { state.destination }
 
-    private let head: Route.Head
-
     private let store: Store
 
     private var state: State
 
-    /// Made from its route, the one way a list is made (spec section 3): the title and the rows of the view the head
-    /// names, and the task the tail names declared over them, which the stack makes in the walk after the list is
-    /// made. The view is read for its title and then once more by the query of its tasks, which reads it and hands
-    /// back only the tasks, and each read of a view reads the table of views whole (`Store.view(_:)`): a list made
-    /// reads that table twice, tens of rows in this epic.
+    /// Made from its route, the one way a list is made (spec section 3): the page of the view the head names, read by
+    /// the device's day, with the tags and the parents its groups name; the folds and the layout the device keeps for
+    /// the list, which a group's screen keeps none of; and what the tail names declared over it, which the stack makes
+    /// in the walk after the list is made.
     ///
     /// The day is the device's, which the window's stack hands the list when it makes it, the day its root has then, so
     /// that a list made after midnight starts on the new day (spec section 8). It has no default, as the root's has
     /// none: the day is the platform's to say (`docs/style.md`, "A lower layer holds no policy of its client").
     ///
-    /// Throws when the view or its tasks cannot be read, a view that is gone among them, which is refused with
-    /// `.notFound` and the view's id: a list that came up empty would look like a view with nothing in it,
-    /// and the stack keeps what was open while the list's opener says so (navigation state spec, section 2). A task
-    /// that cannot be made does not stop the list: a link to a task that is gone opens the view it names, and the
-    /// stack tells the list, which says why with no task open, which is what still exists (spec section 3, the
-    /// fourth flow).
+    /// Throws when the page cannot be read, a view that is gone among it, which is refused with `.notFound` and the
+    /// view's id: a list that came up empty would look like a view with nothing in it, and the stack keeps what was
+    /// open while the list's opener says so (navigation state spec, section 2). A group that reads but names nothing,
+    /// a word that is not the list's grouping or a tag or a parent that is gone, is refused the same way, with
+    /// `.invalid` or `.notFound`, and the list it was declared over stays open and says why (ADR-0009, amendment of
+    /// 2026-11-02). What the tail names that cannot be made does not stop the list: a link to a task that is gone opens
+    /// the view it names, and the stack tells the list, which says why with nothing open over it, which is what still
+    /// exists (spec section 3, the fourth flow).
     public init(store: Store, route: Route, day: DeviceDay) throws(StoreError) {
-        guard let view = try store.view(route.head.view) else { throw .notFound(route.head.view) }
-        let rows = try TaskList.rows(of: store, in: route.head.view, today: day.day)
-        self.head = route.head
+        let read = try TaskList.read(store, head: route.head, today: day.day)
+        if let group = route.head.group, let refusal = TaskList.refusal(of: group, in: read) { throw refusal }
+        let isGroup = route.head.group != nil
         self.store = store
-        self.state = State(title: view.title, rows: rows, day: day, destination: Destination(), problem: nil)
+        self.state = State(
+            head: route.head, title: read.page.view.title, read: read, day: day,
+            folded: isGroup ? [] : try TaskList.folded(in: store, of: route.head.view),
+            layout: isGroup ? .list : try TaskList.layout(in: store, of: route.head.view), picks: [],
+            destination: Destination(), problem: nil
+        )
         setDestination(route.over)
     }
 
     public func send(_ event: Event) -> Output? {
         switch event {
         case .action(.rowTapped(let id)):
-            // A row the list does not hold opens nothing and moves nothing, the sentence included, the way the
-            // sidebar's menu items do nothing on a row it does not hold: the tap is on something no longer on
-            // screen, and what it would open is a task this view does not show.
-            guard state.rows.contains(where: { $0.id == id }) else { return nil }
-            // The sentence goes with a tap on a row, the one gesture made on the list itself, and it goes before the
-            // task is declared, so that a task that cannot be made writes a fresh one when the stack says so: it
-            // answers this tap, and the one it replaces answered something earlier.
+            // A row the list does not draw opens nothing and moves nothing, the sentence included, the way the
+            // sidebar's menu items do nothing on a row it does not hold: the tap is on something no longer on screen,
+            // folded away or filtered out, and what it would open is a task this list does not show.
+            guard TaskList.blocks(in: model.layout).contains(where: { $0.rows.contains { $0.id == id } }) else {
+                return nil
+            }
+            // The sentence goes with a tap that declares, a gesture on the list itself, and it goes before the screen
+            // is declared, so that one that cannot be made writes a fresh one when the stack says so: it answers this
+            // tap, and the one it replaces answered something earlier.
             state.problem = nil
             setDestination(.task(TaskScreen.Route(head: id)))
+            return nil
+        case .action(.blockTitleTapped(let id)):
+            // A title the model does not draw opens nothing, a group's screen's one block among them, whose header is
+            // its screen's (spec section 2). A list inside opens as itself; one of the list's own groups as the list
+            // on its group's address, by the distance from today for a day; and the own block of a list that groups by
+            // nothing has no group to open. Nothing is written: the group is read from the list's page when its
+            // screen is made (ADR-0004, amendment of 2026-11-02).
+            guard TaskList.blocks(in: model.layout).contains(where: { block in
+                [block.header?.titleTapped, block.column?.header.titleTapped].contains(.blockTitleTapped(id))
+            }) else { return nil }
+            let declared: Route
+            switch id {
+            case .list(let view):
+                declared = Route(head: .init(view: view))
+            case .own(let key?):
+                let group = TaskList.address(of: key, by: state.read.page.view.groupBy, today: state.day.day)
+                declared = Route(head: .init(view: state.head.view, group: group))
+            case .own(nil):
+                return nil
+            }
+            state.problem = nil
+            setDestination(.list(declared))
+            return nil
+        case .action(.blockChevronTapped(let id)):
+            // Only a block the model draws with a chevron folds, which no column has. The fold is the one thing that
+            // moves: it is the device's state and no answer to anything a person was told, so the sentence stays.
+            let model = model
+            guard TaskList.blocks(in: model.layout).contains(where: { $0.header?.chevron?.action == .blockChevronTapped(id) }),
+                  let key = TaskList.foldKey(of: id)
+            else { return nil }
+            let drawn = Set(TaskList.blocks(in: model.layout).compactMap { TaskList.foldKey(of: $0.id) })
+            setFolded(state.folded.intersection(drawn).symmetricDifference([key]))
+            return nil
+        case .action(.tagChipTapped(let tag)):
+            // A chip the bar does not show picks nothing. A pick is session state, which a relaunch loses (ADR-0009,
+            // amendment of 2026-11-01), and no answer to anything a person was told, so the sentence stays.
+            guard model.tagBar?.chips.contains(where: { $0.action == .tagChipTapped(tag) }) == true else { return nil }
+            state.picks.formSymmetricDifference([tag])
+            return nil
+        case .action(.showAsChosen(let layout)):
+            // An item is checked against the model: Columns disabled moves nothing (spec section 5). The choice is the
+            // device's, kept per list (ADR-0010), and a group's screen keeps none, its one layout being the list's. The
+            // sentence stays, as for a fold.
+            guard model.showAs.menu.sections.flatMap(\.items).contains(where: {
+                $0.action == .showAsChosen(layout) && !$0.isDisabled
+            }), layout != state.layout else { return nil }
+            // A write that fails is not said, as a fold's is not: the layout stays on screen until the next list made
+            // on the view reads what was kept.
+            try? store.setDeviceState(TaskList.layoutKey(of: state.head.view), layout)
+            state.layout = layout
             return nil
         case .created:
             // Being created answers no gesture, so it moves nothing, the sentence included.
@@ -300,7 +353,7 @@ public final class TaskList: Routable {
             // The route's own head is not read: the stack hands a live list only a route with its head, and the head
             // of a live module never changes (spec section 3). The sentence goes at the start, as it does for a tap:
             // a route is what a link or a click in the sidebar asks of this list, and the sentence on screen
-            // answered something earlier (owner, 2026-10-16). A task the route names that cannot be made writes a
+            // answered something earlier (owner, 2026-10-16). What the route names that cannot be made writes a
             // fresh one, on `.notOpened`.
             state.problem = nil
             setDestination(route.over)
@@ -328,41 +381,59 @@ public final class TaskList: Routable {
         case .changed(let changes):
             do {
                 // Only a change naming this view can have deleted it or renamed it, and the view's read tells. A view
-                // that is gone is answered at once: the opener closes this list, and the stack drops it with the task
-                // screen over it (spec section 3), so rows read here would be work for nothing. A view that is there
-                // gives the list its title, which stands even when the read of the tasks below fails, since the read
-                // that answered it succeeded. A read that fails is a reread that failed, and the catch below says so.
-                if changes.views.contains(head.view) {
-                    guard let view = try store.view(head.view) else { return .closeRequested }
+                // that is gone is answered at once: the opener closes this list, and the stack drops it with what
+                // stands over it (spec section 3), so a page read here would be work for nothing. A view that is
+                // there gives the header its title, which stands even when the page's read below fails, since the
+                // read that answered it succeeded; the rest of the view, its rule among it, is the page's, read whole
+                // or not at all. A read that fails is a reread that failed, and the catch says so.
+                if changes.views.contains(state.head.view) {
+                    guard let view = try store.view(state.head.view) else { return .closeRequested }
                     state.title = view.title
                 }
-                if TaskList.rereads(on: changes, of: head.view) {
-                    state.rows = try TaskList.rows(of: store, in: head.view, today: state.day.day)
-                }
+                // Every change rereads the page. It reads tasks, the tags they carry, this view's rule and the lists
+                // inside it, to any depth for a folder inside, and a change names the entity it touched and not what
+                // moved because of it: a list made inside this one, or under a folder inside it, names itself alone,
+                // and a tag deleted empties a list filtered by it and names only the tag (`ChangeSet`). Which of them
+                // moved this page is the page's to say.
+                let read = try TaskList.read(store, head: state.head, today: state.day.day)
+                // A group's screen whose group names nothing any more, its tag or its parent gone or its list grouped
+                // another way, asks to be closed, as a list whose view is gone does (the controller's ruling R57).
+                if let group = state.head.group, TaskList.refusal(of: group, in: read) != nil { return .closeRequested }
+                take(read)
             } catch {
-                // Neither the rows on screen nor the title is cleared, since each is assigned only after its own read
+                // Neither the blocks on screen nor the title is cleared, since each is assigned only after its own read
                 // succeeded, and a list emptied by a failed read would take with it the only thing left to act on.
                 // The sentence is written only when none is on screen, as in the sidebar: a change answers for
                 // nobody, so it neither clears a sentence nor replaces one, and "may be out of date" would take the
                 // place of what the person was told about something they did or a link asked for.
                 if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
-            // The destination stays: the task screen over the list reads the change itself, handed it by the window,
-            // and asks to be closed when its task is gone.
+            // The destination stays: a screen over the list reads the change itself, handed it by the window, and asks
+            // to be closed when its subject is gone. Nothing is written in answer (ADR-0009).
             return nil
         case .dayChanged(let day):
             // The day is kept whether or not the read below holds, since it is what the world says and every later
-            // read of the rows is by it. A read that fails leaves the rows and says so only when nothing is on screen,
-            // as a change's reread does: the day answers for nobody.
+            // read of the page is by it. A read that fails leaves the blocks and says so only when nothing is on
+            // screen, as a change's reread does: the day answers for nobody. A group's screen moves onto the new day's
+            // group, its key being a distance (spec section 2).
             guard day != state.day else { return nil }
             state.day = day
             do {
-                state.rows = try TaskList.rows(of: store, in: head.view, today: day.day)
+                take(try TaskList.read(store, head: state.head, today: day.day))
             } catch {
                 if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
             return nil
         }
+    }
+
+    /// Takes a read of the store as the page on screen, its view's title the header's, and drops the picks whose chips
+    /// are no longer on the bar, which stop filtering and come back unlit (the controller's ruling R63).
+    private func take(_ read: Read) {
+        let chips = TaskList.chips(in: TaskList.blocks(of: read, head: state.head, today: state.day.day), tags: read.tags)
+        state.read = read
+        state.title = read.page.view.title
+        state.picks.formIntersection(chips.map(\.id))
     }
 
     /// Declares the task screen or a list over the list, or nothing: a tap, a route, the way back and the stack's
@@ -372,35 +443,50 @@ public final class TaskList: Routable {
         state.destination.declare(over.map { .pushed($0) })
     }
 
-    /// Whether a change can have moved this view's tasks. Which tasks a view holds is its query's to say, and
-    /// that query reads tasks, the tags they carry and the view's own filter, so a change naming any task, any
-    /// tag or this view rereads the whole list. A change names the entity it touched and not what moved
-    /// because of it: a task trashed moves its children out of a view and names itself alone, and a tag
-    /// deleted empties a view filtered by it and names only the tag (`ChangeSet`). A view holds tens of tasks
-    /// in this epic, and the query is the one place that knows which. A change naming only other views is no
-    /// change to this one's tasks and costs not even a read, which is every edit made in the sidebar to a view
-    /// other than this one.
-    private static func rereads(on changes: ChangeSet, of view: ViewID) -> Bool {
-        !changes.tasks.isEmpty || !changes.tags.isEmpty || changes.views.contains(view)
+    /// Folds and unfolds the blocks to the set, written to the device's state first and kept after (ADR-0010), as the
+    /// sidebar's folds are: only the keys of the blocks drawn now are written, so that a day's key goes once the day
+    /// has no block.
+    private func setFolded(_ folded: Set<String>) {
+        // A write that fails is not said: the fold stays on screen until the next list made on the view reads what was
+        // kept, and this module's sentences stay for the data a person edits, which a fold is not. Sorted, so that the
+        // same folds are the same text in the file.
+        try? store.setDeviceState(TaskList.foldedKey(of: state.head.view), folded.sorted())
+        state.folded = folded
     }
 
-    /// The view's tasks as one read of the store answers them, in the query's order.
-    ///
-    /// `today` is the device's day, handed in: a view such as Today selects by the day the query is made, and the list
-    /// has no time zone to tell the day by, since a feature target may not import the Foundation that holds one
-    /// (ADR-0001). The platform, which has one, reads the day and hands it in when the list is made and again when it
-    /// changes (`.dayChanged`), so the list draws the device's own day and catches up at midnight with no change to
-    /// the store (spec section 8; ADR-0006, amendment of 2026-11-01).
-    private static func rows(of store: Store, in view: ViewID, today: Day) throws(StoreError) -> [Model.Row] {
-        try store.tasks(in: view, today: today).map { Model.Row(id: $0.id, title: $0.title) }
+    /// The blocks a layout draws, a list's or the board's columns.
+    private static func blocks(in layout: Model.Layout) -> [Model.Block] {
+        switch layout {
+        case .list(let blocks): blocks
+        case .columns(let board): board.columns
+        }
     }
+
+    /// The folded blocks of the view as the device's state keeps them, by their keys (`foldKey(of:)`). What was kept
+    /// is the device's and may be stale: a key no block has now draws nothing, and the next fold writes the set back
+    /// without it. A value that does not decode as a list of texts reads as nothing folded, which the store decides.
+    private static func folded(in store: Store, of view: ViewID) throws(StoreError) -> Set<String> {
+        Set(try store.deviceState(foldedKey(of: view), as: [String].self) ?? [])
+    }
+
+    /// The layout the device keeps for the view, and the list when it keeps none.
+    private static func layout(in store: Store, of view: ViewID) throws(StoreError) -> Model.Layout.Kind {
+        try store.deviceState(layoutKey(of: view), as: Model.Layout.Kind.self) ?? .list
+    }
+
+    /// The keys the folds and the layout of a list are kept under in the device's own state, one each per list: the
+    /// module's name, what it keeps and the view's id. A write of either reports no change set, which the store's
+    /// writes of a device's state never do: they are one screen's own, and another window of the same device reads
+    /// them when it next makes a list on the view (spec section 9; ADR-0010).
+    private static func foldedKey(of view: ViewID) -> String { "taskList.folded.\(view.rawValue)" }
+    private static func layoutKey(of view: ViewID) -> String { "taskList.layout.\(view.rawValue)" }
 
     /// The sentence what the list declared over itself reads as when it could not be made, by what it declared.
     /// `.notFound` is what was declared being gone, which is what a link written before a delete, or a tap on a row a
     /// peer's delete has not yet reached, looks like from here: the task, the list inside, or a group's tag or parent.
     /// A group refused as `.invalid` names a grouping its list does not have, a link that outlived the grouping it
     /// names (ADR-0009, amendment of 2026-11-02). Anything else is the store failing to read what may well be there,
-    /// and calling that "gone" would put on screen something that is not true.
+    /// and calling that "gone" would put on screen something that is not true (the controller's ruling R52).
     private static func problem(_ error: StoreError, declared: Route.Over?) -> Problem {
         switch (declared, error) {
         case (.list(let route)?, .notFound): route.head.group == nil ? .listIsGone : .groupIsGone
@@ -411,22 +497,32 @@ public final class TaskList: Routable {
         }
     }
 
-    /// Everything the list holds between two events: the view's title and the rows as the last reads produced them, the
-    /// device's day they were read by, what it declared over them, and the sentence a person was last told. One value,
-    /// moved field by field, and the one place any of it is kept: the model is computed from it on every read (owner's
-    /// reviews of #77 and #101).
+    /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
+    /// it even when the page's read fails; the store's read the blocks, the tile and the rule are read from; the
+    /// device's day it was read by; the folds and the layout the device keeps, and the picked tags this session keeps;
+    /// what it declared over itself; and the sentence a person was last told. One value, moved field by field, and the one place any of it is kept: the model is computed
+    /// from it on every read (owner's reviews of #77 and #101).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
     private struct State {
+        let head: Route.Head
         var title: String
-        var rows: [Model.Row]
+        var read: Read
         var day: DeviceDay
+        var folded: Set<String>
+        var layout: Model.Layout.Kind
+        var picks: Set<TagID>
         var destination: Destination<Route.Over>
         var problem: String?
 
-        /// The model a view draws: the title, the rows and the sentence, if any.
-        var model: Model { Model(title: title, rows: rows, problem: problem) }
+        /// The model a view draws (`TaskList.model`).
+        var model: Model {
+            TaskList.model(
+                head: head, title: title, read: read, today: day.day, folded: folded, layout: layout, picks: picks,
+                problem: problem
+            )
+        }
     }
 
     /// What can go wrong in this module, with the sentence each one reads as. The store's own error stays here:

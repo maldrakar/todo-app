@@ -25,7 +25,9 @@ import WASILibc
 /// area, Move to… into it, a drop back to the root, edit mode and Done, a delete asked and cancelled, and New task in
 /// the sidebar, a link applied as `.route` through the window's stack, quick entry creating a task, a tap in the list
 /// sent to its element of the stack, which pushes the task, the way back as the shorter path, the window narrowing, the
-/// day turning, Cancel, and Open in New Window, whose path it writes down — with the change each write produced, and a
+/// day turning, Cancel, a list over a list and a group over its list by link, a tag picked, a block folded, Show as's
+/// columns and the list again, a block's title pushing a list inside and a day's group, the day turning under the
+/// group, and Open in New Window, whose path it writes down — with the change each write produced, and a
 /// path the routes refuse, and it reads the layout the root cuts for the window's width and the sidebar's component
 /// models, its rows with the numbers of that width, its bar in and out of edit mode and the bar of a root made with no
 /// edit mode, as the Mac's window is, the confirmation, the picker and the look of the drag in both widths, each
@@ -224,6 +226,42 @@ private enum WasmSizeProbe {
         perform(.action(.quickEntryButtonTapped))
         let drafted = app.model.quickEntry?.draft ?? "none"
         perform(.action(.quickEntry(.cancelButtonTapped)))
+        // The list screen: a list with a list inside it, their tasks tagged, due and with notes, on the day the window
+        // has now; a link to the list inside over the list, both read through the layout's and a row's switches, and
+        // Back to the outer one; on it a tag picked, the list inside folded, Show as's columns read and the list again,
+        // and the list inside's title tapped, which pushes it; a link to Upcoming, whose day block's title pushes its
+        // group, read, and the day turning under the group's screen, which follows it.
+        let listDay = today.advanced(by: 1)
+        let errandTag = try appStore.createTag(title: "errand")
+        let homeTag = try appStore.createTag(title: "home")
+        let projects = try appStore.createView(NewTaskView(title: "Projects", color: .indigo, filter: .status([.open])))
+        let house = try appStore.createView(
+            NewTaskView(title: "House", parent: projects, color: .teal, filter: .hasTag(homeTag))
+        )
+        try appStore.createTask(NewTask(title: "Fix the door", notes: "the hinge", deadline: listDay, tags: [homeTag]))
+        try appStore.createTask(NewTask(title: "Post the letter", when: listDay.advanced(by: 2), tags: [errandTag]))
+        perform(.route(try AppModule.Route(path: "/view/\(projects)/view/\(house)")))
+        let chain = idsOverTheSidebar(in: app.model.layout).map { listLine(of: app.model.screens[$0]) }
+        let chainRoute = app.route.path
+        perform(.action(.wentBack(to: Array(idsOverTheSidebar(in: app.model.layout).prefix(1)))))
+        var columns = "no list"
+        if let outer = idsOverTheSidebar(in: app.model.layout).first {
+            perform(.action(.screen(outer, .list(.tagChipTapped(errandTag)))))
+            perform(.action(.screen(outer, .list(.blockChevronTapped(.list(house))))))
+            perform(.action(.screen(outer, .list(.showAsChosen(.columns)))))
+            columns = listLine(of: app.model.screens[outer])
+            perform(.action(.screen(outer, .list(.showAsChosen(.list)))))
+            perform(.action(.screen(outer, .list(.blockTitleTapped(.list(house))))))
+        }
+        let pushedInside = app.route.path
+        perform(.route(try AppModule.Route(path: "/view/\(BuiltInTaskViews.upcoming)")))
+        if let upcoming = idsOverTheSidebar(in: app.model.layout).first {
+            perform(.action(.screen(upcoming, .list(.blockTitleTapped(.own(.day(listDay.advanced(by: 2))))))))
+        }
+        let group = listLine(of: idsOverTheSidebar(in: app.model.layout).last.flatMap { app.model.screens[$0] })
+        let groupRoute = app.route.path
+        perform(.dayChanged(DeviceDay(day: listDay.advanced(by: 1), began: day.began + 2 * 86_400_000)))
+        let nextDay = listLine(of: idsOverTheSidebar(in: app.model.layout).last.flatMap { app.model.screens[$0] })
         let window: String
         switch perform(.action(.taskViewList(.openInNewWindowMenuItemChosen(BuiltInTaskViews.today)))) {
         case .openWindow(let route)?: window = route.path
@@ -254,6 +292,8 @@ private enum WasmSizeProbe {
         print("bar \(bar); in edit mode \(editBar); without edit mode \(barLine(of: withoutEditMode.model))")
         print("asked \(asked ?? "nothing"); drag \(drag), narrow \(narrowDrag)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
+        print("chain at \(chainRoute): \(chain.joined(separator: " under ")); columns \(columns); then \(pushedInside)")
+        print("group at \(groupRoute): \(group); the next day \(nextDay)")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
         print("notified \(notified) times, system clock \(Store.systemNow() > 0), statuses \(TaskStatus.allCases.count), kinds \(EntityKind.allCases.count)")
     }
@@ -274,7 +314,7 @@ private enum WasmSizeProbe {
     /// view's, and one line here.
     private static func label(_ screen: AppModule.ScreenModel?) -> String {
         switch screen {
-        case .list(let list)?: "a list of \(list.rows.count) rows"
+        case .list(let list)?: "a list of \(rows(of: screen).count) rows titled \(list.header.title.text)"
         case .task(let task)?: "the task \(task.title)"
         case nil: "nothing"
         }
@@ -421,11 +461,54 @@ private enum WasmSizeProbe {
         }
     }
 
+    /// A list standing in the window's stack as a line: its header, its chips and how many are lit, its blocks or its
+    /// board's columns with their headers and folds, its first row's check and meta line, Show as's disabled items and
+    /// its empty state, through one switch over the layout's shapes and one over a row's kinds, as the list's view has;
+    /// any other screen as its label.
+    private static func listLine(of screen: AppModule.ScreenModel?) -> String {
+        guard case .list(let list)? = screen else { return label(screen) }
+        let header = list.header.title.text + (list.header.subtitle.map { " (\($0.text))" } ?? "")
+        let chips = list.tagBar.map { "\($0.chips.count) chips, \($0.chips.filter(\.isLit).count) lit" } ?? "no tag bar"
+        let shape: String
+        let rows = switch list.layout {
+        case .list(let blocks): blocks.flatMap(\.rows)
+        case .columns(let board): board.columns.flatMap(\.rows)
+        }
+        switch list.layout {
+        case .list(let blocks):
+            let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.chevron?.accessibilityLabel ?? "")" } }
+            shape = "\(blocks.count) blocks, \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/"))"
+        case .columns(let board):
+            let headers = board.columns.compactMap { $0.column.map { "\($0.header.title.text) \($0.width) wide" } }
+            shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), headed \(headers.joined(separator: "/"))"
+        }
+        let first = rows.first.map { row in
+            switch row {
+            case .task(_, let task): "\(task.check.accessibilityLabel) [\(task.meta.map(\.text.text).joined(separator: " "))]"
+            }
+        } ?? "no row"
+        let disabled = list.showAs.menu.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)
+        let empty = list.empty.map { "empty: \($0.title.text)" } ?? "not empty"
+        return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(empty)"
+    }
+
     /// The first row of a list standing in the window's stack, which the probe taps, and nil for any other screen.
     private static func firstRow(of screen: AppModule.ScreenModel?) -> (id: TaskID, title: String)? {
-        switch screen {
-        case .list(let list)?: list.rows.first.map { ($0.id, $0.title) }
-        case .task?, nil: nil
+        rows(of: screen).first
+    }
+
+    /// The rows of a list standing in the window's stack, each block's in turn, whichever its layout, and none for any
+    /// other screen: one switch over the layout's shapes and one over a row's kinds, as the list's view has.
+    private static func rows(of screen: AppModule.ScreenModel?) -> [(id: TaskID, title: String)] {
+        guard case .list(let list)? = screen else { return [] }
+        let blocks = switch list.layout {
+        case .list(let blocks): blocks
+        case .columns(let board): board.columns
+        }
+        return blocks.flatMap(\.rows).map { row in
+            switch row {
+            case .task(let id, let model): (id, model.title.text)
+            }
         }
     }
 

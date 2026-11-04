@@ -6,8 +6,8 @@ import DesignSystem
 /// `trailingMargin`, `bottomMargin` and `leadingMargin` from what stands round it; its title, or the field in its place
 /// while the list is being named, and `titleToSubtitle` after the title its subtitle where it has one, `topPadding`
 /// below its top, `horizontalPadding` in from either side and `bottomPadding` above its bottom; the chevron that folds
-/// and opens the block, centred in a square cell `chevronHitSide` on a side; its rule along its bottom where it has
-/// one; and what it draws under itself, the pointer's tint, rounded by `cornerRadius`, in points.
+/// and opens the block where it has one, centred in a square cell `chevronHitSide` on a side; its rule along its bottom
+/// where it has one; and what it draws under itself, the pointer's tint, rounded by `cornerRadius`, in points.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block and a column each hold one, every comparison
 /// of the screen's model compares it, and inline, its field and chevron with it, it is some 770 bytes on wasm32. Its
@@ -24,7 +24,9 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
     /// The field the title is typed into while the list is being named, in the title's place, and nil while it is not.
     public let field: TextFieldModel<Action>?
 
-    public let chevron: AccessoryModel<Action>.Chevron
+    /// The chevron that folds and opens the block, and nil for a header with none, as a column's is, since columns do
+    /// not fold (list screen spec, section 5).
+    public let chevron: AccessoryModel<Action>.Chevron?
     public let chevronHitSide: Double
 
     /// The rule under the header, across its width, whose width is how thick it is, and nil for a header with none, as
@@ -49,7 +51,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         subtitle: TextModel?,
         titleToSubtitle: Double,
         field: TextFieldModel<Action>?,
-        chevron: AccessoryModel<Action>.Chevron,
+        chevron: AccessoryModel<Action>.Chevron?,
         chevronHitSide: Double,
         rule: StrokeModel?,
         height: Double,
