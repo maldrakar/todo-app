@@ -59,12 +59,6 @@ struct DriverChooser<Weighing: DriverWeighing> {
         static func < (lhs: Driver, rhs: Driver) -> Bool { lhs.rawValue < rhs.rawValue }
     }
 
-    /// A range of days drives by itself only when it spans fewer days than this. A wide range holds most dated tasks,
-    /// and its index then walks them all: in #153's measurement at 50,000 tasks, `when` from a year ago to two months
-    /// ahead counted 2.8 times slower driven by the day index than by the walk of the open tasks, while every range it
-    /// measured up to 29 days long was faster driven. A month is a judgement between the two, not a crossover.
-    private static var widestDrivingRange: Int64 { 31 }
-
     /// The conditions a statement over any of `rules` asks for all of: a list's rule, or the rules of the lists under a
     /// folder, each split into the branches it asks for any of, and regrouped into one conjunction that selects the
     /// same tasks, so that a driver can be found for it (`union`).
@@ -200,11 +194,8 @@ struct DriverChooser<Weighing: DriverWeighing> {
             return parent == nil ? nil : .project
         case .when(.on), .deadline(.on):
             return .day
-        case .when(.between(let from, let to)), .deadline(.between(let from, let to)):
-            let (span, overflow) = to.subtractingReportingOverflow(from)
-            if !overflow && span < Self.widestDrivingRange { return .days }
-            return weighing.rangeDrives(condition, in: walk) ? .range : nil
         case .when, .deadline:
+            if condition.isAShortRangeOfDays { return .days }
             return weighing.rangeDrives(condition, in: walk) ? .range : nil
         case .hasTag(let tag):
             return weighing.tagDrives(tag, in: walk) ? .tag : nil
@@ -248,6 +239,24 @@ extension Filter {
     /// A disjunction of conditions, and a single condition as itself.
     static func disjunction(of conditions: [Filter]) -> Filter {
         conditions.count == 1 ? conditions[0] : .or(conditions)
+    }
+
+    /// A range of days drives by itself only when it spans fewer days than this. A wide range holds most dated tasks,
+    /// and its index then walks them all: in #153's measurement at 50,000 tasks, `when` from a year ago to two months
+    /// ahead counted 2.8 times slower driven by the day index than by the walk of the open tasks, while every range it
+    /// measured up to 29 days long was faster driven. A month is a judgement between the two, not a crossover.
+    static let widestDrivingRange: Int64 = 31
+
+    /// Whether the filter is a range of days that drives a statement by itself, one shorter than `widestDrivingRange`. A
+    /// range over more days than an `Int64` counts is as wide as a range gets.
+    var isAShortRangeOfDays: Bool {
+        switch self {
+        case .when(.between(let from, let to)), .deadline(.between(let from, let to)):
+            let (span, overflow) = to.subtractingReportingOverflow(from)
+            return !overflow && span < Filter.widestDrivingRange
+        case .status, .when, .deadline, .hasTag, .parent, .listedIn, .trashed, .and, .or, .not:
+            return false
+        }
     }
 
     /// Whether a condition is one SQLite tests before a tag's or a pin's subquery and that rejects most tasks of a
