@@ -45,7 +45,8 @@ extension Store {
     public func tasks(in viewID: ViewID, today: Day) throws(StoreError) -> [TodoTask] {
         let view = try Store.readableView(viewID, among: try views())
         let rules = view.filter.map { [$0] } ?? []
-        return try groups(of: view, from: try tasks(selectedByAnyOf: rules, sort: view.sort, today: today)).flatMap(\.tasks)
+        let sizes = try readSizes(for: [rules], today: today)
+        return try groups(of: view, from: try tasks(selectedByAnyOf: rules, sort: view.sort, today: today, sizes: sizes)).flatMap(\.tasks)
     }
 
     /// A page: the view's own section first, then every child view as a section in rank order, which is the
@@ -68,15 +69,17 @@ extension Store {
     public func page(of viewID: ViewID, today: Day) throws(StoreError) -> TaskViewPage {
         let allViews = try views()
         let view = try Store.readableView(viewID, among: allViews)
+        let children = Store.childSections(of: viewID, among: allViews)
+        let sizes = try readSizes(for: [view.filter.map { [$0] } ?? []] + children.map(\.rules), today: today)
         var sections: [TaskViewPage.Section] = []
         var claimed: Set<TaskID> = []
-        for (child, rules) in Store.childSections(of: viewID, among: allViews) {
-            let tasks = try tasks(selectedByAnyOf: rules, sort: child.sort, today: today)
+        for (child, rules) in children {
+            let tasks = try tasks(selectedByAnyOf: rules, sort: child.sort, today: today, sizes: sizes)
             claimed.formUnion(tasks.map(\.id))
             sections.append(TaskViewPage.Section(view: child, groups: try groups(of: child, from: tasks)))
         }
         guard let rule = view.filter else { return TaskViewPage(view: view, sections: sections) }
-        let own = try tasks(selectedByAnyOf: [rule], sort: view.sort, today: today).filter { !claimed.contains($0.id) }
+        let own = try tasks(selectedByAnyOf: [rule], sort: view.sort, today: today, sizes: sizes).filter { !claimed.contains($0.id) }
         return TaskViewPage(view: view, sections: [TaskViewPage.Section(view: nil, groups: try groups(of: view, from: own))] + sections)
     }
 
@@ -101,25 +104,69 @@ extension Store {
 
     /// The tasks any of `rules` selects, each once, in `sort`: every read of a view's tasks is read here. A list's
     /// is its one rule, and a folder's section on a page the union of its lists' reads; a folder read on its own
-    /// has no rule and selects nothing.
-    private func tasks(selectedByAnyOf rules: [Filter], sort: [SortKey], today: Day) throws(StoreError) -> [TodoTask] {
+    /// has no rule and selects nothing. `sizes` are what the call read for the choice of its reads' drivers.
+    private func tasks(selectedByAnyOf rules: [Filter], sort: [SortKey], today: Day, sizes: ReadCompiler.Sizes) throws(StoreError) -> [TodoTask] {
         guard !rules.isEmpty else { return [] }
-        let statement = Store.viewStatement(rules: rules, sort: sort, today: today)
+        let statement = Store.viewStatement(rules: rules, sort: sort, today: today, sizes: sizes)
         return try loadTasks(sql: statement.sql, statement.params)
     }
 
     /// The statement and parameters a view's read runs: the rules, one for a list and its lists' for a folder's
-    /// section, each read with its own exclusion of the Trash (`FilterCompiler.whereClause(anyOf:today:)`), and the
-    /// sort, and nothing of the manual list. Ordering by the list here would order the whole result by it, and a
-    /// manual list belongs to a group — `group(_:by:manual:)` applies it where it belongs. A filter that asks about
-    /// the list, `listedIn`, is a condition like any other and compiles into a subquery of its own.
+    /// section, each read with its own exclusion of the Trash, written by `ReadCompiler` so that the rule's own index
+    /// drives the read where it has one (#155), and the sort, and nothing of the manual list. Ordering by the list here
+    /// would order the whole result by it, and a manual list belongs to a group — `group(_:by:manual:)` applies it
+    /// where it belongs. A filter that asks about the list, `listedIn`, is a condition like any other and compiles
+    /// into a subquery of its own.
     ///
     /// Assembled here rather than inside the read, so that `builtInViewsUseIndexes` explains the query plan
     /// of exactly this statement (spec, "Cost"). A guard that explained a copy would pass while the read
     /// itself degraded into a scan.
-    static func viewStatement(rules: [Filter], sort: [SortKey], today: Day) -> (sql: String, params: [Value]) {
-        let clause = FilterCompiler.whereClause(anyOf: rules, today: today)
+    static func viewStatement(rules: [Filter], sort: [SortKey], today: Day, sizes: ReadCompiler.Sizes) -> (sql: String, params: [Value]) {
+        let clause = ReadCompiler(today: today, sizes: sizes).compile(rules)
         return (Store.taskQuery(where: clause.sql, orderBy: FilterCompiler.orderBy(sort), limit: nil), clause.params)
+    }
+
+    /// The sizes the reads of `sections` choose their drivers by (`ReadCompiler`), each section the rules of one read,
+    /// read once for the call however many of its reads ask for one. Each is read from an index and no table row, by
+    /// the statements `readSizeStatements` assembles. A read that fails fails the call, as any of its reads would;
+    /// `count(*)` always answers one row, and a size whose answer had none is left out, which costs speed and never a
+    /// task.
+    func readSizes(for sections: [[Filter]], today: Day) throws(StoreError) -> ReadCompiler.Sizes {
+        try sql { () throws(SQLiteError) in
+            var sizes: [(size: ReadCompiler.Size, tasks: Int64)] = []
+            for read in Store.readSizeStatements(for: sections, today: today) {
+                if let tasks = try counted(read.sql, read.params) { sizes.append((read.size, tasks)) }
+            }
+            return ReadCompiler.Sizes(sizes)
+        }
+    }
+
+    /// The statement of every size `readSizes` reads for `sections`, in the order it reads them: each size any of the
+    /// reads asks for (`ReadCompiler.sizes(wantedBy:today:)`), once. Every task is counted on the smallest index SQLite has
+    /// of them, a status on the status index, a tag on its partial index, and a condition on its day's index or, for
+    /// the root, on the tree's parent index.
+    ///
+    /// Assembled here, beside `viewStatement` and for its reason: `theSizeReadsReadIndexesAlone` explains exactly these
+    /// statements, and a guard that explained a copy would pass while a size read degraded into a walk of the tasks.
+    static func readSizeStatements(for sections: [[Filter]], today: Day) -> [(size: ReadCompiler.Size, sql: String, params: [Value])] {
+        var sizes: [ReadCompiler.Size] = []
+        for rules in sections {
+            for size in ReadCompiler.sizes(wantedBy: rules, today: today) where !sizes.contains(size) { sizes.append(size) }
+        }
+        return sizes.map { size in
+            switch size {
+            case .tasks:
+                return (size, "SELECT count(*) FROM tasks", [])
+            case .status(let status):
+                return (size, Store.statusSizeQuery, [.integer(status.rawValue)])
+            case .tag(let tag):
+                return (size, Store.tagSizeQuery, [.text(tag.rawValue)])
+            case .condition(let condition):
+                let fragment = FilterCompiler.compile(condition, today: today)
+                let table = condition == .parent(nil) ? "task_tree tt" : "tasks t"
+                return (size, "SELECT count(*) FROM \(table) WHERE \(fragment.sql)", fragment.params)
+            }
+        }
     }
 
     /// The groups of one section, from the tasks the view's sort brought back. A section with no tasks has no

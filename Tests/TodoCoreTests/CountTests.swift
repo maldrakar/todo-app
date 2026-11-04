@@ -300,7 +300,7 @@ private func plan(_ store: Store, _ statement: (sql: String, params: [Value])) t
 /// and a tag's tasks on the tag's partial index, by the statements `taskCounts` runs for them.
 @Test func theSizesOfTheTagsAreReadFromTheIndexesAlone() throws {
     let store = try makeStore()
-    #expect(try plan(store, (Store.openTaskCountQuery, [])) == ["SEARCH tasks USING COVERING INDEX tasks_status (status=?)"])
+    #expect(try plan(store, (Store.statusSizeQuery, [.integer(TaskStatus.open.rawValue)])) == ["SEARCH tasks USING COVERING INDEX tasks_status (status=?)"])
     #expect(try plan(store, (Store.tagSizeQuery, [.text("tag")])) == ["SEARCH task_tags USING COVERING INDEX task_tags_tag (tag_id=?)"])
 }
 

@@ -190,7 +190,7 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     for id in [BuiltInTaskViews.inbox, BuiltInTaskViews.today, BuiltInTaskViews.upcoming, BuiltInTaskViews.logbook, BuiltInTaskViews.trash] {
         let view = try #require(try store.view(id))
         let filter = try #require(view.filter)
-        let statement = Store.viewStatement(rules: [filter], sort: view.sort, today: today)
+        let statement = Store.viewStatement(rules: [filter], sort: view.sort, today: today, sizes: try store.readSizes(for: [[filter]], today: today))
         let plan = try store.sql { () throws(SQLiteError) in
             try store.db.rows("EXPLAIN QUERY PLAN " + statement.sql, statement.params).map { $0[3].string ?? "" }
         }

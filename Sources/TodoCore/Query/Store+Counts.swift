@@ -13,10 +13,10 @@ extension Store {
     public func taskCounts(today: Day) throws(StoreError) -> [ViewID: Int] {
         var counts: [ViewID: Int] = [:]
         for count in try countStatements(today: today) {
-            let rows = try sql { () throws(SQLiteError) in try db.rows(count.sql, count.params) }
+            let answer = try sql { () throws(SQLiteError) in try counted(count.sql, count.params) }
             // SQLite counts in 64 bits and `Int` is 32 bits wide on wasm32, so a number the type cannot hold reads
             // as no count rather than a trap, the way a stored day the type cannot hold reads as no day.
-            counts[count.view] = rows.first?.first?.int64.flatMap { Int(exactly: $0) }
+            counts[count.view] = answer.flatMap { Int(exactly: $0) }
         }
         return counts
     }
@@ -63,8 +63,10 @@ extension Store {
         return gathered
     }
 
-    /// The open tasks the status index holds, the trashed and the deleted among them, counted on the index alone.
-    static let openTaskCountQuery = "SELECT count(*) FROM tasks WHERE status = 0"
+    /// The tasks the status index holds of one status, the trashed and the deleted among them, counted on the index
+    /// alone: the open ones for a count (`tagSizes(among:)`), and each status a rule names for a read
+    /// (`readSizeStatements(for:today:)`).
+    static let statusSizeQuery = "SELECT count(*) FROM tasks WHERE status = ?"
 
     /// The tasks a tag holds, done, trashed and deleted ones among them, counted on the tag's partial index alone.
     static let tagSizeQuery = "SELECT count(*) FROM task_tags WHERE tag_id = ? AND present = 1"
@@ -77,13 +79,19 @@ extension Store {
     private func tagSizes(among candidates: Set<TagID>) throws(StoreError) -> (open: Int64, tags: [TagID: Int64]) {
         guard !candidates.isEmpty else { return (0, [:]) }
         return try sql { () throws(SQLiteError) in
-            let open = try db.rows(Store.openTaskCountQuery).first?.first?.int64 ?? 0
+            let open = try counted(Store.statusSizeQuery, [.integer(TaskStatus.open.rawValue)]) ?? 0
             var tags: [TagID: Int64] = [:]
             for tag in candidates {
-                tags[tag] = try db.rows(Store.tagSizeQuery, [.text(tag.rawValue)]).first?.first?.int64
+                tags[tag] = try counted(Store.tagSizeQuery, [.text(tag.rawValue)])
             }
             return (open, tags)
         }
+    }
+
+    /// The number a `SELECT count(*)` statement answers: a count's, and each size a count or a read weighs. Nil for a
+    /// statement that answered no row or no integer, which `count(*)` never does.
+    func counted(_ sql: String, _ params: [Value]) throws(SQLiteError) -> Int64? {
+        try db.rows(sql, params).first?.first?.int64
     }
 
     /// The statement one view's count runs, over the condition of what the view counts: the open tasks that

@@ -7,9 +7,10 @@ struct SQLFragment: Equatable {
 
 /// Turns a filter tree into one WHERE fragment over `tasks t JOIN task_tree tt`.
 enum FilterCompiler {
-    /// How `compile` writes a condition that SQLite could drive a statement from. A view's read writes every one
-    /// plainly and leaves the choice of an index to the planner; a count chooses the one condition it is driven
-    /// by itself (`CountCompiler`, #153) and writes the others so that the planner cannot take them.
+    /// How `compile` writes a condition that SQLite could drive a statement from. A count and a view's read choose the
+    /// one condition they are driven by themselves (`DriverChooser`, #153, #155) and write the others so that the
+    /// planner cannot take them; a statement with no such condition writes every one plainly and leaves the choice of
+    /// an index to the planner.
     enum Form {
         /// As a view's read writes them: a column compared as it is, and a tag and a pin as a correlated `EXISTS`,
         /// which SQLite answers once per row it reaches.
@@ -24,11 +25,20 @@ enum FilterCompiler {
         /// loop, so the count reads no row whichever index the planner opened, as the Trash's count does
         /// (`EXPLAIN`, SQLite 3.53.4); anywhere else in a rule no index serves it.
         case unindexed
+        /// As `plain`, but a tag as the list of the tasks it holds kept off every index, `+t.id IN (SELECT …)`, and
+        /// written after every condition of its conjunction and every branch of its disjunction that names no tag. A
+        /// read with no driver of its own writes its tags so (`ReadCompiler`, #155): SQLite builds the list once per
+        /// statement where it answers the correlated `EXISTS` once per row, and no plan can take the list for a driver.
+        /// It tests an uncorrelated list in the place it is written, while it moves a correlated `EXISTS` behind the
+        /// other conditions, so the list goes last for SQLite to test the cheaper conditions first: in #155's
+        /// measurement at 50,000 tasks a rule asking for open tasks, a tag and a deadline within a month read in 3.49
+        /// ms with the list written first and 1.99 with it last, where the `EXISTS` took 2.49.
+        case tagListsLast
     }
 
     /// The fragment a view uses: the filter, plus `tt.trashed = 0` unless the filter mentions trash itself.
-    static func whereClause(_ filter: Filter, today: Day) -> SQLFragment {
-        let fragment = compile(filter, today: today)
+    static func whereClause(_ filter: Filter, today: Day, form: Form = .plain) -> SQLFragment {
+        let fragment = compile(filter, today: today, form: form)
         guard !mentionsTrashed(filter) else { return fragment }
         return SQLFragment(sql: "(\(fragment.sql)) AND tt.trashed = 0", params: fragment.params)
     }
@@ -38,9 +48,9 @@ enum FilterCompiler {
     /// holds what its lists hold, so a list whose rule names the Trash reads it there and a list whose rule does not
     /// still leaves it out: an exclusion written once over a disjunction would be dropped for every rule as soon as
     /// one named the Trash.
-    static func whereClause(anyOf rules: [Filter], today: Day) -> SQLFragment {
+    static func whereClause(anyOf rules: [Filter], today: Day, form: Form = .plain) -> SQLFragment {
         let reads = rules.map { rule in
-            let read = whereClause(rule, today: today)
+            let read = whereClause(rule, today: today, form: form)
             return SQLFragment(sql: "(\(read.sql))", params: read.params)
         }
         return joined(reads, separator: " OR ", empty: "0")
@@ -59,16 +69,18 @@ enum FilterCompiler {
         case .deadline(let condition):
             return day(column("t.deadline_day", form), condition, today)
         case .hasTag(let tag):
-            guard form == .lists else {
+            let list = "t.id IN (SELECT x.task_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.tag_id = ? AND x.present = 1)"
+            switch form {
+            case .plain, .unindexed:
                 return SQLFragment(
                     sql: "EXISTS (SELECT 1 FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.task_id = t.id AND x.tag_id = ? AND x.present = 1)",
                     params: [.text(tag.rawValue)]
                 )
+            case .lists:
+                return SQLFragment(sql: list, params: [.text(tag.rawValue)])
+            case .tagListsLast:
+                return SQLFragment(sql: "+" + list, params: [.text(tag.rawValue)])
             }
-            return SQLFragment(
-                sql: "t.id IN (SELECT x.task_id FROM task_tags x JOIN tags g ON g.id = x.tag_id AND g.deleted = 0 WHERE x.tag_id = ? AND x.present = 1)",
-                params: [.text(tag.rawValue)]
-            )
         case .parent(let parent):
             guard let parent else { return SQLFragment(sql: "\(column("tt.parent", form)) IS NULL", params: []) }
             return SQLFragment(sql: "\(column("tt.parent", form)) = ?", params: [.text(parent.rawValue)])
@@ -106,6 +118,16 @@ enum FilterCompiler {
     /// A column as `form` compares it: behind a unary `+`, which leaves the value as it is and the index unused.
     private static func column(_ name: String, _ form: Form) -> String {
         form == .unindexed ? "+" + name : name
+    }
+
+    /// Every tag a filter names, negated or not, at any depth, once for each time it names it.
+    static func tags(of filter: Filter) -> [TagID] {
+        switch filter {
+        case .hasTag(let tag): return [tag]
+        case .and(let parts), .or(let parts): return parts.flatMap(tags(of:))
+        case .not(let inner): return tags(of: inner)
+        case .status, .when, .deadline, .parent, .listedIn, .trashed: return []
+        }
     }
 
     static func mentionsTrashed(_ filter: Filter) -> Bool {
@@ -162,8 +184,19 @@ enum FilterCompiler {
         }
     }
 
+    /// A group's parts compiled and joined, in the order written, or with the parts that name a tag last where `form`
+    /// writes its tags last.
     private static func combine(_ parts: [Filter], separator: String, empty: String, today: Day, form: Form) -> SQLFragment {
-        joined(parts.map { compile($0, today: today, form: form) }, separator: separator, empty: empty)
+        var ordered = parts
+        if form == .tagListsLast {
+            var untagged: [Filter] = []
+            var tagged: [Filter] = []
+            for part in parts {
+                if tags(of: part).isEmpty { untagged.append(part) } else { tagged.append(part) }
+            }
+            ordered = untagged + tagged
+        }
+        return joined(ordered.map { compile($0, today: today, form: form) }, separator: separator, empty: empty)
     }
 
     /// Fragments joined by an operator, in parentheses of their own; none is the operator's identity, `empty`.
