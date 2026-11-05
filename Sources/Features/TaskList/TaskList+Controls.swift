@@ -30,11 +30,15 @@ extension TaskList {
         )
     }
 
+    /// What a task with no title is called: what the floating "+" adds, what the card's title field shows while it is
+    /// empty, and what a row draws for such a task (the controller's ruling on #176, 2026-11-05).
+    static let newTaskTitle = "New task"
+
     /// The floating "+": a white plus on the accent, casting the raised shadow.
     static func floatingButton(_ metrics: Metrics.FloatingButton) -> FloatingButtonModel<UserAction> {
         FloatingButtonModel(
             icon: IconModel(icon: .plus, size: metrics.glyphSize, weight: .semibold, color: .onAccent),
-            diameter: metrics.diameter, fill: .accent, shadow: .raised, accessibilityLabel: "New task",
+            diameter: metrics.diameter, fill: .accent, shadow: .raised, accessibilityLabel: newTaskTitle,
             action: .addTaskButtonTapped
         )
     }
@@ -69,8 +73,8 @@ extension TaskList {
             threshold: metrics.threshold, shift: metrics.shift, buttonWidth: metrics.buttonWidth,
             buttonVerticalInset: metrics.buttonVerticalInset, buttonTrailingInset: metrics.buttonTrailingInset,
             buttonCornerRadius: metrics.buttonCornerRadius,
-            button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), background: .red, animation: .swipe,
-            action: .deleteSwiped(id)
+            button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), background: .red,
+            animation: .swipe, action: .deleteSwiped(id)
         )
     }
 

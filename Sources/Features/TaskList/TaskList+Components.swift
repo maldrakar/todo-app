@@ -219,16 +219,18 @@ extension TaskList {
 
     /// A task's row, or a column's card in the card look (spec section 3; Task 8's table, Row and Board): the check in
     /// the block's list's colour, filled for a task that is not open and saying what a tap will do (the controller's
-    /// ruling on #175, 2026-11-04); the title, struck in ink 3 over ink 2 for a task that is not open; what stands
-    /// under it and what it slides off and holds; and the row's tap.
+    /// ruling on #175, 2026-11-04); the title, struck in ink 3 over ink 2 for a task that is not open, and "New task" for a
+    /// task with no title or a blank one, in the title and in what the check reads aloud (spec, "Risks"; the controller's
+    /// ruling on #176, 2026-11-05); what stands under it and what it slides off and holds; and the row's tap.
     private static func taskRow(
         _ task: TodoTask, _ color: Tile, meta: [MetaItemModel], swipe: SwipeModel<UserAction>?,
         menu: MenuModel<UserAction>?, _ metrics: Metrics.Row
     ) -> TaskRowModel<UserAction> {
         let isOpen = task.status == .open
+        let title = task.title.trimmed().isEmpty ? newTaskTitle : task.title
         return TaskRowModel(
-            check: check(title: task.title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
-            title: TextModel(text: task.title, font: metrics.title, color: isOpen ? .ink : .ink2),
+            check: check(title: title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
+            title: TextModel(text: title, font: metrics.title, color: isOpen ? .ink : .ink2),
             strike: isOpen ? nil : .ink3, meta: meta, titleToMeta: metrics.titleToMeta,
             metaSpacing: metrics.metaSpacing, metaLineSpacing: metrics.metaLineSpacing,
             verticalPadding: metrics.verticalPadding, titleLeading: metrics.titleLeading,

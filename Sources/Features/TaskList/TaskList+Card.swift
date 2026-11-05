@@ -30,7 +30,7 @@ extension TaskList {
         return CardModel(
             check: check(title: task.title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
             title: plainField(
-                card.typedTitle ?? task.title, placeholder: "New task", font: .rowTitleEmphasized,
+                card.typedTitle ?? task.title, placeholder: newTaskTitle, font: .rowTitleEmphasized,
                 color: isOpen ? .ink : .ink2, background: .surface, height: metrics.titleHeight,
                 padding: metrics.titlePadding, submitted: .titleFieldSubmitted, cancelled: .titleFieldCancelled,
                 focusLost: .titleFieldLostFocus

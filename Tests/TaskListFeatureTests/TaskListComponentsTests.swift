@@ -247,6 +247,42 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     )])
 }
 
+/// A task with no title is drawn as "New task" in its row, a blank title too, wherever a row is drawn: a block's, a column's
+/// card and the strip's, its title and what its check reads aloud alike, since a row with nothing to read is no row to find
+/// (spec, "Risks"; the controller's ruling on #176, 2026-11-05). The store keeps what it holds, and the open card's field
+/// shows that with its placeholder, as it does for a task just added.
+@Test func aTaskWithNoTitleIsDrawnAsNewTaskInItsRow() throws {
+    let store = try makeStore()
+    let empty = try store.createTask(NewTask(title: "", when: day(1)))
+    let blank = try store.createTask(NewTask(title: "   ", when: day(1)))
+    let finished = try store.createTask(NewTask(title: "", notes: "Call at 5", when: day(2)))
+    try store.update(task: finished, [.status(.done)])
+    let module = try list(BuiltInTaskViews.upcoming, in: store)
+    func expectNewTask(_ row: TaskRowModel<Action>, check: String, sourceLocation: SourceLocation = #_sourceLocation) {
+        #expect(row.title.text == "New task", sourceLocation: sourceLocation)
+        #expect(row.check.accessibilityLabel == check, sourceLocation: sourceLocation)
+    }
+    let id = TaskList.Model.BlockID.own(.day(day(1)))
+    let rows = try #require(block(id, of: module.model)?.rows)
+    #expect(rows.map(\.id) == [empty, blank])
+    for listRow in rows { expectNewTask(row(listRow), check: "Complete: New task") }
+    module.tap(.doneStripTapped)
+    expectNewTask(row(try #require(module.model.doneRows.first)), check: "Mark as not done: New task")
+    module.tap(.showAsChosen(.columns))
+    let cards = try #require(block(id, of: module.model)?.rows)
+    #expect(cards.map(\.id) == [empty, blank])
+    for card in cards { expectNewTask(row(card), check: "Complete: New task") }
+    #expect(try store.task(empty)?.title == "", "the store keeps what it holds")
+    #expect(try store.task(blank)?.title == "   ")
+    module.tap(.showAsChosen(.list))
+    module.tap(.rowTapped(blank))
+    let opened = try #require(openCard(in: module.model))
+    #expect(opened.card.title.text == "   ", "the field shows what the store keeps")
+    #expect(opened.card.title.placeholder == "New task")
+    module.tap(.titleFieldChanged("Typed"))
+    #expect(openCard(in: module.model)?.card.title.text == "Typed")
+}
+
 /// A row that adds a task carries the phone's numbers in the list, 40 high with its plus 18 in a 44 cell, and in a
 /// column, 44 high with the plus 6 before its title; the row that adds a list stands after the blocks over a rule and
 /// as the board's dashed last column (Task 8's table, Add rows and Board).
