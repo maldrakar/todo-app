@@ -177,8 +177,12 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     let canceled = try store3.createTask(NewTask(title: "Dropped"))
     try store3.update(task: canceled, [.status(.canceled)])
     try store3.createTask(NewTask(title: "Still open"))
-    let byStatus = try store3.createView(NewTaskView(title: "By status", filter: .status([.open, .done, .canceled]), sort: [SortKey(.title)], groupBy: .status))
-    #expect(Set(blocks(of: try list(byStatus, in: store3).model).compactMap { heading(of: $0)?.first ?? nil }) == ["Open", "Done", "Canceled"])
+    let byStatus = try store3.createView(NewTaskView(title: "By status", filter: .status([.done, .canceled]), sort: [SortKey(.title)], groupBy: .status))
+    #expect(Set(blocks(of: try list(byStatus, in: store3).model).compactMap { heading(of: $0)?.first ?? nil }) == ["Done", "Canceled"])
+    // A rule that also asks for open tasks draws those alone, its finished ones being the strip's (the controller's ruling
+    // R78).
+    let withOpen = try store3.createView(NewTaskView(title: "With open", filter: .status([.open, .done, .canceled]), sort: [SortKey(.title)], groupBy: .status))
+    #expect(blocks(of: try list(withOpen, in: store3).model).map(heading(of:)) == [["Open", nil]])
 
     let store4 = try makeStore()
     let byDay = try store4.createView(NewTaskView(title: "By day", filter: .status([.open]), groupBy: .whenDay))

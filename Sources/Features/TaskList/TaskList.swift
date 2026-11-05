@@ -4,11 +4,12 @@ import TaskScreenFeature
 import TodoCore
 
 /// The screen of one list: its tasks as the store's page of the view lays them out, the list's own tasks first in their
-/// groups and then one block per list inside it, with the tag bar, the folds and the layout the device keeps, and what
-/// it declared over itself (list screen spec, sections 1, 2, 5, 7 and 9).
+/// groups and then one block per list inside it, with the tag bar, the folds and the layout the device keeps, every write
+/// the screen makes, and what it declared over itself (list screen spec, sections 1 to 7 and 9).
 ///
 /// It is declared by the sidebar, by a choice there, and stands in its window's stack over the sidebar, drawn in the
-/// pane beside it on the Mac. A tap on a row declares the task screen over it, and a tap on a block's title the list
+/// pane beside it on the Mac. A tap on a row opens the task in place, as a card; the card's Open full screen declares the
+/// task screen over the list, and a tap on a block's title the list
 /// inside that the block is, or the list's own group the block is, opened as a screen of its own, which is this module
 /// on another route; the window's stack makes, keeps and drops what the list declared (ADR-0009, amendments of
 /// 2026-10-22, 2026-11-01 and 2026-11-02): the list holds no screen and draws none, and hears what a screen over it
@@ -28,8 +29,43 @@ public final class TaskList: Routable {
     /// wrote, which the root view sends the window whole, and the stack tells the list `.uncovered` (navigation state
     /// spec, section 3).
     public enum UserAction: Equatable, Sendable {
-        /// A row of a block, or its check until #176 gives the check its own action, tapped or clicked.
+        /// A row of a block or of the strip, beside its check, tapped or clicked.
         case rowTapped(TaskID)
+        /// A row's or a strip row's check, or the open card's.
+        case checkTapped(TaskID)
+        /// The screen's background beside the open card.
+        case backgroundTapped
+        /// Esc, on a keyboard, in the card or in its notes.
+        case escapeKeyPressed
+        /// The card's title's field: its text, Return, Esc and leaving it.
+        case titleFieldChanged(String), titleFieldSubmitted, titleFieldCancelled, titleFieldLostFocus
+        /// The card's notes' field: its text and leaving it.
+        case notesFieldChanged(String), notesFieldLostFocus
+        /// A subtask's check in the card.
+        case subtaskCheckTapped(TaskID)
+        /// "Add subtask" in the card.
+        case addSubtaskTapped
+        /// The field a new subtask is typed into: its text, Return, Esc and leaving it.
+        case subtaskFieldChanged(String), subtaskFieldSubmitted, subtaskFieldCancelled, subtaskFieldLostFocus
+        /// Open full screen, at the card's top.
+        case openFullScreenTapped
+        /// The floating "+".
+        case addTaskButtonTapped
+        /// "+ Add task" at the end of a block or a column.
+        case addTaskRowTapped(in: Model.BlockID)
+        /// "+ Add list", in both layouts.
+        case addListTapped
+        /// The field a new list's name is typed into: its text, Return, Esc and leaving it.
+        case listNameFieldChanged(String), listNameFieldSubmitted, listNameFieldCancelled, listNameFieldLostFocus
+        /// The Done strip's capsule.
+        case doneStripTapped
+        /// A row's Delete, uncovered by its swipe.
+        case deleteSwiped(TaskID)
+        /// Delete in a row's menu.
+        case deleteMenuItemChosen(TaskID)
+        /// A row let go: the block it was dragged from, which names one of the two that draw a task both select, the block
+        /// it was let go in, and the row it stands after there, nil for the top (the controller's ruling R76).
+        case rowDropped(TaskID, from: Model.BlockID, in: Model.BlockID, after: TaskID?)
         /// A block's title, in its header or its column's.
         case blockTitleTapped(Model.BlockID)
         /// A block's chevron, which folds and unfolds it.
@@ -97,14 +133,14 @@ public final class TaskList: Routable {
     /// event and follows (ADR-0009, amendment of 2026-10-22, point 2).
     public var destination: Destination<Route.Tail> { state.destination }
 
-    private let store: Store
+    let store: Store
 
-    private var state: State
+    var state: State
 
     /// Made from its route, the one way a list is made (spec section 3): the page of the view the head names, read by
-    /// the device's day, with the tags and the parents its groups name; the folds and the layout the device keeps for
-    /// the list, which a group's screen keeps none of; and what the tail names declared over it, which the stack makes
-    /// in the walk after the list is made.
+    /// the device's day, with the tags and the parents its groups name and the tasks completed that day; the folds and
+    /// the layout the device keeps for the list, which a group's screen keeps none of; and what the tail names declared
+    /// over it, which the stack makes in the walk after the list is made.
     ///
     /// The day is the device's, which the window's stack hands the list when it makes it, the day its root has then, so
     /// that a list made after midnight starts on the new day (spec section 8). It has no default, as the root's has
@@ -119,34 +155,49 @@ public final class TaskList: Routable {
     /// the view it names, and the stack tells the list, which says why with nothing open over it, which is what still
     /// exists (spec section 3, the fourth flow).
     public init(store: Store, route: Route, day: DeviceDay) throws(StoreError) {
-        let snapshot = try TaskList.read(store, head: route.head, today: day.day)
+        let snapshot = try TaskList.read(store, head: route.head, day: day)
         if let group = route.head.group, let refusal = TaskList.refusal(of: group, in: snapshot) { throw refusal }
         let isGroup = route.head.group != nil
         self.store = store
         self.state = State(
             head: route.head, title: snapshot.page.view.title, snapshot: snapshot, day: day,
             folded: isGroup ? [] : try TaskList.keptFolds(in: store, of: route.head.view),
-            layout: isGroup ? .list : try TaskList.keptLayout(in: store, of: route.head.view), picks: [],
-            destination: Destination(), problem: nil
+            layout: isGroup ? .list : try TaskList.keptLayout(in: store, of: route.head.view), picks: [], card: nil,
+            isDoneOpen: false, naming: nil, destination: Destination(), problem: nil
         )
         setDestination(route.tail)
     }
 
     public func send(_ event: Event) -> Output? {
         switch event {
-        case .action(.rowTapped(let id)):
-            // A row the list does not draw opens nothing and moves nothing, the sentence included, the way the
-            // sidebar's menu items do nothing on a row it does not hold: the tap is on something no longer on screen,
-            // folded away or filtered out, and what it would open is a task this list does not show.
-            guard TaskList.blocks(in: model.layout).contains(where: { $0.rows.contains { $0.id == id } }) else {
-                return nil
-            }
-            // The sentence goes with a tap that declares, a gesture on the list itself, and it goes before the screen
-            // is declared, so that one that cannot be made writes a fresh one when the stack says so: it answers this
-            // tap, and the one it replaces answered something earlier.
-            state.problem = nil
-            setDestination(.task(TaskScreen.Route(head: id)))
-            return nil
+        case .action(.rowTapped(let id)): openCard(on: id)
+        case .action(.checkTapped(let id)): check(id)
+        case .action(.backgroundTapped), .action(.titleFieldCancelled): dismissCard()
+        case .action(.escapeKeyPressed):
+            state.card?.subtaskDraft = nil
+            dismissCard()
+        case .action(.titleFieldChanged(let text)): typeTitle(text)
+        case .action(.titleFieldSubmitted): submitTitle()
+        case .action(.titleFieldLostFocus), .action(.notesFieldLostFocus): saveCard()
+        case .action(.notesFieldChanged(let text)): typeNotes(text)
+        case .action(.subtaskCheckTapped(let id)): checkSubtask(id)
+        case .action(.addSubtaskTapped): openSubtaskField()
+        case .action(.subtaskFieldChanged(let text)): typeSubtask(text)
+        case .action(.subtaskFieldSubmitted): writeSubtask(thenOpensNext: true)
+        case .action(.subtaskFieldLostFocus): writeSubtask(thenOpensNext: false)
+        case .action(.subtaskFieldCancelled): state.card?.subtaskDraft = nil
+        case .action(.openFullScreenTapped): openFullScreen()
+        case .action(.addTaskButtonTapped): addFromFloatingButton()
+        case .action(.addTaskRowTapped(let block)): addFromRow(in: block)
+        case .action(.addListTapped): addList()
+        case .action(.listNameFieldChanged(let text)): typeListName(text)
+        case .action(.listNameFieldSubmitted), .action(.listNameFieldLostFocus): settleListName()
+        case .action(.listNameFieldCancelled): state.naming = nil
+        case .action(.doneStripTapped): toggleDoneStrip()
+        case .action(.deleteSwiped(let id)): trash(id, offeredBy: .deleteSwiped(id))
+        case .action(.deleteMenuItemChosen(let id)): trash(id, offeredBy: .deleteMenuItemChosen(id))
+        case .action(.rowDropped(let id, let source, let target, let anchor)):
+            drop(id, from: source, in: target, after: anchor)
         case .action(.blockTitleTapped(let id)):
             // A title the model does not draw opens nothing, a group's screen's one block among them, whose header is
             // its screen's (spec section 2). A list inside opens as itself; one of the list's own groups as the list
@@ -178,12 +229,14 @@ public final class TaskList: Routable {
             else { return nil }
             let drawn = Set(blocks.compactMap { TaskList.foldKey(of: $0.id) })
             setFolded(state.folded.intersection(drawn).symmetricDifference([key]))
+            closeCardIfHidden()
             return nil
         case .action(.tagChipTapped(let tag)):
             // A chip the bar does not show picks nothing. A pick is session state, which a relaunch loses (ADR-0009,
             // amendment of 2026-11-01), and no answer to anything a person was told, so the sentence stays.
             guard model.tagBar?.chips.contains(where: { $0.action == .tagChipTapped(tag) }) == true else { return nil }
             state.picks.formSymmetricDifference([tag])
+            closeCardIfHidden()
             return nil
         case .action(.showAsChosen(let layout)):
             // An item is checked against the model: Columns disabled moves nothing (spec section 5). The choice is the
@@ -196,6 +249,7 @@ public final class TaskList: Routable {
             // on the view reads what was kept.
             try? store.setDeviceState(TaskList.layoutKey(of: state.head.view), layout)
             state.layout = layout
+            closeCardIfHidden()
             return nil
         case .created:
             // Being created answers no gesture, so it moves nothing, the sentence included.
@@ -246,7 +300,7 @@ public final class TaskList: Routable {
                 // moved because of it: a list made inside this one, or under a folder inside it, names itself alone,
                 // and a tag deleted empties a list filtered by it and names only the tag (`ChangeSet`). Which of them
                 // moved this page is the page's to say.
-                let snapshot = try TaskList.read(store, head: state.head, today: state.day.day)
+                let snapshot = try TaskList.read(store, head: state.head, day: state.day)
                 // A group's screen whose group names nothing any more, its tag or its parent gone or its list grouped
                 // another way, asks to be closed, as a list whose view is gone does (the controller's ruling on #175,
                 // 2026-11-04).
@@ -271,12 +325,13 @@ public final class TaskList: Routable {
             guard day != state.day else { return nil }
             state.day = day
             do {
-                try take(try TaskList.read(store, head: state.head, today: day.day))
+                try take(try TaskList.read(store, head: state.head, day: day))
             } catch {
                 if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
             return nil
         }
+        return nil
     }
 
     /// Takes a read of the store as the page on screen, its view's title the header's, with the folds the device keeps
@@ -284,29 +339,37 @@ public final class TaskList: Routable {
     /// fold made here, as the sidebar reads its folds with its rows (ADR-0010); a group's screen keeps none. The layout
     /// is not read again: it is one value, the last one chosen wins, and a window would change its layout on a change
     /// to anything. It drops the picks whose chips are no longer on the bar, which stop filtering and come back unlit
-    /// (the controller's ruling on #175, 2026-11-04). The folds are read before anything is assigned, so a read that
-    /// fails leaves what is on screen.
-    private func take(_ snapshot: PageSnapshot) throws(StoreError) {
+    /// (the controller's ruling on #175, 2026-11-04). The folds and the open card's subtasks are read before anything is
+    /// assigned, so a read that fails leaves what is on screen.
+    ///
+    /// A card stays while its row is drawn, and a read that no longer finds it drops it with no write: this answers a
+    /// change as well as a write, and a module never writes in answer to a change (ADR-0009; the controller's ruling R82).
+    /// A list being named goes with its block.
+    func take(_ snapshot: PageSnapshot) throws(StoreError) {
         let folded = state.head.group == nil ? try TaskList.keptFolds(in: store, of: state.head.view) : []
+        let subtasks = try state.card.map { card throws(StoreError) in try store.children(of: card.id) }
         let blocks = TaskList.blocks(of: snapshot, head: state.head, today: state.day.day)
         let chips = TaskList.chips(in: blocks, tags: snapshot.tags)
         state.snapshot = snapshot
         state.title = snapshot.page.view.title
         state.folded = folded
         state.picks.formIntersection(chips.map(\.id))
+        if let subtasks { state.card?.subtasks = subtasks }
+        if let card = state.card, !isDrawn(card.id) { state.card = nil }
+        if let naming = state.naming, !blocks.contains(where: { $0.id == .list(naming.id) }) { state.naming = nil }
     }
 
     /// Declares the task screen or a list over the list, or nothing: a tap, a route, the way back and the stack's
     /// notices each arrive here, so what a tap opens and what a link opens cannot drift apart (spec section 3). Every
     /// call is a new write, which the window's stack follows at the walk after the event.
-    private func setDestination(_ tail: Route.Tail?) {
+    func setDestination(_ tail: Route.Tail?) {
         state.destination.declare(tail.map { .pushed($0) })
     }
 
     /// Folds and unfolds the blocks to the set, written to the device's state first and kept after (ADR-0010), as the
     /// sidebar's folds are: only the keys of the blocks drawn now are written, so that a day's key goes once the day
     /// has no block.
-    private func setFolded(_ folded: Set<String>) {
+    func setFolded(_ folded: Set<String>) {
         // A write that fails is not said: the fold stays on screen until the next list made on the view reads what was
         // kept, and this module's sentences stay for the data a person edits, which a fold is not. Sorted, so that the
         // same folds are the same text in the file.
@@ -315,7 +378,7 @@ public final class TaskList: Routable {
     }
 
     /// The blocks a layout draws, a list's or the board's columns.
-    private static func blocks(in layout: Model.Layout) -> [Model.Block] {
+    static func blocks(in layout: Model.Layout) -> [Model.Block] {
         switch layout {
         case .list(let blocks): blocks
         case .columns(let board): board.columns
@@ -359,15 +422,15 @@ public final class TaskList: Routable {
     }
 
     /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
-    /// it even when the page's read fails; the snapshot of the store the blocks, the tile and the rule are read from,
-    /// and the device's day it was taken by; the folds and the layout the device keeps, and the picked tags this
-    /// session keeps; what it declared over itself; and the sentence a person was last told. One value, moved field by
-    /// field, and the one place any of it is kept: the model is assembled from it on every read, in `model` and
-    /// nowhere else (owner's reviews of #77, #101 and #188).
+    /// it even when the page's read fails; the snapshot of the store the blocks, the tile, the rule and the strip are read
+    /// from, and the device's day it was taken by; the folds and the layout the device keeps, and what this session keeps,
+    /// the picked tags, the open card, whether the strip is open and the list being named; what it declared over itself;
+    /// and the sentence a person was last told. One value, moved field by field, and the one place any of it is kept: the
+    /// model is assembled from it on every read, in `model` and nowhere else (owner's reviews of #77, #101 and #188).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
-    private struct State {
+    struct State {
         let head: Route.Head
         var title: String
         var snapshot: PageSnapshot
@@ -375,13 +438,32 @@ public final class TaskList: Routable {
         var folded: Set<String>
         var layout: Model.Layout.Kind
         var picks: Set<TagID>
+        var card: OpenCard?
+        var isDoneOpen: Bool
+        var naming: ListNaming?
         var destination: Destination<Route.Tail>
         var problem: String?
+
+        /// The blocks of the page as this snapshot reads them, before the tag bar's filter.
+        var pageBlocks: [PageBlock] {
+            TaskList.blocks(of: snapshot, head: head, today: day.day)
+        }
+
+        /// A task of the snapshot, in a section of the page or in the strip, finished or not, whatever the tag bar and the
+        /// folds leave.
+        func task(_ id: TaskID) -> TodoTask? {
+            for section in snapshot.page.sections {
+                for group in section.groups {
+                    if let task = group.tasks.first(where: { $0.id == id }) { return task }
+                }
+            }
+            return snapshot.done.first { $0.id == id }
+        }
 
         /// The model a view draws, assembled here and nowhere else: the blocks of the page, the chips of their open
         /// tasks and the rows the picked ones leave, the layout the list is shown as where Show as offers Columns and
         /// the list otherwise, a block's fold where it has a header to fold by, and the header, Show as, the empty
-        /// state and the sentence.
+        /// state, the strip and what stands under it, the floating "+", "+ Add list" and the sentence.
         ///
         /// Columns are offered where the list groups or has more than one block, and never on a group's screen, which
         /// has one block and no grouping (spec section 5; the controller's ruling on #175, 2026-11-04). The empty state
@@ -390,20 +472,20 @@ public final class TaskList: Routable {
         var model: Model {
             let view = snapshot.page.view
             let today = day.day
-            let blocks = TaskList.blocks(of: snapshot, head: head, today: today)
+            let blocks = pageBlocks
             let chips = TaskList.chips(in: blocks, tags: snapshot.tags)
             let picked = picks.intersection(chips.map(\.id))
-            let shown = blocks.map { block in
-                picked.isEmpty ? block : PageBlock(
-                    id: block.id, tasks: block.tasks.filter { !$0.tags.isDisjoint(with: picked) },
-                    heading: block.heading, color: block.color
-                )
+            func kept(_ tasks: [TodoTask]) -> [TodoTask] {
+                picked.isEmpty ? tasks : tasks.filter { !$0.tags.isDisjoint(with: picked) }
             }
+            let shown = blocks.map { $0.keeping(kept($0.tasks)) }
             let canBoard = head.group == nil && (view.groupBy != nil || blocks.count > 1)
-            let metrics = Metrics.of(canBoard ? layout : .list)
+            let shape = canBoard ? layout : .list
+            let metrics = Metrics.of(shape)
             let color = TaskList.tileColor(view.color)
             let icon = TaskList.tileIcon(view.icon)
             let tags = TagNames(snapshot.tags)
+            let context = RowContext(today: today, tags: tags, card: card, naming: naming)
             let hasListsInside = blocks.contains { if case .list = $0.id { true } else { false } }
             let heading = TaskList.screenHeading(
                 head: head, title: title, rule: view.filter, snapshot: snapshot, today: today
@@ -413,12 +495,31 @@ public final class TaskList: Routable {
                     TaskList.emptyWords(head: head, view: view, tags: tags), color: color, icon: icon, metrics.empty
                 )
                 : nil
+            let addList = head.group == nil && view.filter.map(TaskList.drawsFinished) != true
+                ? TaskList.addListRow(metrics.addList)
+                : nil
+            let done = kept(snapshot.done)
+            let strip = done.isEmpty ? nil : metrics.doneStrip
             return Model(
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
                 tagBar: TaskList.tagBar(chips, picked: picked, colors: color.check, metrics.tagBar),
-                layout: TaskList.layout(shown, title: title, folded: folded, today: today, tags: tags, metrics.blocks),
+                layout: TaskList.layout(
+                    shown, title: title, folded: folded, addList: addList, context, metrics.blocks
+                ),
                 showAs: TaskList.showAs(canBoard: canBoard),
                 empty: empty,
+                done: strip.map {
+                    TaskList.doneStrip(count: done.count, isOpen: isDoneOpen, color: color, $0)
+                },
+                doneRows: isDoneOpen
+                    ? strip.map { strip in
+                        done.map { TaskList.doneRow($0, color, context, strip.row, card: strip.card) }
+                    } ?? []
+                    : [],
+                addTask: TaskList.floatingTarget(in: blocks, head: head, rule: view.filter, today: today).map { _ in
+                    TaskList.floatingButton(metrics.floatingButton)
+                },
+                addList: shape == .list ? addList : nil,
                 problem: problem
             )
         }
@@ -427,7 +528,9 @@ public final class TaskList: Routable {
     /// What can go wrong in this module, with the sentence each one reads as. The store's own error stays here:
     /// it names SQLite codes and journal rows, which is what a bug report is made of and not what a person can
     /// do anything about.
-    private enum Problem {
+    enum Problem {
+        case couldNotSave
+        case couldNotMove
         case taskIsGone
         case couldNotReadTask
         case couldNotReadTasks
@@ -439,6 +542,8 @@ public final class TaskList: Routable {
 
         var sentence: String {
             switch self {
+            case .couldNotSave: "The change could not be saved, so nothing was written."
+            case .couldNotMove: "The task could not be moved, so it may have moved only in part."
             case .taskIsGone: "The task is gone."
             case .couldNotReadTask: "The task could not be read."
             case .couldNotReadTasks: "The tasks could not be read, so this list may be out of date."

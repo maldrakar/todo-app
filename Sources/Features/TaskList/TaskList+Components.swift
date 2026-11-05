@@ -9,8 +9,19 @@ import TodoCore
 /// points, every colour, font, icon, animation and shadow a token of the design system, every word finished, in English
 /// until the formatting service arrives, and every control's action a value (ADR-0007, amendment of 2026-10-30). The
 /// numbers are one value per layout (`Metrics`), picked once where the model is built, so that no builder branches on
-/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`).
+/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`). The open card is in
+/// `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete in
+/// `TaskList+Controls.swift`.
 extension TaskList {
+    /// What the rows and the headers of a model are built from beside their own tasks: the device's day, the tags' names,
+    /// the open card and the list being named.
+    struct RowContext {
+        let today: Day
+        let tags: TagNames
+        let card: OpenCard?
+        let naming: ListNaming?
+    }
+
     /// The screen's header (Task 8's table, Header): the list's tile, the title in the large title, and the subtitle,
     /// where it has one, in the count's font and ink 2.
     static func header(
@@ -58,23 +69,24 @@ extension TaskList {
     /// gone while it is folded; a block with no header folds by nothing. In columns, each block a column headed as the
     /// block is, the own block of a list that groups by nothing titled with the list's own title, its cards drawn
     /// whatever the folds, since columns do not fold, and the block itself with no header, so that it has one and not
-    /// two (spec section 5; the controller's ruling on #175, 2026-11-04).
+    /// two (spec section 5; the controller's ruling on #175, 2026-11-04). "+ Add task" ends every block whose rule reads
+    /// as edits, the folded ones but in the list (canvas); the board ends with `addList`.
     static func layout(
-        _ blocks: [PageBlock], title: String, folded: Set<String>, today: Day, tags: TagNames, _ metrics: Metrics.Blocks
+        _ blocks: [PageBlock], title: String, folded: Set<String>, addList: AddRowModel<UserAction>?, _ context: RowContext,
+        _ metrics: Metrics.Blocks
     ) -> Model.Layout {
         switch metrics {
-        case .list(let headerMetrics, let chevronMetrics, let rowMetrics):
+        case .list(let headerMetrics, let chevronMetrics, let rowMetrics, let cardMetrics, let addTaskMetrics):
             return .list(blocks.map { block in
                 let isFolded = block.heading != nil && foldKey(of: block.id).map(folded.contains) == true
                 return Model.Block(
                     id: block.id,
                     header: block.heading.map {
-                        blockHeader($0, of: block, isFolded: isFolded, headerMetrics, chevron: chevronMetrics)
+                        blockHeader($0, of: block, isFolded: isFolded, context, headerMetrics, chevron: chevronMetrics)
                     },
-                    rows: isFolded ? [] : block.tasks.map {
-                        .task($0.id, row($0, block.color, today: today, tags: tags, rowMetrics))
-                    },
-                    isFolded: isFolded, column: nil
+                    rows: isFolded ? [] : block.tasks.map { row($0, block.color, context, rowMetrics, card: cardMetrics) },
+                    isFolded: isFolded, column: nil,
+                    addTask: isFolded ? nil : addTaskRow(for: block, addTaskMetrics), takesDrop: block.edits != nil
                 )
             })
         case .columns(let board):
@@ -82,15 +94,14 @@ extension TaskList {
                 columns: blocks.map { block in
                     Model.Block(
                         id: block.id, header: nil,
-                        rows: block.tasks.map {
-                            .task($0.id, row($0, block.color, today: today, tags: tags, board.card))
-                        },
+                        rows: block.tasks.map { row($0, block.color, context, board.card, card: board.openCard) },
                         isFolded: false,
-                        column: column(block.heading ?? Heading(title: title, subtitle: nil), of: block, board)
+                        column: column(block.heading ?? Heading(title: title, subtitle: nil), of: block, context, board),
+                        addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edits != nil
                     )
                 },
                 spacing: board.spacing, horizontalPadding: board.horizontalPadding, bottomPadding: board.bottomPadding,
-                snaps: board.snaps
+                snaps: board.snaps, addList: addList
             ))
         }
     }
@@ -101,7 +112,7 @@ extension TaskList {
     /// on #175, 2026-11-04: the canvas keeps "Fold" and carries the state in `aria-expanded`, which the model has no
     /// field for).
     private static func blockHeader(
-        _ heading: Heading, of block: PageBlock, isFolded: Bool, _ metrics: Metrics.BlockHeader,
+        _ heading: Heading, of block: PageBlock, isFolded: Bool, _ context: RowContext, _ metrics: Metrics.BlockHeader,
         chevron: Metrics.Chevron
     ) -> BlockHeaderModel<UserAction> {
         let fold = BlockHeaderModel<UserAction>.Fold(
@@ -113,34 +124,49 @@ extension TaskList {
             ),
             hitSide: chevron.hitSide
         )
-        return blockHeader(heading, of: block, fold: fold, metrics)
+        return blockHeader(heading, of: block, fold: fold, background: .paper, context, metrics)
     }
 
     /// A block's column (Task 8's table, Board): its header as a block's but with no rule and no chevron, since columns
     /// do not fold; the column on the fill, rounded; its cards on the surface, rounded, ringed with the glass line and
-    /// casting the resting shadow; the drop's tint and ring in the block's list's colours, which no column shows until
-    /// a block's rule is read for a drop (Task 7).
+    /// casting the resting shadow; the drop's tint and ring in the block's list's colours, where the block's rule reads
+    /// as edits (spec section 6).
     private static func column(
-        _ heading: Heading, of block: PageBlock, _ metrics: Metrics.Board
+        _ heading: Heading, of block: PageBlock, _ context: RowContext, _ metrics: Metrics.Board
     ) -> ColumnModel<UserAction> {
         ColumnModel(
-            header: blockHeader(heading, of: block, fold: nil, metrics.header), width: metrics.columnWidth,
-            cornerRadius: metrics.columnCornerRadius, cardSpacing: metrics.cardSpacing, padding: metrics.columnPadding,
-            fill: .fill, dropTint: block.color.dropTint, isDropTarget: false,
+            header: blockHeader(heading, of: block, fold: nil, background: .fill, context, metrics.header),
+            width: metrics.columnWidth, cornerRadius: metrics.columnCornerRadius, cardSpacing: metrics.cardSpacing,
+            padding: metrics.columnPadding, fill: .fill, dropTint: block.color.dropTint,
+            isDropTarget: block.edits != nil,
             dropRing: StrokeModel(color: block.color.check.fill, width: metrics.dropRingWidth, dash: []),
             cardCornerRadius: metrics.cardCornerRadius, cardBackground: .surface,
             cardRing: StrokeModel(color: .glassLine, width: metrics.cardRingWidth, dash: []), cardShadow: .resting
         )
     }
 
-    /// The header of a block or a column, with the fold it is given or none: what both share.
+    /// The header of a block or a column, with the fold it is given or none: what both share. While the block's list is
+    /// being named its name's field stands in its title's place, in what is left of the header's height under and over
+    /// its paddings, on what the header stands on (`Phone.dc.html`, the block's and the column's name field; the
+    /// controller's ruling R89: no placeholder).
     private static func blockHeader(
-        _ heading: Heading, of block: PageBlock, fold: BlockHeaderModel<UserAction>.Fold?, _ metrics: Metrics.BlockHeader
+        _ heading: Heading, of block: PageBlock, fold: BlockHeaderModel<UserAction>.Fold?,
+        background: DesignSystem.Color, _ context: RowContext, _ metrics: Metrics.BlockHeader
     ) -> BlockHeaderModel<UserAction> {
-        BlockHeaderModel(
+        let field: TextFieldModel<UserAction>? = if let naming = context.naming, block.id == .list(naming.id) {
+            plainField(
+                naming.draft, placeholder: "", font: .sectionTitle, color: block.color.glyph, background: background,
+                height: metrics.height - metrics.topPadding - metrics.bottomPadding, padding: 0,
+                submitted: .listNameFieldSubmitted, cancelled: .listNameFieldCancelled,
+                focusLost: .listNameFieldLostFocus
+            )
+        } else {
+            nil
+        }
+        return BlockHeaderModel(
             title: TextModel(text: heading.title, font: .sectionTitle, color: block.color.glyph),
             subtitle: heading.subtitle.map { TextModel(text: $0, font: .areaLabel, color: .ink2) },
-            titleToSubtitle: metrics.titleToSubtitle, field: nil, fold: fold, rule: metrics.rule, height: metrics.height,
+            titleToSubtitle: metrics.titleToSubtitle, field: field, fold: fold, rule: metrics.rule, height: metrics.height,
             topMargin: metrics.topMargin, trailingMargin: metrics.trailingMargin, bottomMargin: metrics.bottomMargin,
             leadingMargin: metrics.leadingMargin, topPadding: metrics.topPadding,
             horizontalPadding: metrics.horizontalPadding, bottomPadding: metrics.bottomPadding, cornerRadius: 0,
@@ -148,31 +174,78 @@ extension TaskList {
         )
     }
 
+    /// A task of a block: the open card where its row stood, or its row with its meta line, and its swipe and its menu,
+    /// which a task in the Trash has neither of (spec section 6; the controller's ruling R73). A column's card has the menu
+    /// and no swipe, its metrics having none. The row's `lift` and `fresh` are Task 8's.
+    private static func row(
+        _ task: TodoTask, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Row, card cardMetrics: Metrics.Card
+    ) -> Model.Row {
+        if let card = context.card, card.id == task.id {
+            return .card(task.id, self.card(of: task, card, color, context, cardMetrics))
+        }
+        return .task(task.id, taskRow(
+            task, color, meta: meta(of: task, today: context.today, tags: context.tags, metrics),
+            swipe: task.trashed ? nil : metrics.swipe.map { swipe(of: task.id, $0) },
+            menu: task.trashed ? nil : deleteMenu(of: task.id), metrics
+        ))
+    }
+
+    /// A row of the strip: the open card where it stood, or its check and its struck title, with no meta line, no swipe and
+    /// no menu (canvas; the controller's ruling R74).
+    static func doneRow(
+        _ task: TodoTask, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Row, card cardMetrics: Metrics.Card
+    ) -> Model.Row {
+        if let card = context.card, card.id == task.id {
+            return .card(task.id, self.card(of: task, card, color, context, cardMetrics))
+        }
+        return .task(task.id, taskRow(task, color, meta: [], swipe: nil, menu: nil, metrics))
+    }
+
     /// A task's row, or a column's card in the card look (spec section 3; Task 8's table, Row and Board): the check in
     /// the block's list's colour, filled for a task that is not open and saying what a tap will do (the controller's
-    /// ruling on #175, 2026-11-04); the title, struck in ink 3 over ink 2 for a task that is not open; the meta line;
-    /// and the row's tap. The check sends the row's tap until #176 gives it its own action (the controller's ruling on
-    /// #175, 2026-11-04).
-    private static func row(
-        _ task: TodoTask, _ color: Tile, today: Day, tags: TagNames, _ metrics: Metrics.Row
+    /// ruling on #175, 2026-11-04); the title, struck in ink 3 over ink 2 for a task that is not open; what stands under
+    /// it and what it slides off and holds; and the row's tap.
+    private static func taskRow(
+        _ task: TodoTask, _ color: Tile, meta: [MetaItemModel], swipe: SwipeModel<UserAction>?,
+        menu: MenuModel<UserAction>?, _ metrics: Metrics.Row
     ) -> TaskRowModel<UserAction> {
         let isOpen = task.status == .open
         return TaskRowModel(
-            check: CheckModel(
-                diameter: metrics.checkDiameter, ringWidth: metrics.checkRingWidth, markSize: metrics.markSize,
-                markStrokeWidth: metrics.markStrokeWidth, hitWidth: metrics.checkHitWidth,
-                hitHeight: metrics.checkHitHeight, colors: color.check, isChecked: !isOpen, animation: .check,
-                accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + task.title,
-                action: .rowTapped(task.id)
-            ),
+            check: check(title: task.title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
             title: TextModel(text: task.title, font: metrics.title, color: isOpen ? .ink : .ink2),
-            strike: isOpen ? nil : .ink3, meta: meta(of: task, today: today, tags: tags, metrics),
-            titleToMeta: metrics.titleToMeta, metaSpacing: metrics.metaSpacing,
+            strike: isOpen ? nil : .ink3, meta: meta, titleToMeta: metrics.titleToMeta, metaSpacing: metrics.metaSpacing,
             metaLineSpacing: metrics.metaLineSpacing,
             verticalPadding: metrics.verticalPadding, titleLeading: metrics.titleLeading,
             titleTrailing: metrics.titleTrailing, leading: metrics.leading, trailing: metrics.trailing,
-            minimumHeight: metrics.minimumHeight, cornerRadius: metrics.cornerRadius, swipe: nil, lift: nil, fresh: nil,
-            freshAnimation: .fresh, tap: .rowTapped(task.id), menu: nil
+            minimumHeight: metrics.minimumHeight, cornerRadius: metrics.cornerRadius, swipe: swipe, lift: nil, fresh: nil,
+            freshAnimation: .fresh, tap: .rowTapped(task.id), menu: menu
+        )
+    }
+
+    /// A check, a row's, a card's or a subtask's: in the colour of the block's list, filled for a task that is not open,
+    /// saying what a tap will do (canvas, `cbLabel`).
+    static func check(
+        title: String, isOpen: Bool, _ color: Tile, action: UserAction, _ metrics: Metrics.Check
+    ) -> CheckModel<UserAction> {
+        CheckModel(
+            diameter: metrics.diameter, ringWidth: metrics.ringWidth, markSize: metrics.markSize,
+            markStrokeWidth: metrics.markStrokeWidth, hitWidth: metrics.hitWidth, hitHeight: metrics.hitHeight,
+            colors: color.check, isChecked: !isOpen, animation: .check,
+            accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: action
+        )
+    }
+
+    /// A field with no ring of its own, on what it stands on, drawn by the line of what it stands in: a card's three and a
+    /// list's name's.
+    static func plainField(
+        _ text: String, placeholder: String, font: DesignSystem.Font, color: DesignSystem.Color,
+        background: DesignSystem.Color, height: Double, padding: Double, submitted: UserAction, cancelled: UserAction,
+        focusLost: UserAction
+    ) -> TextFieldModel<UserAction> {
+        TextFieldModel(
+            text: text, placeholder: placeholder, font: font, color: color, background: background, minimumWidth: 0,
+            height: height, padding: padding, cornerRadius: 0, ring: StrokeModel(color: background, width: 0, dash: []),
+            submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )
     }
 

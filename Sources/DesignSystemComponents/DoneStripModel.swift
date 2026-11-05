@@ -5,11 +5,12 @@ import DesignSystem
 /// `height` high on `background`, with corners of `cornerRadius`, its glyph `leadingPadding` in from its leading edge,
 /// then its label and its chevron, each `spacing` after what stands before it, the chevron `trailingPadding` short of
 /// its trailing edge; the capsule `topMargin` below the blocks and `leadingMargin` and `trailingMargin` in from the
-/// sides; and under it, while the strip is open, the tasks done, in points.
+/// sides, in points. The tasks done under it, while the strip is open, are the feature module's rows, each a row or the
+/// open card, so the model holds none (list screen spec, section 3).
 public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
 
-    /// The label, finished, such as "Done · 3".
+    /// The label, finished, such as "Done today · 3".
     public let label: TextModel
 
     /// The chevron, which turns as the strip opens and closes.
@@ -28,9 +29,6 @@ public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable 
     /// Whether the strip is open, which shows its rows and which VoiceOver reads.
     public let isOpen: Bool
 
-    /// The tasks done, as rows, struck, in the order they stand under the capsule while the strip is open.
-    public let rows: [TaskRowModel<Action>]
-
     /// What a tap on the capsule sends.
     public let action: Action
 
@@ -48,7 +46,6 @@ public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable 
         leadingMargin: Double,
         trailingMargin: Double,
         isOpen: Bool,
-        rows: [TaskRowModel<Action>],
         action: Action
     ) {
         self.icon = icon
@@ -64,7 +61,6 @@ public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable 
         self.leadingMargin = leadingMargin
         self.trailingMargin = trailingMargin
         self.isOpen = isOpen
-        self.rows = rows
         self.action = action
     }
 }

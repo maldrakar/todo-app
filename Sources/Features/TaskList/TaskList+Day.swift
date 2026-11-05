@@ -43,6 +43,23 @@ extension TaskList {
         }
     }
 
+    /// What a card's When pill says of its day: "Today", "Tomorrow", "Oct 22" for a day past, and "Mon, Oct 26" for a later
+    /// one (canvas, `whenLabel`; the controller's ruling R89).
+    static func whenPillText(_ day: Day, today: Day) -> String {
+        switch distance(to: day, from: today) {
+        case 0: "Today"
+        case 1: "Tomorrow"
+        case ..<0: monthDate(Self.drawnIn(day))
+        default: shortDate(day)
+        }
+    }
+
+    /// What a card's Deadline pill says of its day: "Sat, Oct 24", always, never "Today" (canvas, `dayShort`; the
+    /// controller's ruling R89).
+    static func deadlinePillText(_ day: Day) -> String {
+        shortDate(day)
+    }
+
     /// What a deadline says on a row: "Overdue 1 day" or "Overdue N days" once it has passed, "Due today", the
     /// weekday's short name through six days ahead, "Due Sun", with no "Due tomorrow", and "Due Oct 31" from seven
     /// days on (canvas, `dueText`).
