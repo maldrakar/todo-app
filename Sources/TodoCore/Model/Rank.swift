@@ -41,6 +41,24 @@ public enum Rank {
         return String(result.map { alphabet[$0] })
     }
 
+    /// `count` keys for one gap, in order, as `between` reads its neighbours. Each is halved out of what is left of the
+    /// gap and not taken after the key before it, whose digits would grow by one every five keys: pinning the 13,680 rows
+    /// above a drop that way wrote some 19 MB of ranks (#176's measure), and halving keeps them a few digits long. One
+    /// loop over a stack of what is left, so that nothing recurses however many keys a list asks for.
+    static func between(_ lower: String?, _ upper: String?, count: Int) -> [String] {
+        var keys = [String](repeating: initial, count: count)
+        var left: [(start: Int, end: Int, lower: String?, upper: String?)] = [(0, count, lower, upper)]
+        while let gap = left.popLast() {
+            guard gap.start < gap.end else { continue }
+            let middle = gap.start + (gap.end - gap.start) / 2
+            let key = between(gap.lower, gap.upper)
+            keys[middle] = key
+            left.append((gap.start, middle, gap.lower, key))
+            left.append((middle + 1, gap.end, key, gap.upper))
+        }
+        return keys
+    }
+
     private static func digits(_ key: String) -> [Int]? {
         guard isValid(key) else { return nil }
         return key.map { alphabet.firstIndex(of: $0)! }

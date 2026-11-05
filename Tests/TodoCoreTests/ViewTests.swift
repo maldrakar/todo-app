@@ -395,6 +395,8 @@ private func thisWeek(_ store: Store) throws -> ViewID {
     #expect(try store.manualList(of: heading) == [d, c, a, e, b])
     try store.pin(tasks: [a, d], in: heading, at: .end)
     #expect(try store.manualList(of: heading) == [c, e, b, a, d])
+    try store.pin(tasks: [e, c, b, a, d], in: heading, at: .end)
+    #expect(try store.manualList(of: heading) == [e, c, b, a, d], "every task of the list, in the order given")
     let none = try commits(of: store) { try store.pin(tasks: [], in: heading, at: .start) }
     #expect(none.isEmpty, "nothing to pin writes nothing")
 }

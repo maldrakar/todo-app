@@ -165,22 +165,20 @@ extension Store {
     /// Pins several tasks in a view's manual list in one transaction: the first at the placement, each next after the
     /// one before, so that a dropped task and the unpinned tasks above it land where they stood (list screen spec,
     /// section 6). A task already pinned there moves with them, and the anchor of `.after` is a task of the list that
-    /// stays where it is, one of those moving being as gone as one never pinned. The ranks are made among the tasks
-    /// that stay, the next one up from the placement their upper bound, and every operation shares one stamp, for the
+    /// stays where it is, one of those moving being as gone as one never pinned. Their ranks share the gap the placement
+    /// falls in among the tasks that stay (`Rank.between(_:_:count:)`), and every operation shares one stamp, for the
     /// reason written on `pin(task:in:at:)`.
     public func pin(tasks: [TaskID], in view: ViewID, at placement: Placement) throws(StoreError) {
         for task in tasks { try requireTask(task) }
         try requireView(view)
         let moving = Set(tasks.map(\.rawValue))
         let staying = try pinnedItems(of: view).filter { !moving.contains($0.id) }
-        var rank = try Store.rank(among: staying, placement: placement)
-        let upper = staying.first { $0.rank > rank }?.rank
+        let (lower, upper) = try Store.neighbours(among: staying, placement: placement)
         let stamp = clock.next()
         var ops: [JournalOperation] = []
-        for task in tasks {
+        for (task, rank) in zip(tasks, Rank.between(lower, upper, count: tasks.count)) {
             let id = JournalOperation.pairID(view, task)
             ops += [op(.viewItem, id, "present", Value(true), stamp), op(.viewItem, id, "rank", .text(rank), stamp)]
-            rank = Rank.between(rank, upper)
         }
         try apply(ops)
     }

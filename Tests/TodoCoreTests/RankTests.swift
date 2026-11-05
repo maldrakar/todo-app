@@ -56,3 +56,26 @@ import Testing
     #expect(afterBrokenLower < "i")
     #expect(Rank.isValid(afterBrokenLower))
 }
+
+/// Several keys for one gap are halved out of it: the next key after the last would grow a digit every five keys, so that
+/// pinning the 13,680 rows above a drop wrote some 19 MB of ranks (#176's measure), where halving keeps them a few digits.
+/// They stand in order between the neighbours, with the neighbours a merge can leave too.
+@Test func severalKeysForOneGapAreHalvedOutOfIt() throws {
+    func expectOrdered(_ keys: [String], after lower: String?, before upper: String?) {
+        #expect(keys.allSatisfy(Rank.isValid))
+        #expect(zip(keys, keys.dropFirst()).allSatisfy { $0 < $1 })
+        if let lower, let first = keys.first { #expect(lower < first) }
+        if let upper, let last = keys.last { #expect(last < upper) }
+    }
+    let many = Rank.between(nil, nil, count: 20_000)
+    #expect(many.count == 20_000)
+    expectOrdered(many, after: nil, before: nil)
+    #expect(try #require(many.map(\.count).max()) <= 6)
+    let gap = Rank.between("a", "b", count: 1_000)
+    expectOrdered(gap, after: "a", before: "b")
+    #expect(try #require(gap.map(\.count).max()) <= 5)
+    #expect(Rank.between("a", "b", count: 1) == [Rank.between("a", "b")], "one key is the one `between` gives")
+    #expect(Rank.between("a", "b", count: 0).isEmpty)
+    let unordered = Rank.between("z", "a", count: 3)
+    expectOrdered(unordered, after: "z", before: nil)
+}
