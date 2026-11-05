@@ -28,7 +28,9 @@ extension TaskList {
     ) -> CardModel<UserAction> {
         let isOpen = task.status == .open
         return CardModel(
-            check: check(title: task.title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
+            check: check(
+                title: drawnTitle(of: task), isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check
+            ),
             title: plainField(
                 card.typedTitle ?? task.title, placeholder: newTaskTitle, font: .rowTitleEmphasized,
                 color: isOpen ? .ink : .ink2, background: .surface, height: metrics.titleHeight,

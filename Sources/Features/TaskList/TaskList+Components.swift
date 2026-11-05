@@ -227,7 +227,7 @@ extension TaskList {
         menu: MenuModel<UserAction>?, _ metrics: Metrics.Row
     ) -> TaskRowModel<UserAction> {
         let isOpen = task.status == .open
-        let title = task.title.trimmed().isEmpty ? newTaskTitle : task.title
+        let title = drawnTitle(of: task)
         return TaskRowModel(
             check: check(title: title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
             title: TextModel(text: title, font: metrics.title, color: isOpen ? .ink : .ink2),

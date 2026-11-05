@@ -279,8 +279,14 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let opened = try #require(openCard(in: module.model))
     #expect(opened.card.title.text == "   ", "the field shows what the store keeps")
     #expect(opened.card.title.placeholder == "New task")
+    #expect(opened.card.check.accessibilityLabel == "Complete: New task", "the name VoiceOver hears on its row")
     module.tap(.titleFieldChanged("Typed"))
     #expect(openCard(in: module.model)?.card.title.text == "Typed")
+    #expect(openCard(in: module.model)?.card.check.accessibilityLabel == "Complete: New task", "the stored title's, none")
+    let titled = try store.createTask(NewTask(title: "Buy milk", when: day(1)))
+    let onTitled = try list(BuiltInTaskViews.upcoming, in: store)
+    onTitled.tap(.rowTapped(titled))
+    #expect(openCard(in: onTitled.model)?.card.check.accessibilityLabel == "Complete: Buy milk")
 }
 
 /// A row that adds a task carries the phone's numbers in the list, 40 high with its plus 18 in a 44 cell, and in a

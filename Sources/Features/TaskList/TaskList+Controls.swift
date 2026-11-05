@@ -34,6 +34,12 @@ extension TaskList {
     /// empty, and what a row draws for such a task (the controller's ruling on #176, 2026-11-05).
     static let newTaskTitle = "New task"
 
+    /// What a row draws for a task and a check reads aloud, on the row and on its open card alike: its title, and
+    /// `newTaskTitle` for a task with none or a blank one.
+    static func drawnTitle(of task: TodoTask) -> String {
+        task.title.trimmed().isEmpty ? newTaskTitle : task.title
+    }
+
     /// The floating "+": a white plus on the accent, casting the raised shadow.
     static func floatingButton(_ metrics: Metrics.FloatingButton) -> FloatingButtonModel<UserAction> {
         FloatingButtonModel(
