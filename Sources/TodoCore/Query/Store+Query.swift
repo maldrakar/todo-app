@@ -9,6 +9,18 @@ public enum GroupKey: Hashable, Sendable {
     case tag(TagID?)
     case parent(TaskID?)
     case status(TaskStatus)
+
+    /// The key a grouping puts a task under, the page's one rule (a task with several tags under the least), so that a
+    /// group's screen keeps the strip's tasks of its group by the rule the page grouped them by.
+    public init(of task: TodoTask, by groupBy: GroupBy) {
+        self = switch groupBy {
+        case .whenDay: .day(task.when)
+        case .deadlineDay: .day(task.deadline)
+        case .parent: .parent(task.parent)
+        case .status: .status(task.status)
+        case .tag: .tag(task.tags.min())
+        }
+    }
 }
 
 /// What one opened view shows: the view itself, then its sections.
@@ -200,13 +212,7 @@ extension Store {
         var order: [GroupKey] = []
         var buckets: [GroupKey: [TodoTask]] = [:]
         for task in tasks {
-            let key: GroupKey = switch groupBy {
-            case .whenDay: .day(task.when)
-            case .deadlineDay: .day(task.deadline)
-            case .parent: .parent(task.parent)
-            case .status: .status(task.status)
-            case .tag: .tag(task.tags.min())
-            }
+            let key = GroupKey(of: task, by: groupBy)
             if buckets[key] == nil { order.append(key) }
             buckets[key, default: []].append(task)
         }

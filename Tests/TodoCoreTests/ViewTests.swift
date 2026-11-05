@@ -373,3 +373,46 @@ private func thisWeek(_ store: Store) throws -> ViewID {
     #expect(try store.tasks(in: id, today: Day(year: 2026, month: 11, day: 2)).map(\.id) == [task])
     #expect(throws: StoreError.notFound(ViewID("gone"))) { try store.createManualList("Lost", in: ViewID("gone"), color: nil) }
 }
+
+/// A reorder pins a task and the unpinned tasks above it in one call, so that the drop lands where it was let go: one
+/// transaction, the first at the placement and each next after the one before, a task already pinned moved with them
+/// and the rest of the list left where it stood (list screen spec, section 6).
+@Test func pinningSeveralTasksIsOneTransactionInOrder() throws {
+    let store = try makeStore()
+    let a = try store.createTask(NewTask(title: "a"))
+    let b = try store.createTask(NewTask(title: "b"))
+    let c = try store.createTask(NewTask(title: "c"))
+    let d = try store.createTask(NewTask(title: "d"))
+    let e = try store.createTask(NewTask(title: "e"))
+    let heading = try store.createView(NewTaskView(title: "H"))
+    try store.pin(task: a, in: heading)
+    try store.pin(task: b, in: heading)
+    try store.pin(task: e, in: heading)
+    let written = try commits(of: store) { try store.pin(tasks: [c, e, d], in: heading, at: .after(a)) }
+    #expect(written.count == 1, "one transaction")
+    #expect(try store.manualList(of: heading) == [a, c, e, d, b])
+    try store.pin(tasks: [d, c], in: heading, at: .start)
+    #expect(try store.manualList(of: heading) == [d, c, a, e, b])
+    try store.pin(tasks: [a, d], in: heading, at: .end)
+    #expect(try store.manualList(of: heading) == [c, e, b, a, d])
+    let none = try commits(of: store) { try store.pin(tasks: [], in: heading, at: .start) }
+    #expect(none.isEmpty, "nothing to pin writes nothing")
+}
+
+/// The anchor has to be a task pinned there and not one of those moving, and every task and the view have to be there:
+/// a refusal writes nothing, so a drop never leaves half its tasks pinned (`Store.rank(among:placement:)`).
+@Test func pinningAfterATaskNotInTheListIsRefused() throws {
+    let store = try makeStore()
+    let a = try store.createTask(NewTask(title: "a"))
+    let b = try store.createTask(NewTask(title: "b"))
+    let loose = try store.createTask(NewTask(title: "loose"))
+    let heading = try store.createView(NewTaskView(title: "H"))
+    try store.pin(task: a, in: heading)
+    #expect(throws: StoreError.notFound(loose)) { try store.pin(tasks: [b], in: heading, at: .after(loose)) }
+    #expect(throws: StoreError.notFound(a)) { try store.pin(tasks: [a, b], in: heading, at: .after(a)) }
+    let gone = TaskID("gone")
+    #expect(throws: StoreError.notFound(gone)) { try store.pin(tasks: [b, gone], in: heading, at: .start) }
+    let elsewhere = ViewID("elsewhere")
+    #expect(throws: StoreError.notFound(elsewhere)) { try store.pin(tasks: [b], in: elsewhere, at: .start) }
+    #expect(try store.manualList(of: heading) == [a])
+}
