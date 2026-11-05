@@ -50,25 +50,11 @@ extension TaskList {
 
         /// What the list can declare over itself, the route's tail: the task screen, or another list, a list inside it
         /// or one of this list's own groups, each holding that screen's route whole, so that a chain of lists is a
-        /// chain of these. It is a route value because `Destination` holds one (owner's review of #188).
-        public enum Tail: RouteValue {
+        /// chain of these. It has no head of its own: the stack compares the heads of the routes it holds once the
+        /// window's enum of screens has mapped this one into it (`AppModule.Screen.Route`; owner's review of #188).
+        public enum Tail: Equatable, Sendable {
             case task(TaskScreen.Route)
             indirect case list(TaskList.Route)
-
-            /// The head the stack compares a declaration with what stands by: a list's carries its group, so that a
-            /// group's screen declared over its list is pushed and not kept (one shape with the root's route of a
-            /// screen, `AppModule.Screen.Route.Head`).
-            public enum Head: Equatable, Sendable {
-                case task(TaskID)
-                case list(TaskList.Route.Head)
-            }
-
-            public var head: Head {
-                switch self {
-                case .task(let route): .task(route.head)
-                case .list(let route): .list(route.head)
-                }
-            }
 
             /// What the screen over the list answers, the task screen's or a list's, which the stack hands the list;
             /// both mean the screen asks to be closed.

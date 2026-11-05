@@ -521,7 +521,6 @@ private func group(_ group: TaskList.Route.Group, of view: ViewID, task: TaskID?
     let chain = try read(path)
     #expect(chain == TaskList.Route(head: .init(view: view), tail: .list(on(other))))
     #expect(chain.segments == path)
-    #expect(chain.tail?.head == .list(.init(view: other)))
     let grouped = ["view", view.rawValue, "view", other.rawValue, "day", "+1"]
     #expect(try read(grouped) == TaskList.Route(head: .init(view: view), tail: .list(group(.day(1), of: other))))
     #expect(try read(grouped).segments == grouped, "a group stands over the list before it, the inner one")
