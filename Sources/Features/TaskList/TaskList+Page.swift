@@ -11,23 +11,32 @@ import TodoCore
 extension TaskList {
     /// What one read of the store gives the list, kept whole until the next read replaces it: the view's page; every
     /// tag, whose titles the chips, the meta lines and the headers of a grouping by tag name and whose order the meta
-    /// lines keep; the title of each parent task a group by parent stands for, by the parent's id, the page's
-    /// groups' and the group's own on a group's screen by parent, each read once, never per row, which the header of
-    /// such a group shows (spec section 9; the controller's ruling on #175, 2026-11-04); the tasks completed today that
-    /// the Done strip holds, kept on a group's screen to the group; and the rule of the first list of each folder among
-    /// the lists inside, whose edits are the folder's (spec section 4).
+    /// lines keep; the title of each parent task a group by parent stands for, by the parent's id, the page's groups'
+    /// and the group's own on a group's screen by parent, each read once, never per row, which the header of such a
+    /// group shows (spec section 9; the controller's ruling on #175, 2026-11-04); the tasks completed today that the
+    /// Done strip holds, kept on a group's screen to the group; and the rules of each folder among the lists inside, by
+    /// its id.
     struct PageSnapshot {
         let page: TaskViewPage
         let tags: [Tag]
         let parentTitles: [TaskID: String]
         let done: [TodoTask]
-        let firstListRules: [ViewID: Filter]
+        let folderRules: [ViewID: FolderRules]
+    }
+
+    /// The rules a folder inside is read by: its first list's, whose edits are the folder's and nil where it has none
+    /// (spec section 4), and every list's its section reads, which a task dragged out of its block leaves (the
+    /// controller's ruling on #176, 2026-11-05).
+    struct FolderRules {
+        let first: Filter?
+        let all: [Filter]
     }
 
     /// A block as the page gives it, before the tag bar's filter, the folds and the look: what it is, its tasks, what
     /// its header says, nil for a block with none, the colour of the list it belongs to, whose check its rows take, the
-    /// rule it is read by, a folder's its first list's, and what that rule asks of a task added or dropped there, nil
-    /// where the block takes neither.
+    /// rule it is read by, a folder's its first list's, what that rule asks of a task added or dropped there, nil where
+    /// the block takes neither, and the rules of the lists a task dragged out of it leaves: a list inside's one, a
+    /// folder's every list's, and none for an own block, whose task leaves by its new day or by being claimed.
     struct PageBlock {
         let id: Model.BlockID
         let tasks: [TodoTask]
@@ -35,10 +44,13 @@ extension TaskList {
         let color: DesignSystem.Color.Components.Tile
         let rule: Filter?
         let edits: Edits?
+        let listRules: [Filter]
 
         /// The block with the tasks a filter leaves.
         func keeping(_ tasks: [TodoTask]) -> PageBlock {
-            PageBlock(id: id, tasks: tasks, heading: heading, color: color, rule: rule, edits: edits)
+            PageBlock(
+                id: id, tasks: tasks, heading: heading, color: color, rule: rule, edits: edits, listRules: listRules
+            )
         }
     }
 
@@ -80,7 +92,7 @@ extension TaskList {
         return PageSnapshot(
             page: page, tags: try store.tags(), parentTitles: titles,
             done: try doneTasks(in: store, of: page.view, head: head, day: day),
-            firstListRules: try firstListRules(in: store, of: page)
+            folderRules: try folderRules(in: store, of: page)
         )
     }
 
@@ -97,21 +109,32 @@ extension TaskList {
         return done.filter { GroupKey(of: $0, by: groupBy) == key }
     }
 
-    /// The rule of the first list under each folder among the page's lists inside, by the folder's id, a folder inside
-    /// it handing on to its own first, to any depth, by one loop per folder over the views; a folder with no lists, or
-    /// one whose first this app cannot read, has none (spec section 4). A view this app cannot read reads as having no
-    /// rule and is no folder. A page with no folder inside reads nothing more.
-    private static func firstListRules(in store: Store, of page: TaskViewPage) throws(StoreError) -> [ViewID: Filter] {
+    /// The rules of each folder among the page's lists inside, by the folder's id, each by loops over the views and no
+    /// recursion. Its first list's: a folder inside it handing on to its own first, to any depth; a folder with no
+    /// lists, or one whose first this app cannot read, has none (spec section 4). Every list's, as far as its section
+    /// reads, as the store gathers them (`Store.gatheredRules(of:)`): a list with a rule its rule and not the lists
+    /// inside it, a folder its lists', and a view this app cannot read nothing. A view this app cannot read reads as
+    /// having no rule and is no folder. A page with no folder inside reads nothing more.
+    private static func folderRules(
+        in store: Store, of page: TaskViewPage
+    ) throws(StoreError) -> [ViewID: FolderRules] {
         let folders = page.sections.compactMap(\.view).filter { $0.filter == nil && $0.needsNewerApp == nil }
         guard !folders.isEmpty else { return [:] }
         let views = try store.views()
-        var rules: [ViewID: Filter] = [:]
+        var rules: [ViewID: FolderRules] = [:]
         for folder in folders {
             var first = views.first { $0.parent == folder.id }
             while let view = first, view.filter == nil, view.needsNewerApp == nil {
                 first = views.first { $0.parent == view.id }
             }
-            if let first, first.needsNewerApp == nil { rules[folder.id] = first.filter }
+            var all: [Filter] = []
+            var inside = [folder.id]
+            while let parent = inside.popLast() {
+                for view in views where view.parent == parent && view.needsNewerApp == nil {
+                    if let rule = view.filter { all.append(rule) } else { inside.append(view.id) }
+                }
+            }
+            rules[folder.id] = FolderRules(first: first?.needsNewerApp == nil ? first?.filter : nil, all: all)
         }
         return rules
     }
@@ -150,7 +173,7 @@ extension TaskList {
         func ownBlock(_ key: GroupKey?, _ tasks: [TodoTask], heading: Heading?) -> PageBlock {
             PageBlock(
                 id: .own(key), tasks: rows(of: tasks, by: view.filter), heading: heading, color: color,
-                rule: view.filter, edits: ownEdits(of: view, key: key, today: today)
+                rule: view.filter, edits: ownEdits(of: view, key: key, today: today), listRules: []
             )
         }
         if let group = head.group {
@@ -172,11 +195,13 @@ extension TaskList {
         }
         for section in snapshot.page.sections {
             guard let child = section.view else { continue }
-            let rule = child.needsNewerApp == nil ? child.filter ?? snapshot.firstListRules[child.id] : nil
+            let folder = snapshot.folderRules[child.id]
+            let rule = child.needsNewerApp == nil ? child.filter ?? folder?.first : nil
             blocks.append(PageBlock(
                 id: .list(child.id), tasks: rows(of: section.groups.flatMap(\.tasks), by: child.filter),
                 heading: Heading(title: child.title, subtitle: nil), color: tileColor(child.color), rule: rule,
-                edits: rule.flatMap { Edits.of($0, today: today, day: nil) }
+                edits: rule.flatMap { Edits.of($0, today: today, day: nil) },
+                listRules: child.filter.map { [$0] } ?? folder?.all ?? []
             ))
         }
         return blocks
@@ -205,21 +230,26 @@ extension TaskList {
         }
     }
 
-    /// What the floating "+" adds by, and the view whose manual list its task lands at the top of (the controller's
-    /// ruling on #176, 2026-11-05): a group's screen's one block, a folder's first block, which is its first list; and
-    /// a list with a rule its first own block, where that block takes one, and otherwise the rule's edits with no day,
-    /// a grouped list with no tasks having no block and a block of a grouping by tag asking nothing. A group's screen
-    /// with such a block has none, a list whose rule reads as no edits has none, which is how Logbook and Trash have
-    /// none, and neither has a folder with no lists.
+    /// What the floating "+" adds by, and the view whose top its task lands at (the controller's ruling on #176,
+    /// 2026-11-05): a group's screen's one block, a folder's first block, which is its first list; and a list with a
+    /// rule its first own block, where that block takes one, and otherwise the rule's edits with no day, a grouped list
+    /// with no tasks having no block and a block of a grouping by tag asking nothing. A group's screen with such a
+    /// block has none, a list whose rule reads as no edits has none, which is how Logbook and Trash have none, and
+    /// neither has a folder with no lists. The view is one the page read: the list's, or the list inside's.
     static func floatingTarget(
-        in blocks: [PageBlock], head: Route.Head, rule: Filter?, today: Day
-    ) -> (edits: Edits, view: ViewID)? {
-        guard let rule, head.group == nil else {
+        in blocks: [PageBlock], of snapshot: PageSnapshot, head: Route.Head, today: Day
+    ) -> (edits: Edits, view: TaskView)? {
+        let page = snapshot.page
+        guard let rule = page.view.filter, head.group == nil else {
             guard let first = blocks.first, let edits = first.edits else { return nil }
-            return (edits, first.id.view(under: head))
+            let view = switch first.id {
+            case .own: page.view
+            case .list(let id): page.sections.first { $0.view?.id == id }?.view
+            }
+            return view.map { (edits, $0) }
         }
-        if let first = blocks.first, case .own = first.id, let edits = first.edits { return (edits, head.view) }
-        return Edits.of(rule, today: today, day: nil).map { ($0, head.view) }
+        if let first = blocks.first, case .own = first.id, let edits = first.edits { return (edits, page.view) }
+        return Edits.of(rule, today: today, day: nil).map { ($0, page.view) }
     }
 
     /// The tags the open tasks of the blocks carry, each task once however many blocks draw it, the most used first,

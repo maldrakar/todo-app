@@ -43,20 +43,21 @@ extension TaskList {
     }
 
     /// Takes what the target's rule asks, its day through `update(task:)`, its tags, its pin last in its manual list
-    /// (spec section 6's table), and gives back what the block it was dragged from gave it, where that block is a list
-    /// inside: an own block gives nothing back, a day block's task leaving by its new day and an own block's by being
-    /// claimed, and what the target asks is not given back (the controller's ruling on #176, 2026-11-05). A task two
-    /// blocks draw leaves only the one it was dragged from (the controller's ruling on #176, 2026-11-05). The target's
-    /// fold stays (the controller's ruling on #176, 2026-11-05).
+    /// (spec section 6's table), and gives back the tags and the pins of the lists it was dragged out of: a list
+    /// inside's, and a folder's every list's, so that it leaves the block it came from whichever of them held it. An
+    /// own block gives nothing back, a day block's task leaving by its new day and an own block's by being claimed; a
+    /// list whose rule reads as no edits gives nothing back; and what the target asks is not given back. A task two
+    /// blocks draw leaves only the one it was dragged from, and the target's fold stays (the controller's ruling on
+    /// #176, 2026-11-05).
     private func move(_ task: TodoTask, from source: PageBlock, to target: PageBlock) {
         guard let edits = target.edits else { return }
         let view = state.snapshot.page.view
         let ownDay: GroupBy? = if case .own(.day?) = target.id { view.groupBy } else { nil }
         let changes = edits.dayChanges(of: task, rule: target.rule, ownDay: ownDay, today: state.day.day)
-        let givenBack: Edits? = if case .list = source.id { source.edits } else { nil }
-        let leaving = edits.removeTags.union(givenBack?.addTags ?? []).subtracting(edits.addTags)
-        var unpinning = edits.unpinFrom
-        if let list = givenBack?.pinIn, list != edits.pinIn { unpinning.insert(list) }
+        let givenBack = source.listRules.compactMap { Edits.of($0, today: state.day.day, day: nil) }
+        let leaving = edits.removeTags.union(givenBack.flatMap(\.addTags)).subtracting(edits.addTags)
+        var unpinning = edits.unpinFrom.union(givenBack.compactMap(\.pinIn))
+        if let list = edits.pinIn { unpinning.remove(list) }
         writeAndReread(refusal: .couldNotMove) { () throws(StoreError) in
             try store.update(task: task.id, changes)
             for tag in edits.addTags.subtracting(task.tags) { try store.add(tag: tag, to: task.id) }

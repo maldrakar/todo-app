@@ -160,6 +160,95 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     #expect(module.model == (try list(inbox, in: store).model))
 }
 
+/// A card with no title goes on closing only where nothing was put in it: notes typed stay, with the task, its stored
+/// title empty, a row a person can open and name or delete (spec section 4; the controller's ruling on #176,
+/// 2026-11-05).
+@Test func aCardWithNoTitleAndNotesTypedStaysWithItsNotes() throws {
+    let store = try makeStore()
+    let module = try list(inbox, in: store)
+    module.tap(.addTaskButtonTapped)
+    let id = try #require(openCard(in: module.model)?.id)
+    module.tap(.notesFieldChanged("Call at 5"))
+    module.tap(.backgroundTapped)
+    #expect(openCard(in: module.model) == nil)
+    let task = try stored(id, in: store)
+    #expect(task.title == "" && !task.trashed)
+    #expect(try store.notes(of: id) == "Call at 5")
+    #expect(rows(of: module.model).map(\.id) == [id])
+    module.tap(.rowTapped(id))
+    module.tap(.titleFieldSubmitted)
+    #expect(openCard(in: module.model) == nil, "Return on its empty title closes it")
+    #expect(try store.task(id) != nil, "and its stored notes keep it")
+}
+
+/// The subtask being typed is written and keeps the task, as what stands under it; a draft of spaces is nothing.
+@Test func aCardWithNoTitleAndASubtaskTypedStaysWithIt() throws {
+    let store = try makeStore()
+    let module = try list(inbox, in: store)
+    module.tap(.addTaskButtonTapped)
+    let id = try #require(openCard(in: module.model)?.id)
+    module.tap(.addSubtaskTapped)
+    module.tap(.subtaskFieldChanged(" Typed "))
+    module.tap(.backgroundTapped)
+    #expect(try store.task(id)?.title == "")
+    #expect(try store.children(of: id).map(\.title) == ["Typed"])
+    let spaces = try list(inbox, in: store)
+    spaces.tap(.addTaskButtonTapped)
+    let blank = try #require(openCard(in: spaces.model)?.id)
+    spaces.tap(.addSubtaskTapped)
+    spaces.tap(.subtaskFieldChanged("   "))
+    spaces.tap(.notesFieldChanged("  "))
+    spaces.tap(.backgroundTapped)
+    #expect(try store.task(blank) == nil, "spaces are nothing put in it")
+}
+
+/// A subtask stored under a task with no title keeps it, on Return and on a tap beside the card alike, and so do notes
+/// stored, a task the command line or a peer wrote.
+@Test func aCardWithNoTitleAndASubtaskStoredStays() throws {
+    let store = try makeStore()
+    let parent = try store.createTask(NewTask(title: ""))
+    try store.createTask(NewTask(title: "Old subtask", parent: parent))
+    let noted = try store.createTask(NewTask(title: "", notes: "Old notes"))
+    let module = try list(inbox, in: store)
+    for id in [parent, noted] {
+        module.tap(.rowTapped(id))
+        module.tap(.backgroundTapped)
+        #expect(try store.task(id) != nil)
+    }
+    module.tap(.rowTapped(parent))
+    module.tap(.escapeKeyPressed)
+    #expect(try store.task(parent) != nil)
+}
+
+/// A card with nothing in it but a subtask draft Esc drops is deleted: the draft goes first, and then nothing was put
+/// in it.
+@Test func escapeOnACardWithOnlyASubtaskDraftDeletesTheTask() throws {
+    let store = try makeStore()
+    let module = try list(inbox, in: store)
+    module.tap(.addTaskButtonTapped)
+    let id = try #require(openCard(in: module.model)?.id)
+    module.tap(.addSubtaskTapped)
+    module.tap(.subtaskFieldChanged("Dropped"))
+    module.tap(.escapeKeyPressed)
+    #expect(try store.task(id) == nil)
+    #expect(try store.allTasks().isEmpty)
+}
+
+/// The check on a card with no title and something in it completes the task, what was typed written with it, and the
+/// task stays, in the strip.
+@Test func theCheckOnACardWithNoTitleAndNotesCompletesIt() throws {
+    let store = try makeStore()
+    let module = try list(inbox, in: store)
+    module.tap(.addTaskButtonTapped)
+    let id = try #require(openCard(in: module.model)?.id)
+    module.tap(.notesFieldChanged("Call at 5"))
+    module.tap(.checkTapped(id))
+    let task = try stored(id, in: store)
+    #expect(task.status == .done && task.title == "")
+    #expect(try store.notes(of: id) == "Call at 5")
+    #expect(module.model.done != nil)
+}
+
 /// Clearing the title of a task that has one and tapping away keeps the old title, as a list's empty name keeps the old
 /// (the controller's ruling on #176, 2026-11-05): `delete(task:)` is a tombstone with no Trash, which that must not
 /// reach.

@@ -4,9 +4,10 @@ import TodoCore
 
 /// What the open card does (spec sections 3 and 4; the controller's ruling on #176, 2026-11-05). A card closes by a tap
 /// beside it, on another row, Esc or Return on an empty title, on "+", on "+ Add list", and where a fold, a pick or the
-/// strip hides its row. Every close writes what was typed, and an empty title is never written: the task whose stored
-/// title is empty too goes, since it never had anything in it, and any other keeps its title, as a list's empty name
-/// keeps the old.
+/// strip hides its row. Every close writes what was typed, and an empty title is never written: a task with no title
+/// and nothing else in it goes, since nothing was put in it; one with something in it, notes or a subtask, stays with
+/// its title empty, a row a person can open and name or delete; and one whose title was cleared keeps it, as a list's
+/// empty name keeps the old.
 extension TaskList {
     /// Opens a row the model draws as one, closing the card that was open: the notes and the children are read here,
     /// since the list's read carries neither (spec section 3). A row's tap on a task a peer has deleted says so and
@@ -29,17 +30,22 @@ extension TaskList {
         }
     }
 
-    /// Whether the open card holds a task with no title stored and none typed, the one a close deletes.
-    func cardIsUntitled() -> Bool {
+    /// Whether nothing was put in the open card: no title, no notes and no subtask, stored or typed, a draft of spaces
+    /// being nothing. Its task is the one a close deletes, since a task with anything in it is someone's (spec section
+    /// 4; the controller's ruling on #176, 2026-11-05).
+    func cardHoldsNothing() -> Bool {
         guard let card = state.card, let task = state.task(card.id) else { return false }
-        return task.title.trimmed().isEmpty && (card.typedTitle ?? task.title).trimmed().isEmpty
+        func isBlank(_ text: String?) -> Bool { text?.trimmed().isEmpty != false }
+        return isBlank(task.title) && isBlank(card.typedTitle) && !task.hasNotes && isBlank(card.typedNotes)
+            && card.subtasks.isEmpty && isBlank(card.subtaskDraft)
     }
 
-    /// Closes the card by the rule of every close, what was typed written and the untitled task deleted. A failed write
-    /// says so and the card closes all the same, as a rename's field does (`TaskViewList.commit`).
+    /// Closes the card by the rule of every close: what was typed written, and the task deleted where nothing was put
+    /// in it. A failed write says so and the card closes all the same, as a rename's field does
+    /// (`TaskViewList.commit`).
     func closeCard() {
         guard let card = state.card else { return }
-        if cardIsUntitled() {
+        if cardHoldsNothing() {
             state.card = nil
             writeAndReread { () throws(StoreError) in try store.delete(task: card.id) }
         } else {

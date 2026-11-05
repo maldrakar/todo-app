@@ -185,19 +185,25 @@ extension TaskList {
     private static func row(
         _ task: TodoTask, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Row, card cardMetrics: Metrics.Card
     ) -> Model.Row {
-        if let card = context.card, card.id == task.id {
-            return .card(task.id, self.card(of: task, card, color, context, cardMetrics))
-        }
-        return .task(task.id, taskRow(
+        cardRow(of: task, color, context, cardMetrics) ?? .task(task.id, taskRow(
             task, color, meta: meta(of: task, today: context.today, tags: context.tags, metrics),
             swipe: task.trashed ? nil : metrics.swipe.map { swipe(of: task.id, $0) },
             menu: task.trashed ? nil : deleteMenu(of: task.id), metrics
         ))
     }
 
-    /// The Done strip and what stands under it while it is open, in the layout that has one (canvas: the board has none):
-    /// its capsule, nil with no task to hold, and each task the open card where it stood, or its check and its struck
-    /// title, with no meta line, no swipe and no menu (spec section 3; canvas; the controller's ruling on #176, 2026-11-05).
+    /// The open card where its row stood, and nil for any other task: a block's rows and the strip's alike.
+    private static func cardRow(
+        of task: TodoTask, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Card
+    ) -> Model.Row? {
+        guard let card = context.card, card.id == task.id else { return nil }
+        return .card(task.id, self.card(of: task, card, color, context, metrics))
+    }
+
+    /// The Done strip and what stands under it while it is open, in the layout that has one (canvas: the board has
+    /// none): its capsule, nil with no task to hold, and each task the open card where it stood, or its check and its
+    /// struck title, with no meta line, no swipe and no menu (spec section 3; canvas; the controller's ruling on #176,
+    /// 2026-11-05).
     static func doneStrip(
         _ tasks: [TodoTask], isOpen: Bool, color: Tile, _ context: RowContext, _ metrics: Metrics.Blocks
     ) -> (strip: DoneStripModel<UserAction>?, rows: [Model.Row]) {
@@ -205,10 +211,8 @@ extension TaskList {
             return (nil, [])
         }
         let rows: [Model.Row] = isOpen ? tasks.map { task in
-            if let card = context.card, card.id == task.id {
-                return .card(task.id, self.card(of: task, card, color, context, cardMetrics))
-            }
-            return .task(task.id, taskRow(task, color, meta: [], swipe: nil, menu: nil, rowMetrics))
+            cardRow(of: task, color, context, cardMetrics)
+                ?? .task(task.id, taskRow(task, color, meta: [], swipe: nil, menu: nil, rowMetrics))
         } : []
         return (doneStrip(count: tasks.count, isOpen: isOpen, color: color, stripMetrics), rows)
     }

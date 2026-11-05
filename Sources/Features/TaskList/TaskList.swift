@@ -514,7 +514,7 @@ public final class TaskList: Routable {
                 empty: empty,
                 done: done.strip,
                 doneRows: done.rows,
-                addTask: TaskList.floatingTarget(in: blocks, head: head, rule: view.filter, today: today).map { _ in
+                addTask: TaskList.floatingTarget(in: blocks, of: snapshot, head: head, today: today).map { _ in
                     TaskList.floatingButton(metrics.floatingButton)
                 },
                 addList: shape == .list ? addList : nil,

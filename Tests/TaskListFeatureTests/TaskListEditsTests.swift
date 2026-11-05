@@ -104,6 +104,47 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(rows(of: module.model).map(\.id) == [pinned, loose, last.id])
 }
 
+/// A list that orders by anything but rank puts a task where its sort says, so the floating "+" pins a new task first
+/// to land it at the top of the block, above a task overdue on Today (spec section 4; the controller's ruling on #176,
+/// 2026-11-05).
+@Test func theFloatingPlusOnTodayLandsAboveAnOverdueTask() throws {
+    let store = try makeStore()
+    let overdue = try store.createTask(NewTask(title: "Late", when: day(-1)))
+    let module = try list(BuiltInTaskViews.today, in: store)
+    module.tap(.addTaskButtonTapped)
+    let opened = try #require(openCard(in: module.model))
+    #expect(rows(of: module.model).map(\.id) == [opened.id, overdue])
+    #expect(try store.manualList(of: BuiltInTaskViews.today) == [opened.id])
+    let descending = try store.createView(NewTaskView(
+        title: "Newest ranks first", filter: .status([.open]), sort: [SortKey(.rank, descending: true)]
+    ))
+    let onDescending = try list(descending, in: store)
+    onDescending.tap(.addTaskButtonTapped)
+    let onTop = try #require(openCard(in: onDescending.model))
+    #expect(rows(of: onDescending.model).first?.id == onTop.id, "a descending rank puts the lowest last")
+    #expect(try store.manualList(of: descending) == [onTop.id])
+}
+
+/// A list ordered by rank with no pins has the new task at the top by its rank alone, and takes no pin, which would put
+/// the `.start` tasks quick entry and the command line write under it. An empty sort orders by rank too
+/// (`FilterCompiler.orderBy`).
+@Test func theFloatingPlusOnARankOrderedListWritesNoPin() throws {
+    let store = try makeStore()
+    let old = try store.createTask(NewTask(title: "Buy milk"))
+    let module = try list(inbox, in: store)
+    module.tap(.addTaskButtonTapped)
+    let opened = try #require(openCard(in: module.model))
+    #expect(rows(of: module.model).map(\.id) == [opened.id, old])
+    #expect(try store.manualList(of: inbox).isEmpty)
+    module.tap(.backgroundTapped)
+    let unsorted = try store.createView(NewTaskView(title: "No sort", filter: .status([.open])))
+    let onUnsorted = try list(unsorted, in: store)
+    onUnsorted.tap(.addTaskButtonTapped)
+    let onTop = try #require(openCard(in: onUnsorted.model))
+    #expect(rows(of: onUnsorted.model).first?.id == onTop.id)
+    #expect(try store.manualList(of: unsorted).isEmpty)
+}
+
 /// A grouped list with no tasks has no block, and its floating "+" takes the rule's edits (the controller's ruling on
 /// #176, 2026-11-05).
 @Test func theFloatingPlusOnAnEmptyGroupedListTakesTheRulesEdits() throws {
@@ -127,6 +168,22 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(block(id, of: module.model)?.isFolded == false)
     #expect(openCard(in: module.model) != nil)
     #expect(block(id, of: try list(BuiltInTaskViews.upcoming, in: store).model)?.isFolded == false, "the device keeps it")
+}
+
+/// Columns do not fold (spec section 5), so a task added on the board leaves the fold the list keeps for that block
+/// (the controller's ruling on #176, 2026-11-05).
+@Test func addingInAColumnKeepsTheListsFold() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Buy milk", when: day(1)))
+    let module = try list(BuiltInTaskViews.upcoming, in: store)
+    let id = TaskList.Model.BlockID.own(.day(day(1)))
+    module.tap(.blockChevronTapped(id))
+    module.tap(.showAsChosen(.columns))
+    module.tap(.addTaskRowTapped(in: id))
+    #expect(openCard(in: module.model) != nil)
+    module.tap(.backgroundTapped)
+    module.tap(.showAsChosen(.list))
+    #expect(block(id, of: module.model)?.isFolded == true)
 }
 
 /// A folded block has no "+ Add task" (canvas), and one sent for it adds nothing.
@@ -502,6 +559,23 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(block(.list(third.id), of: module.model)?.header?.field == nil)
 }
 
+/// "+ Add list" tapped while a name is being typed keeps what was typed, a natural way to add two lists in a row (spec
+/// section 4; the controller's ruling on #176, 2026-11-05).
+@Test func addingAListWhileNamingKeepsWhatWasTyped() throws {
+    let store = try makeStore()
+    let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let module = try list(parent, in: store)
+    module.tap(.addListTapped)
+    let first = try #require(try store.children(ofView: parent).last)
+    module.tap(.listNameFieldChanged("Errands"))
+    module.tap(.addListTapped)
+    #expect(try store.view(first.id)?.title == "Errands")
+    let second = try #require(try store.children(ofView: parent).last)
+    #expect(second.id != first.id)
+    #expect(block(.list(second.id), of: module.model)?.header?.field?.text == "New list")
+    #expect(block(.list(first.id), of: module.model)?.header?.field == nil)
+}
+
 @Test func anEmptyNameKeepsTheOld() throws {
     let store = try makeStore()
     let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
@@ -565,6 +639,49 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
 }
 
 // MARK: - A refusal
+
+/// The new task and its pin are two transactions: where the pin is refused, a peer having deleted the manual list, the
+/// task is taken back, so that "nothing was written" is true and no untitled task stays behind (the controller's ruling
+/// on #176, 2026-11-05).
+@Test func aRefusedPinTakesTheNewTaskBack() throws {
+    let store = try makeStore()
+    let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open]), sort: [SortKey(.rank)]))
+    let manual = try store.createManualList("Errands", in: parent, color: nil)
+    let module = try list(parent, in: store)
+    try store.delete(view: manual)
+    module.tap(.addTaskRowTapped(in: .list(manual)))
+    #expect(try store.allTasks().isEmpty)
+    #expect(openCard(in: module.model) == nil)
+    #expect(rows(of: module.model).isEmpty)
+    #expect(module.model.problem == "The change could not be saved, so nothing was written.")
+}
+
+/// A close the store refused stops the add that followed it, so that its sentence stands and a title that was not saved
+/// is not passed over in silence; the card is closed, so a second tap adds (the controller's ruling on #176,
+/// 2026-11-05).
+@Test func aCloseTheStoreRefusedStopsTheAddThatFollowed() throws {
+    let adds: [(TaskList.UserAction, Bool)] = [
+        (.addTaskButtonTapped, true), (.addTaskRowTapped(in: .own(nil)), true), (.addListTapped, false),
+    ]
+    for (add, addsATask) in adds {
+        let store = try makeStore()
+        let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+        let id = try store.createTask(NewTask(title: "Buy milk"))
+        let kept = try store.createTask(NewTask(title: "Call the bank"))
+        let module = try list(parent, in: store)
+        module.tap(.rowTapped(id))
+        module.tap(.titleFieldChanged("Typed"))
+        try store.delete(task: id)
+        module.tap(add)
+        #expect(module.model.problem == "The change could not be saved, so nothing was written.", "\(add)")
+        #expect(try store.allTasks().map(\.id) == [kept], "\(add)")
+        #expect(try store.children(ofView: parent).isEmpty, "\(add)")
+        module.tap(add)
+        #expect(module.model.problem == nil, "\(add)")
+        #expect(try store.allTasks().count == (addsATask ? 2 : 1), "\(add)")
+        #expect(try store.children(ofView: parent).count == (addsATask ? 0 : 1), "\(add)")
+    }
+}
 
 /// A write the store refuses says so with the module's sentence, and the rows are read back, since what it refused can
 /// be a peer's change the module has not heard of yet; the next write that holds takes the sentence away.

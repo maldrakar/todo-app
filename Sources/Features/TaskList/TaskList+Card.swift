@@ -20,12 +20,6 @@ extension TaskList {
         var subtaskDraft: String?
     }
 
-    /// The name of the list just made, being typed in its header (spec section 4).
-    struct ListNaming {
-        let id: ViewID
-        var draft: String
-    }
-
     /// The card of a task (spec section 3; the controller's ruling on #176, 2026-11-05): its check, its title's and
     /// notes' fields with what was typed or what the store keeps, its subtasks each with a small check, the subtask's
     /// field where one is open, "Add subtask", the pills, and Open full screen.

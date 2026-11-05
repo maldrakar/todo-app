@@ -161,9 +161,9 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(rowIDs(of: .list(house), in: module.model).isEmpty)
 }
 
-/// A day block always writes its day, though the rule's own day condition holds of the day the task is on: a task dragged
-/// between two days moves to the one it was let go in (the controller's ruling on #176, 2026-11-05). The row names where it
-/// lands among the block's rows, and a move pins nothing where the rule asks for no manual list.
+/// A day block always writes its day, though the rule's own day condition holds of the day the task is on: a task
+/// dragged between two days moves to the one it was let go in (the controller's ruling on #176, 2026-11-05). The row
+/// names where it lands among the block's rows, and a move pins nothing where the rule asks for no manual list.
 @Test func aDayBlockAlwaysWritesItsDay() throws {
     let store = try makeStore()
     let work = try store.createTag(title: "work")
@@ -178,8 +178,8 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(blocks(of: module.model).map(\.id) == [.own(.day(day(2)))], "the day it left has no block")
 }
 
-/// A day block of a list grouped by deadline writes its day as the deadline, and what the rule's When gives only where the
-/// task does not meet it (the controller's ruling on #176, 2026-11-05).
+/// A day block of a list grouped by deadline writes its day as the deadline, and what the rule's When gives only where
+/// the task does not meet it (the controller's ruling on #176, 2026-11-05).
 @Test func aDropIntoADeadlineDayBlockSetsTheDeadline() throws {
     let store = try makeStore()
     let due = try store.createView(NewTaskView(
@@ -244,6 +244,71 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     module.tap(.rowDropped(id, from: .list(house), in: .list(folder), after: nil))
     #expect(try stored(id, in: store).tags == [first])
     #expect(rowIDs(of: .list(folder), in: module.model) == [id])
+}
+
+/// A task dragged out of a folder's block gives back what every list under it asks, so that it leaves the block it came
+/// from whichever list held it: a tag of the folder's second list (the controller's ruling on #176, 2026-11-05).
+@Test func aDropOutOfAFolderLeavesItsSecondList() throws {
+    let store = try makeStore()
+    let a = try store.createTag(title: "a")
+    let b = try store.createTag(title: "b")
+    let c = try store.createTag(title: "c")
+    let parent = try projects(store)
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: parent))
+    try store.createView(NewTaskView(title: "First", parent: folder, filter: .hasTag(a)))
+    try store.createView(NewTaskView(title: "Second", parent: folder, filter: .hasTag(b)))
+    let other = try store.createView(NewTaskView(title: "Other", parent: parent, filter: .hasTag(c)))
+    let id = try store.createTask(NewTask(title: "Fix the door", tags: [b]))
+    let module = try list(parent, in: store)
+    #expect(rowIDs(of: .list(folder), in: module.model) == [id])
+    module.tap(.rowDropped(id, from: .list(folder), in: .list(other), after: nil))
+    #expect(try stored(id, in: store).tags == [c])
+    #expect(rowIDs(of: .list(other), in: module.model) == [id])
+    #expect(rowIDs(of: .list(folder), in: module.model).isEmpty)
+}
+
+/// So does a task pinned in a manual list under the folder, however deep the folder's section reaches, and what the
+/// target asks stays: a tag a list under the folder asks too.
+@Test func aDropOutOfAFolderLeavesItsManualListsToAnyDepth() throws {
+    let store = try makeStore()
+    let a = try store.createTag(title: "a")
+    let shared = try store.createTag(title: "shared")
+    let parent = try projects(store)
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: parent))
+    try store.createView(NewTaskView(title: "First", parent: folder, filter: .hasTag(a)))
+    let inner = try store.createView(NewTaskView(title: "Inner", parent: folder))
+    let manual = try store.createManualList("Manual", in: inner, color: nil)
+    try store.createView(NewTaskView(title: "Sharing", parent: inner, filter: .hasTag(shared)))
+    let other = try store.createView(NewTaskView(title: "Other", parent: parent, filter: .hasTag(shared)))
+    let pinned = try store.createTask(NewTask(title: "Pinned", tags: [shared]))
+    try store.pin(task: pinned, in: manual)
+    let module = try list(parent, in: store)
+    module.tap(.rowDropped(pinned, from: .list(folder), in: .list(other), after: nil))
+    #expect(try store.manualList(of: manual).isEmpty)
+    #expect(try stored(pinned, in: store).tags == [shared], "what the target asks is not given back")
+    #expect(rowIDs(of: .list(other), in: module.model) == [pinned])
+}
+
+/// A folder gives back only what its section reads: not the rule of a list inside one of its lists with a rule, which
+/// its section does not reach (`Store.gatheredRules(of:)`), and nothing for a list whose rule reads as no edits.
+@Test func aDropOutOfAFolderGivesBackOnlyWhatItsSectionReads() throws {
+    let store = try makeStore()
+    let kept = try store.createTag(title: "kept")
+    let a = try store.createTag(title: "a")
+    let c = try store.createTag(title: "c")
+    let alternative = try store.createTag(title: "alternative")
+    let parent = try projects(store)
+    let folder = try store.createView(NewTaskView(title: "Folder", parent: parent))
+    let first = try store.createView(NewTaskView(title: "First", parent: folder, filter: .hasTag(a)))
+    try store.createView(NewTaskView(title: "Inside first", parent: first, filter: .hasTag(kept)))
+    try store.createView(NewTaskView(
+        title: "Either", parent: folder, filter: .or([.hasTag(alternative), .when(.on(40))])
+    ))
+    let other = try store.createView(NewTaskView(title: "Other", parent: parent, filter: .hasTag(c)))
+    let id = try store.createTask(NewTask(title: "Fix the door", tags: [a, kept, alternative]))
+    let module = try list(parent, in: store)
+    module.tap(.rowDropped(id, from: .list(folder), in: .list(other), after: nil))
+    #expect(try stored(id, in: store).tags == [kept, alternative, c])
 }
 
 @Test func aDropIntoTheOwnBlockLeavesTheListInside() throws {

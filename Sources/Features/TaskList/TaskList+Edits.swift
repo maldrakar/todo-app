@@ -52,7 +52,7 @@ extension TaskList {
             writeAndReread { () throws(StoreError) in try store.update(task: id, [.status(status)]) }
             return
         }
-        if cardIsUntitled() { dismissCard() } else { saveCard(setting: status, withSubtask: true) }
+        if cardHoldsNothing() { dismissCard() } else { saveCard(setting: status, withSubtask: true) }
     }
 
     /// Opens and closes the strip, session state; closing it closes a card under it by the rule of every close. It
@@ -67,13 +67,15 @@ extension TaskList {
 
     /// The floating "+": a new task at the top of the block it adds to, by what that block's rule asks (spec section 4;
     /// the controller's ruling on #176, 2026-11-05). The card that was open closes first, which can change which block
-    /// that is.
+    /// that is, and a close the store refused stops the add, so that its sentence stands; the card is closed, so a
+    /// second tap adds.
     func addFromFloatingButton() {
         guard model.addTask != nil else { return }
         state.problem = nil
         closeCard()
+        guard state.problem == nil else { return }
         let target = TaskList.floatingTarget(
-            in: state.pageBlocks, head: state.head, rule: state.snapshot.page.view.filter, today: state.day.day
+            in: state.pageBlocks, of: state.snapshot, head: state.head, today: state.day.day
         )
         guard let target else { return }
         addTask(target.edits, at: .start, onTopOf: target.view)
@@ -81,23 +83,26 @@ extension TaskList {
 
     /// "+ Add task": a new task at the end of its block, by what the block's rule asks (spec section 4). The block's
     /// edits are read before the card that was open closes, which can take the block with it, a day whose one task it
-    /// was.
+    /// was; a close the store refused stops the add, as the floating "+"'s does.
     func addFromRow(in id: Model.BlockID) {
         guard TaskList.blocks(in: model.layout).first(where: { $0.id == id })?.addTask != nil,
               let edits = state.pageBlocks.first(where: { $0.id == id })?.edits
         else { return }
         state.problem = nil
         closeCard()
+        guard state.problem == nil else { return }
         addTask(edits, at: .end, onTopOf: nil)
     }
 
     /// Writes a new empty task with what the edits give it and the tags picked in the tag bar but one the rule takes
-    /// off, pinned where they pin; `onTopOf` names the view whose manual list it must stand above, where they do not
-    /// pin and that view has one, an unpinned task landing under the pinned ones (the controller's ruling on #176,
-    /// 2026-11-05). Its card opens, its block unfolding if it was folded (the controller's ruling on #176, 2026-11-05);
-    /// and a task that landed nowhere the screen draws has no card to close, so it is taken back, and not left behind
-    /// untitled.
-    private func addTask(_ edits: Edits, at placement: Placement, onTopOf view: ViewID?) {
+    /// off, pinned where they pin. `onTopOf` names the view whose top it must stand at, where they do not pin: it is
+    /// pinned first there unless that view orders by rank with an empty manual list, where its rank at `.start` is the
+    /// top already, and a pin would put the `.start` tasks quick entry and the command line write under it (the
+    /// controller's ruling on #176, 2026-11-05). A pin refused takes the task back, so that the sentence saying nothing
+    /// was written is true. Its card opens, its block unfolding in the list if it was folded, columns not folding (spec
+    /// section 5); and a task that landed nowhere the screen draws has no card to close, so it is taken back, and not
+    /// left behind untitled.
+    private func addTask(_ edits: Edits, at placement: Placement, onTopOf view: TaskView?) {
         let new = NewTask(
             title: "", when: edits.when ?? nil, deadline: edits.deadline ?? nil,
             tags: edits.addTags.union(state.picks.subtracting(edits.removeTags))
@@ -105,28 +110,55 @@ extension TaskList {
         var created: TaskID?
         let written = writeAndReread { () throws(StoreError) in
             let id = try store.createTask(new, at: placement)
-            created = id
-            if let list = edits.pinIn {
-                try store.pin(task: id, in: list, at: placement)
-            } else if let view, try !store.manualList(of: view).isEmpty {
-                try store.pin(task: id, in: view, at: .start)
+            do throws(StoreError) {
+                if let list = edits.pinIn {
+                    try store.pin(task: id, in: list, at: placement)
+                } else if let view, try !isAtTheTopAlready(of: view) {
+                    try store.pin(task: id, in: view.id, at: .start)
+                }
+            } catch {
+                try? store.delete(task: id)
+                throw error
             }
+            created = id
         }
         guard written, let created else { return }
         state.card = OpenCard(id: created, typedTitle: nil, notes: "", typedNotes: nil, subtasks: [], subtaskDraft: nil)
-        let landed = state.pageBlocks.filter { $0.tasks.contains { $0.id == created } }
-        let keys = landed.compactMap { TaskList.foldKey(of: $0.id) }
-        if !state.folded.isDisjoint(with: keys) { setFolded(state.folded.subtracting(keys)) }
+        unfoldTheBlocks(of: created)
         if !isDrawn(created) {
             state.card = nil
             writeAndReread { () throws(StoreError) in try store.delete(task: created) }
         }
     }
 
+    /// Whether a task created at `.start` stands first in a view: where it orders by rank, an empty sort doing so too
+    /// (`FilterCompiler.orderBy`), and no task is pinned above it.
+    private func isAtTheTopAlready(of view: TaskView) throws(StoreError) -> Bool {
+        let ordersByRank = view.sort.first.map { $0.field == .rank && !$0.descending } ?? true
+        guard ordersByRank else { return false }
+        return try store.manualList(of: view.id).isEmpty
+    }
+
+    /// Unfolds the blocks a new task landed in, in the list: columns do not fold, and a task added on the board leaves
+    /// the fold the list keeps (spec section 5).
+    private func unfoldTheBlocks(of id: TaskID) {
+        guard case .list = model.layout else { return }
+        let landed = state.pageBlocks.filter { $0.tasks.contains { $0.id == id } }
+        let keys = landed.compactMap { TaskList.foldKey(of: $0.id) }
+        if !state.folded.isDisjoint(with: keys) { setFolded(state.folded.subtracting(keys)) }
+    }
+
     // MARK: - Adding a list
 
+    /// The name of the list just made, being typed in its header (spec section 4).
+    struct ListNaming {
+        let id: ViewID
+        var draft: String
+    }
+
     /// "+ Add list": a manual list inside this one, last among its lists, in its colour, with its name's field open in
-    /// its header on the title it was made with (spec section 4). The card that was open closes first.
+    /// its header on the title it was made with (spec section 4). A name being typed is settled and the card that was
+    /// open closes first, and a write the store refused there stops the add, as the floating "+"'s does.
     func addList() {
         let model = model
         let offered = switch model.layout {
@@ -135,7 +167,9 @@ extension TaskList {
         }
         guard offered != nil else { return }
         state.problem = nil
+        settleListName()
         closeCard()
+        guard state.problem == nil else { return }
         let title = "New list"
         var made: ViewID?
         let color = state.snapshot.page.view.color
