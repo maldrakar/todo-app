@@ -12,6 +12,21 @@ struct Edits: Equatable {
     let pinIn: ViewID?
     let unpinFrom: Set<ViewID>
 
+    /// Edits ask nothing but what they are given, which is what an open status, the root and being out of the Trash ask
+    /// of a task the screen adds or drags, which is open, at the root and out of the Trash, and what a conjunction starts
+    /// from.
+    init(
+        when: Day?? = nil, deadline: Day?? = nil, addTags: Set<TagID> = [], removeTags: Set<TagID> = [],
+        pinIn: ViewID? = nil, unpinFrom: Set<ViewID> = []
+    ) {
+        self.when = when
+        self.deadline = deadline
+        self.addTags = addTags
+        self.removeTags = removeTags
+        self.pinIn = pinIn
+        self.unpinFrom = unpinFrom
+    }
+
     /// The edits a rule asks of a task, or nil for a rule the module cannot read as edits (spec section 4). `day` is
     /// the When of the day block they are for, which replaces what the rule's When gives and stands where the rule has
     /// none, and nil outside a day block; a rule that refuses refuses there too (the controller's ruling on #176,
@@ -53,36 +68,30 @@ struct Edits: Equatable {
         return changes
     }
 
-    /// Asks nothing, what an open status, the root and being out of the Trash ask of a task the screen adds or drags,
-    /// which is open, at the root and out of the Trash, and what a conjunction starts from.
-    private static let nothing = Edits(
-        when: nil, deadline: nil, addTags: [], removeTags: [], pinIn: nil, unpinFrom: []
-    )
-
     /// The walk over the rule, which may recurse, since the store refuses a filter deeper than `maximumDepth` (global
     /// constraints): a condition its edit, a conjunction each of its parts, and nil for what no edit satisfies.
     private static func read(_ filter: Filter, today: Day) -> Edits? {
         switch filter {
         case .when(let condition):
             guard let day = day(condition, today: today) else { return nil }
-            return Edits(when: day, deadline: nil, addTags: [], removeTags: [], pinIn: nil, unpinFrom: [])
+            return Edits(when: day)
         case .deadline(let condition):
             guard let day = day(condition, today: today) else { return nil }
-            return Edits(when: nil, deadline: day, addTags: [], removeTags: [], pinIn: nil, unpinFrom: [])
+            return Edits(deadline: day)
         case .hasTag(let tag):
-            return Edits(when: nil, deadline: nil, addTags: [tag], removeTags: [], pinIn: nil, unpinFrom: [])
+            return Edits(addTags: [tag])
         case .listedIn(let view):
-            return Edits(when: nil, deadline: nil, addTags: [], removeTags: [], pinIn: view, unpinFrom: [])
+            return Edits(pinIn: view)
         case .not(.hasTag(let tag)):
-            return Edits(when: nil, deadline: nil, addTags: [], removeTags: [tag], pinIn: nil, unpinFrom: [])
+            return Edits(removeTags: [tag])
         case .not(.listedIn(let view)):
-            return Edits(when: nil, deadline: nil, addTags: [], removeTags: [], pinIn: nil, unpinFrom: [view])
+            return Edits(unpinFrom: [view])
         case .status(let statuses) where !statuses.isEmpty && statuses.allSatisfy({ $0 == .open }):
-            return nothing
+            return Edits()
         case .parent(nil), .trashed(false):
-            return nothing
+            return Edits()
         case .and(let parts):
-            var edits = nothing
+            var edits = Edits()
             for part in parts {
                 guard let asked = read(part, today: today), let merged = edits.merged(with: asked) else { return nil }
                 edits = merged

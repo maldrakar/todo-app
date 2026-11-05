@@ -60,13 +60,16 @@ extension TaskList {
         )
     }
 
+    /// What a row's swipe and its menu both call what they do.
+    private static let deleteTitle = "Delete"
+
     /// A row's swipe to its Delete.
     static func swipe(of id: TaskID, _ metrics: Metrics.Swipe) -> SwipeModel<UserAction> {
         SwipeModel(
             threshold: metrics.threshold, shift: metrics.shift, buttonWidth: metrics.buttonWidth,
             buttonVerticalInset: metrics.buttonVerticalInset, buttonTrailingInset: metrics.buttonTrailingInset,
             buttonCornerRadius: metrics.buttonCornerRadius,
-            button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), background: .red, animation: .swipe,
+            button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), background: .red, animation: .swipe,
             action: .deleteSwiped(id)
         )
     }
@@ -77,7 +80,7 @@ extension TaskList {
         MenuModel(sections: [
             .init(items: [
                 .init(
-                    title: "Delete", icon: .trash, isDestructive: true, shortcut: nil,
+                    title: deleteTitle, icon: .trash, isDestructive: true, shortcut: nil,
                     action: .deleteMenuItemChosen(id)
                 ),
             ]),
