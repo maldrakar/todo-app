@@ -106,12 +106,12 @@ public struct Route: RouteValue {
     public enum Group: Hashable, Sendable {   // a group's key as its address: a distance, never a date
         case day(Int32?), deadline(Int32?), tag(TagID?), parent(TaskID?), status(TaskStatus)
     }
-    public enum Over: RouteValue {    // what the list declares over itself
+    public enum Tail: Equatable, Sendable {   // what the list declares over itself
         case task(TaskScreen.Route)   // Open full screen
         case list(TaskList.Route)     // a block opened as a screen: a list inside, or one of this list's groups
     }
     public let head: Head
-    public let over: Over?
+    public let tail: Tail?
 }
 
 public struct Model: Equatable, Sendable {

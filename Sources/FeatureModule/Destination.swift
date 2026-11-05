@@ -14,7 +14,12 @@
 /// A destination holds a push or nothing. A modal is the other case the spec gives it, `presented`, and joins
 /// `Declared` as a second generic parameter with the first screen that declares one, since nothing is added
 /// before its caller (spec section 5, "Built in this epic"; `docs/style.md`).
-public struct Destination<Pushed: RouteValue> {
+///
+/// What it holds is any equatable value, and not a `RouteValue`: it never reads a head. The stack compares heads
+/// on its flow's enum of routes, which each screen's destination is lifted into (`map`), so an opener whose
+/// destination is one of several kinds of screen holds an enum of their routes with no head of its own (owner's
+/// review of #188).
+public struct Destination<Pushed: Equatable & Sendable> {
     /// What a screen declares over it, which a destination holds or does not: a screen pushed over this one.
     public enum Declared: Equatable, Sendable {
         case pushed(Pushed)
@@ -57,7 +62,7 @@ public struct Destination<Pushed: RouteValue> {
     /// The same declaration over another type of route, with the same write mark: what a flow's enum of screens
     /// gives the stack, each screen's destination over its own route lifted into the enum's route, so that the
     /// stack follows a write exactly once whichever type it is read through.
-    public func map<Mapped: RouteValue>(_ transform: (Pushed) -> Mapped) -> Destination<Mapped> {
+    public func map<Mapped: Equatable & Sendable>(_ transform: (Pushed) -> Mapped) -> Destination<Mapped> {
         let mapped: Destination<Mapped>.Declared? = switch declared {
         case .pushed(let route)?: .pushed(transform(route))
         case nil: nil

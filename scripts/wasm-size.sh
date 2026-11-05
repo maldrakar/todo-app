@@ -6,13 +6,18 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# 6.75 MiB. The probe measures 6,752,164 bytes with Swift 6.4.0 as this is written, so the budget is that with four
-# percent to spare, rounded up to a whole 64 KiB. What has moved the reading since is the code: 6,711,593 bytes on the
-# `main` this was measured beside, 9e279c5, and the other 40,571 once the sidebar built the wide window's rows, lines,
-# bar and drag from the Mac board's numbers, one value of them per width, and named the bar's "+" menu once more for
-# the menu bar, and the probe read both looks of the drag and the bar of a root made with no edit mode (#149). The
-# binary carries the path of the directory it was built in, so a
-# reading moves by a few hundred bytes with the checkout's path, and the two above were taken in one. In #161 it was
+# 7.125 MiB. The probe measures 7,146,002 bytes with Swift 6.4.0 as this is written, so the budget is that with four
+# percent to spare, rounded up to a whole 64 KiB. What has moved the reading since is the code: 6,933,573 bytes on the
+# `main` this was measured beside, d6ed078, and the other 212,429 once the task list read its view's page into blocks
+# built from the design system's component models, in a list and as columns, with the tag bar, the folds and the layout
+# the device keeps and the days named in English, and its route read and wrote a chain of lists and a group's address,
+# and the probe drove a chain, a group across a day, a pick, a fold and both layouts through the switches the list's
+# view has (#175). The binary carries the path of the directory it was built in, so a reading moves by a few hundred
+# bytes with the checkout's path, and the two above were taken in one. In #149 it was 6.75 MiB over the 6,752,164
+# bytes the probe measured then, and the code moved the reading then too: 6,711,593 bytes on the `main` that was
+# measured beside, 9e279c5, and the other 40,571 once the sidebar built the wide window's rows, lines, bar and drag from
+# the Mac board's numbers, one value of them per width, and named the bar's "+" menu once more for the menu bar, and the
+# probe read both looks of the drag and the bar of a root made with no edit mode. In #161 it was
 # 6.6875 MiB over the 6,711,728 bytes the probe measured then, and the code moved the reading then too: 6,605,543 bytes
 # on the `main` that was measured beside, 023eeb2, and the other 106,185 once the sidebar built its screen's component
 # models, its rows, its bar, the look of its drag and its dialogs, from the design system's components target, and the
@@ -36,7 +41,7 @@ cd "$(dirname "$0")/.."
 # in, costs 2.8 MB instead. SQLite and FoundationEssentials sit inside the floor, on both sides of the comparison, so
 # they are not what the difference is made of. Moving this number is a decision, so it lives here in one place and
 # nowhere else.
-BUDGET_BYTES=7077888
+BUDGET_BYTES=7471104
 SDK=swift-6.4.0-RELEASE_wasm
 PRODUCT=wasm-size-probe
 

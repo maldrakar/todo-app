@@ -6,13 +6,26 @@ import DesignSystem
 /// `trailingMargin`, `bottomMargin` and `leadingMargin` from what stands round it; its title, or the field in its place
 /// while the list is being named, and `titleToSubtitle` after the title its subtitle where it has one, `topPadding`
 /// below its top, `horizontalPadding` in from either side and `bottomPadding` above its bottom; the chevron that folds
-/// and opens the block, centred in a square cell `chevronHitSide` on a side; its rule along its bottom where it has
-/// one; and what it draws under itself, the pointer's tint, rounded by `cornerRadius`, in points.
+/// and opens the block where it has one (`Fold`); its rule along its bottom where it has one; and what it draws under
+/// itself, the pointer's tint, rounded by `cornerRadius`, in points.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block and a column each hold one, every comparison
 /// of the screen's model compares it, and inline, its field and chevron with it, it is some 770 bytes on wasm32. Its
 /// `==` compares every stored property, and a test changes them one at a time.
 public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Sendable {
+    /// The control that folds and opens the block: its chevron, centred in a square cell `hitSide` on a side, in
+    /// points. Held whole where a header has it and absent where it has none, as `SearchFieldModel.TrailingGlyph` holds
+    /// a glyph and its cell, so that a header with no chevron carries no size for one.
+    public struct Fold: Equatable, Sendable {
+        public let chevron: AccessoryModel<Action>.Chevron
+        public let hitSide: Double
+
+        public init(chevron: AccessoryModel<Action>.Chevron, hitSide: Double) {
+            self.chevron = chevron
+            self.hitSide = hitSide
+        }
+    }
+
     /// The title, in the colour of the list the block is: the open list's glyph colour for a group, its own for a list.
     public let title: TextModel
 
@@ -24,8 +37,9 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
     /// The field the title is typed into while the list is being named, in the title's place, and nil while it is not.
     public let field: TextFieldModel<Action>?
 
-    public let chevron: AccessoryModel<Action>.Chevron
-    public let chevronHitSide: Double
+    /// The control that folds and opens the block, and nil for a header with none, as a column's is, since columns do
+    /// not fold (list screen spec, section 5).
+    public let fold: Fold?
 
     /// The rule under the header, across its width, whose width is how thick it is, and nil for a header with none, as
     /// a column's is.
@@ -49,8 +63,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         subtitle: TextModel?,
         titleToSubtitle: Double,
         field: TextFieldModel<Action>?,
-        chevron: AccessoryModel<Action>.Chevron,
-        chevronHitSide: Double,
+        fold: Fold?,
         rule: StrokeModel?,
         height: Double,
         topMargin: Double,
@@ -67,8 +80,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         self.subtitle = subtitle
         self.titleToSubtitle = titleToSubtitle
         self.field = field
-        self.chevron = chevron
-        self.chevronHitSide = chevronHitSide
+        self.fold = fold
         self.rule = rule
         self.height = height
         self.topMargin = topMargin
@@ -88,8 +100,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
             && lhs.subtitle == rhs.subtitle
             && lhs.titleToSubtitle == rhs.titleToSubtitle
             && lhs.field == rhs.field
-            && lhs.chevron == rhs.chevron
-            && lhs.chevronHitSide == rhs.chevronHitSide
+            && lhs.fold == rhs.fold
             && lhs.rule == rhs.rule
             && lhs.height == rhs.height
             && lhs.topMargin == rhs.topMargin

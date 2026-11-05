@@ -38,7 +38,7 @@ private func sidebarOn(
     _ view: ViewID, in store: Store, width: WindowWidth, on day: DeviceDay = testDay
 ) throws -> TaskViewList.Model {
     try TaskViewList(
-        store: store, route: .init(list: .init(head: view)), width: width, day: day, capabilities: iPhone
+        store: store, route: .init(list: .init(head: .init(view: view))), width: width, day: day, capabilities: iPhone
     ).model
 }
 
@@ -74,7 +74,15 @@ private func draft(of row: TaskViewList.Model.Row) -> String? {
 /// standing in the window is compared with: the rows as a read now answers them on the day, the test's unless another
 /// is named, and no sentence.
 private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay) throws -> AppModule.ScreenModel {
-    .list(try TaskList(store: store, route: .init(head: view), day: day).model)
+    .list(try TaskList(store: store, route: .init(head: .init(view: view)), day: day).model)
+}
+
+/// The model of the screen of one of a list's own groups made now, as an element of the window's stack holds it, which
+/// is what a group standing over its list is compared with.
+private func groupOn(
+    _ group: TaskList.Route.Group, of view: ViewID, in store: Store, on day: DeviceDay = testDay
+) throws -> AppModule.ScreenModel {
+    .list(try TaskList(store: store, route: .init(head: .init(view: view, group: group)), day: day).model)
 }
 
 /// The model of a task screen made now on a task, as an element of the window's stack holds it.
@@ -114,6 +122,20 @@ private func firstList(in app: AppModule) throws -> TaskList.Model {
 
 private struct FirstScreenIsNoList: Error {}
 
+/// The rows a list's model draws, block by block and flattened, as their ids and titles, read over the layout and a
+/// row's kind as the list's view reads them.
+private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
+    let blocks = switch list.layout {
+    case .list(let blocks): blocks
+    case .columns(let board): board.columns
+    }
+    return blocks.flatMap(\.rows).map { row in
+        switch row {
+        case .task(let id, let model): (id, model.title.text)
+        }
+    }
+}
+
 /// The default window names no view, so the sidebar chooses the Inbox itself and declares its list, which the
 /// window's stack makes: the root names no view of its own (ADR-0006, amendment of 2026-10-03).
 @Test func theDefaultWindowOpensTheListOnTheSidebarsChoice() throws {
@@ -122,7 +144,7 @@ private struct FirstScreenIsNoList: Error {}
     let app = try AppModule(store: store, width: .wide, day: testDay, capabilities: iPhone)
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
     #expect(try standing(in: app) == [listOn(inbox, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy milk"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy milk"])
     #expect(app.model.quickEntry == nil)
     #expect(app.model.problem == nil)
     #expect(app.route.path == "/view/\(inbox)")
@@ -285,7 +307,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.send(.changed(deleted)) == nil)
     #expect(app.model.layout == .wide(column: path[0], path: []))
     #expect(try standing(in: app) == [listOn(inbox, in: store)])
-    #expect(try firstList(in: app).rows.map(\.id) == [kept])
+    #expect(rows(of: try firstList(in: app)).map(\.id) == [kept])
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
     #expect(app.route.path == "/view/\(inbox)")
     let model = app.model
@@ -362,7 +384,7 @@ private struct FirstScreenIsNoList: Error {}
     let ids = idsOverTheSidebar(in: wide)
     try #require(ids.count == 2, "the list and the task over it are the setup")
     let narrowSidebar = try TaskViewList(
-        store: store, route: .init(list: .init(head: inbox)), width: .narrow, day: testDay, capabilities: iPhone
+        store: store, route: .init(list: .init(head: .init(view: inbox))), width: .narrow, day: testDay, capabilities: iPhone
     )
     _ = narrowSidebar.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
     _ = narrowSidebar.send(.action(.titleFieldChanged("Soon")))
@@ -485,12 +507,12 @@ private struct FirstScreenIsNoList: Error {}
     let app = try AppModule(
         store: store, route: route, width: .wide, day: deviceDay(testDay.day.advanced(by: -1)), capabilities: iPhone
     )
-    #expect(try firstList(in: app).rows.isEmpty, "the task is tomorrow's; this is the setup")
+    #expect(rows(of: try firstList(in: app)).isEmpty, "the task is tomorrow's; this is the setup")
     let layout = app.model.layout
     #expect(app.send(.dayChanged(testDay)) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(today, in: store, width: .wide)))
     #expect(try standing(in: app) == [listOn(today, in: store), taskOn(id, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Call the bank"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Call the bank"])
     #expect(app.model.layout == layout)
     #expect(app.route == route)
 }
@@ -526,7 +548,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.send(.dayChanged(testDay)) == nil)
     #expect(app.send(.action(.taskViewList(.rowSelected(BuiltInTaskViews.today)))) == nil)
     #expect(try standing(in: app) == [listOn(BuiltInTaskViews.today, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Call the bank"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Call the bank"])
 }
 
 /// What the window's platform offers reaches the sidebar as the platform said it when the window was made (Lists
@@ -544,7 +566,7 @@ private struct FirstScreenIsNoList: Error {}
             let capabilities = WindowCapabilities(opensWindowsBeside: opensWindowsBeside, hasEditMode: hasEditMode)
             let app = try AppModule(store: store, width: .wide, day: testDay, capabilities: capabilities)
             let sidebar = try TaskViewList(
-                store: store, route: .init(list: .init(head: inbox)), width: .wide, day: testDay, capabilities: capabilities
+                store: store, route: .init(list: .init(head: .init(view: inbox))), width: .wide, day: testDay, capabilities: capabilities
             )
             #expect(app.model.taskViewList == sidebar.model)
             #expect(inboxMenu(app.model.taskViewList).contains("Open in New Window") == opensWindowsBeside)
@@ -573,7 +595,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.send(.route(try Route(path: "/view/\(home.view)/task/\(milk)"))) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(home.view, in: store, width: .wide)))
     #expect(try standing(in: app) == [listOn(home.view, in: store), taskOn(milk, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy milk"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy milk"])
     #expect(idsOverTheSidebar(in: app.model).allSatisfy { !replaced.contains($0) })
     #expect(app.route.path == "/view/\(home.view)/task/\(milk)")
 }
@@ -591,7 +613,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.model.taskViewList == (try sidebarOn(work.view, in: store, width: .wide)))
     #expect(idsOverTheSidebar(in: app.model).count == 1)
     let list = try firstList(in: app)
-    #expect(list.rows.map(\.id) == [kept])
+    #expect(rows(of: list).map(\.id) == [kept])
     #expect(list.problem == "The task is gone.")
     #expect(app.route.path == "/view/\(work.view)")
 }
@@ -654,7 +676,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(app.model.taskViewList.rows.last.flatMap(title(of:)) == "Docs")
     #expect(idsOverTheSidebar(in: app.model) == path)
     #expect(try standing(in: app) == [listOn(inbox, in: store), taskOn(id, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy oat milk", "Water the plants"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy oat milk", "Water the plants"])
     #expect(app.model.quickEntry?.draft == "Call the")
 }
 
@@ -700,7 +722,7 @@ private struct FirstScreenIsNoList: Error {}
     #expect(try inboxTitles(of: store) == ["Buy milk"])
     #expect(app.send(.changed(created)) == nil)
     #expect(try standing(in: app) == [listOn(inbox, in: store)])
-    #expect(try firstList(in: app).rows.map(\.title) == ["Buy milk"])
+    #expect(rows(of: try firstList(in: app)).map(\.title) == ["Buy milk"])
 }
 
 /// The sidebar's New task asks the root for quick entry, and the root opens it as its own toolbar button does, over
@@ -819,7 +841,7 @@ private struct FirstScreenIsNoList: Error {}
         return
     }
     #expect(window.path == "/view/\(today)")
-    #expect(window == Route(sidebar: .init(list: .init(head: today)), quickEntry: nil))
+    #expect(window == Route(sidebar: .init(list: .init(head: .init(view: today))), quickEntry: nil))
     #expect(app.model == model)
     #expect(app.route == route)
 }
@@ -987,6 +1009,104 @@ private struct FirstScreenIsNoList: Error {}
     #expect(relaunched.route == app.route)
 }
 
+/// A list opened over a list, by a link to a list inside it, stands in the stack as a second list over the first, each
+/// with an id of its own, which the stack's ids were made for (ADR-0009, amendment of 2026-11-01): the root's enum of
+/// screens gains no case, the sidebar lights the base of the chain, and the route writes both lists.
+@Test func aListOverAListStandsTwiceInTheStack() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects, filter: .status([.open])))
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(projects)/view/\(home)"), width: .narrow, day: testDay,
+        capabilities: iPhone
+    )
+    let path = idsOverTheSidebar(in: app.model)
+    #expect(path.count == 2)
+    #expect(Set(path).count == 2, "two elements, two ids")
+    #expect(try standing(in: app) == [listOn(projects, in: store), listOn(home, in: store)])
+    #expect(app.model.taskViewList == (try sidebarOn(projects, in: store, width: .narrow)), "the light on the base")
+    #expect(app.route.path == "/view/\(projects)/view/\(home)")
+}
+
+/// One of a list's own groups opened over the list has the list's view and the group in its head, so the stack pushes
+/// it over its list rather than keeping the list in its place (ADR-0009, amendment of 2026-11-02), and a task opened in
+/// it stands over it in turn; the sidebar lights the list.
+@Test func aGroupStandsOverItsList() throws {
+    let store = try makeStore()
+    let upcoming = BuiltInTaskViews.upcoming
+    let id = try store.createTask(NewTask(title: "Call the bank", when: testDay.day.advanced(by: 1)))
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(upcoming)/day/+1/task/\(id)"), width: .narrow, day: testDay,
+        capabilities: iPhone
+    )
+    #expect(idsOverTheSidebar(in: app.model).count == 3)
+    #expect(try standing(in: app) == [listOn(upcoming, in: store), groupOn(.day(1), of: upcoming, in: store), taskOn(id, in: store)])
+    #expect(app.model.taskViewList == (try sidebarOn(upcoming, in: store, width: .narrow)))
+    #expect(app.route.path == "/view/\(upcoming)/day/+1/task/\(id)")
+}
+
+/// A link to a group its list is not grouped by names nothing: the stack cannot make the group's screen, so the list
+/// stands alone, says why, and the window's route names the list alone (ADR-0009, amendment of 2026-11-02).
+@Test func aLinkToAGroupItsListIsNotGroupedByOpensTheListAndSaysWhy() throws {
+    let store = try makeStore()
+    let upcoming = BuiltInTaskViews.upcoming
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(upcoming)/deadline/+1"), width: .narrow, day: testDay,
+        capabilities: iPhone
+    )
+    #expect(idsOverTheSidebar(in: app.model).count == 1)
+    let list = try firstList(in: app)
+    #expect(list.header.title.text == "Upcoming")
+    #expect(list.problem == "This list is not grouped that way, so the group could not be opened.")
+    #expect(app.route.path == "/view/\(upcoming)")
+    #expect(app.model.taskViewList == (try sidebarOn(upcoming, in: store, width: .narrow)))
+}
+
+/// The window's route is written from what stands, a chain of lists included: Back from the task leaves the two lists,
+/// Back again the outer one, each route naming what stood, and a relaunch from either opens it.
+@Test func theRouteIsWrittenFromWhatStandsInAChain() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects, filter: .status([.open])))
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(projects)/view/\(home)/task/\(id)"), width: .narrow,
+        day: testDay, capabilities: iPhone
+    )
+    let path = idsOverTheSidebar(in: app.model)
+    try #require(path.count == 3)
+    #expect(app.send(.action(.wentBack(to: Array(path.prefix(2))))) == nil)
+    #expect(app.route.path == "/view/\(projects)/view/\(home)")
+    let relaunched = try AppModule(
+        store: store, route: try Route(path: app.route.path), width: .narrow, day: testDay, capabilities: iPhone
+    )
+    #expect(relaunched.model == app.model, "a relaunch opens what stood")
+    #expect(app.send(.action(.wentBack(to: [path[0]]))) == nil)
+    #expect(app.route.path == "/view/\(projects)")
+}
+
+/// The inner list closes and uncovers the outer one, by Back, which tells the outer list it was uncovered, and by its
+/// own answer, a view deleted under it, which the stack hands the outer list as `.destinationAnswered(.list(…))`: the
+/// outer list stands alone with nothing declared over it, its sentence untouched, and the route names it alone.
+@Test func closingTheInnerListUncoversTheOuter() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects, filter: .status([.open])))
+    let route = try Route(path: "/view/\(projects)/view/\(home)")
+    let backed = try AppModule(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
+    let path = idsOverTheSidebar(in: backed.model)
+    try #require(path.count == 2)
+    #expect(backed.send(.action(.wentBack(to: [path[0]]))) == nil)
+    #expect(try standing(in: backed) == [listOn(projects, in: store)])
+    #expect(backed.route.path == "/view/\(projects)")
+    let answered = try AppModule(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
+    let deleted = try changeSet(of: store) { try store.delete(view: home) }
+    #expect(answered.send(.changed(deleted)) == nil)
+    #expect(idsOverTheSidebar(in: answered.model).count == 1)
+    #expect(try standing(in: answered) == [listOn(projects, in: store)])
+    #expect(answered.route.path == "/view/\(projects)")
+}
+
 /// The root's own sentence, for a link the composition root could not read (the owner, 2026-10-16, answering the
 /// spec's open question; `docs/specs/navigation.md`, section 7).
 private let linkSentence = "The link could not be opened."
@@ -1122,7 +1242,7 @@ private let linkSentence = "The link could not be opened."
         #expect(app.send(event) == nil)
         #expect(twin.send(event) == nil)
     }
-    #expect(try firstList(in: twin).rows.map(\.title) == ["Buy milk"], "the change was read; this is the setup")
+    #expect(rows(of: try firstList(in: twin)).map(\.title) == ["Buy milk"], "the change was read; this is the setup")
     #expect(app.model.taskViewList == twin.model.taskViewList)
     #expect(app.model.layout == twin.model.layout)
     #expect(app.model.screens == twin.model.screens)

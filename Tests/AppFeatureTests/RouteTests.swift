@@ -12,23 +12,38 @@ private typealias Route = AppModule.Route
 /// A view and a task as the command line prints their ids, the lowercase UUID string of `EntityID`. Fixed, so
 /// that a refusal can name them and a failure reads the same on every run.
 private let view = ViewID("6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f")
+private let other = ViewID("2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901")
 private let task = TaskID("0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a")
 
 /// The sidebar's list on a view, the task open in it when there is one, and quick entry when it is up, which is
 /// the shape every row of the text form's table reads as.
 private func pane(_ view: ViewID, task: TaskID? = nil, quickEntry: Bool = false) -> Route {
     Route(
-        sidebar: .init(list: .init(head: view, task: task.map { TaskScreen.Route(head: $0) })),
+        sidebar: .init(list: .init(head: .init(view: view), tail: task.map { .task(TaskScreen.Route(head: $0)) })),
         quickEntry: quickEntry ? QuickEntry.Route() : nil
     )
 }
 
+/// The sidebar's list on a view with another list over it, a list inside or one of its own groups, with the task open
+/// in that: what a chain of two lists reads as (ADR-0009, amendments of 2026-11-01 and 2026-11-02).
+private func chain(_ view: ViewID, over: TaskList.Route.Head, task: TaskID) -> Route {
+    Route(
+        sidebar: .init(list: .init(
+            head: .init(view: view), tail: .list(.init(head: over, tail: .task(TaskScreen.Route(head: task))))
+        )),
+        quickEntry: nil
+    )
+}
+
 /// The table of spec section 2, a row per line, with the two rows quick entry adds where the table has one: up
-/// over a view with nothing open in it, and up over the default window.
+/// over a view with nothing open in it, and up over the default window; and the two chains the list screen adds, a
+/// list over a list and a group over its list, each with a task over it (list screen spec, section 9).
 private let table: [(route: Route, path: String)] = [
     (.default, "/"),
     (pane(view), "/view/\(view)"),
     (pane(view, task: task), "/view/\(view)/task/\(task)"),
+    (chain(view, over: .init(view: other), task: task), "/view/\(view)/view/\(other)/task/\(task)"),
+    (chain(view, over: .init(view: view, group: .day(1)), task: task), "/view/\(view)/day/+1/task/\(task)"),
     (pane(view, task: task, quickEntry: true), "/view/\(view)/task/\(task)?quick-entry"),
     (pane(view, quickEntry: true), "/view/\(view)?quick-entry"),
     (Route(sidebar: .init(list: nil), quickEntry: QuickEntry.Route()), "/?quick-entry"),
@@ -60,12 +75,18 @@ private let table: [(route: Route, path: String)] = [
 }
 
 /// Each route reads its own part of the path and refuses what it cannot read, and the window refuses with what it
-/// threw: here the list's route, which finds `task` before a view, `view` after the task and a word it does not
-/// know, the task screen's route, which finds no id after `task`, and the core's reading of an id, which reads one
-/// only whole.
+/// threw: here the list's route, which finds `task` before a view, a third word after the task, a list after a group,
+/// a thirty-third list in a chain and a word it does not know, a group's key that does not read, the task screen's
+/// route, which finds no id after `task`, and the core's reading of an id, which reads one only whole.
 @Test func whatARouteRefusesInThePathIsWhatTheWindowRefuses() {
     #expect(throws: RouteError.segmentOutOfPlace("task")) { try Route(path: "/task/\(task)") }
     #expect(throws: RouteError.segmentOutOfPlace("view")) { try Route(path: "/view/\(view)/task/\(task)/view/\(view)") }
+    #expect(throws: RouteError.segmentOutOfPlace("day")) { try Route(path: "/view/\(view)/task/\(task)/day/+1") }
+    #expect(throws: RouteError.segmentOutOfPlace("view")) { try Route(path: "/view/\(view)/day/+1/view/\(other)") }
+    #expect(throws: RouteError.unknownSegment("1")) { try Route(path: "/view/\(view)/day/1") }
+    #expect(throws: RouteError.segmentOutOfPlace("view")) {
+        try Route(path: "/view/\(view)" + String(repeating: "/view/\(other)", count: 32))
+    }
     #expect(throws: RouteError.unknownSegment("edit")) { try Route(path: "/view/\(view)/task/\(task)/edit") }
     #expect(throws: RouteError.notAnID("42")) { try Route(path: "/view/\(view)/task/42") }
     #expect(throws: RouteError.notAnID("inbox")) { try Route(path: "/view/inbox") }

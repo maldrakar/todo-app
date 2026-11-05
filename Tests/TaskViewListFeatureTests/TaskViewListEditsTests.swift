@@ -98,7 +98,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     #expect(areaLabels(in: list.model) == ["Work", "Area"])
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, unnamed])
     #expect(list.send(.action(.rowSelected(clients))) == nil)
-    #expect(list.destination.pushed == .init(head: inbox), "no list declared")
+    #expect(list.destination.pushed == .init(head: .init(view: inbox)), "no list declared")
     let reference = try TaskViewList(
         store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     )
@@ -109,7 +109,7 @@ private func offersTheRows(_ options: [Option]?, of rows: [TaskViewList.Model.Ro
     #expect(list.send(.action(.rowSelected(unnamed))) == nil)
     #expect(try rowBeingNamed(in: list.model).id == unnamed, "an area's line opens its field too")
     #expect(draft(of: try rowBeingNamed(in: list.model)) == "")
-    #expect(list.destination.pushed == .init(head: inbox))
+    #expect(list.destination.pushed == .init(head: .init(view: inbox)))
 }
 
 /// Done settles an open field as Return does and leaves edit mode, so the module ends as one made now on the store
@@ -413,7 +413,7 @@ private let couldNotDeleteArea = "The area could not be deleted, so some of its 
     _ = list.send(.widthChanged(.wide))
     _ = list.send(.action(.editMenuItemChosen))
     let wide = try TaskViewList(
-        store: store, route: .init(list: .init(head: ViewID())), width: .wide, day: testDay, capabilities: iPhone
+        store: store, route: .init(list: .init(head: .init(view: ViewID()))), width: .wide, day: testDay, capabilities: iPhone
     )
     #expect(
         offersTheRows(list.model.movePicker?.options, of: wide.model.rows),
