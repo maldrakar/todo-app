@@ -556,6 +556,7 @@ private func listTitles(_ model: AppModule.Model) -> [String]? {
     return blocks.flatMap(\.rows).map { row in
         switch row {
         case .task(_, let task): task.title.text
+        case .card(_, let card): card.title.text
         }
     }
 }
