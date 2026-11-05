@@ -32,9 +32,9 @@ import TodoCore
     }
 }
 
-/// A day's block is titled "Today", "Tomorrow", or the weekday's full name for every other day, past or future, at
-/// any distance, with the date under it short with its weekday for today and tomorrow and without it for every other
-/// day; a day in another year needs no year (canvas, `dayTitle` and `dayDate`; the controller's ruling on #175, 2026-11-04).
+/// A day's block is titled "Today", "Tomorrow", or the weekday's full name for every other day, past or future, at any
+/// distance, with the date under it short with its weekday for today and tomorrow and without it for every other day; a
+/// day in another year needs no year (canvas, `dayTitle` and `dayDate`; the controller's ruling on #175, 2026-11-04).
 @Test func aDaysBlockIsTitledTodayTomorrowOrItsWeekdayAtAnyDistance() throws {
     let store = try makeStore()
     let byDay = try store.createView(NewTaskView(title: "By day", filter: .status([.open]), sort: [SortKey(.when)], groupBy: .whenDay))
@@ -128,8 +128,9 @@ import TodoCore
     #expect(module.destination.pushed != nil)
 }
 
-/// The When pill names today and tomorrow, a past day by its date and a later one by its weekday and date; unset it reads
-/// "When" in ink 2, and the sun is amber only while it is set (canvas, `whenLabel`; the controller's ruling R89).
+/// The When pill names today and tomorrow, a past day by its date and a later one by its weekday and date; unset it
+/// reads "When" in ink 2, and the sun is amber only while it is set (canvas, `whenLabel`; the controller's ruling on
+/// #176, 2026-11-05).
 @Test func theWhenPillNamesTodayTomorrowAPastDayAndALaterOne() throws {
     let store = try makeStore()
     let cases: [(Int?, String)] = [
@@ -147,8 +148,9 @@ import TodoCore
     }
 }
 
-/// The Deadline pill always names its weekday and date, in ink, and red from the day it is due; its flag is red while it
-/// is set, a future deadline's too; unset it reads "Deadline" in ink 2 (canvas, `dayShort`; the controller's ruling R89).
+/// The Deadline pill always names its weekday and date, in ink, and red from the day it is due; its flag is red while
+/// it is set, a future deadline's too; unset it reads "Deadline" in ink 2 (canvas, `dayShort`; the controller's ruling
+/// on #176, 2026-11-05).
 @Test func theDeadlinePillAlwaysNamesItsWeekdayAndDate() throws {
     let store = try makeStore()
     let cases: [(Int?, String, DesignSystem.Color)] = [

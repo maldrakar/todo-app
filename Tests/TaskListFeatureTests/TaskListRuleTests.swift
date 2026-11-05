@@ -68,8 +68,8 @@ private func read(_ filter: Filter) -> Edits? {
     #expect(Edits.of(.when(.onOrAfter(1)), today: today, day: .some(nil)) == asks(when: .some(nil)))
 }
 
-/// The block's day replaces what the rule's When gives, and it stands where the rule has none: a day block of a list whose
-/// rule is a tag and a day of its own grouping (the controller's ruling R79).
+/// The block's day replaces what the rule's When gives, and it stands where the rule has none: a day block of a list
+/// whose rule is a tag and a day of its own grouping (the controller's ruling on #176, 2026-11-05).
 @Test func aRuleWithNoWhenInADayBlockTakesTheDay() {
     #expect(Edits.of(.hasTag(work), today: today, day: .some(day(2))) == asks(when: day(2), addTags: [work]))
     #expect(Edits.of(.or([.hasTag(work)]), today: today, day: .some(day(2))) == nil, "a rule that refuses still refuses")
@@ -116,8 +116,8 @@ private func read(_ filter: Filter) -> Edits? {
     #expect(read(.and([.when(.onOrAfter(0)), .when(.onOrBefore(7))])) == asks(when: today), "both ask for today")
 }
 
-/// A rule that asks a thing and its negation, or for two manual lists where a task is pinned by one edit, reads as no one
-/// edit to one task: a condition no edit satisfies refuses (spec section 4).
+/// A rule that asks a thing and its negation, or for two manual lists where a task is pinned by one edit, reads as no
+/// one edit to one task: a condition no edit satisfies refuses (spec section 4).
 @Test func aRuleAtOddsWithItselfRefuses() {
     #expect(read(.and([.hasTag(work), .not(.hasTag(work))])) == nil)
     #expect(read(.and([.listedIn(errands), .not(.listedIn(errands))])) == nil)
@@ -140,8 +140,8 @@ private func read(_ filter: Filter) -> Edits? {
     #expect(read(.not(.not(.hasTag(work)))) == nil)
 }
 
-/// An offset comes from a filter another device wrote and may lie past what a day holds: it lands on the nearest day the
-/// module names and nothing traps (global constraints).
+/// An offset comes from a filter another device wrote and may lie past what a day holds: it lands on the nearest day
+/// the module names and nothing traps (global constraints).
 @Test func anOffsetOutsideInt32IsClamped() {
     let latest = Day(year: 2_000_000, month: 1, day: 1)
     let earliest = Day(year: -2_000_000, month: 1, day: 1)
@@ -167,8 +167,8 @@ private func read(_ filter: Filter) -> Edits? {
     #expect(read(try #require(try store.view(BuiltInTaskViews.trash)?.filter)) == nil)
 }
 
-/// A rule draws finished tasks as its rows where it asks for no open task: a status without open, the Trash, a conjunction
-/// with such a part, alternatives of only such parts (the controller's ruling R78).
+/// A rule draws finished tasks as its rows where it asks for no open task: a status without open, the Trash, a
+/// conjunction with such a part, alternatives of only such parts (the controller's ruling on #176, 2026-11-05).
 @Test func aRuleDrawsFinishedTasksWhereItAsksForNoOpenOne() {
     #expect(TaskList.drawsFinished(.status([.done, .canceled])))
     #expect(TaskList.drawsFinished(.trashed(true)))

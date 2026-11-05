@@ -3,8 +3,9 @@ import DesignSystem
 import DesignSystemComponents
 import TodoCore
 
-/// The screen's controls that write: the rows that add and the floating "+", the Done strip's capsule, a row's swipe and
-/// its menu (Task 8's table, Add rows, Done strip, Floating "+" and Swipe; the controller's ruling R89, their words).
+/// The screen's controls that write: the rows that add and the floating "+", the Done strip's capsule, a row's swipe
+/// and its menu (Task 8's table, Add rows, Done strip, Floating "+" and Swipe; the controller's ruling on #176,
+/// 2026-11-05, their words).
 extension TaskList {
     /// A block's "+ Add task", and none where the block's rule reads as no edits.
     static func addTaskRow(for block: PageBlock, _ metrics: Metrics.AddRow) -> AddRowModel<UserAction>? {
@@ -38,9 +39,9 @@ extension TaskList {
         )
     }
 
-    /// The Done strip's capsule (spec section 3; the controller's ruling R88): the check in a circle in the list's glyph
-    /// colour, "Done today · N" on every list, and the chevron, turned half round while it is open, saying what a tap will
-    /// do.
+    /// The Done strip's capsule (spec section 3; the controller's ruling on #176, 2026-11-05): the check in a circle in
+    /// the list's glyph colour, "Done today · N" on every list, and the chevron, turned half round while it is open,
+    /// saying what a tap will do.
     static func doneStrip(
         count: Int, isOpen: Bool, color: Tile, _ metrics: Metrics.DoneStrip
     ) -> DoneStripModel<UserAction> {
@@ -70,12 +71,15 @@ extension TaskList {
         )
     }
 
-    /// A row's menu, the Mac's right click: Delete, with the trash's glyph, as what destroys something (spec section 6; the
-    /// controller's ruling R73).
+    /// A row's menu, the Mac's right click: Delete, with the trash's glyph, as what destroys something (spec section 6;
+    /// the controller's ruling on #176, 2026-11-05).
     static func deleteMenu(of id: TaskID) -> MenuModel<UserAction> {
         MenuModel(sections: [
             .init(items: [
-                .init(title: "Delete", icon: .trash, isDestructive: true, shortcut: nil, action: .deleteMenuItemChosen(id)),
+                .init(
+                    title: "Delete", icon: .trash, isDestructive: true, shortcut: nil,
+                    action: .deleteMenuItemChosen(id)
+                ),
             ]),
         ])
     }

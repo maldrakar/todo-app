@@ -43,8 +43,8 @@ extension TaskList {
         }
     }
 
-    /// What a card's When pill says of its day: "Today", "Tomorrow", "Oct 22" for a day past, and "Mon, Oct 26" for a later
-    /// one (canvas, `whenLabel`; the controller's ruling R89).
+    /// What a card's When pill says of its day: "Today", "Tomorrow", "Oct 22" for a day past, and "Mon, Oct 26" for a
+    /// later one (canvas, `whenLabel`; the controller's ruling on #176, 2026-11-05).
     static func whenPillText(_ day: Day, today: Day) -> String {
         switch distance(to: day, from: today) {
         case 0: "Today"
@@ -55,7 +55,7 @@ extension TaskList {
     }
 
     /// What a card's Deadline pill says of its day: "Sat, Oct 24", always, never "Today" (canvas, `dayShort`; the
-    /// controller's ruling R89).
+    /// controller's ruling on #176, 2026-11-05).
     static func deadlinePillText(_ day: Day) -> String {
         shortDate(day)
     }

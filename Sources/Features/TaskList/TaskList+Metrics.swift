@@ -51,8 +51,8 @@ extension TaskList {
             let rule: StrokeModel?
         }
 
-        /// The chevron that folds a block in the list: its glyph's size and its square hit's side. A column's header has
-        /// none, so the board carries none.
+        /// The chevron that folds a block in the list: its glyph's size and its square hit's side. A column's header
+        /// has none, so the board carries none.
         struct Chevron {
             let size: Double
             let hitSide: Double
@@ -160,8 +160,8 @@ extension TaskList {
             let trailingMargin: Double
         }
 
-        /// The Done strip: the capsule's glyph, chevron, height, paddings, gap and margins, and the row and the card
-        /// drawn under it while it is open.
+        /// The Done strip's capsule: its glyph, chevron, height, paddings, gap and margins. The row and the card drawn
+        /// under it are the list's.
         struct DoneStrip {
             let iconSize: Double
             let chevronSize: Double
@@ -172,8 +172,6 @@ extension TaskList {
             let topMargin: Double
             let leadingMargin: Double
             let trailingMargin: Double
-            let row: Row
-            let card: Card
         }
 
         /// The floating "+": the circle's side and its glyph's.
@@ -215,10 +213,11 @@ extension TaskList {
             let addTask: AddRow
         }
 
-        /// The blocks' numbers in the layout: the list's header, its chevron, its row, its open card and its "+ Add
-        /// task", or the board's.
-        enum Blocks {
-            case list(header: BlockHeader, chevron: Chevron, row: Row, card: Card, addTask: AddRow)
+        /// The blocks' numbers in the layout: the list's header, its chevron, its row, its open card, its "+ Add task" and
+        /// its Done strip, or the board's, which has no strip (canvas). Indirect, as the layout's whole numbers are some
+        /// 1,300 bytes on wasm32, which a debug build would put on the stack at every copy of `Metrics`.
+        indirect enum Blocks {
+            case list(header: BlockHeader, chevron: Chevron, row: Row, card: Card, addTask: AddRow, doneStrip: DoneStrip)
             case columns(Board)
         }
 
@@ -228,9 +227,6 @@ extension TaskList {
         let blocks: Blocks
         let addList: AddRow
         let floatingButton: FloatingButton
-
-        /// The Done strip's, nil for the layout with none: the board has no strip (canvas).
-        let doneStrip: DoneStrip?
 
         /// The numbers of the layout.
         static func of(_ layout: Model.Layout.Kind) -> Metrics {
@@ -242,10 +238,12 @@ extension TaskList {
 
         /// The phone's list (Task 8's table): the header, the tag bar, the empty state and the floating "+" the board
         /// shares; a block's header 44 high, 6 6 2 12 from what stands round it, padded 13 8 0, its date 8 after its
-        /// title, over the line's 1 pt rule, its chevron 18 in a 44 hit; the row, the open card and the Done strip
-        /// below; "+ Add task" 40 high, 8 in and 12 short of the edges, its plus 18 in a 44 cell with its title right
-        /// after it and 12 short of its end, rounded 12; "+ Add list" 44 high over the line's 1 pt rule with 4 under it,
-        /// 10 under what stands above and 12 in and 6 short of the edges, its plus 18 in a 40 cell.
+        /// title, over the line's 1 pt rule, its chevron 18 in a 44 hit; the row and the open card below; "+ Add task" 40
+        /// high, 8 in and 12 short of the edges, its plus 18 in a 44 cell with its title right after it and 12 short of
+        /// its end, rounded 12; "+ Add list" 44 high over the line's 1 pt rule with 4 under it, 10 under what stands above
+        /// and 12 in and 6 short of the edges, its plus 18 in a 40 cell; the Done strip's capsule 36 high and 20 under what
+        /// stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14 short of its end, 8
+        /// on either side of its label.
         static let phone = Metrics(
             header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .list(
@@ -256,9 +254,13 @@ extension TaskList {
                 ),
                 chevron: Chevron(size: 18, hitSide: 44), row: phoneRow, card: phoneCard,
                 addTask: AddRow(
-                    iconSize: 18, iconCellWidth: 44, spacing: 0, font: .addRow, height: 40, width: nil, cornerRadius: 12,
-                    topPadding: 0, leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0,
-                    leadingMargin: 8, trailingMargin: 12
+                    iconSize: 18, iconCellWidth: 44, spacing: 0, font: .addRow, height: 40, width: nil,
+                    cornerRadius: 12, topPadding: 0, leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil,
+                    topMargin: 0, leadingMargin: 8, trailingMargin: 12
+                ),
+                doneStrip: DoneStrip(
+                    iconSize: 18, chevronSize: 15, height: 36, spacing: 8, leadingPadding: 10, trailingPadding: 14,
+                    topMargin: 20, leadingMargin: 14, trailingMargin: 16
                 )
             ),
             addList: AddRow(
@@ -266,11 +268,7 @@ extension TaskList {
                 topPadding: 4, leadingPadding: 0, trailingPadding: 12, dash: nil,
                 rule: StrokeModel(color: .line, width: 1, dash: []), topMargin: 10, leadingMargin: 12, trailingMargin: 6
             ),
-            floatingButton: phoneFloatingButton,
-            doneStrip: DoneStrip(
-                iconSize: 18, chevronSize: 15, height: 36, spacing: 8, leadingPadding: 10, trailingPadding: 14,
-                topMargin: 20, leadingMargin: 14, trailingMargin: 16, row: phoneRow, card: phoneCard
-            )
+            floatingButton: phoneFloatingButton
         )
 
         /// The phone's board (Task 8's table, Board; the controller's ruling on #175, 2026-11-04): 10 between columns,
@@ -280,11 +278,11 @@ extension TaskList {
         /// cards are 8 apart (`task-4-canvas.md`, "column body gap 8") and 8 in; a column's header no height: a block's
         /// 44; a card's row the row's numbers but its check, its title and its edges: 0 in, the check's hit at its
         /// edge, 12 short of its end, rounded as the card. The card's check keeps the row's ring and mark, the canvas
-        /// resizing only its circle, and it has the menu and no swipe. Its open card fills the card, its own corners and
-        /// resting shadow, its check the row's, its body 44 in and 12 short of its end and bottom (`Phone.dc.html`, the
-        /// column's card). "+ Add task" 44 high, rounded 13, padded 11 and 12, the plus 18 and 6 before its title; "+
-        /// Add list" a column 200 wide edged in a 1.5 dashed line, as rounded as a column, 52 high, padded 16, the plus
-        /// 18 and 8 before its title. The table gives the dash no lengths: 5 and 4, the sidebar's dashed line.
+        /// resizing only its circle, and it has the menu and no swipe. Its open card fills the card, its own corners
+        /// and resting shadow, its check the row's, its body 44 in and 12 short of its end and bottom (`Phone.dc.html`,
+        /// the column's card). "+ Add task" 44 high, rounded 13, padded 11 and 12, the plus 18 and 6 before its title;
+        /// "+ Add list" a column 200 wide edged in a 1.5 dashed line, as rounded as a column, 52 high, padded 16, the
+        /// plus 18 and 8 before its title. The table gives the dash no lengths: 5 and 4, the sidebar's dashed line.
         static let phoneColumns = Metrics(
             header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .columns(Board(
@@ -312,9 +310,9 @@ extension TaskList {
                     pillSpacing: 6, pill: phonePill
                 ),
                 addTask: AddRow(
-                    iconSize: 18, iconCellWidth: 18, spacing: 6, font: .addRow, height: 44, width: nil, cornerRadius: 13,
-                    topPadding: 0, leadingPadding: 11, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0,
-                    leadingMargin: 0, trailingMargin: 0
+                    iconSize: 18, iconCellWidth: 18, spacing: 6, font: .addRow, height: 44, width: nil,
+                    cornerRadius: 13, topPadding: 0, leadingPadding: 11, trailingPadding: 12, dash: nil, rule: nil,
+                    topMargin: 0, leadingMargin: 0, trailingMargin: 0
                 )
             )),
             addList: AddRow(
@@ -323,8 +321,7 @@ extension TaskList {
                 dash: StrokeModel(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0, leadingMargin: 0,
                 trailingMargin: 0
             ),
-            floatingButton: phoneFloatingButton,
-            doneStrip: nil
+            floatingButton: phoneFloatingButton
         )
 
         /// A check of the phone's row and of its open card: 24 across with a 1.75 ring and the 15 pt mark stroked 1.75
@@ -341,9 +338,10 @@ extension TaskList {
 
         /// The phone's row (Task 8's table, Row and Swipe): 8 in and 12 short of the edges, its check `phoneCheck`, its
         /// title the row title padded 11 above and below, 2 after the check's hit and 4 short of the end, the meta 3
-        /// under it, its items 10 apart and its lines 3, its glyphs 13 and 3 before their text, at least 44 high; dragged
-        /// 40 leftward it stays moved 88, over a Delete 78 wide, 3 in from its top and bottom and 10 from its end, rounded
-        /// 12. The table gives the row no radius: 12, the add row's under it, until Task 8's hand check tunes it.
+        /// under it, its items 10 apart and its lines 3, its glyphs 13 and 3 before their text, at least 44 high;
+        /// dragged 40 leftward it stays moved 88, over a Delete 78 wide, 3 in from its top and bottom and 10 from its
+        /// end, rounded 12. The table gives the row no radius: 12, the add row's under it, until Task 8's hand check
+        /// tunes it.
         private static let phoneRow = Row(
             leading: 8, trailing: 12, check: phoneCheck, title: .rowTitle, verticalPadding: 11, titleLeading: 2,
             titleTrailing: 4, titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, metaIconSize: 13, metaIconSpacing: 3,
@@ -356,9 +354,9 @@ extension TaskList {
 
         /// The phone's open card (Task 8's table, Card; `Phone.dc.html`, the open card): 6 10 10 from what stands round
         /// it, rounded 18, casting the raised shadow; its check `phoneCheck`, its title field 44 high and padded 2, the
-        /// canvas's 2 before and 4 after in one padding; Open full screen 19 in a 44 hit; its body 46 in and 14 short of
-        /// its end and bottom; a subtask 44 high, its field 40; the pills 6 apart and 10 under the subtasks. The table
-        /// gives the notes no height: 22, their 15 pt line at the canvas's 1.45, the least a field grows from.
+        /// canvas's 2 before and 4 after in one padding; Open full screen 19 in a 44 hit; its body 46 in and 14 short
+        /// of its end and bottom; a subtask 44 high, its field 40; the pills 6 apart and 10 under the subtasks. The
+        /// table gives the notes no height: 22, their 15 pt line at the canvas's 1.45, the least a field grows from.
         private static let phoneCard = Card(
             topMargin: 6, horizontalMargin: 10, bottomMargin: 10, cornerRadius: 18, shadow: .raised, check: phoneCheck,
             titleHeight: 44, titlePadding: 2, expandSize: 19, expandHitSide: 44, bodyLeading: 46, bodyTrailing: 14,
@@ -366,17 +364,17 @@ extension TaskList {
             addSubtask: phoneAddSubtask, subtasksToPills: 10, pillSpacing: 6, pill: phonePill
         )
 
-        /// "Add subtask" in the phone's card (`Phone.dc.html`, the open card): 44 high, its plus 17 in a 40 cell under the
-        /// subtasks' checks, 12 outside the body's leading edge as they are, its title right after it and 12 short of its
-        /// end, rounded 12.
+        /// "Add subtask" in the phone's card (`Phone.dc.html`, the open card): 44 high, its plus 17 in a 40 cell under
+        /// the subtasks' checks, 12 outside the body's leading edge as they are, its title right after it and 12 short
+        /// of its end, rounded 12.
         private static let phoneAddSubtask = AddRow(
             iconSize: 17, iconCellWidth: 40, spacing: 0, font: .notes, height: 44, width: nil, cornerRadius: 12,
-            topPadding: 0, leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: -12,
-            trailingMargin: 0
+            topPadding: 0, leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0,
+            leadingMargin: -12, trailingMargin: 0
         )
 
-        /// The phone's pill (Task 8's table, Card; `Phone.dc.html`, `.xpill`): 32 high, a capsule, padded 10 and 12, its
-        /// glyph 6 before its text, the sun 16, the flag 15, the hash 14.
+        /// The phone's pill (Task 8's table, Card; `Phone.dc.html`, `.xpill`): 32 high, a capsule, padded 10 and 12,
+        /// its glyph 6 before its text, the sun 16, the flag 15, the hash 14.
         private static let phonePill = Pill(
             height: 32, leadingPadding: 10, trailingPadding: 12, spacing: 6, sunSize: 16, flagSize: 15, hashSize: 14
         )

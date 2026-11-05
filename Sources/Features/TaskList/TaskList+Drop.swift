@@ -1,13 +1,13 @@
 // Sources/Features/TaskList/TaskList+Drop.swift
 import TodoCore
 
-/// A row let go (spec section 6; the controller's rulings R76, R77, R90 and R91): in the block it was dragged from it takes
-/// that place by the manual list, and in another block it takes what that block's rule asks. The writes of a move are
-/// several transactions, each a change a window rereads for; a task's writes are skipped where they change nothing, which
-/// is what keeps the rereads few.
+/// A row let go (spec section 6; the controller's ruling on #176, 2026-11-05): in the block it was dragged from it
+/// takes that place by the manual list, and in another block it takes what that block's rule asks. The writes of a move
+/// are several transactions, each a change a window rereads for; a task's writes are skipped where they change nothing,
+/// which is what keeps the rereads few.
 extension TaskList {
-    /// Checks a drop against the model: both blocks drawn, the task a row of the one it was dragged from, the other taking a
-    /// drop, and `anchor` a row of it other than the task. Anything else writes nothing.
+    /// Checks a drop against the model: both blocks drawn, the task a row of the one it was dragged from, the other
+    /// taking a drop, and `anchor` a row of it other than the task. Anything else writes nothing.
     func drop(_ id: TaskID, from source: Model.BlockID, in target: Model.BlockID, after anchor: TaskID?) {
         let drawn = TaskList.blocks(in: model.layout)
         guard let drawnSource = drawn.first(where: { $0.id == source }),
@@ -22,10 +22,11 @@ extension TaskList {
         if source == target { reorder(id, in: to, after: anchor) } else { move(task, from: from, to: to) }
     }
 
-    /// Takes its place in its own block: the task and the unpinned tasks that stand above the place, in their order, are
-    /// pinned in one transaction, after the last pinned task above it or first, so that it lands where it was let go and
-    /// keeps it, the manual list being the view's and applied within a group (spec section 6). The order read is the page's
-    /// block's, before the tag bar's filter, so that the tasks a pick hides keep their places (the controller's ruling R90).
+    /// Takes its place in its own block: the task and the unpinned tasks that stand above the place, in their order,
+    /// are pinned in one transaction, after the last pinned task above it or first, so that it lands where it was let
+    /// go and keeps it, the manual list being the view's and applied within a group (spec section 6). The order read is
+    /// the page's block's, before the tag bar's filter, so that the tasks a pick hides keep their places (the
+    /// controller's ruling on #176, 2026-11-05).
     private func reorder(_ id: TaskID, in block: PageBlock, after anchor: TaskID?) {
         let order = block.tasks.map(\.id)
         let others = order.filter { $0 != id }
@@ -41,11 +42,12 @@ extension TaskList {
         }
     }
 
-    /// Takes what the target's rule asks, its day through `update(task:)`, its tags, its pin last in its manual list (spec
-    /// section 6's table), and gives back what the block it was dragged from gave it, where that block is a list inside: an
-    /// own block gives nothing back, a day block's task leaving by its new day and an own block's by being claimed, and what
-    /// the target asks is not given back (the controller's ruling R77). A task two blocks draw leaves only the one it was
-    /// dragged from (R76). The target's fold stays (R90).
+    /// Takes what the target's rule asks, its day through `update(task:)`, its tags, its pin last in its manual list
+    /// (spec section 6's table), and gives back what the block it was dragged from gave it, where that block is a list
+    /// inside: an own block gives nothing back, a day block's task leaving by its new day and an own block's by being
+    /// claimed, and what the target asks is not given back (the controller's ruling on #176, 2026-11-05). A task two
+    /// blocks draw leaves only the one it was dragged from (the controller's ruling on #176, 2026-11-05). The target's
+    /// fold stays (the controller's ruling on #176, 2026-11-05).
     private func move(_ task: TodoTask, from source: PageBlock, to target: PageBlock) {
         guard let edits = target.edits else { return }
         let view = state.snapshot.page.view

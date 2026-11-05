@@ -85,8 +85,8 @@ extension TaskList {
     }
 
     /// The tasks the strip holds: the list's completed today, and on a group's screen those its grouping puts under the
-    /// group, by the rule the page grouped them by (spec section 2; `GroupKey(of:by:)`). A list that draws finished tasks
-    /// as its rows has no strip, so it reads none.
+    /// group, by the rule the page grouped them by (spec section 2; `GroupKey(of:by:)`). A list that draws finished
+    /// tasks as its rows has no strip, so it reads none.
     private static func doneTasks(
         in store: Store, of view: TaskView, head: Route.Head, day: DeviceDay
     ) throws(StoreError) -> [TodoTask] {
@@ -97,10 +97,10 @@ extension TaskList {
         return done.filter { GroupKey(of: $0, by: groupBy) == key }
     }
 
-    /// The rule of the first list under each folder among the page's lists inside, by the folder's id, a folder inside it
-    /// handing on to its own first, to any depth, by one loop per folder over the views; a folder with no lists, or one
-    /// whose first this app cannot read, has none (spec section 4). A view this app cannot read reads as having no rule
-    /// and is no folder. A page with no folder inside reads nothing more.
+    /// The rule of the first list under each folder among the page's lists inside, by the folder's id, a folder inside
+    /// it handing on to its own first, to any depth, by one loop per folder over the views; a folder with no lists, or
+    /// one whose first this app cannot read, has none (spec section 4). A view this app cannot read reads as having no
+    /// rule and is no folder. A page with no folder inside reads nothing more.
     private static func firstListRules(in store: Store, of page: TaskViewPage) throws(StoreError) -> [ViewID: Filter] {
         let folders = page.sections.compactMap(\.view).filter { $0.filter == nil && $0.needsNewerApp == nil }
         guard !folders.isEmpty else { return [:] }
@@ -142,15 +142,15 @@ extension TaskList {
     ///
     /// Which block a task is in is the store's one answer; which of them are rows is the screen's: its open tasks, and
     /// the finished ones only where the block's rule draws them, the rest being the strip's (spec section 3; the
-    /// controller's ruling R78).
+    /// controller's ruling on #176, 2026-11-05).
     static func blocks(of snapshot: PageSnapshot, head: Route.Head, today: Day) -> [PageBlock] {
         let view = snapshot.page.view
         let color = tileColor(view.color)
         let own = snapshot.page.sections.first { $0.view == nil }
         func ownBlock(_ key: GroupKey?, _ tasks: [TodoTask], heading: Heading?) -> PageBlock {
             PageBlock(
-                id: .own(key), tasks: rows(of: tasks, by: view.filter), heading: heading, color: color, rule: view.filter,
-                edits: ownEdits(of: view, key: key, today: today)
+                id: .own(key), tasks: rows(of: tasks, by: view.filter), heading: heading, color: color,
+                rule: view.filter, edits: ownEdits(of: view, key: key, today: today)
             )
         }
         if let group = head.group {
@@ -187,10 +187,10 @@ extension TaskList {
         rule.map(drawsFinished) == true ? tasks : tasks.filter { $0.status == .open }
     }
 
-    /// What one of the list's own blocks asks of a task: the rule's edits, with a day block's day as its When, or as its
-    /// deadline for a list grouped by deadline (the controller's ruling R79). A grouping by tag, parent or status has no
-    /// one field to set, so its blocks ask nothing and take nothing (`Store.group(_:by:manual:)`; the controller's ruling
-    /// R80).
+    /// What one of the list's own blocks asks of a task: the rule's edits, with a day block's day as its When, or as
+    /// its deadline for a list grouped by deadline (the controller's ruling on #176, 2026-11-05). A grouping by tag,
+    /// parent or status has no one field to set, so its blocks ask nothing and take nothing
+    /// (`Store.group(_:by:manual:)`; the controller's ruling on #176, 2026-11-05).
     private static func ownEdits(of view: TaskView, key: GroupKey?, today: Day) -> Edits? {
         guard let rule = view.filter else { return nil }
         switch key {
@@ -205,12 +205,12 @@ extension TaskList {
         }
     }
 
-    /// What the floating "+" adds by, and the view whose manual list its task lands at the top of (the controller's ruling
-    /// R81): a group's screen's one block, a folder's first block, which is its first list; and a list with a rule its
-    /// first own block, where that block takes one, and otherwise the rule's edits with no day, a grouped list with no
-    /// tasks having no block and a block of a grouping by tag asking nothing. A group's screen with such a block has none,
-    /// a list whose rule reads as no edits has none, which is how Logbook and Trash have none, and neither has a folder
-    /// with no lists.
+    /// What the floating "+" adds by, and the view whose manual list its task lands at the top of (the controller's
+    /// ruling on #176, 2026-11-05): a group's screen's one block, a folder's first block, which is its first list; and
+    /// a list with a rule its first own block, where that block takes one, and otherwise the rule's edits with no day,
+    /// a grouped list with no tasks having no block and a block of a grouping by tag asking nothing. A group's screen
+    /// with such a block has none, a list whose rule reads as no edits has none, which is how Logbook and Trash have
+    /// none, and neither has a folder with no lists.
     static func floatingTarget(
         in blocks: [PageBlock], head: Route.Head, rule: Filter?, today: Day
     ) -> (edits: Edits, view: ViewID)? {

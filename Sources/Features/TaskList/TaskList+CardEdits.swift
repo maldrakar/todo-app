@@ -2,13 +2,15 @@
 import TaskScreenFeature
 import TodoCore
 
-/// What the open card does (spec sections 3 and 4; the controller's rulings R82 to R85). A card closes by a tap beside it,
-/// on another row, Esc or Return on an empty title, on "+", on "+ Add list", and where a fold, a pick or the strip hides
-/// its row. Every close writes what was typed, and an empty title is never written: the task whose stored title is empty
-/// too goes, since it never had anything in it, and any other keeps its title, as a list's empty name keeps the old.
+/// What the open card does (spec sections 3 and 4; the controller's ruling on #176, 2026-11-05). A card closes by a tap
+/// beside it, on another row, Esc or Return on an empty title, on "+", on "+ Add list", and where a fold, a pick or the
+/// strip hides its row. Every close writes what was typed, and an empty title is never written: the task whose stored
+/// title is empty too goes, since it never had anything in it, and any other keeps its title, as a list's empty name
+/// keeps the old.
 extension TaskList {
-    /// Opens a row the model draws as one, closing the card that was open: the notes and the children are read here, since
-    /// the list's read carries neither (spec section 3). A row's tap on a task a peer has deleted says so and opens nothing.
+    /// Opens a row the model draws as one, closing the card that was open: the notes and the children are read here,
+    /// since the list's read carries neither (spec section 3). A row's tap on a task a peer has deleted says so and
+    /// opens nothing.
     func openCard(on id: TaskID) {
         let isRow = drawnRows.contains { row in
             if case .task(let rowID, _) = row { rowID == id } else { false }
@@ -54,14 +56,14 @@ extension TaskList {
     }
 
     /// Closes the card where its row is no longer drawn, a fold, a pick or the strip having hidden it (the controller's
-    /// ruling R82).
+    /// ruling on #176, 2026-11-05).
     func closeCardIfHidden() {
         if let card = state.card, !isDrawn(card.id) { closeCard() }
     }
 
-    /// Writes what the card's fields hold, and `status` with them, in one transaction, with the subtask being typed after
-    /// them where `withSubtask` says so; what held the fields then show as the store keeps it. A blank title is not written
-    /// and stays typed, and nothing that changes nothing is written.
+    /// Writes what the card's fields hold, and `status` with them, in one transaction, with the subtask being typed
+    /// after them where `withSubtask` says so; what held the fields then show as the store keeps it. A blank title is
+    /// not written and stays typed, and nothing that changes nothing is written.
     func saveCard(setting status: TaskStatus? = nil, withSubtask: Bool = false) {
         guard let card = state.card, let task = state.task(card.id) else { return }
         let title = card.typedTitle?.trimmed()
@@ -84,17 +86,19 @@ extension TaskList {
         if withSubtask { state.card?.subtaskDraft = nil }
     }
 
-    /// What is typed into the title. A field writes the text it holds back through its binding, and again after Return and
-    /// after a lost focus, so a text it already holds is no keystroke and takes no sentence away (`TaskViewList`, by hand on
-    /// 2026-10-12).
+    /// What is typed into the title. A field writes the text it holds back through its binding, and again after Return
+    /// and after a lost focus, so a text it already holds is no keystroke and takes no sentence away (`TaskViewList`,
+    /// by hand on 2026-10-12).
     func typeTitle(_ text: String) {
-        guard let card = state.card, let task = state.task(card.id), text != card.typedTitle ?? task.title else { return }
+        guard let card = state.card, let task = state.task(card.id), text != card.typedTitle ?? task.title else {
+            return
+        }
         state.card?.typedTitle = text
         state.problem = nil
     }
 
     /// Return in the title: with text it writes it and leaves the card open, and on an empty title it closes the card
-    /// (canvas; the controller's ruling R84).
+    /// (canvas; the controller's ruling on #176, 2026-11-05).
     func submitTitle() {
         guard let card = state.card, let task = state.task(card.id) else { return }
         if (card.typedTitle ?? task.title).trimmed().isEmpty { dismissCard() } else { saveCard() }
@@ -107,8 +111,8 @@ extension TaskList {
         state.problem = nil
     }
 
-    /// Writes a subtask of the card's task done or open, which moves nothing else: completing the last subtask leaves the
-    /// parent open (spec section 3).
+    /// Writes a subtask of the card's task done or open, which moves nothing else: completing the last subtask leaves
+    /// the parent open (spec section 3).
     func checkSubtask(_ id: TaskID) {
         guard let subtask = state.card?.subtasks.first(where: { $0.id == id }) else { return }
         let status: TaskStatus = subtask.status == .open ? .done : .open
@@ -129,9 +133,9 @@ extension TaskList {
         state.problem = nil
     }
 
-    /// Return or leaving the field writes what was typed, trimmed, at the end of the subtasks, and Return opens the next
-    /// empty field; with nothing typed the field closes (spec section 3; canvas). A refused write leaves the field and
-    /// what was typed.
+    /// Return or leaving the field writes what was typed, trimmed, at the end of the subtasks, and Return opens the
+    /// next empty field; with nothing typed the field closes (spec section 3; canvas). A refused write leaves the field
+    /// and what was typed.
     func writeSubtask(thenOpensNext opensNext: Bool) {
         guard let card = state.card, let draft = card.subtaskDraft else { return }
         let title = draft.trimmed()
@@ -145,9 +149,9 @@ extension TaskList {
         if written { state.card?.subtaskDraft = opensNext ? "" : nil }
     }
 
-    /// Open full screen writes what the card holds, leaves it open (canvas; the controller's ruling R84) and declares the
-    /// task screen over the list, as a link to the task does, so a screen that cannot be made says so when the stack tells
-    /// the list.
+    /// Open full screen writes what the card holds, leaves it open (canvas; the controller's ruling on #176,
+    /// 2026-11-05) and declares the task screen over the list, as a link to the task does, so a screen that cannot be
+    /// made says so when the stack tells the list.
     func openFullScreen() {
         guard let id = state.card?.id else { return }
         state.problem = nil

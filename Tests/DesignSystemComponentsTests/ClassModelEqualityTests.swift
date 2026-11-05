@@ -378,3 +378,77 @@ private func blockHeader(
         "titleTapped": blockHeader(titleTapped: .second),
     ])
 }
+
+private let plus = IconModel(icon: .plus, size: 18, weight: .regular, color: .ink2)
+
+private func addRow(
+    icon: IconModel = plus, iconCellWidth: Double = 44, spacing: Double = 0, title: TextModel = text,
+    height: Double = 40, width: Double? = nil, cornerRadius: Double = 12, topPadding: Double = 0,
+    leadingPadding: Double = 0, trailingPadding: Double = 12, dash: StrokeModel? = nil, rule: StrokeModel? = nil,
+    topMargin: Double = 0, leadingMargin: Double = 8, trailingMargin: Double = 12, action: Action = .first
+) -> AddRowModel<Action> {
+    AddRowModel(
+        icon: icon, iconCellWidth: iconCellWidth, spacing: spacing, title: title, height: height, width: width,
+        cornerRadius: cornerRadius, topPadding: topPadding, leadingPadding: leadingPadding,
+        trailingPadding: trailingPadding, dash: dash, rule: rule, topMargin: topMargin, leadingMargin: leadingMargin,
+        trailingMargin: trailingMargin, action: action
+    )
+}
+
+@Test func anAddRowModelComparesEveryProperty() {
+    let line = StrokeModel(color: .line, width: 1, dash: [])
+    expectEveryPropertyCompared({ addRow() }, [
+        "icon": addRow(icon: IconModel(icon: .plus, size: 17, weight: .regular, color: .ink2)),
+        "iconCellWidth": addRow(iconCellWidth: 40),
+        "spacing": addRow(spacing: 6),
+        "title": addRow(title: TextModel(text: "Add list", font: .barLabel, color: .ink2)),
+        "height": addRow(height: 44),
+        "width": addRow(width: 200),
+        "cornerRadius": addRow(cornerRadius: 13),
+        "topPadding": addRow(topPadding: 4),
+        "leadingPadding": addRow(leadingPadding: 11),
+        "trailingPadding": addRow(trailingPadding: 16),
+        "dash": addRow(dash: line),
+        "rule": addRow(rule: line),
+        "topMargin": addRow(topMargin: 10),
+        "leadingMargin": addRow(leadingMargin: 12),
+        "trailingMargin": addRow(trailingMargin: 6),
+        "action": addRow(action: .second),
+    ])
+}
+
+private func doneStrip(
+    icon: IconModel = plus, label: TextModel = text, rotation: Double = 0, background: DesignSystem.Color = .fill,
+    height: Double = 36, cornerRadius: Double = 18, spacing: Double = 8, leadingPadding: Double = 10,
+    trailingPadding: Double = 14, topMargin: Double = 20, leadingMargin: Double = 14, trailingMargin: Double = 16,
+    isOpen: Bool = false, action: Action = .first
+) -> DoneStripModel<Action> {
+    DoneStripModel(
+        icon: icon, label: label,
+        chevron: AccessoryModel.Chevron(
+            icon: plus, rotation: rotation, animation: .fold, accessibilityLabel: "Show done tasks", action: .first
+        ),
+        background: background, height: height, cornerRadius: cornerRadius, spacing: spacing,
+        leadingPadding: leadingPadding, trailingPadding: trailingPadding, topMargin: topMargin,
+        leadingMargin: leadingMargin, trailingMargin: trailingMargin, isOpen: isOpen, action: action
+    )
+}
+
+@Test func aDoneStripModelComparesEveryProperty() {
+    expectEveryPropertyCompared({ doneStrip() }, [
+        "icon": doneStrip(icon: IconModel(icon: .checkCircle, size: 18, weight: .regular, color: .ink2)),
+        "label": doneStrip(label: TextModel(text: "Done today · 3", font: .barLabel, color: .ink2)),
+        "chevron": doneStrip(rotation: 180),
+        "background": doneStrip(background: .surface),
+        "height": doneStrip(height: 30),
+        "cornerRadius": doneStrip(cornerRadius: 15),
+        "spacing": doneStrip(spacing: 7),
+        "leadingPadding": doneStrip(leadingPadding: 9),
+        "trailingPadding": doneStrip(trailingPadding: 12),
+        "topMargin": doneStrip(topMargin: 22),
+        "leadingMargin": doneStrip(leadingMargin: 6),
+        "trailingMargin": doneStrip(trailingMargin: 0),
+        "isOpen": doneStrip(isOpen: true),
+        "action": doneStrip(action: .second),
+    ])
+}

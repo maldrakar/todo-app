@@ -4,8 +4,8 @@ import DesignSystemComponents
 import TaskListFeature
 import TodoCore
 
-// A drop (spec section 6; the controller's rulings R76, R77, R90, R91): inside its own block a task takes its place by the
-// manual list; into another block it takes what that block's rule asks and leaves the list inside it came from.
+// A drop (spec section 6; the controller's ruling on #176, 2026-11-05): inside its own block a task takes its place by
+// the manual list; into another block it takes what that block's rule asks and leaves the list inside it came from.
 
 private let inbox = BuiltInTaskViews.inbox
 
@@ -29,15 +29,15 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
 
 // MARK: - The reorder
 
-/// A task dropped below the pinned tasks lands where it was let go: it and the unpinned tasks above it are pinned in one
-/// transaction, in the order they stood.
+/// A task dropped below the pinned tasks lands where it was let go: it and the unpinned tasks above it are pinned in
+/// one transaction, in the order they stood.
 @Test func aReorderPinsTheTaskAndTheUnpinnedAbove() throws {
     let store = try makeStore()
     let ids = try tasks("a", "b", "c", "d", "e", in: store)
     try store.pin(task: ids[0], in: inbox)
     let module = try list(inbox, in: store)
     let block = TaskList.Model.BlockID.own(nil)
-    #expect(try commits(of: store) { module.tap(.rowDropped(ids[4], from: block, in: block, after: ids[1])) } == 1)
+    #expect(commits(of: store) { module.tap(.rowDropped(ids[4], from: block, in: block, after: ids[1])) } == 1)
     #expect(try store.manualList(of: inbox) == [ids[0], ids[1], ids[4]])
     #expect(rowIDs(of: block, in: module.model) == [ids[0], ids[1], ids[4], ids[2], ids[3]])
     module.tap(.rowDropped(ids[3], from: block, in: block, after: nil))
@@ -47,8 +47,8 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(try list(inbox, in: store).model == module.model, "and keeps it")
 }
 
-/// In a day block the manual list is the list's and the order is kept within the day: a drop moves no other day and no day
-/// its task is on (spec section 6).
+/// In a day block the manual list is the list's and the order is kept within the day: a drop moves no other day and no
+/// day its task is on (spec section 6).
 @Test func aReorderInADayBlockStaysInTheDay() throws {
     let store = try makeStore()
     let work = try store.createTag(title: "work")
@@ -86,7 +86,7 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
 }
 
 /// The reorder reads the block's order before the tag bar's filter: the tasks the pick hides keep their places (the
-/// controller's ruling R90).
+/// controller's ruling on #176, 2026-11-05).
 @Test func aReorderUnderAPickKeepsTheHiddenTasksPlaces() throws {
     let store = try makeStore()
     let shown = try store.createTag(title: "shown")
@@ -105,14 +105,14 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(rowIDs(of: block, in: try list(inbox, in: store).model) == [a, hidden, b, d, c])
 }
 
-/// A task let go where it stands moves nothing, so it writes nothing (the controller's ruling R91).
+/// A task let go where it stands moves nothing, so it writes nothing (the controller's ruling on #176, 2026-11-05).
 @Test func aReorderToItsOwnPlaceWritesNothing() throws {
     let store = try makeStore()
     let ids = try tasks("a", "b", "c", in: store)
     let module = try list(inbox, in: store)
     let block = TaskList.Model.BlockID.own(nil)
-    #expect(try commits(of: store) { module.tap(.rowDropped(ids[1], from: block, in: block, after: ids[0])) } == 0)
-    #expect(try commits(of: store) { module.tap(.rowDropped(ids[0], from: block, in: block, after: nil)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(ids[1], from: block, in: block, after: ids[0])) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(ids[0], from: block, in: block, after: nil)) } == 0)
 }
 
 @Test func aDropAfterARowNotInTheBlockWritesNothing() throws {
@@ -124,12 +124,12 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     let a = try store.createTask(NewTask(title: "a"))
     let b = try store.createTask(NewTask(title: "b"))
     let module = try list(parent, in: store)
-    #expect(try commits(of: store) { module.tap(.rowDropped(b, from: .own(nil), in: .own(nil), after: inside)) } == 0)
-    #expect(try commits(of: store) { module.tap(.rowDropped(a, from: .own(nil), in: .list(house), after: b)) } == 0)
-    #expect(try commits(of: store) { module.tap(.rowDropped(b, from: .list(house), in: .own(nil), after: nil)) } == 0, "not its row")
+    #expect(commits(of: store) { module.tap(.rowDropped(b, from: .own(nil), in: .own(nil), after: inside)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(a, from: .own(nil), in: .list(house), after: b)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(b, from: .list(house), in: .own(nil), after: nil)) } == 0, "not its row")
     let gone = TaskList.Model.BlockID.list(ViewID("gone"))
-    #expect(try commits(of: store) { module.tap(.rowDropped(a, from: .own(nil), in: gone, after: nil)) } == 0)
-    #expect(try commits(of: store) { module.tap(.rowDropped(a, from: gone, in: .own(nil), after: nil)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(a, from: .own(nil), in: gone, after: nil)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(a, from: gone, in: .own(nil), after: nil)) } == 0)
 }
 
 @Test func aDropAfterItselfWritesNothing() throws {
@@ -137,7 +137,7 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     let ids = try tasks("a", "b", "c", in: store)
     let module = try list(inbox, in: store)
     let block = TaskList.Model.BlockID.own(nil)
-    #expect(try commits(of: store) { module.tap(.rowDropped(ids[1], from: block, in: block, after: ids[1])) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(ids[1], from: block, in: block, after: ids[1])) } == 0)
 }
 
 // MARK: - The move
@@ -159,6 +159,39 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(task.when == day(2) && task.tags == [work])
     #expect(rowIDs(of: block, in: module.model) == [there, id])
     #expect(rowIDs(of: .list(house), in: module.model).isEmpty)
+}
+
+/// A day block always writes its day, though the rule's own day condition holds of the day the task is on: a task dragged
+/// between two days moves to the one it was let go in (the controller's ruling on #176, 2026-11-05). The row names where it
+/// lands among the block's rows, and a move pins nothing where the rule asks for no manual list.
+@Test func aDayBlockAlwaysWritesItsDay() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let week = try thisWeek(store, tag: work)
+    let id = try store.createTask(NewTask(title: "Standup", when: day(1), tags: [work]))
+    let there = try store.createTask(NewTask(title: "Review", when: day(2), tags: [work]))
+    let module = try list(week, in: store)
+    module.tap(.rowDropped(id, from: .own(.day(day(1))), in: .own(.day(day(2))), after: there))
+    let task = try stored(id, in: store)
+    #expect(task.when == day(2) && task.tags == [work])
+    #expect(try store.manualList(of: week).isEmpty)
+    #expect(blocks(of: module.model).map(\.id) == [.own(.day(day(2)))], "the day it left has no block")
+}
+
+/// A day block of a list grouped by deadline writes its day as the deadline, and what the rule's When gives only where the
+/// task does not meet it (the controller's ruling on #176, 2026-11-05).
+@Test func aDropIntoADeadlineDayBlockSetsTheDeadline() throws {
+    let store = try makeStore()
+    let due = try store.createView(NewTaskView(
+        title: "Due", filter: .and([.status([.open]), .when(.onOrBefore(0))]), sort: [SortKey(.deadline)],
+        groupBy: .deadlineDay
+    ))
+    let id = try store.createTask(NewTask(title: "Pay", when: day(-1), deadline: day(1)))
+    try store.createTask(NewTask(title: "File", when: day(0), deadline: day(2)))
+    let module = try list(due, in: store)
+    module.tap(.rowDropped(id, from: .own(.day(day(1))), in: .own(.day(day(2))), after: nil))
+    let task = try stored(id, in: store)
+    #expect(task.deadline == day(2) && task.when == day(-1))
 }
 
 /// A manual list takes the task last, and it leaves the manual list it came from (spec section 6's table). `after` is
@@ -225,8 +258,8 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(rowIDs(of: .own(nil), in: module.model) == [id])
 }
 
-/// A rule of alternatives, a condition no edit satisfies, takes no drop: the model says so for the view, and one sent all
-/// the same writes nothing (spec section 6).
+/// A rule of alternatives, a condition no edit satisfies, takes no drop: the model says so for the view, and one sent
+/// all the same writes nothing (spec section 6).
 @Test func aBlockWhoseRuleRefusesTakesNoDrop() throws {
     let store = try makeStore()
     let parent = try projects(store)
@@ -235,14 +268,14 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     let module = try list(parent, in: store)
     #expect(block(.list(either), of: module.model)?.takesDrop == false)
     #expect(block(.own(nil), of: module.model)?.takesDrop == true)
-    #expect(try commits(of: store) { module.tap(.rowDropped(id, from: .own(nil), in: .list(either), after: nil)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(id, from: .own(nil), in: .list(either), after: nil)) } == 0)
     module.tap(.showAsChosen(.columns))
     #expect(block(.list(either), of: module.model)?.column?.isDropTarget == false)
     #expect(block(.own(nil), of: module.model)?.column?.isDropTarget == true)
-    #expect(try commits(of: store) { module.tap(.rowDropped(id, from: .own(nil), in: .list(either), after: nil)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(id, from: .own(nil), in: .list(either), after: nil)) } == 0)
 }
 
-/// A task two blocks draw leaves only the one it was dragged from (the controller's ruling R76).
+/// A task two blocks draw leaves only the one it was dragged from (the controller's ruling on #176, 2026-11-05).
 @Test func aTaskTwoBlocksDrawLeavesOnlyTheOneItWasDraggedFrom() throws {
     let store = try makeStore()
     let a = try store.createTag(title: "a")
@@ -263,8 +296,8 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(rowIDs(of: .list(listC), in: module.model) == [id])
 }
 
-/// An own block reverses nothing: reversing the list's own rule would strip a tag or a pin the spec's table never lists as
-/// left, and the task leaves it by being claimed (the controller's ruling R77).
+/// An own block reverses nothing: reversing the list's own rule would strip a tag or a pin the spec's table never lists
+/// as left, and the task leaves it by being claimed (the controller's ruling on #176, 2026-11-05).
 @Test func aDropOutOfAnOwnBlockKeepsTheListsTag() throws {
     let store = try makeStore()
     let work = try store.createTag(title: "work")
@@ -280,7 +313,7 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
 }
 
 /// What the target asks is taken out of what the source gave back: a shared tag and the same manual list stay (the
-/// controller's ruling R77).
+/// controller's ruling on #176, 2026-11-05).
 @Test func theReversalKeepsWhatTheTargetAsks() throws {
     let store = try makeStore()
     let shared = try store.createTag(title: "shared")
@@ -302,8 +335,8 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(try store.manualList(of: manual) == [id])
 }
 
-/// A day condition the task already meets asks nothing of it, so an overdue task dropped into a list of what is due keeps
-/// its day, where a day block always writes its own (the controller's ruling R91).
+/// A day condition the task already meets asks nothing of it, so an overdue task dropped into a list of what is due
+/// keeps its day, where a day block always writes its own (the controller's ruling on #176, 2026-11-05).
 @Test func aDropIntoARuleTheTaskAlreadyMatchesKeepsItsDay() throws {
     let store = try makeStore()
     let a = try store.createTag(title: "a")
@@ -323,8 +356,8 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(try stored(future, in: store).tags == [])
 }
 
-/// A move writes only what changes: a tag the task holds, the day it is on and a pin it does not have cost no write, which
-/// is what keeps the rereads few (the controller's ruling R91).
+/// A move writes only what changes: a tag the task holds, the day it is on and a pin it does not have cost no write,
+/// which is what keeps the rereads few (the controller's ruling on #176, 2026-11-05).
 @Test func aMoveWritesOnlyWhatChanges() throws {
     let store = try makeStore()
     let a = try store.createTag(title: "a")
@@ -337,12 +370,12 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     ))
     let id = try store.createTask(NewTask(title: "Buy milk", when: day(1), tags: [a, shared]))
     let module = try list(parent, in: store)
-    #expect(try commits(of: store) { module.tap(.rowDropped(id, from: .list(from), in: .list(to), after: nil)) } == 1)
+    #expect(commits(of: store) { module.tap(.rowDropped(id, from: .list(from), in: .list(to), after: nil)) } == 1)
     #expect(try stored(id, in: store).tags == [shared], "the one write: the tag it left")
     #expect(try stored(id, in: store).when == day(1))
 }
 
-/// A move into a folded block leaves it folded (the controller's ruling R90).
+/// A move into a folded block leaves it folded (the controller's ruling on #176, 2026-11-05).
 @Test func aMoveIntoAFoldedBlockLeavesItFolded() throws {
     let store = try makeStore()
     let home = try store.createTag(title: "home")

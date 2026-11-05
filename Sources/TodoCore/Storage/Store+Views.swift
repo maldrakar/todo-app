@@ -165,9 +165,9 @@ extension Store {
     /// Pins several tasks in a view's manual list in one transaction: the first at the placement, each next after the
     /// one before, so that a dropped task and the unpinned tasks above it land where they stood (list screen spec,
     /// section 6). A task already pinned there moves with them, and the anchor of `.after` is a task of the list that
-    /// stays where it is, one of those moving being as gone as one never pinned. The ranks are made among the tasks that
-    /// stay, the next one up from the placement their upper bound, and every operation shares one stamp, for the reason
-    /// written on `pin(task:in:at:)`.
+    /// stays where it is, one of those moving being as gone as one never pinned. The ranks are made among the tasks
+    /// that stay, the next one up from the placement their upper bound, and every operation shares one stamp, for the
+    /// reason written on `pin(task:in:at:)`.
     public func pin(tasks: [TaskID], in view: ViewID, at placement: Placement) throws(StoreError) {
         for task in tasks { try requireTask(task) }
         try requireView(view)

@@ -7,7 +7,11 @@ import DesignSystem
 /// its trailing edge; the capsule `topMargin` below the blocks and `leadingMargin` and `trailingMargin` in from the
 /// sides, in points. The tasks done under it, while the strip is open, are the feature module's rows, each a row or the
 /// open card, so the model holds none (list screen spec, section 3).
-public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable {
+///
+/// A class, for the reason a list's row is one (`ListRowModel`): the screen's model holds one, every copy and comparison of
+/// that model copies and compares it, and inline it is some 500 bytes on wasm32. Its `==` compares every stored property,
+/// and a test changes them one at a time.
+public final class DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
 
     /// The label, finished, such as "Done today · 3".
@@ -62,5 +66,23 @@ public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable 
         self.trailingMargin = trailingMargin
         self.isOpen = isOpen
         self.action = action
+    }
+
+    public static func == (lhs: DoneStripModel, rhs: DoneStripModel) -> Bool {
+        if lhs === rhs { return true }
+        return lhs.icon == rhs.icon
+            && lhs.label == rhs.label
+            && lhs.chevron == rhs.chevron
+            && lhs.background == rhs.background
+            && lhs.height == rhs.height
+            && lhs.cornerRadius == rhs.cornerRadius
+            && lhs.spacing == rhs.spacing
+            && lhs.leadingPadding == rhs.leadingPadding
+            && lhs.trailingPadding == rhs.trailingPadding
+            && lhs.topMargin == rhs.topMargin
+            && lhs.leadingMargin == rhs.leadingMargin
+            && lhs.trailingMargin == rhs.trailingMargin
+            && lhs.isOpen == rhs.isOpen
+            && lhs.action == rhs.action
     }
 }

@@ -4,17 +4,17 @@ import TaskScreenFeature
 import TodoCore
 
 /// The screen of one list: its tasks as the store's page of the view lays them out, the list's own tasks first in their
-/// groups and then one block per list inside it, with the tag bar, the folds and the layout the device keeps, every write
-/// the screen makes, and what it declared over itself (list screen spec, sections 1 to 7 and 9).
+/// groups and then one block per list inside it, with the tag bar, the folds and the layout the device keeps, every
+/// write the screen makes, and what it declared over itself (list screen spec, sections 1 to 7 and 9).
 ///
 /// It is declared by the sidebar, by a choice there, and stands in its window's stack over the sidebar, drawn in the
-/// pane beside it on the Mac. A tap on a row opens the task in place, as a card; the card's Open full screen declares the
-/// task screen over the list, and a tap on a block's title the list
-/// inside that the block is, or the list's own group the block is, opened as a screen of its own, which is this module
-/// on another route; the window's stack makes, keeps and drops what the list declared (ADR-0009, amendments of
-/// 2026-10-22, 2026-11-01 and 2026-11-02): the list holds no screen and draws none, and hears what a screen over it
-/// asks for as `.destinationAnswered`. Neither the sidebar nor the root learns what a list opens, and their code does
-/// not grow when it learns to open something (navigation state spec, section 2).
+/// pane beside it on the Mac. A tap on a row opens the task in place, as a card; the card's Open full screen declares
+/// the task screen over the list, and a tap on a block's title the list inside that the block is, or the list's own
+/// group the block is, opened as a screen of its own, which is this module on another route; the window's stack makes,
+/// keeps and drops what the list declared (ADR-0009, amendments of 2026-10-22, 2026-11-01 and 2026-11-02): the list
+/// holds no screen and draws none, and hears what a screen over it asks for as `.destinationAnswered`. Neither the
+/// sidebar nor the root learns what a list opens, and their code does not grow when it learns to open something
+/// (navigation state spec, section 2).
 ///
 /// A group's screen is the list it belongs to read for one of its own groups: the module reads the list's page and
 /// draws that group's block of it, so the two always agree, and nothing stores the group or writes when it opens
@@ -64,8 +64,10 @@ public final class TaskList: Routable {
         /// Delete in a row's menu.
         case deleteMenuItemChosen(TaskID)
         /// A row let go: the block it was dragged from, which names one of the two that draw a task both select, the block
-        /// it was let go in, and the row it stands after there, nil for the top (the controller's ruling R76).
-        case rowDropped(TaskID, from: Model.BlockID, in: Model.BlockID, after: TaskID?)
+        /// it was let go in, and the row it stands after there, nil for the top (the controller's ruling on #176,
+        /// 2026-11-05). Indirect, since every control's model holds an action inline, and inline this one case makes all of
+        /// them 56 bytes on wasm32 where the rest need 14, which a debug build puts on the stack at every copy.
+        indirect case rowDropped(TaskID, from: Model.BlockID, in: Model.BlockID, after: TaskID?)
         /// A block's title, in its header or its column's.
         case blockTitleTapped(Model.BlockID)
         /// A block's chevron, which folds and unfolds it.
@@ -339,12 +341,12 @@ public final class TaskList: Routable {
     /// fold made here, as the sidebar reads its folds with its rows (ADR-0010); a group's screen keeps none. The layout
     /// is not read again: it is one value, the last one chosen wins, and a window would change its layout on a change
     /// to anything. It drops the picks whose chips are no longer on the bar, which stop filtering and come back unlit
-    /// (the controller's ruling on #175, 2026-11-04). The folds and the open card's subtasks are read before anything is
-    /// assigned, so a read that fails leaves what is on screen.
+    /// (the controller's ruling on #175, 2026-11-04). The folds and the open card's subtasks are read before anything
+    /// is assigned, so a read that fails leaves what is on screen.
     ///
     /// A card stays while its row is drawn, and a read that no longer finds it drops it with no write: this answers a
-    /// change as well as a write, and a module never writes in answer to a change (ADR-0009; the controller's ruling R82).
-    /// A list being named goes with its block.
+    /// change as well as a write, and a module never writes in answer to a change (ADR-0009; the controller's ruling on
+    /// #176, 2026-11-05). A list being named goes with its block.
     func take(_ snapshot: PageSnapshot) throws(StoreError) {
         let folded = state.head.group == nil ? try TaskList.keptFolds(in: store, of: state.head.view) : []
         let subtasks = try state.card.map { card throws(StoreError) in try store.children(of: card.id) }
@@ -422,11 +424,12 @@ public final class TaskList: Routable {
     }
 
     /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
-    /// it even when the page's read fails; the snapshot of the store the blocks, the tile, the rule and the strip are read
-    /// from, and the device's day it was taken by; the folds and the layout the device keeps, and what this session keeps,
-    /// the picked tags, the open card, whether the strip is open and the list being named; what it declared over itself;
-    /// and the sentence a person was last told. One value, moved field by field, and the one place any of it is kept: the
-    /// model is assembled from it on every read, in `model` and nowhere else (owner's reviews of #77, #101 and #188).
+    /// it even when the page's read fails; the snapshot of the store the blocks, the tile, the rule and the strip are
+    /// read from, and the device's day it was taken by; the folds and the layout the device keeps, and what this
+    /// session keeps, the picked tags, the open card, whether the strip is open and the list being named; what it
+    /// declared over itself; and the sentence a person was last told. One value, moved field by field, and the one
+    /// place any of it is kept: the model is assembled from it on every read, in `model` and nowhere else (owner's
+    /// reviews of #77, #101 and #188).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
@@ -449,8 +452,8 @@ public final class TaskList: Routable {
             TaskList.blocks(of: snapshot, head: head, today: day.day)
         }
 
-        /// A task of the snapshot, in a section of the page or in the strip, finished or not, whatever the tag bar and the
-        /// folds leave.
+        /// A task of the snapshot, in a section of the page or in the strip, finished or not, whatever the tag bar and
+        /// the folds leave.
         func task(_ id: TaskID) -> TodoTask? {
             for section in snapshot.page.sections {
                 for group in section.groups {
@@ -498,8 +501,9 @@ public final class TaskList: Routable {
             let addList = head.group == nil && view.filter.map(TaskList.drawsFinished) != true
                 ? TaskList.addListRow(metrics.addList)
                 : nil
-            let done = kept(snapshot.done)
-            let strip = done.isEmpty ? nil : metrics.doneStrip
+            let done = TaskList.doneStrip(
+                kept(snapshot.done), isOpen: isDoneOpen, color: color, context, metrics.blocks
+            )
             return Model(
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
                 tagBar: TaskList.tagBar(chips, picked: picked, colors: color.check, metrics.tagBar),
@@ -508,14 +512,8 @@ public final class TaskList: Routable {
                 ),
                 showAs: TaskList.showAs(canBoard: canBoard),
                 empty: empty,
-                done: strip.map {
-                    TaskList.doneStrip(count: done.count, isOpen: isDoneOpen, color: color, $0)
-                },
-                doneRows: isDoneOpen
-                    ? strip.map { strip in
-                        done.map { TaskList.doneRow($0, color, context, strip.row, card: strip.card) }
-                    } ?? []
-                    : [],
+                done: done.strip,
+                doneRows: done.rows,
                 addTask: TaskList.floatingTarget(in: blocks, head: head, rule: view.filter, today: today).map { _ in
                     TaskList.floatingButton(metrics.floatingButton)
                 },

@@ -6,8 +6,9 @@ import TaskListFeature
 import TaskScreenFeature
 import TodoCore
 
-// The card in place (spec sections 3 and 4; the controller's rulings R82 to R85): a tap opens a task where its row stood,
-// its fields are written as they are left, a close writes what was typed, and a card lives while its row is drawn.
+// The card in place (spec sections 3 and 4; the controller's ruling on #176, 2026-11-05): a tap opens a task where its
+// row stood, its fields are written as they are left, a close writes what was typed, and a card lives while its row is
+// drawn.
 
 private let inbox = BuiltInTaskViews.inbox
 
@@ -53,7 +54,7 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     module.tap(.titleFieldLostFocus)
     #expect(try stored(id, in: store).title == "Buy soy milk", "trimmed")
     #expect(openCard(in: module.model)?.card.title.text == "Buy soy milk")
-    #expect(try commits(of: store) { module.tap(.titleFieldSubmitted) } == 0, "it did not change")
+    #expect(commits(of: store) { module.tap(.titleFieldSubmitted) } == 0, "it did not change")
 }
 
 @Test func notesAreWrittenOnLeavingTheField() throws {
@@ -64,7 +65,7 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     module.tap(.notesFieldLostFocus)
     #expect(try store.notes(of: id) == " two, oat ", "as typed")
     #expect(openCard(in: module.model)?.card.notes.text == " two, oat ")
-    #expect(try commits(of: store) { module.tap(.notesFieldLostFocus) } == 0, "it did not change")
+    #expect(commits(of: store) { module.tap(.notesFieldLostFocus) } == 0, "it did not change")
 }
 
 @Test func aSubtaskIsAddedOnReturnAndTheNextFieldOpens() throws {
@@ -92,7 +93,7 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     #expect(try store.children(of: id).map(\.title) == ["Second"])
     #expect(openCard(in: module.model)?.card.subtaskField == nil, "and closes it")
     module.tap(.addSubtaskTapped)
-    #expect(try commits(of: store) { module.tap(.subtaskFieldLostFocus) } == 0, "nothing was typed")
+    #expect(commits(of: store) { module.tap(.subtaskFieldLostFocus) } == 0, "nothing was typed")
     #expect(openCard(in: module.model)?.card.subtaskField == nil)
     module.tap(.addSubtaskTapped)
     module.tap(.subtaskFieldChanged("Dropped"))
@@ -160,7 +161,8 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
 }
 
 /// Clearing the title of a task that has one and tapping away keeps the old title, as a list's empty name keeps the old
-/// (the controller's ruling R83): `delete(task:)` is a tombstone with no Trash, which that must not reach.
+/// (the controller's ruling on #176, 2026-11-05): `delete(task:)` is a tombstone with no Trash, which that must not
+/// reach.
 @Test func clearingATitleKeepsTheOldWhenTheCardCloses() throws {
     let store = try makeStore()
     let (module, id) = try cardOnATask(store)
@@ -187,7 +189,8 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
 }
 
 /// Esc closes the card and keeps what was typed, as the canvas does; of the subtask field it drops only that (the
-/// controller's ruling R84). Esc in the title field and a tap on the background keep an open subtask draft too.
+/// controller's ruling on #176, 2026-11-05). Esc in the title field and a tap on the background keep an open subtask
+/// draft too.
 @Test func escapeKeepsWhatWasTypedAndClosesTheCard() throws {
     let store = try makeStore()
     let (module, id) = try cardOnATask(store)
@@ -231,7 +234,7 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     let module = try list(inbox, in: store)
     module.tap(.addTaskButtonTapped)
     let id = try #require(openCard(in: module.model)?.id)
-    #expect(try commits(of: store) { module.tap(.titleFieldLostFocus) } == 0)
+    #expect(commits(of: store) { module.tap(.titleFieldLostFocus) } == 0)
     #expect(openCard(in: module.model)?.id == id)
     #expect(try store.task(id) != nil)
 }
@@ -241,7 +244,7 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     let (module, id) = try cardOnATask(store)
     module.tap(.titleFieldChanged("Buy oat milk"))
     module.tap(.notesFieldChanged("two"))
-    #expect(try commits(of: store) { module.tap(.checkTapped(id)) } == 1, "one transaction")
+    #expect(commits(of: store) { module.tap(.checkTapped(id)) } == 1, "one transaction")
     let task = try stored(id, in: store)
     #expect(task.title == "Buy oat milk" && task.status == .done)
     #expect(try store.notes(of: id) == "two")
@@ -259,7 +262,7 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
 }
 
 /// A fold that hides the card closes it by the rule of every close, and writes what was typed (the controller's ruling
-/// R82).
+/// on #176, 2026-11-05).
 @Test func aFoldThatHidesTheCardClosesIt() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk", when: day(1)))
@@ -296,7 +299,7 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     let (module, id) = try cardOnATask(store)
     module.tap(.titleFieldChanged("Buy oat milk"))
     let trashed = try changeSet(of: store) { try store.trash(task: id) }
-    #expect(try commits(of: store) { _ = module.send(.changed(trashed)) } == 0)
+    #expect(commits(of: store) { _ = module.send(.changed(trashed)) } == 0)
     #expect(openCard(in: module.model) == nil)
     #expect(try stored(id, in: store).title == "Buy milk")
     #expect(module.model == (try list(inbox, in: store).model))
@@ -318,8 +321,8 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     #expect(opened.card.subtasks.map(\.title.text) == ["A subtask"])
 }
 
-/// A field writes the text it holds back through its binding, after Return and after a lost focus too (`TaskViewList`, by
-/// hand on 2026-10-12): that echo is no keystroke, so the sentence stays, and a field with no card to write to moves
+/// A field writes the text it holds back through its binding, after Return and after a lost focus too (`TaskViewList`,
+/// by hand on 2026-10-12): that echo is no keystroke, so the sentence stays, and a field with no card to write to moves
 /// nothing.
 @Test func aFieldsEchoOfItsTextLeavesTheSentence() throws {
     let store = try makeStore()

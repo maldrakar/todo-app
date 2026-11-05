@@ -6,11 +6,11 @@ import TodoCore
 /// The task opened in place (spec section 3; Task 8's table, Card; `Phone.dc.html`, the open card), and what the module
 /// keeps of it between two events: session state a relaunch loses (ADR-0009, amendment of 2026-11-01).
 extension TaskList {
-    /// The open card: its task; what was typed into its title and its notes, nil until something was, while its fields show
-    /// what the store keeps, so that a change a reread finds is drawn over a field no one typed in and never written over;
-    /// its notes as read when it opened and as written since, since the list's read carries none (ADR-0002); its children,
-    /// read with every reread, so that one just written shows (the controller's ruling R85); and the subtask being typed,
-    /// nil while no field is open.
+    /// The open card: its task; what was typed into its title and its notes, nil until something was, while its fields
+    /// show what the store keeps, so that a change a reread finds is drawn over a field no one typed in and never
+    /// written over; its notes as read when it opened and as written since, since the list's read carries none
+    /// (ADR-0002); its children, read with every reread, so that one just written shows (the controller's ruling on
+    /// #176, 2026-11-05); and the subtask being typed, nil while no field is open.
     struct OpenCard {
         let id: TaskID
         var typedTitle: String?
@@ -26,9 +26,9 @@ extension TaskList {
         var draft: String
     }
 
-    /// The card of a task (spec section 3; the controller's ruling R89): its check, its title's and notes' fields with what
-    /// was typed or what the store keeps, its subtasks each with a small check, the subtask's field where one is open, "Add
-    /// subtask", the pills, and Open full screen.
+    /// The card of a task (spec section 3; the controller's ruling on #176, 2026-11-05): its check, its title's and
+    /// notes' fields with what was typed or what the store keeps, its subtasks each with a small check, the subtask's
+    /// field where one is open, "Add subtask", the pills, and Open full screen.
     static func card(
         of task: TodoTask, _ card: OpenCard, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Card
     ) -> CardModel<UserAction> {
@@ -58,8 +58,8 @@ extension TaskList {
             pills: pills(of: task, today: context.today, tags: context.tags, metrics.pill),
             expand: ButtonModel(
                 label: ButtonLabelModel(
-                    icon: IconModel(icon: .expand, size: metrics.expandSize, weight: .regular, color: .ink2), title: nil,
-                    accessibilityLabel: "Open full screen", fill: .color(.surface)
+                    icon: IconModel(icon: .expand, size: metrics.expandSize, weight: .regular, color: .ink2),
+                    title: nil, accessibilityLabel: "Open full screen", fill: .color(.surface)
                 ),
                 action: .openFullScreenTapped
             ),
@@ -72,7 +72,9 @@ extension TaskList {
     }
 
     /// A subtask's row in the card, in the card's list's colour, struck where it is no longer open (canvas).
-    private static func subtask(of task: TodoTask, _ color: Tile, _ metrics: Metrics.Card) -> SubtaskRowModel<UserAction> {
+    private static func subtask(
+        of task: TodoTask, _ color: Tile, _ metrics: Metrics.Card
+    ) -> SubtaskRowModel<UserAction> {
         let isOpen = task.status == .open
         return SubtaskRowModel(
             check: check(
@@ -83,10 +85,10 @@ extension TaskList {
         )
     }
 
-    /// The card's pills, drawn and inert in this epic (spec section 3; canvas, `.xpill`; the controller's ruling R89): When
-    /// with its sun, amber while it is set, and Deadline with its flag, red while it is set, each in ink 2 unset; the
-    /// deadline's text red from the day it is due; and one per tag in the tags' order, the bare name after a hash in ink 2,
-    /// a weight lighter than the two (`.areaLabel`, the pill's size at 500).
+    /// The card's pills, drawn and inert in this epic (spec section 3; canvas, `.xpill`; the controller's ruling on
+    /// #176, 2026-11-05): When with its sun, amber while it is set, and Deadline with its flag, red while it is set,
+    /// each in ink 2 unset; the deadline's text red from the day it is due; and one per tag in the tags' order, the
+    /// bare name after a hash in ink 2, a weight lighter than the two (`.areaLabel`, the pill's size at 500).
     private static func pills(
         of task: TodoTask, today: Day, tags: TagNames, _ metrics: Metrics.Pill
     ) -> [PillModel] {

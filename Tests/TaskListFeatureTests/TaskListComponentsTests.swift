@@ -19,8 +19,9 @@ private func board(of model: TaskList.Model) -> TaskList.Model.Board? {
 /// The phone's row, as Task 8's table gives it: 8 in and 12 short of the edges, the check 24 across with a 1.75 ring
 /// and the 15 pt mark stroked 1.75 in a 44 pt hit, popping on the check's motion; the title in the row title, 11 above
 /// and below, 2 after the check's hit and 4 short of the end; the meta 3 under it, its items 10 apart and its lines 3;
-/// at least 44 high and rounded 12; dragged 40 leftward it stays moved 88 over its Delete, 78 wide, 3 and 10 in from its
-/// edges, rounded 12, and its menu holds Delete; no lift yet (Task 8). A row of the strip has neither, and no meta line.
+/// at least 44 high and rounded 12; dragged 40 leftward it stays moved 88 over its Delete, 78 wide, 3 and 10 in from
+/// its edges, rounded 12, and its menu holds Delete; no lift yet (Task 8). A row of the strip has neither, and no meta
+/// line.
 private func phoneRow(
     _ title: String, id: TaskID, colors: DesignSystem.Color.Components.Check, isOpen: Bool = true,
     meta: [MetaItemModel] = [], deletes: Bool = true
@@ -208,8 +209,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 /// bottom, snapping; a column 296 wide, rounded 18 on the fill, its cards 8 apart and 8 in, each rounded 13 on the
 /// surface with a 0.5 hairline of the glass line and the resting shadow; its header 44 high, padded 13 14 9, with no
 /// rule and no chevron; a card's check 22 across in a 42 by 44 hit and its title callout-sized (Task 8's table; the
-/// controller's ruling on #175, 2026-11-04). A card has the row's menu and no swipe (canvas), and the column takes a drop
-/// where the block's rule reads as edits.
+/// controller's ruling on #175, 2026-11-04). A card has the row's menu and no swipe (canvas), and the column takes a
+/// drop where the block's rule reads as edits.
 @Test func aColumnCarriesTheBoardsNumbers() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk", when: day(1)))
@@ -246,9 +247,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     )])
 }
 
-/// A row that adds a task carries the phone's numbers in the list, 40 high with its plus 18 in a 44 cell, and in a column,
-/// 44 high with the plus 6 before its title; the row that adds a list stands after the blocks over a rule and as the
-/// board's dashed last column (Task 8's table, Add rows and Board).
+/// A row that adds a task carries the phone's numbers in the list, 40 high with its plus 18 in a 44 cell, and in a
+/// column, 44 high with the plus 6 before its title; the row that adds a list stands after the blocks over a rule and
+/// as the board's dashed last column (Task 8's table, Add rows and Board).
 @Test func theAddRowsCarryThePhonesNumbers() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk", when: day(1)))
@@ -281,8 +282,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ))
 }
 
-/// The floating "+" is the accent's 48 circle with a white plus 22 across, casting the raised shadow and reading "New task"
-/// (Task 8's table, Floating "+"; the controller's ruling R89).
+/// The floating "+" is the accent's 48 circle with a white plus 22 across, casting the raised shadow and reading "New
+/// task" (Task 8's table, Floating "+"; the controller's ruling on #176, 2026-11-05).
 @Test func theFloatingPlusCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     #expect(try list(BuiltInTaskViews.inbox, in: store).model.addTask == FloatingButtonModel(
@@ -291,9 +292,10 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ))
 }
 
-/// The Done strip is a 36 capsule on the fill, its check in a circle 18 in the list's glyph colour, "Done today · N" in the
-/// bar's label and ink 2, its chevron 15, turned half round while it is open and saying what a tap will do; a row under it
-/// is struck, with no meta line, no swipe and no menu (Task 8's table, Done strip; the controller's rulings R74, R88).
+/// The Done strip is a 36 capsule on the fill, its check in a circle 18 in the list's glyph colour, "Done today · N" in
+/// the bar's label and ink 2, its chevron 15, turned half round while it is open and saying what a tap will do; a row
+/// under it is struck, with no meta line, no swipe and no menu (Task 8's table, Done strip; the controller's ruling on
+/// #176, 2026-11-05).
 @Test func theDoneStripCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     let errand = try store.createTag(title: "errand")
@@ -323,8 +325,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ])
 }
 
-/// A task in the Trash has no swipe and no menu (spec section 6): its row is the row's, its check the mark of whether it is
-/// open.
+/// A task in the Trash has no swipe and no menu (spec section 6): its row is the row's, its check the mark of whether
+/// it is open.
 @Test func aTrashRowHasNoSwipeAndNoMenu() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Binned"))
@@ -333,8 +335,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     #expect(rows == [phoneRow("Binned", id: id, colors: Tile.stone.check, deletes: false)])
 }
 
-/// The open card carries the phone's numbers, in the list and in a column; its pills, its fields and its subtasks read what
-/// the task holds (Task 8's table, Card; `Phone.dc.html`, the open card; the controller's ruling R89).
+/// The open card carries the phone's numbers, in the list and in a column; its pills, its fields and its subtasks read
+/// what the task holds (Task 8's table, Card; `Phone.dc.html`, the open card; the controller's ruling on #176,
+/// 2026-11-05).
 @Test func theCardCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     let errand = try store.createTag(title: "errand")

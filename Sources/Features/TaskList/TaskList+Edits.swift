@@ -1,5 +1,4 @@
 // Sources/Features/TaskList/TaskList+Edits.swift
-import TaskScreenFeature
 import TodoCore
 
 /// The screen's writes but the card's and the drop's (`TaskList+CardEdits.swift`, `TaskList+Drop.swift`): the check and
@@ -7,10 +6,10 @@ import TodoCore
 /// Each answers a person's action and none a change (ADR-0009), and every id a view sends is checked against the model.
 extension TaskList {
     /// Writes, says what the store refused, and reads the page back at once, as the sidebar's writes do
-    /// (`TaskViewList.writeAndReread`), so that a new task's card has its row; `.changed` rereads again as it always has
-    /// (the controller's ruling R85). The page is read back after a refusal too, since what the store refused can be a
-    /// peer's change the module has not heard of yet. A write that held takes the sentence away; a read that fails says the
-    /// list may be out of date only when nothing else was said. Answers whether both held.
+    /// (`TaskViewList.writeAndReread`), so that a new task's card has its row; `.changed` rereads again as it always
+    /// has (the controller's ruling on #176, 2026-11-05). The page is read back after a refusal too, since what the
+    /// store refused can be a peer's change the module has not heard of yet. A write that held takes the sentence away;
+    /// a read that fails says the list may be out of date only when nothing else was said. Answers whether both held.
     @discardableResult
     func writeAndReread(refusal: Problem = .couldNotSave, _ write: () throws(StoreError) -> Void) -> Bool {
         let written: Bool
@@ -44,8 +43,8 @@ extension TaskList {
 
     // MARK: - The check and the strip
 
-    /// Writes a drawn task done, or open where it is not, with no timer and no done task kept among the rows: the strip's
-    /// check is the undo (spec section 3). The open card's own task goes through what the card holds.
+    /// Writes a drawn task done, or open where it is not, with no timer and no done task kept among the rows: the
+    /// strip's check is the undo (spec section 3). The open card's own task goes through what the card holds.
     func check(_ id: TaskID) {
         guard isDrawn(id), let task = state.task(id) else { return }
         let status: TaskStatus = task.status == .open ? .done : .open
@@ -56,8 +55,8 @@ extension TaskList {
         if cardIsUntitled() { dismissCard() } else { saveCard(setting: status, withSubtask: true) }
     }
 
-    /// Opens and closes the strip, session state; closing it closes a card under it by the rule of every close. It answers
-    /// nothing a person was told, so the sentence stays.
+    /// Opens and closes the strip, session state; closing it closes a card under it by the rule of every close. It
+    /// answers nothing a person was told, so the sentence stays.
     func toggleDoneStrip() {
         guard model.done != nil else { return }
         state.isDoneOpen.toggle()
@@ -66,8 +65,9 @@ extension TaskList {
 
     // MARK: - Adding a task
 
-    /// The floating "+": a new task at the top of the block it adds to, by what that block's rule asks (spec section 4; the
-    /// controller's ruling R81). The card that was open closes first, which can change which block that is.
+    /// The floating "+": a new task at the top of the block it adds to, by what that block's rule asks (spec section 4;
+    /// the controller's ruling on #176, 2026-11-05). The card that was open closes first, which can change which block
+    /// that is.
     func addFromFloatingButton() {
         guard model.addTask != nil else { return }
         state.problem = nil
@@ -79,8 +79,9 @@ extension TaskList {
         addTask(target.edits, at: .start, onTopOf: target.view)
     }
 
-    /// "+ Add task": a new task at the end of its block, by what the block's rule asks (spec section 4). The block's edits
-    /// are read before the card that was open closes, which can take the block with it, a day whose one task it was.
+    /// "+ Add task": a new task at the end of its block, by what the block's rule asks (spec section 4). The block's
+    /// edits are read before the card that was open closes, which can take the block with it, a day whose one task it
+    /// was.
     func addFromRow(in id: Model.BlockID) {
         guard TaskList.blocks(in: model.layout).first(where: { $0.id == id })?.addTask != nil,
               let edits = state.pageBlocks.first(where: { $0.id == id })?.edits
@@ -90,11 +91,12 @@ extension TaskList {
         addTask(edits, at: .end, onTopOf: nil)
     }
 
-    /// Writes a new empty task with what the edits give it and the tags picked in the tag bar but one the rule takes off,
-    /// pinned where they pin; `onTopOf` names the view whose manual list it must stand above, where they do not pin and
-    /// that view has one, an unpinned task landing under the pinned ones (the controller's ruling R81). Its card opens,
-    /// its block unfolding if it was folded (the controller's ruling R82); and a task that landed nowhere the screen draws
-    /// has no card to close, so it is taken back, and not left behind untitled.
+    /// Writes a new empty task with what the edits give it and the tags picked in the tag bar but one the rule takes
+    /// off, pinned where they pin; `onTopOf` names the view whose manual list it must stand above, where they do not
+    /// pin and that view has one, an unpinned task landing under the pinned ones (the controller's ruling on #176,
+    /// 2026-11-05). Its card opens, its block unfolding if it was folded (the controller's ruling on #176, 2026-11-05);
+    /// and a task that landed nowhere the screen draws has no card to close, so it is taken back, and not left behind
+    /// untitled.
     private func addTask(_ edits: Edits, at placement: Placement, onTopOf view: ViewID?) {
         let new = NewTask(
             title: "", when: edits.when ?? nil, deadline: edits.deadline ?? nil,
@@ -123,8 +125,8 @@ extension TaskList {
 
     // MARK: - Adding a list
 
-    /// "+ Add list": a manual list inside this one, last among its lists, in its colour, with its name's field open in its
-    /// header on the title it was made with (spec section 4). The card that was open closes first.
+    /// "+ Add list": a manual list inside this one, last among its lists, in its colour, with its name's field open in
+    /// its header on the title it was made with (spec section 4). The card that was open closes first.
     func addList() {
         let model = model
         let offered = switch model.layout {
@@ -150,8 +152,8 @@ extension TaskList {
         state.problem = nil
     }
 
-    /// Return or leaving the field keeps what was typed, trimmed, and an empty name keeps the old, as a rename on the Lists
-    /// screen does (spec section 4); the field closes either way, and a name that did not change writes nothing.
+    /// Return or leaving the field keeps what was typed, trimmed, and an empty name keeps the old, as a rename on the
+    /// Lists screen does (spec section 4); the field closes either way, and a name that did not change writes nothing.
     func settleListName() {
         guard let naming = state.naming else { return }
         state.naming = nil
@@ -163,8 +165,9 @@ extension TaskList {
 
     // MARK: - Deleting
 
-    /// Puts a task in the Trash, with no confirmation, since the Trash gives it back (spec section 6), where the model draws
-    /// the control the action came from: a row of the Trash, and an open card, have none (the controller's ruling R73).
+    /// Puts a task in the Trash, with no confirmation, since the Trash gives it back (spec section 6), where the model
+    /// draws the control the action came from: a row of the Trash, and an open card, have none (the controller's ruling
+    /// on #176, 2026-11-05).
     func trash(_ id: TaskID, offeredBy action: UserAction) {
         let isOffered = drawnRows.contains { row in
             guard case .task(_, let model) = row else { return false }

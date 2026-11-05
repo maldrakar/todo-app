@@ -6,8 +6,9 @@ import TaskListFeature
 import TaskScreenFeature
 import TodoCore
 
-// The module's writes other than the card and the drop (spec sections 3, 4 and 6): adding a task, adding a list, the check
-// and the Done strip, the swipe and the menu's Delete, each through `TaskList`, read back from the store and the model.
+// The module's writes other than the card and the drop (spec sections 3, 4 and 6): adding a task, adding a list, the
+// check and the Done strip, the swipe and the menu's Delete, each through `TaskList`, read back from the store and the
+// model.
 
 private let inbox = BuiltInTaskViews.inbox
 
@@ -83,8 +84,9 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(try store.task(opened.id) == nil, "the untitled card before it closed")
 }
 
-/// A pinned task stands above an unpinned one, so the floating "+" pins a new task first in a list with pins, whose rule
-/// does not, to land at the top of the block; "+ Add task" does not, the end being the end (the controller's ruling R81).
+/// A pinned task stands above an unpinned one, so the floating "+" pins a new task first in a list with pins, whose
+/// rule does not, to land at the top of the block; "+ Add task" does not, the end being the end (the controller's
+/// ruling on #176, 2026-11-05).
 @Test func theFloatingPlusOnAListWithPinsLandsAtTheTop() throws {
     let store = try makeStore()
     let pinned = try store.createTask(NewTask(title: "Pinned"))
@@ -102,7 +104,8 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(rows(of: module.model).map(\.id) == [pinned, loose, last.id])
 }
 
-/// A grouped list with no tasks has no block, and its floating "+" takes the rule's edits (the controller's ruling R81).
+/// A grouped list with no tasks has no block, and its floating "+" takes the rule's edits (the controller's ruling on
+/// #176, 2026-11-05).
 @Test func theFloatingPlusOnAnEmptyGroupedListTakesTheRulesEdits() throws {
     let store = try makeStore()
     let module = try list(BuiltInTaskViews.upcoming, in: store)
@@ -135,17 +138,17 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(block(id, of: module.model)?.addTask != nil)
     module.tap(.blockChevronTapped(id))
     #expect(block(id, of: module.model)?.addTask == nil)
-    #expect(try commits(of: store) { module.tap(.addTaskRowTapped(in: id)) } == 0)
+    #expect(commits(of: store) { module.tap(.addTaskRowTapped(in: id)) } == 0)
 }
 
-/// A rule read as no edits has no "+ Add task" and no floating "+", which is how Logbook and Trash have none, and neither
-/// has a list inside that this app cannot read, which reads as no rule and is no folder (spec section 4).
+/// A rule read as no edits has no "+ Add task" and no floating "+", which is how Logbook and Trash have none, and
+/// neither has a list inside that this app cannot read, which reads as no rule and is no folder (spec section 4).
 @Test func aListThatRefusesHasNoWayToAdd() throws {
     let store = try makeStore()
     for view in [BuiltInTaskViews.logbook, BuiltInTaskViews.trash] {
         let module = try list(view, in: store)
         #expect(module.model.addTask == nil)
-        #expect(try commits(of: store) { module.tap(.addTaskButtonTapped) } == 0)
+        #expect(commits(of: store) { module.tap(.addTaskButtonTapped) } == 0)
     }
     let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
     let either = try store.createView(NewTaskView(title: "Either", parent: parent, filter: .or([.when(.on(0)), .when(.on(1))])))
@@ -176,8 +179,8 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(try list(empty, in: store).model.addTask == nil)
 }
 
-/// A list grouped by a deadline's day gives a new task the block's day as its deadline, and what the rule's When gives as
-/// its When (the controller's ruling R79).
+/// A list grouped by a deadline's day gives a new task the block's day as its deadline, and what the rule's When gives
+/// as its When (the controller's ruling on #176, 2026-11-05).
 @Test func aDeadlineDayBlockGivesItsDeadline() throws {
     let store = try makeStore()
     let due = try store.createView(NewTaskView(
@@ -191,8 +194,9 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(task.deadline == day(2) && task.when == day(0))
 }
 
-/// An own block of a grouping by tag, parent or status has no one field to set: no "+ Add task", no drop, no reorder. The
-/// list's floating "+" takes the rule's edits, and its group's screen has none (the controller's ruling R80).
+/// An own block of a grouping by tag, parent or status has no one field to set: no "+ Add task", no drop, no reorder.
+/// The list's floating "+" takes the rule's edits, and its group's screen has none (the controller's ruling on #176,
+/// 2026-11-05).
 @Test func aListThatGroupsByTagHasNoEditsOnItsBlocks() throws {
     let store = try makeStore()
     let home = try store.createTag(title: "home")
@@ -203,7 +207,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     let id = TaskList.Model.BlockID.own(.tag(home))
     #expect(block(id, of: module.model)?.addTask == nil)
     #expect(block(id, of: module.model)?.takesDrop == false)
-    #expect(try commits(of: store) { module.tap(.rowDropped(second, from: id, in: id, after: nil)) } == 0)
+    #expect(commits(of: store) { module.tap(.rowDropped(second, from: id, in: id, after: nil)) } == 0)
     #expect(rowIDs(of: id, in: module.model) == [first, second])
     module.tap(.addTaskButtonTapped)
     let opened = try #require(openCard(in: module.model))
@@ -214,8 +218,8 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(blocks(of: group.model).first?.addTask == nil)
 }
 
-/// A new task that lands in no block of the screen is not left behind untitled where nothing draws it: its card closes as
-/// it was drawn, by the rule of every close.
+/// A new task that lands in no block of the screen is not left behind untitled where nothing draws it: its card closes
+/// as it was drawn, by the rule of every close.
 @Test func aNewTaskThatDoesNotLandIsNotLeftBehind() throws {
     let store = try makeStore()
     let overdue = try store.createView(NewTaskView(
@@ -229,8 +233,8 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
 
 // MARK: - A group's screen
 
-/// A group's "+" and its block's "+ Add task" give what that block's "+ Add task" gives on the list's screen: the list's
-/// edits with the group's day (spec section 2).
+/// A group's "+" and its block's "+ Add task" give what that block's "+ Add task" gives on the list's screen: the
+/// list's edits with the group's day (spec section 2).
 @Test func aGroupsScreenAddsWhatItsBlockAdds() throws {
     let store = try makeStore()
     let work = try store.createTag(title: "work")
@@ -250,8 +254,8 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(rows(of: module.model).last?.id == added.id)
 }
 
-/// A group's strip is the list's kept to the tasks the list's grouping puts under the group, by the page's own rule (spec
-/// section 2; `GroupKey(of:by:)`).
+/// A group's strip is the list's kept to the tasks the list's grouping puts under the group, by the page's own rule
+/// (spec section 2; `GroupKey(of:by:)`).
 @Test func aGroupsStripIsTheListsKeptToTheGroup() throws {
     let store = try makeStore()
     let work = try store.createTag(title: "work")
@@ -279,7 +283,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(try stored(id, in: store).status == .done)
     #expect(rows(of: module.model).map(\.id) == [other], "no pause in which a done task stays among the rows")
     #expect(module.model == (try list(inbox, in: store).model))
-    #expect(try commits(of: store) { today.tap(.checkTapped(other)) } == 0, "a row the list does not draw")
+    #expect(commits(of: store) { today.tap(.checkTapped(other)) } == 0, "a row the list does not draw")
 }
 
 /// The strip holds the tasks completed today that the page's rules select with their status lifted: the list's own and
@@ -322,8 +326,8 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(try list(BuiltInTaskViews.trash, in: store).model.addList == nil)
 }
 
-/// The strip's own check reopens a task, which leaves the strip and returns to the block the page puts it in (spec section
-/// 3).
+/// The strip's own check reopens a task, which leaves the strip and returns to the block the page puts it in (spec
+/// section 3).
 @Test func aStripRowsCheckReopensTheTask() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
@@ -352,7 +356,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
 }
 
 /// A tap on a row of the strip opens its card under the capsule, like any row's (spec section 3, over the canvas's full
-/// screen; the controller's ruling R74); closing the strip closes the card by the rule of every close.
+/// screen; the controller's ruling on #176, 2026-11-05); closing the strip closes the card by the rule of every close.
 @Test func aCardOpensFromAStripRow() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
@@ -387,7 +391,8 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(openCard(in: module.model) == nil, "the task left the Logbook")
 }
 
-/// The board has no strip (canvas; the controller's ruling R88), and a card under the strip closes when the layout changes.
+/// The board has no strip (canvas; the controller's ruling on #176, 2026-11-05), and a card under the strip closes when
+/// the layout changes.
 @Test func theStripIsNilInColumns() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk", when: day(1)))
@@ -406,7 +411,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
 }
 
 /// N counts what the tag bar's filter leaves, and a filter that leaves nothing leaves no strip (the controller's ruling
-/// R88).
+/// on #176, 2026-11-05).
 @Test func theStripCountsWhatThePicksLeave() throws {
     let store = try makeStore()
     let home = try store.createTag(title: "home")
@@ -428,7 +433,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
 }
 
 /// A manual list's rule names no status, and its rows are its open tasks all the same, its done ones the strip's (spec
-/// section 3; the controller's ruling R78).
+/// section 3; the controller's ruling on #176, 2026-11-05).
 @Test func aManualListDrawsNoDoneTask() throws {
     let store = try makeStore()
     let parent = try store.createView(NewTaskView(title: "Projects"))
@@ -504,11 +509,11 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     module.tap(.addListTapped)
     let made = try #require(try store.children(ofView: parent).last)
     module.tap(.listNameFieldChanged("   "))
-    #expect(try commits(of: store) { module.tap(.listNameFieldSubmitted) } == 0)
+    #expect(commits(of: store) { module.tap(.listNameFieldSubmitted) } == 0)
     #expect(try store.view(made.id)?.title == "New list")
     #expect(block(.list(made.id), of: module.model)?.header?.field == nil)
     module.tap(.listNameFieldChanged("Echo of a closed field"))
-    #expect(try commits(of: store) { module.tap(.listNameFieldLostFocus) } == 0, "no field is open")
+    #expect(commits(of: store) { module.tap(.listNameFieldLostFocus) } == 0, "no field is open")
 }
 
 /// A list made in columns is named in its column's header, and the board's "+ Add list" adds it as the list's does.
@@ -538,31 +543,31 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(try list(BuiltInTaskViews.trash, in: store).model.empty == nil, "the Trash gives it back")
 }
 
-/// A control the model does not draw writes nothing: a task in the Trash has no Delete, and neither has a column's card a
-/// swipe nor the open card either.
+/// A control the model does not draw writes nothing: a task in the Trash has no Delete, and neither has a column's card
+/// a swipe nor the open card either.
 @Test func aDeleteTheModelDoesNotDrawWritesNothing() throws {
     let store = try makeStore()
     let binned = try store.createTask(NewTask(title: "Binned"))
     try store.trash(task: binned)
     let trash = try list(BuiltInTaskViews.trash, in: store)
-    #expect(try commits(of: store) { trash.tap(.deleteSwiped(binned)) } == 0)
-    #expect(try commits(of: store) { trash.tap(.deleteMenuItemChosen(binned)) } == 0)
+    #expect(commits(of: store) { trash.tap(.deleteSwiped(binned)) } == 0)
+    #expect(commits(of: store) { trash.tap(.deleteMenuItemChosen(binned)) } == 0)
     let id = try store.createTask(NewTask(title: "Buy milk", when: day(1)))
     let board = try list(BuiltInTaskViews.upcoming, in: store)
     board.tap(.showAsChosen(.columns))
-    #expect(try commits(of: store) { board.tap(.deleteSwiped(id)) } == 0)
+    #expect(commits(of: store) { board.tap(.deleteSwiped(id)) } == 0)
     board.tap(.deleteMenuItemChosen(id))
     #expect(try stored(id, in: store).trashed, "a column's card has the menu")
     let other = try store.createTask(NewTask(title: "Call the bank"))
     let card = try list(inbox, in: store)
     card.tap(.rowTapped(other))
-    #expect(try commits(of: store) { card.tap(.deleteSwiped(other)) } == 0)
+    #expect(commits(of: store) { card.tap(.deleteSwiped(other)) } == 0)
 }
 
 // MARK: - A refusal
 
-/// A write the store refuses says so with the module's sentence, and the rows are read back, since what it refused can be
-/// a peer's change the module has not heard of yet; the next write that holds takes the sentence away.
+/// A write the store refuses says so with the module's sentence, and the rows are read back, since what it refused can
+/// be a peer's change the module has not heard of yet; the next write that holds takes the sentence away.
 @Test func whatTheStoreRefusesBecomesTheSentence() throws {
     let store = try makeStore()
     let gone = try store.createTask(NewTask(title: "Buy milk"))
