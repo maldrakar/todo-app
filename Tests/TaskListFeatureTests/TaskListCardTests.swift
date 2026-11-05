@@ -303,6 +303,9 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     #expect(openCard(in: module.model) == nil)
     #expect(try stored(id, in: store).title == "Buy milk")
     #expect(module.model == (try list(inbox, in: store).model))
+    let restored = try changeSet(of: store) { try store.restore(task: id) }
+    #expect(module.send(.changed(restored)) == nil)
+    #expect(openCard(in: module.model) == nil, "the card went with the read, and does not come back with the row")
 }
 
 /// A change keeps what was typed and shows what it wrote beside it: a subtask a screen over the list added, and a title
