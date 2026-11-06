@@ -66,7 +66,7 @@ extension TaskList {
     private static let deleteTitle = "Delete"
 
     /// A row's swipe to its Delete.
-    static func swipe(of id: TaskID, _ style: SwipeModel<UserAction>.Style) -> SwipeModel<UserAction> {
+    static func swipe(of id: TaskID, _ style: SwipeStyle) -> SwipeModel<UserAction> {
         SwipeModel(
             style: style,
             button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), background: .red,

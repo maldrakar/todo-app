@@ -6,10 +6,10 @@ extension TaskList {
     /// The numbers the screen's components are drawn with in one layout, in points, picked once by the layout
     /// (`of(_:)`), so that no builder branches on it: the phone's list (`phone`) and the phone's board
     /// (`phoneColumns`), which share the header, the tag bar, the empty state and the floating "+" and differ in their
-    /// blocks, their "+ Add list" and the Done strip, which only the list has. A component's numbers are its own
-    /// `Style` (`DesignSystemComponents`), declared here once per layout and handed to its model whole; a struct of
-    /// this type's own stays only for a number that feeds a model nested in a component, such as a glyph's size, which
-    /// the component's `Style` cannot hand over.
+    /// blocks, their "+ Add list" and the Done strip, which only the list has. A component's numbers are its style,
+    /// `CheckStyle` for `CheckModel` and so on (`DesignSystemComponents`), declared here once per layout and handed to
+    /// its model whole; a struct of this type's own stays only for a number that feeds a model nested in a component,
+    /// such as a glyph's size, which the component's style cannot hand over.
     struct Metrics {
         /// A tile's side, its corners and the size of its glyph: the tile's own numbers, beside which its colour and
         /// which glyph it draws are the list's.
@@ -21,14 +21,14 @@ extension TaskList {
 
         /// The screen's header: its own numbers and its tile.
         struct Header {
-            let style: ScreenHeaderModel.Style
+            let style: ScreenHeaderStyle
             let tile: TileSize
         }
 
         /// The tag bar and its chips: the bar's numbers, a chip's and the size of the chip's hash.
         struct TagBar {
-            let style: TagBarModel<UserAction>.Style
-            let chip: TagChipModel<UserAction>.Style
+            let style: TagBarStyle
+            let chip: TagChipStyle
             let hashSize: Double
         }
 
@@ -42,17 +42,17 @@ extension TaskList {
         /// A task's row, or a column's card: its numbers, its check, the title's font, the meta line's glyph and its
         /// gap to its text, and its swipe, nil for a column's card, which has none (canvas).
         struct Row {
-            let style: TaskRowModel<UserAction>.Style
-            let check: CheckModel<UserAction>.Style
+            let style: TaskRowStyle
+            let check: CheckStyle
             let title: DesignSystem.Font
             let metaIconSize: Double
             let metaIconSpacing: Double
-            let swipe: SwipeModel<UserAction>.Style?
+            let swipe: SwipeStyle?
         }
 
         /// A pill of the open card: its numbers and the sizes of its glyphs, the sun's, the flag's and the hash's.
         struct Pill {
-            let style: PillModel.Style
+            let style: PillStyle
             let sunSize: Double
             let flagSize: Double
             let hashSize: Double
@@ -60,7 +60,7 @@ extension TaskList {
 
         /// A row that adds: its numbers, its glyph's size and its title's font.
         struct AddRow {
-            let style: AddRowModel<UserAction>.Style
+            let style: AddRowStyle
             let iconSize: Double
             let font: DesignSystem.Font
         }
@@ -69,10 +69,10 @@ extension TaskList {
         /// padding, the size of the button that opens it full screen, the notes' height and the subtask field's; and
         /// the row that adds a subtask and its pills.
         struct Card {
-            let style: CardModel<UserAction>.Style
-            let check: CheckModel<UserAction>.Style
-            let subtaskCheck: CheckModel<UserAction>.Style
-            let subtask: SubtaskRowModel<UserAction>.Style
+            let style: CardStyle
+            let check: CheckStyle
+            let subtaskCheck: CheckStyle
+            let subtask: SubtaskRowStyle
             let titleHeight: Double
             let titlePadding: Double
             let expandSize: Double
@@ -85,20 +85,20 @@ extension TaskList {
         /// The Done strip's capsule: its numbers and its glyph's and chevron's sizes. The row and the card drawn under
         /// it are the list's.
         struct DoneStrip {
-            let style: DoneStripModel<UserAction>.Style
+            let style: DoneStripStyle
             let iconSize: Double
             let chevronSize: Double
         }
 
         /// The floating "+": the circle's numbers and its glyph's size.
         struct FloatingButton {
-            let style: FloatingButtonModel<UserAction>.Style
+            let style: FloatingButtonStyle
             let glyphSize: Double
         }
 
         /// The empty state: its numbers and its tile.
         struct Empty {
-            let style: EmptyScreenModel.Style
+            let style: EmptyScreenStyle
             let tile: TileSize
         }
 
@@ -110,9 +110,9 @@ extension TaskList {
             let horizontalPadding: Double
             let bottomPadding: Double
             let snaps: Bool
-            let column: ColumnModel<UserAction>.Style
+            let column: ColumnStyle
             let dropRingWidth: Double
-            let header: BlockHeaderModel<UserAction>.Style
+            let header: BlockHeaderStyle
             let card: Row
             let openCard: Card
             let addTask: AddRow
@@ -123,8 +123,7 @@ extension TaskList {
         /// some 1,300 to 1,400 bytes on wasm32, which a debug build would put on the stack at every copy of `Metrics`.
         indirect enum Blocks {
             case list(
-                header: BlockHeaderModel<UserAction>.Style, chevron: Chevron, row: Row, card: Card, addTask: AddRow,
-                doneStrip: DoneStrip
+                header: BlockHeaderStyle, chevron: Chevron, row: Row, card: Card, addTask: AddRow, doneStrip: DoneStrip
             )
             case columns(Board)
         }
@@ -257,14 +256,14 @@ extension TaskList {
 
         /// A check of the phone's row and of its open card: 24 across with a 1.75 ring and the 15 pt mark stroked 1.75
         /// in a 44 hit (Task 8's table, Row).
-        private static let phoneCheck = CheckModel<UserAction>.Style(
+        private static let phoneCheck = CheckStyle(
             diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44
         )
 
         /// A subtask's check in the open card: 18 across with a 1.5 ring and the 12 pt mark in a 40 by 44 hit (Task 8's
         /// table, Card), the canvas's 2.8 in its 24-unit box stroked 1.4 at that size
-        /// (`CheckModel.Style.markStrokeWidth`).
-        private static let phoneSubtaskCheck = CheckModel<UserAction>.Style(
+        /// (`CheckStyle.markStrokeWidth`).
+        private static let phoneSubtaskCheck = CheckStyle(
             diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44
         )
 

@@ -10,8 +10,8 @@ import TodoCore
 /// until the formatting service arrives, and every control's action a value (ADR-0007, amendment of 2026-10-30). The
 /// numbers are one value per layout (`Metrics`), picked once where the model is built, so that no builder branches on
 /// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`); a component's are its
-/// model's own `Style`, which a builder hands over whole, and what stays in `Metrics` beside the styles is a number a
-/// nested model takes, such as a glyph's size, and a font. The open card is in
+/// style, `CheckStyle` for `CheckModel` and so on, which a builder hands over whole, and what stays in `Metrics` beside
+/// the styles is a number a nested model takes, such as a glyph's size, and a font. The open card is in
 /// `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete in
 /// `TaskList+Controls.swift`.
 extension TaskList {
@@ -115,7 +115,7 @@ extension TaskList {
     /// field for).
     private static func blockHeader(
         _ heading: Heading, of block: PageBlock, isFolded: Bool, _ context: RowContext,
-        _ style: BlockHeaderModel<UserAction>.Style, chevron: Metrics.Chevron
+        _ style: BlockHeaderStyle, chevron: Metrics.Chevron
     ) -> BlockHeaderModel<UserAction> {
         let fold = BlockHeaderModel<UserAction>.Fold(
             chevron: AccessoryModel.Chevron(
@@ -150,7 +150,7 @@ extension TaskList {
     /// controller's ruling on #176, 2026-11-05: no placeholder).
     private static func blockHeader(
         _ heading: Heading, of block: PageBlock, fold: BlockHeaderModel<UserAction>.Fold?,
-        background: DesignSystem.Color, _ context: RowContext, _ style: BlockHeaderModel<UserAction>.Style
+        background: DesignSystem.Color, _ context: RowContext, _ style: BlockHeaderStyle
     ) -> BlockHeaderModel<UserAction> {
         let field: TextFieldModel<UserAction>? = if let naming = context.naming, block.id == .list(naming.id) {
             plainField(
@@ -230,7 +230,7 @@ extension TaskList {
     /// A check, a row's, a card's or a subtask's: in the colour of the block's list, filled for a task that is not
     /// open, saying what a tap will do (canvas, `cbLabel`).
     static func check(
-        title: String, isOpen: Bool, _ color: Tile, action: UserAction, _ style: CheckModel<UserAction>.Style
+        title: String, isOpen: Bool, _ color: Tile, action: UserAction, _ style: CheckStyle
     ) -> CheckModel<UserAction> {
         CheckModel(
             style: style, colors: color.check, isChecked: !isOpen, animation: .check,

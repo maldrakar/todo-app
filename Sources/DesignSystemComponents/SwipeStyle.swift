@@ -1,0 +1,28 @@
+// Sources/DesignSystemComponents/SwipeStyle.swift
+
+/// The numbers a `SwipeModel` is drawn with, in points, which a layout holds whole and a builder hands over as one
+/// value.
+public struct SwipeStyle: Equatable, Sendable {
+    public let threshold: Double
+    public let shift: Double
+    public let buttonWidth: Double
+    public let buttonVerticalInset: Double
+    public let buttonTrailingInset: Double
+    public let buttonCornerRadius: Double
+
+    public init(
+        threshold: Double,
+        shift: Double,
+        buttonWidth: Double,
+        buttonVerticalInset: Double,
+        buttonTrailingInset: Double,
+        buttonCornerRadius: Double
+    ) {
+        self.threshold = threshold
+        self.shift = shift
+        self.buttonWidth = buttonWidth
+        self.buttonVerticalInset = buttonVerticalInset
+        self.buttonTrailingInset = buttonTrailingInset
+        self.buttonCornerRadius = buttonCornerRadius
+    }
+}

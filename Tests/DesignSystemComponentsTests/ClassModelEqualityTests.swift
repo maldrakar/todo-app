@@ -225,14 +225,14 @@ private let lift = TaskLiftModel(
     )
 )
 
-private let taskRowStyle = TaskRowModel<Action>.Style(
+private let taskRowStyle = TaskRowStyle(
     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
     leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0
 )
 
 private func taskRow(
     check: CheckModel<Action> = check(), title: TextModel = text, strike: DesignSystem.Color? = nil,
-    meta: [MetaItemModel] = [], style: TaskRowModel<Action>.Style = taskRowStyle, swipe: SwipeModel<Action>? = nil,
+    meta: [MetaItemModel] = [], style: TaskRowStyle = taskRowStyle, swipe: SwipeModel<Action>? = nil,
     lift: TaskLiftModel? = nil, fresh: DesignSystem.Color? = nil, freshAnimation: DesignSystem.Animation = .fresh,
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> TaskRowModel<Action> {
@@ -284,7 +284,7 @@ private let expand = ButtonModel<Action>(
     action: .first
 )
 
-private let cardStyle = CardModel<Action>.Style(
+private let cardStyle = CardStyle(
     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
     bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised
 )
@@ -294,7 +294,7 @@ private func card(
     notes: TextFieldModel<Action> = field(""), subtasks: [SubtaskRowModel<Action>] = [],
     subtaskField: TextFieldModel<Action>? = nil, addSubtask: AddRowModel<Action> = addSubtask,
     pills: [PillModel] = [], expand: ButtonModel<Action> = expand, background: DesignSystem.Color = .surface,
-    style: CardModel<Action>.Style = cardStyle, animation: DesignSystem.Animation = .cardOpens,
+    style: CardStyle = cardStyle, animation: DesignSystem.Animation = .cardOpens,
     backgroundTapped: Action = .first
 ) -> CardModel<Action> {
     CardModel(
@@ -340,7 +340,7 @@ private let chevron = AccessoryModel<Action>.Chevron(
     accessibilityLabel: "Fold", action: .second
 )
 
-private let blockHeaderStyle = BlockHeaderModel<Action>.Style(
+private let blockHeaderStyle = BlockHeaderStyle(
     titleToSubtitle: 8, rule: stroke, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12,
     topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0
 )
@@ -348,7 +348,7 @@ private let blockHeaderStyle = BlockHeaderModel<Action>.Style(
 private func blockHeader(
     title: TextModel = text, subtitle: TextModel? = nil, field: TextFieldModel<Action>? = nil,
     fold: BlockHeaderModel<Action>.Fold? = BlockHeaderModel.Fold(chevron: chevron, hitSide: 44),
-    style: BlockHeaderModel<Action>.Style = blockHeaderStyle, titleTapped: Action = .first
+    style: BlockHeaderStyle = blockHeaderStyle, titleTapped: Action = .first
 ) -> BlockHeaderModel<Action> {
     BlockHeaderModel(
         title: title, subtitle: subtitle, field: field, fold: fold, style: style, titleTapped: titleTapped
@@ -371,13 +371,13 @@ private func blockHeader(
 
 private let plus = IconModel(icon: .plus, size: 18, weight: .regular, color: .ink2)
 
-private let addRowStyle = AddRowModel<Action>.Style(
+private let addRowStyle = AddRowStyle(
     iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
     trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
 )
 
 private func addRow(
-    icon: IconModel = plus, title: TextModel = text, style: AddRowModel<Action>.Style = addRowStyle,
+    icon: IconModel = plus, title: TextModel = text, style: AddRowStyle = addRowStyle,
     action: Action = .first
 ) -> AddRowModel<Action> {
     AddRowModel(icon: icon, title: title, style: style, action: action)
@@ -396,14 +396,14 @@ private func addRow(
     ])
 }
 
-private let doneStripStyle = DoneStripModel<Action>.Style(
+private let doneStripStyle = DoneStripStyle(
     height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
     leadingMargin: 14, trailingMargin: 16
 )
 
 private func doneStrip(
     icon: IconModel = plus, label: TextModel = text, rotation: Double = 0, background: DesignSystem.Color = .fill,
-    style: DoneStripModel<Action>.Style = doneStripStyle, isOpen: Bool = false, action: Action = .first
+    style: DoneStripStyle = doneStripStyle, isOpen: Bool = false, action: Action = .first
 ) -> DoneStripModel<Action> {
     DoneStripModel(
         icon: icon, label: label,

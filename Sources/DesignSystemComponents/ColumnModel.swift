@@ -5,42 +5,13 @@ import DesignSystem
 /// corners of `cornerRadius`, its header at its top and under it its cards, `cardSpacing` apart and `padding` in from
 /// its sides and its bottom, each on `cardBackground` with corners of `cardCornerRadius`, ringed with `cardRing` and
 /// casting `cardShadow`, in points. Where it takes a dropped card, a card dragged over it tints it `dropTint` and rings
-/// it inside with `dropRing`. Its numbers and its `cardRing` are the fields of its `Style`.
+/// it inside with `dropRing`. Its numbers and its `cardRing` are the fields of its `ColumnStyle`.
 ///
-/// It is the column's look: its cards are the feature module's rows drawn in the card look, and the row that adds to
-/// it is the block's, so the model holds neither.
+/// It is the column's look: its cards are the feature module's rows drawn in the card look, and the row that adds to it
+/// is the block's, so the model holds neither.
 public struct ColumnModel<Action: Equatable & Sendable>: Equatable, Sendable {
-    /// The numbers the component is drawn with, in points, and the hairline round its cards, which the layout knows
-    /// whole and a builder hands over as one value.
-    public struct Style: Equatable, Sendable {
-        public let width: Double
-        public let cornerRadius: Double
-        public let cardSpacing: Double
-        public let padding: Double
-        public let cardCornerRadius: Double
-
-        /// The hairline round each card, along its rounded edge.
-        public let cardRing: StrokeModel
-
-        public init(
-            width: Double,
-            cornerRadius: Double,
-            cardSpacing: Double,
-            padding: Double,
-            cardCornerRadius: Double,
-            cardRing: StrokeModel
-        ) {
-            self.width = width
-            self.cornerRadius = cornerRadius
-            self.cardSpacing = cardSpacing
-            self.padding = padding
-            self.cardCornerRadius = cardCornerRadius
-            self.cardRing = cardRing
-        }
-    }
-
     public let header: BlockHeaderModel<Action>
-    public let style: Style
+    public let style: ColumnStyle
     public let fill: DesignSystem.Color
     public let dropTint: DesignSystem.Color
 
@@ -56,7 +27,7 @@ public struct ColumnModel<Action: Equatable & Sendable>: Equatable, Sendable {
 
     public init(
         header: BlockHeaderModel<Action>,
-        style: Style,
+        style: ColumnStyle,
         fill: DesignSystem.Color,
         dropTint: DesignSystem.Color,
         isDropTarget: Bool,
