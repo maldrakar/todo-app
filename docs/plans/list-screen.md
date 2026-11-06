@@ -69,14 +69,16 @@ from.
 | `Sources/TodoCore/Model/DeviceDay.swift` | 3 | `DeviceDay`, the device's day and the instant it began |
 | `Sources/Features/App/AppModule.swift`, `AppModule+Routing.swift` | 3, 6 | `init(store:route:width:day:capabilities:)`, `Event.dayChanged`, forwarded to the base and every element (3); `Screen.destination`, `take` and `route(over:)` over `TaskList.Route.Tail` (6) |
 | `Sources/Features/TaskViewList/TaskViewList.swift`, `TaskViewList+Rows.swift` | 2, 3, #182 | rows of kind `group` skipped, the row's own two-case kind (2), the skip gone with the kind (#182); `init(…day:)`, `Event.dayChanged`, counts by the device's day (3) |
-| `Sources/Features/TaskList/TaskList.swift` | 3, 6, 7 | `init(store:route:day:)`, `Event.dayChanged` (3); the module's events, outputs, actions and state (6, 7); completing and the strip, adding a task and a list, deleting, the card and its drafts, the reorder and the drop, here so that the store and the state stay `private`, as the sidebar's do (7) |
+| `Sources/Features/TaskList/TaskList.swift` | 3, 6, 7 | `init(store:route:day:)`, `Event.dayChanged` (3); the module's events, outputs, actions and state (6, 7) |
 | `Sources/Features/TaskList/TaskList+Routing.swift` | 6 | `Route`, its `Head` with a group, `Route.Group` and its spelling, `Route.Tail` (moved out of `TaskList.swift` in the owner's review of #188) |
 | `Sources/Features/TaskList/TaskList+Model.swift` | 6, 7 | `Model`, `Layout`, `Block`, `Row`, `BlockID` |
 | `Sources/Features/TaskList/TaskList+Page.swift` | 6 | the page read into blocks, the tag bar's chips and filter, the folds and the layout, a group's screen read from its list's page, the lists inside |
 | `Sources/Features/TaskList/TaskList+Day.swift` | 6 | the day's formats: titles, dates, "Tomorrow", "Due Tue", a group's screen's title |
-| `Sources/Features/TaskList/TaskList+Components.swift` | 6, 7, 8, 9 | the builders of the rows, the blocks and the columns, the header, the tag bar, the empty state, the open card, the rows that add, the floating "+", the strip's capsule, the swipe and the menu |
+| `Sources/Features/TaskList/TaskList+Components.swift` | 6, 7, 8, 9 | the builders of the rows, the blocks and the columns, the header, the tag bar, the empty state |
 | `Sources/Features/TaskList/TaskList+Metrics.swift` | 7 (moved out of `+Components`), 8, 9 | `Metrics` per width and layout |
+| `Sources/Features/TaskList/TaskList+Card.swift`, `TaskList+Controls.swift` | 7 | the builders of the open card; of the rows that add, the floating "+", the strip's capsule, the swipe and the menu |
 | `Sources/Features/TaskList/TaskList+Rule.swift` | 7 | `TaskList.TaskEdit`: a rule read as an edit, and the drop table |
+| `Sources/Features/TaskList/TaskList+Edits.swift`, `TaskList+CardEdits.swift`, `TaskList+Drop.swift` | 7 | completing and the strip, adding a task and a list, deleting; the card and its drafts; the reorder and the drop |
 | `Sources/TodoCore/Storage/Store+Views.swift` | 7 | `pin(tasks:in:at:)`, several pins in one transaction |
 | `Package.swift` | 6 | `TaskListFeature` and its tests depend on `DesignSystem` and `DesignSystemComponents` |
 | `Sources/DesignSystem/Color.swift`, `Color+Components.swift` | 4 | `Color.glass`, `glassLine`, `fresh`; `Color.Components.Check` per tile colour, ring, fill and mark, the mark written down per tile; `Tile.dropTint` |
