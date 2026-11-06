@@ -340,6 +340,11 @@ private let chevron = AccessoryModel<Action>.Chevron(
     accessibilityLabel: "Fold", action: .second
 )
 
+private let blockHeaderStyle = BlockHeaderModel<Action>.Style(
+    titleToSubtitle: 8, rule: stroke, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12,
+    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0
+)
+
 private func blockHeader(
     title: TextModel = text, subtitle: TextModel? = nil, field: TextFieldModel<Action>? = nil,
     fold: BlockHeaderModel<Action>.Fold? = BlockHeaderModel.Fold(chevron: chevron, hitSide: 44),
@@ -349,11 +354,6 @@ private func blockHeader(
         title: title, subtitle: subtitle, field: field, fold: fold, style: style, titleTapped: titleTapped
     )
 }
-
-private let blockHeaderStyle = BlockHeaderModel<Action>.Style(
-    titleToSubtitle: 8, rule: stroke, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12,
-    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0
-)
 
 @Test func aBlockHeaderModelComparesEveryProperty() {
     expectEveryPropertyCompared({ blockHeader() }, [
@@ -371,17 +371,17 @@ private let blockHeaderStyle = BlockHeaderModel<Action>.Style(
 
 private let plus = IconModel(icon: .plus, size: 18, weight: .regular, color: .ink2)
 
+private let addRowStyle = AddRowModel<Action>.Style(
+    iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
+    trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+)
+
 private func addRow(
     icon: IconModel = plus, title: TextModel = text, style: AddRowModel<Action>.Style = addRowStyle,
     action: Action = .first
 ) -> AddRowModel<Action> {
     AddRowModel(icon: icon, title: title, style: style, action: action)
 }
-
-private let addRowStyle = AddRowModel<Action>.Style(
-    iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
-    trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
-)
 
 @Test func anAddRowModelComparesEveryProperty() {
     let line = StrokeModel(color: .line, width: 1, dash: [])

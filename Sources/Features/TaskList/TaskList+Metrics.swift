@@ -11,8 +11,9 @@ extension TaskList {
     /// this type's own stays only for a number that feeds a model nested in a component, such as a glyph's size, which
     /// the component's `Style` cannot hand over.
     struct Metrics {
-        /// A tile's side, corners and glyph: the tile's own numbers, beside which its colour and glyph are the list's.
-        struct Tile {
+        /// A tile's side, its corners and the size of its glyph: the tile's own numbers, beside which its colour and which
+        /// glyph it draws are the list's.
+        struct TileSize {
             let side: Double
             let cornerRadius: Double
             let glyphSize: Double
@@ -21,7 +22,7 @@ extension TaskList {
         /// The screen's header: its own numbers and its tile.
         struct Header {
             let style: ScreenHeaderModel.Style
-            let tile: Tile
+            let tile: TileSize
         }
 
         /// The tag bar and its chips: the bar's numbers, a chip's and the size of the chip's hash.
@@ -98,7 +99,7 @@ extension TaskList {
         /// The empty state: its numbers and its tile.
         struct Empty {
             let style: EmptyScreenModel.Style
-            let tile: Tile
+            let tile: TileSize
         }
 
         /// The board: the gap between columns, its paddings, and whether it snaps, which `Model.Board` holds as they
@@ -119,7 +120,7 @@ extension TaskList {
 
         /// The blocks' numbers in the layout: the list's header, its chevron, its row, its open card, its "+ Add task"
         /// and its Done strip, or the board's, which has no strip (canvas). Indirect, as the layout's whole numbers are
-        /// some 1,300 bytes on wasm32, which a debug build would put on the stack at every copy of `Metrics`.
+        /// some 1,300 to 1,400 bytes on wasm32, which a debug build would put on the stack at every copy of `Metrics`.
         indirect enum Blocks {
             case list(
                 header: BlockHeaderModel<UserAction>.Style, chevron: Chevron, row: Row, card: Card, addTask: AddRow,
@@ -326,7 +327,7 @@ extension TaskList {
         /// title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50 in.
         private static let phoneHeader = Header(
             style: .init(spacing: 12, titleToSubtitle: 6, subtitleLeading: 50),
-            tile: Tile(side: 38, cornerRadius: 11, glyphSize: 23)
+            tile: TileSize(side: 38, cornerRadius: 11, glyphSize: 23)
         )
 
         /// The phone's tag bar (Task 8's table, Tag bar): chips 6 apart in a row padded 20, the bar 20 past the
@@ -344,7 +345,7 @@ extension TaskList {
         /// title 18 under it and the line 6 under that, 84 from the top, 40 in, and 270 wide at most.
         private static let phoneEmpty = Empty(
             style: .init(tileToTitle: 18, titleToText: 6, topPadding: 84, horizontalPadding: 40, maxWidth: 270),
-            tile: Tile(side: 64, cornerRadius: 18, glyphSize: 32)
+            tile: TileSize(side: 64, cornerRadius: 18, glyphSize: 32)
         )
     }
 }

@@ -8,7 +8,7 @@ import DesignSystem
 /// side; under them its body, `bodyLeading` in from its leading edge, under the title, and `bodyTrailing` from its
 /// trailing edge, ending `bodyBottom` above its bottom: the notes' field, the subtasks, the field of the subtask being
 /// typed where there is one, the row that adds a subtask, and `subtasksToPills` under them its pills, `pillSpacing`
-/// apart, in points. Its numbers are the fields of its `Style`.
+/// apart, in points. Its numbers and its `shadow` are the fields of its `Style`.
 ///
 /// The actions the typed text of its three fields sends are not here, as no field's is (`TextFieldModel`): a card's
 /// view takes them beside the model. It holds no id of the store's: the feature module's row carries the task's id
@@ -18,8 +18,8 @@ import DesignSystem
 /// the screen's model compares it, and inline, with its three fields, it is some 2,070 bytes on wasm32. Its `==`
 /// compares every stored property, and a test changes them one at a time.
 public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable {
-    /// The numbers the component is drawn with, in points, which a layout holds whole and a builder hands over as one
-    /// value.
+    /// The numbers the component is drawn with, in points, and the card's shadow, which the layout knows whole and a builder hands
+    /// over as one value.
     public struct Style: Equatable, Sendable {
         public let expandHitSide: Double
         public let cornerRadius: Double

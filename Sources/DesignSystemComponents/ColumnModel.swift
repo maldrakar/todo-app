@@ -5,13 +5,13 @@ import DesignSystem
 /// corners of `cornerRadius`, its header at its top and under it its cards, `cardSpacing` apart and `padding` in from
 /// its sides and its bottom, each on `cardBackground` with corners of `cardCornerRadius`, ringed with `cardRing` and
 /// casting `cardShadow`, in points. Where it takes a dropped card, a card dragged over it tints it `dropTint` and rings
-/// it inside with `dropRing`. Its numbers are the fields of its `Style`.
+/// it inside with `dropRing`. Its numbers and its `cardRing` are the fields of its `Style`.
 ///
 /// It is the column's look: its cards are the feature module's rows drawn in the card look, and the row that adds to
 /// it is the block's, so the model holds neither.
 public struct ColumnModel<Action: Equatable & Sendable>: Equatable, Sendable {
-    /// The numbers the component is drawn with, in points, which a layout holds whole and a builder hands over as one
-    /// value.
+    /// The numbers the component is drawn with, in points, and the hairline round its cards, which the layout knows whole and a builder hands
+    /// over as one value.
     public struct Style: Equatable, Sendable {
         public let width: Double
         public let cornerRadius: Double
