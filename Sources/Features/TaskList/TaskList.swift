@@ -488,7 +488,7 @@ public final class TaskList: Routable {
     // MARK: - Adding a list
 
     /// The name of the list just made, being typed in its header (spec section 4).
-    struct ListNaming {
+    private struct ListNaming {
         let id: ViewID
         var draft: String
     }
@@ -747,7 +747,11 @@ public final class TaskList: Routable {
         let others = order.filter { $0 != id }
         let place = anchor.flatMap { others.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
         guard order.firstIndex(of: id) != place else { return }
-        let view = block.id.view(under: state.head)
+        // The list's own manual list for its own blocks and on a group's screen, and the list inside's for its block.
+        let view = switch block.id {
+        case .own: state.head.view
+        case .list(let view): view
+        }
         writeAndReread { () throws(StoreError) in
             let pinned = Set(try store.manualList(of: view))
             let above = others[..<place]
@@ -873,6 +877,20 @@ public final class TaskList: Routable {
         }
     }
 
+    /// The open card: its task; what was typed into its title and its notes, nil until something was, while its fields
+    /// show what the store keeps, so that a change a reread finds is drawn over a field no one typed in and never
+    /// written over; its notes as read when it opened and as written since, since the list's read carries none
+    /// (ADR-0002); its children, read with every reread, so that one just written shows (the controller's ruling on
+    /// #176, 2026-11-05); and the subtask being typed, nil while no field is open.
+    struct OpenCard {
+        let id: TaskID
+        var typedTitle: String?
+        var notes: String
+        var typedNotes: String?
+        var subtasks: [TodoTask]
+        var subtaskDraft: String?
+    }
+
     /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
     /// it even when the page's read fails; the snapshot of the store the blocks, the tile, the rule and the strip are
     /// read from, and the device's day it was taken by; the folds and the layout the device keeps, and what this
@@ -938,7 +956,7 @@ public final class TaskList: Routable {
             let color = TaskList.tileColor(view.color)
             let icon = TaskList.tileIcon(view.icon)
             let tags = TagNames(snapshot.tags)
-            let context = RowContext(today: today, tags: tags, card: card, naming: naming)
+            let context = RowContext(today: today, tags: tags, card: card, naming: naming.map { ($0.id, $0.draft) })
             let hasListsInside = blocks.contains { if case .list = $0.id { true } else { false } }
             let heading = TaskList.screenHeading(
                 head: head, title: title, rule: view.filter, snapshot: snapshot, today: today

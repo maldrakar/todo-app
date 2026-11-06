@@ -126,15 +126,6 @@ extension TaskList {
         public enum BlockID: Hashable, Sendable {
             case own(GroupKey?)
             case list(ViewID)
-
-            /// The view whose manual list a block's order is kept in: the list's own for its own blocks, and on a
-            /// group's screen, and the list inside for its block (spec section 6).
-            func view(under head: Route.Head) -> ViewID {
-                switch self {
-                case .own: head.view
-                case .list(let view): view
-                }
-            }
         }
     }
 }

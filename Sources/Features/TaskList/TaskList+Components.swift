@@ -9,9 +9,7 @@ import TodoCore
 /// points, every colour, font, icon, animation and shadow a token of the design system, every word finished, in English
 /// until the formatting service arrives, and every control's action a value (ADR-0007, amendment of 2026-10-30). The
 /// numbers are one value per layout (`Metrics`), picked once where the model is built, so that no builder branches on
-/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`). The open card is in
-/// `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete in
-/// `TaskList+Controls.swift`.
+/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`).
 extension TaskList {
     /// What the rows and the headers of a model are built from beside their own tasks: the device's day, the tags'
     /// names, the open card and the list being named.
@@ -19,7 +17,7 @@ extension TaskList {
         let today: Day
         let tags: TagNames
         let card: OpenCard?
-        let naming: ListNaming?
+        let naming: (id: ViewID, draft: String)?
     }
 
     /// The screen's header (Task 8's table, Header): the list's tile, the title in the large title, and the subtitle,
@@ -243,7 +241,7 @@ extension TaskList {
 
     /// A check, a row's, a card's or a subtask's: in the colour of the block's list, filled for a task that is not
     /// open, saying what a tap will do (canvas, `cbLabel`).
-    static func check(
+    private static func check(
         title: String, isOpen: Bool, _ color: Tile, action: UserAction, _ metrics: Metrics.Check
     ) -> CheckModel<UserAction> {
         CheckModel(
@@ -256,7 +254,7 @@ extension TaskList {
 
     /// A field with no ring of its own, on what it stands on, drawn by the line of what it stands in: a card's three
     /// and a list's name's.
-    static func plainField(
+    private static func plainField(
         _ text: String, placeholder: String, font: DesignSystem.Font, color: DesignSystem.Color,
         background: DesignSystem.Color, height: Double, padding: Double, submitted: UserAction, cancelled: UserAction,
         focusLost: UserAction
@@ -348,4 +346,202 @@ extension TaskList {
     }
 
     typealias Tile = DesignSystem.Color.Components.Tile
+
+    // MARK: - The open card
+
+    // The task opened in place (spec section 3; Task 8's table, Card; `Phone.dc.html`, the open card).
+
+    /// The card of a task (spec section 3; the controller's ruling on #176, 2026-11-05): its check, its title's and
+    /// notes' fields with what was typed or what the store keeps, its subtasks each with a small check, the subtask's
+    /// field where one is open, "Add subtask", the pills, and Open full screen.
+    private static func card(
+        of task: TodoTask, _ card: OpenCard, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Card
+    ) -> CardModel<UserAction> {
+        let isOpen = task.status == .open
+        return CardModel(
+            check: check(
+                title: drawnTitle(of: task), isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check
+            ),
+            title: plainField(
+                card.typedTitle ?? task.title, placeholder: newTaskTitle, font: .rowTitleEmphasized,
+                color: isOpen ? .ink : .ink2, background: .surface, height: metrics.titleHeight,
+                padding: metrics.titlePadding, submitted: .titleFieldSubmitted, cancelled: .titleFieldCancelled,
+                focusLost: .titleFieldLostFocus
+            ),
+            notes: plainField(
+                card.typedNotes ?? card.notes, placeholder: "Notes", font: .notes, color: .ink2, background: .surface,
+                height: metrics.notesHeight, padding: 0, submitted: .notesFieldLostFocus, cancelled: .escapeKeyPressed,
+                focusLost: .notesFieldLostFocus
+            ),
+            subtasks: card.subtasks.map { subtask(of: $0, color, metrics) },
+            subtaskField: card.subtaskDraft.map { draft in
+                plainField(
+                    draft, placeholder: "Subtask", font: .notes, color: .ink, background: .surface,
+                    height: metrics.subtaskFieldHeight, padding: 0, submitted: .subtaskFieldSubmitted,
+                    cancelled: .subtaskFieldCancelled, focusLost: .subtaskFieldLostFocus
+                )
+            },
+            addSubtask: addRow(title: "Add subtask", action: .addSubtaskTapped, metrics.addSubtask),
+            pills: pills(of: task, today: context.today, tags: context.tags, metrics.pill),
+            expand: ButtonModel(
+                label: ButtonLabelModel(
+                    icon: IconModel(icon: .expand, size: metrics.expandSize, weight: .regular, color: .ink2),
+                    title: nil, accessibilityLabel: "Open full screen", fill: .color(.surface)
+                ),
+                action: .openFullScreenTapped
+            ),
+            expandHitSide: metrics.expandHitSide, background: .surface, cornerRadius: metrics.cornerRadius,
+            topMargin: metrics.topMargin, horizontalMargin: metrics.horizontalMargin,
+            bottomMargin: metrics.bottomMargin, bodyLeading: metrics.bodyLeading, bodyTrailing: metrics.bodyTrailing,
+            bodyBottom: metrics.bodyBottom, subtasksToPills: metrics.subtasksToPills, pillSpacing: metrics.pillSpacing,
+            shadow: metrics.shadow, animation: .cardOpens, backgroundTapped: .backgroundTapped
+        )
+    }
+
+    /// A subtask's row in the card, in the card's list's colour, struck where it is no longer open (canvas).
+    private static func subtask(
+        of task: TodoTask, _ color: Tile, _ metrics: Metrics.Card
+    ) -> SubtaskRowModel<UserAction> {
+        let isOpen = task.status == .open
+        return SubtaskRowModel(
+            check: check(
+                title: task.title, isOpen: isOpen, color, action: .subtaskCheckTapped(task.id), metrics.subtaskCheck
+            ),
+            title: TextModel(text: task.title, font: .notes, color: isOpen ? .ink : .ink2),
+            strike: isOpen ? nil : .ink3, height: metrics.subtaskHeight
+        )
+    }
+
+    /// The card's pills, drawn and inert in this epic (spec section 3; canvas, `.xpill`; the controller's ruling on
+    /// #176, 2026-11-05): When with its sun, amber while it is set, and Deadline with its flag, red while it is set,
+    /// each in ink 2 unset; the deadline's text red from the day it is due; and one per tag in the tags' order, the
+    /// bare name after a hash in ink 2, a weight lighter than the two (`.areaLabel`, the pill's size at 500).
+    private static func pills(
+        of task: TodoTask, today: Day, tags: TagNames, _ metrics: Metrics.Pill
+    ) -> [PillModel] {
+        func pill(
+            _ icon: DesignSystem.Icon, size: Double, iconColor: DesignSystem.Color, _ text: String,
+            font: DesignSystem.Font = .pill, color: DesignSystem.Color
+        ) -> PillModel {
+            PillModel(
+                icon: IconModel(icon: icon, size: size, weight: .regular, color: iconColor),
+                text: TextModel(text: text, font: font, color: color), background: .fill, height: metrics.height,
+                cornerRadius: metrics.height / 2, leadingPadding: metrics.leadingPadding,
+                trailingPadding: metrics.trailingPadding, spacing: metrics.spacing
+            )
+        }
+        let when = task.when.map { whenPillText($0, today: today) }
+        let deadline = task.deadline
+        return [
+            pill(
+                .sun, size: metrics.sunSize, iconColor: when == nil ? .ink2 : Tile.amber.glyph, when ?? "When",
+                color: when == nil ? .ink2 : .ink
+            ),
+            pill(
+                .flag, size: metrics.flagSize, iconColor: deadline == nil ? .ink2 : .red,
+                deadline.map(deadlinePillText) ?? "Deadline",
+                color: deadline.map { isDue($0, today: today) ? .red : .ink } ?? .ink2
+            ),
+        ] + tags.titles(of: task.tags).map {
+            pill(.hash, size: metrics.hashSize, iconColor: .ink2, $0, font: .areaLabel, color: .ink)
+        }
+    }
+
+    // MARK: - The controls that write
+
+    // The screen's controls that write: the rows that add and the floating "+", the Done strip's capsule, a row's swipe
+    // and its menu (Task 8's table, Add rows, Done strip, Floating "+" and Swipe; the controller's ruling on #176,
+    // 2026-11-05, their words).
+
+    /// A block's "+ Add task", and none where the block's rule reads as no edit.
+    private static func addTaskRow(for block: PageBlock, _ metrics: Metrics.AddRow) -> AddRowModel<UserAction>? {
+        block.edit.map { _ in addRow(title: "Add task", action: .addTaskRowTapped(in: block.id), metrics) }
+    }
+
+    /// "+ Add list", in the list and on the board.
+    static func addListRow(_ metrics: Metrics.AddRow) -> AddRowModel<UserAction> {
+        addRow(title: "Add list", action: .addListTapped, metrics)
+    }
+
+    /// A row that adds, its plus and its title in ink 2.
+    private static func addRow(
+        title: String, action: UserAction, _ metrics: Metrics.AddRow
+    ) -> AddRowModel<UserAction> {
+        AddRowModel(
+            icon: IconModel(icon: .plus, size: metrics.iconSize, weight: .regular, color: .ink2),
+            iconCellWidth: metrics.iconCellWidth, spacing: metrics.spacing,
+            title: TextModel(text: title, font: metrics.font, color: .ink2), height: metrics.height,
+            width: metrics.width, cornerRadius: metrics.cornerRadius, topPadding: metrics.topPadding,
+            leadingPadding: metrics.leadingPadding, trailingPadding: metrics.trailingPadding, dash: metrics.dash,
+            rule: metrics.rule, topMargin: metrics.topMargin, leadingMargin: metrics.leadingMargin,
+            trailingMargin: metrics.trailingMargin, action: action
+        )
+    }
+
+    /// What a task with no title is called: what the floating "+" adds, what the card's title field shows while it is
+    /// empty, and what a row draws for such a task (the controller's ruling on #176, 2026-11-05).
+    private static let newTaskTitle = "New task"
+
+    /// What a row draws for a task and a check reads aloud, on the row and on its open card alike: its title, and
+    /// `newTaskTitle` for a task with none or a blank one.
+    private static func drawnTitle(of task: TodoTask) -> String {
+        task.title.trimmed().isEmpty ? newTaskTitle : task.title
+    }
+
+    /// The floating "+": a white plus on the accent, casting the raised shadow.
+    static func floatingButton(_ metrics: Metrics.FloatingButton) -> FloatingButtonModel<UserAction> {
+        FloatingButtonModel(
+            icon: IconModel(icon: .plus, size: metrics.glyphSize, weight: .semibold, color: .onAccent),
+            diameter: metrics.diameter, fill: .accent, shadow: .raised, accessibilityLabel: newTaskTitle,
+            action: .addTaskButtonTapped
+        )
+    }
+
+    /// The Done strip's capsule (spec section 3; the controller's ruling on #176, 2026-11-05): the check in a circle in
+    /// the list's glyph colour, "Done today · N" on every list, and the chevron, turned half round while it is open,
+    /// saying what a tap will do.
+    private static func doneStrip(
+        count: Int, isOpen: Bool, color: Tile, _ metrics: Metrics.DoneStrip
+    ) -> DoneStripModel<UserAction> {
+        DoneStripModel(
+            icon: IconModel(icon: .checkCircle, size: metrics.iconSize, weight: .regular, color: color.glyph),
+            label: TextModel(text: "Done today · \(count)", font: .barLabel, color: .ink2),
+            chevron: AccessoryModel.Chevron(
+                icon: IconModel(icon: .chevron, size: metrics.chevronSize, weight: .semibold, color: .ink2),
+                rotation: isOpen ? 180 : 0, animation: .fold,
+                accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped
+            ),
+            background: .fill, height: metrics.height, cornerRadius: metrics.height / 2, spacing: metrics.spacing,
+            leadingPadding: metrics.leadingPadding, trailingPadding: metrics.trailingPadding,
+            topMargin: metrics.topMargin, leadingMargin: metrics.leadingMargin, trailingMargin: metrics.trailingMargin,
+            isOpen: isOpen, action: .doneStripTapped
+        )
+    }
+
+    /// What a row's swipe and its menu both call what they do.
+    private static let deleteTitle = "Delete"
+
+    /// A row's swipe to its Delete.
+    private static func swipe(of id: TaskID, _ metrics: Metrics.Swipe) -> SwipeModel<UserAction> {
+        SwipeModel(
+            threshold: metrics.threshold, shift: metrics.shift, buttonWidth: metrics.buttonWidth,
+            buttonVerticalInset: metrics.buttonVerticalInset, buttonTrailingInset: metrics.buttonTrailingInset,
+            buttonCornerRadius: metrics.buttonCornerRadius,
+            button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), background: .red,
+            animation: .swipe, action: .deleteSwiped(id)
+        )
+    }
+
+    /// A row's menu, the Mac's right click: Delete, with the trash's glyph, as what destroys something (spec section 6;
+    /// the controller's ruling on #176, 2026-11-05).
+    private static func deleteMenu(of id: TaskID) -> MenuModel<UserAction> {
+        MenuModel(sections: [
+            .init(items: [
+                .init(
+                    title: deleteTitle, icon: .trash, isDestructive: true, shortcut: nil,
+                    action: .deleteMenuItemChosen(id)
+                ),
+            ]),
+        ])
+    }
 }

@@ -21,13 +21,13 @@ extension TaskList {
         let tags: [Tag]
         let parentTitles: [TaskID: String]
         let done: [TodoTask]
-        let folderRules: [ViewID: FolderRules]
+        fileprivate let folderRules: [ViewID: FolderRules]
     }
 
     /// The rules a folder inside is read by: its first list's, whose edit is the folder's and nil where it has none
     /// (spec section 4), and every list's its section reads, which a task dragged out of its block leaves (the
     /// controller's ruling on #176, 2026-11-05).
-    struct FolderRules {
+    fileprivate struct FolderRules {
         let first: Filter?
         let all: [Filter]
     }

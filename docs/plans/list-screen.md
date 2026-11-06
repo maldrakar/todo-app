@@ -74,9 +74,8 @@ from.
 | `Sources/Features/TaskList/TaskList+Model.swift` | 6, 7 | `Model`, `Layout`, `Block`, `Row`, `BlockID` |
 | `Sources/Features/TaskList/TaskList+Page.swift` | 6 | the page read into blocks, the tag bar's chips and filter, the folds and the layout, a group's screen read from its list's page, the lists inside |
 | `Sources/Features/TaskList/TaskList+Day.swift` | 6 | the day's formats: titles, dates, "Tomorrow", "Due Tue", a group's screen's title |
-| `Sources/Features/TaskList/TaskList+Components.swift` | 6, 7, 8, 9 | the builders of the rows, the blocks and the columns, the header, the tag bar, the empty state |
+| `Sources/Features/TaskList/TaskList+Components.swift` | 6, 7, 8, 9 | the builders of the rows, the blocks and the columns, the header, the tag bar, the empty state, the open card, the rows that add, the floating "+", the strip's capsule, the swipe and the menu |
 | `Sources/Features/TaskList/TaskList+Metrics.swift` | 7 (moved out of `+Components`), 8, 9 | `Metrics` per width and layout |
-| `Sources/Features/TaskList/TaskList+Card.swift`, `TaskList+Controls.swift` | 7 | the builders of the open card; of the rows that add, the floating "+", the strip's capsule, the swipe and the menu |
 | `Sources/Features/TaskList/TaskList+Rule.swift` | 7 | `TaskList.TaskEdit`: a rule read as an edit, and the drop table |
 | `Sources/TodoCore/Storage/Store+Views.swift` | 7 | `pin(tasks:in:at:)`, several pins in one transaction |
 | `Package.swift` | 6 | `TaskListFeature` and its tests depend on `DesignSystem` and `DesignSystemComponents` |
