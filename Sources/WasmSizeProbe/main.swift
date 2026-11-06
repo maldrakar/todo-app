@@ -546,7 +546,7 @@ private enum WasmSizeProbe {
             let adds = blocks.compactMap(\.addTask).map(\.title.text).joined(separator: "/")
             shape = "\(blocks.count) blocks, \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):
-            let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.width) wide, \($0.isDropTarget ? "taking" : "refusing") a drop" } }
+            let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, \($0.isDropTarget ? "taking" : "refusing") a drop" } }
             shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), headed \(headers.joined(separator: "/")), then \(board.addList?.title.text ?? "no list to add")"
         }
         let first = rows.first.map { row in

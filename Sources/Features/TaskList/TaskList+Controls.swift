@@ -21,12 +21,7 @@ extension TaskList {
     static func addRow(title: String, action: UserAction, _ metrics: Metrics.AddRow) -> AddRowModel<UserAction> {
         AddRowModel(
             icon: IconModel(icon: .plus, size: metrics.iconSize, weight: .regular, color: .ink2),
-            iconCellWidth: metrics.iconCellWidth, spacing: metrics.spacing,
-            title: TextModel(text: title, font: metrics.font, color: .ink2), height: metrics.height,
-            width: metrics.width, cornerRadius: metrics.cornerRadius, topPadding: metrics.topPadding,
-            leadingPadding: metrics.leadingPadding, trailingPadding: metrics.trailingPadding, dash: metrics.dash,
-            rule: metrics.rule, topMargin: metrics.topMargin, leadingMargin: metrics.leadingMargin,
-            trailingMargin: metrics.trailingMargin, action: action
+            title: TextModel(text: title, font: metrics.font, color: .ink2), style: metrics.style, action: action
         )
     }
 
@@ -44,7 +39,7 @@ extension TaskList {
     static func floatingButton(_ metrics: Metrics.FloatingButton) -> FloatingButtonModel<UserAction> {
         FloatingButtonModel(
             icon: IconModel(icon: .plus, size: metrics.glyphSize, weight: .semibold, color: .onAccent),
-            diameter: metrics.diameter, fill: .accent, shadow: .raised, accessibilityLabel: newTaskTitle,
+            style: metrics.style, fill: .accent, shadow: .raised, accessibilityLabel: newTaskTitle,
             action: .addTaskButtonTapped
         )
     }
@@ -63,10 +58,7 @@ extension TaskList {
                 rotation: isOpen ? 180 : 0, animation: .fold,
                 accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped
             ),
-            background: .fill, height: metrics.height, cornerRadius: metrics.height / 2, spacing: metrics.spacing,
-            leadingPadding: metrics.leadingPadding, trailingPadding: metrics.trailingPadding,
-            topMargin: metrics.topMargin, leadingMargin: metrics.leadingMargin, trailingMargin: metrics.trailingMargin,
-            isOpen: isOpen, action: .doneStripTapped
+            background: .fill, style: metrics.style, isOpen: isOpen, action: .doneStripTapped
         )
     }
 
@@ -74,11 +66,9 @@ extension TaskList {
     private static let deleteTitle = "Delete"
 
     /// A row's swipe to its Delete.
-    static func swipe(of id: TaskID, _ metrics: Metrics.Swipe) -> SwipeModel<UserAction> {
+    static func swipe(of id: TaskID, _ style: SwipeModel<UserAction>.Style) -> SwipeModel<UserAction> {
         SwipeModel(
-            threshold: metrics.threshold, shift: metrics.shift, buttonWidth: metrics.buttonWidth,
-            buttonVerticalInset: metrics.buttonVerticalInset, buttonTrailingInset: metrics.buttonTrailingInset,
-            buttonCornerRadius: metrics.buttonCornerRadius,
+            style: style,
             button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), background: .red,
             animation: .swipe, action: .deleteSwiped(id)
         )

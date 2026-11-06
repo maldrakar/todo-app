@@ -7,7 +7,7 @@ import DesignSystem
 /// while the list is being named, and `titleToSubtitle` after the title its subtitle where it has one, `topPadding`
 /// below its top, `horizontalPadding` in from either side and `bottomPadding` above its bottom; the chevron that folds
 /// and opens the block where it has one (`Fold`); its rule along its bottom where it has one; and what it draws under
-/// itself, the pointer's tint, rounded by `cornerRadius`, in points.
+/// itself, the pointer's tint, rounded by `cornerRadius`, in points. Its numbers are the fields of its `Style`.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block and a column each hold one, every comparison
 /// of the screen's model compares it, and inline, its field and chevron with it, it is some 770 bytes on wasm32. Its
@@ -26,13 +26,57 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         }
     }
 
+    /// The numbers the component is drawn with, in points, which a layout holds whole and a builder hands over as one
+    /// value.
+    public struct Style: Equatable, Sendable {
+        public let titleToSubtitle: Double
+
+        /// The rule under the header, across its width, whose width is how thick it is, and nil for a header with none,
+        /// as a column's is.
+        public let rule: StrokeModel?
+
+        public let height: Double
+        public let topMargin: Double
+        public let trailingMargin: Double
+        public let bottomMargin: Double
+        public let leadingMargin: Double
+        public let topPadding: Double
+        public let horizontalPadding: Double
+        public let bottomPadding: Double
+        public let cornerRadius: Double
+
+        public init(
+            titleToSubtitle: Double,
+            rule: StrokeModel?,
+            height: Double,
+            topMargin: Double,
+            trailingMargin: Double,
+            bottomMargin: Double,
+            leadingMargin: Double,
+            topPadding: Double,
+            horizontalPadding: Double,
+            bottomPadding: Double,
+            cornerRadius: Double
+        ) {
+            self.titleToSubtitle = titleToSubtitle
+            self.rule = rule
+            self.height = height
+            self.topMargin = topMargin
+            self.trailingMargin = trailingMargin
+            self.bottomMargin = bottomMargin
+            self.leadingMargin = leadingMargin
+            self.topPadding = topPadding
+            self.horizontalPadding = horizontalPadding
+            self.bottomPadding = bottomPadding
+            self.cornerRadius = cornerRadius
+        }
+    }
+
     /// The title, in the colour of the list the block is: the open list's glyph colour for a group, its own for a list.
     public let title: TextModel
 
     /// The subtitle on the title's line after it, finished, and nil for a header with none.
     public let subtitle: TextModel?
-
-    public let titleToSubtitle: Double
 
     /// The field the title is typed into while the list is being named, in the title's place, and nil while it is not.
     public let field: TextFieldModel<Action>?
@@ -41,19 +85,7 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
     /// not fold (list screen spec, section 5).
     public let fold: Fold?
 
-    /// The rule under the header, across its width, whose width is how thick it is, and nil for a header with none, as
-    /// a column's is.
-    public let rule: StrokeModel?
-
-    public let height: Double
-    public let topMargin: Double
-    public let trailingMargin: Double
-    public let bottomMargin: Double
-    public let leadingMargin: Double
-    public let topPadding: Double
-    public let horizontalPadding: Double
-    public let bottomPadding: Double
-    public let cornerRadius: Double
+    public let style: Style
 
     /// What a tap on the title sends.
     public let titleTapped: Action
@@ -61,36 +93,16 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
     public init(
         title: TextModel,
         subtitle: TextModel?,
-        titleToSubtitle: Double,
         field: TextFieldModel<Action>?,
         fold: Fold?,
-        rule: StrokeModel?,
-        height: Double,
-        topMargin: Double,
-        trailingMargin: Double,
-        bottomMargin: Double,
-        leadingMargin: Double,
-        topPadding: Double,
-        horizontalPadding: Double,
-        bottomPadding: Double,
-        cornerRadius: Double,
+        style: Style,
         titleTapped: Action
     ) {
         self.title = title
         self.subtitle = subtitle
-        self.titleToSubtitle = titleToSubtitle
         self.field = field
         self.fold = fold
-        self.rule = rule
-        self.height = height
-        self.topMargin = topMargin
-        self.trailingMargin = trailingMargin
-        self.bottomMargin = bottomMargin
-        self.leadingMargin = leadingMargin
-        self.topPadding = topPadding
-        self.horizontalPadding = horizontalPadding
-        self.bottomPadding = bottomPadding
-        self.cornerRadius = cornerRadius
+        self.style = style
         self.titleTapped = titleTapped
     }
 
@@ -98,19 +110,9 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         if lhs === rhs { return true }
         return lhs.title == rhs.title
             && lhs.subtitle == rhs.subtitle
-            && lhs.titleToSubtitle == rhs.titleToSubtitle
+            && lhs.style == rhs.style
             && lhs.field == rhs.field
             && lhs.fold == rhs.fold
-            && lhs.rule == rhs.rule
-            && lhs.height == rhs.height
-            && lhs.topMargin == rhs.topMargin
-            && lhs.trailingMargin == rhs.trailingMargin
-            && lhs.bottomMargin == rhs.bottomMargin
-            && lhs.leadingMargin == rhs.leadingMargin
-            && lhs.topPadding == rhs.topPadding
-            && lhs.horizontalPadding == rhs.horizontalPadding
-            && lhs.bottomPadding == rhs.bottomPadding
-            && lhs.cornerRadius == rhs.cornerRadius
             && lhs.titleTapped == rhs.titleTapped
     }
 }

@@ -59,11 +59,7 @@ extension TaskList {
                 ),
                 action: .openFullScreenTapped
             ),
-            expandHitSide: metrics.expandHitSide, background: .surface, cornerRadius: metrics.cornerRadius,
-            topMargin: metrics.topMargin, horizontalMargin: metrics.horizontalMargin,
-            bottomMargin: metrics.bottomMargin, bodyLeading: metrics.bodyLeading, bodyTrailing: metrics.bodyTrailing,
-            bodyBottom: metrics.bodyBottom, subtasksToPills: metrics.subtasksToPills, pillSpacing: metrics.pillSpacing,
-            shadow: metrics.shadow, animation: .cardOpens, backgroundTapped: .backgroundTapped
+            background: .surface, style: metrics.style, animation: .cardOpens, backgroundTapped: .backgroundTapped
         )
     }
 
@@ -77,7 +73,7 @@ extension TaskList {
                 title: task.title, isOpen: isOpen, color, action: .subtaskCheckTapped(task.id), metrics.subtaskCheck
             ),
             title: TextModel(text: task.title, font: .notes, color: isOpen ? .ink : .ink2),
-            strike: isOpen ? nil : .ink3, height: metrics.subtaskHeight
+            strike: isOpen ? nil : .ink3, style: metrics.subtask
         )
     }
 
@@ -94,9 +90,7 @@ extension TaskList {
         ) -> PillModel {
             PillModel(
                 icon: IconModel(icon: icon, size: size, weight: .regular, color: iconColor),
-                text: TextModel(text: text, font: font, color: color), background: .fill, height: metrics.height,
-                cornerRadius: metrics.height / 2, leadingPadding: metrics.leadingPadding,
-                trailingPadding: metrics.trailingPadding, spacing: metrics.spacing
+                text: TextModel(text: text, font: font, color: color), background: .fill, style: metrics.style
             )
         }
         let when = task.when.map { whenPillText($0, today: today) }

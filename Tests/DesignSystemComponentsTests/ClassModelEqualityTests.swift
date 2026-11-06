@@ -201,16 +201,19 @@ private func picker(
 
 private func check(isChecked: Bool = false) -> CheckModel<Action> {
     CheckModel(
-        diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+        style: .init(diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44),
         colors: DesignSystem.Color.Components.Tile.blue.check, isChecked: isChecked, animation: .check,
         accessibilityLabel: "Complete", action: .first
     )
 }
 
 private let swipe = SwipeModel<Action>(
-    threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
-    buttonCornerRadius: 12, button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), background: .red,
-    animation: .swipe, action: .second
+    style: .init(
+        threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
+        buttonCornerRadius: 12
+    ),
+    button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), background: .red, animation: .swipe,
+    action: .second
 )
 
 private let lift = TaskLiftModel(
@@ -222,19 +225,19 @@ private let lift = TaskLiftModel(
     )
 )
 
+private let taskRowStyle = TaskRowModel<Action>.Style(
+    titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
+    leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0
+)
+
 private func taskRow(
     check: CheckModel<Action> = check(), title: TextModel = text, strike: DesignSystem.Color? = nil,
-    meta: [MetaItemModel] = [], titleToMeta: Double = 3, metaSpacing: Double = 10, metaLineSpacing: Double = 3,
-    verticalPadding: Double = 11, titleLeading: Double = 2, titleTrailing: Double = 4, leading: Double = 8,
-    trailing: Double = 12, minimumHeight: Double = 44, cornerRadius: Double = 0, swipe: SwipeModel<Action>? = nil,
+    meta: [MetaItemModel] = [], style: TaskRowModel<Action>.Style = taskRowStyle, swipe: SwipeModel<Action>? = nil,
     lift: TaskLiftModel? = nil, fresh: DesignSystem.Color? = nil, freshAnimation: DesignSystem.Animation = .fresh,
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> TaskRowModel<Action> {
     TaskRowModel(
-        check: check, title: title, strike: strike, meta: meta, titleToMeta: titleToMeta,
-        metaSpacing: metaSpacing, metaLineSpacing: metaLineSpacing, verticalPadding: verticalPadding,
-        titleLeading: titleLeading, titleTrailing: titleTrailing, leading: leading, trailing: trailing,
-        minimumHeight: minimumHeight, cornerRadius: cornerRadius, swipe: swipe, lift: lift, fresh: fresh,
+        check: check, title: title, strike: strike, meta: meta, style: style, swipe: swipe, lift: lift, fresh: fresh,
         freshAnimation: freshAnimation, tap: tap, menu: menu
     )
 }
@@ -245,16 +248,10 @@ private func taskRow(
         "title": taskRow(title: TextModel(text: "Call the plumber", font: .rowTitle, color: .ink)),
         "strike": taskRow(strike: .ink3),
         "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, spacing: 3, capsule: nil)]),
-        "titleToMeta": taskRow(titleToMeta: 2),
-        "metaSpacing": taskRow(metaSpacing: 8),
-        "metaLineSpacing": taskRow(metaLineSpacing: 2),
-        "verticalPadding": taskRow(verticalPadding: 9),
-        "titleLeading": taskRow(titleLeading: 4),
-        "titleTrailing": taskRow(titleTrailing: 0),
-        "leading": taskRow(leading: 4),
-        "trailing": taskRow(trailing: 10),
-        "minimumHeight": taskRow(minimumHeight: 36),
-        "cornerRadius": taskRow(cornerRadius: 9),
+        "style": taskRow(style: .init(
+            titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
+            leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9
+        )),
         "swipe": taskRow(swipe: swipe),
         "lift": taskRow(lift: lift),
         "fresh": taskRow(fresh: .fresh),
@@ -265,15 +262,18 @@ private func taskRow(
 }
 
 private let pill = PillModel(
-    icon: IconModel(icon: .flag, size: 15, weight: .medium, color: .red), text: text, background: .fill, height: 32,
-    cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6
+    icon: IconModel(icon: .flag, size: 15, weight: .medium, color: .red), text: text, background: .fill,
+    style: .init(height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6)
 )
 
 private let addSubtask = AddRowModel<Action>(
-    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2), iconCellWidth: 40, spacing: 0,
-    title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 44, width: nil, cornerRadius: 0,
-    topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-    trailingMargin: 0, action: .first
+    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2),
+    title: TextModel(text: "Add subtask", font: .notes, color: .ink2),
+    style: .init(
+        iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 0, topPadding: 0, leadingPadding: 0,
+        trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
+    ),
+    action: .first
 )
 
 private let expand = ButtonModel<Action>(
@@ -284,24 +284,23 @@ private let expand = ButtonModel<Action>(
     action: .first
 )
 
+private let cardStyle = CardModel<Action>.Style(
+    expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
+    bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised
+)
+
 private func card(
     check: CheckModel<Action> = check(), title: TextFieldModel<Action> = field("Call the plumber"),
     notes: TextFieldModel<Action> = field(""), subtasks: [SubtaskRowModel<Action>] = [],
     subtaskField: TextFieldModel<Action>? = nil, addSubtask: AddRowModel<Action> = addSubtask,
-    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, expandHitSide: Double = 44,
-    background: DesignSystem.Color = .surface, cornerRadius: Double = 18, topMargin: Double = 6,
-    horizontalMargin: Double = 10, bottomMargin: Double = 10, bodyLeading: Double = 46, bodyTrailing: Double = 14,
-    bodyBottom: Double = 14, subtasksToPills: Double = 10, pillSpacing: Double = 6,
-    shadow: DesignSystem.Shadow = .raised, animation: DesignSystem.Animation = .cardOpens,
+    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, background: DesignSystem.Color = .surface,
+    style: CardModel<Action>.Style = cardStyle, animation: DesignSystem.Animation = .cardOpens,
     backgroundTapped: Action = .first
 ) -> CardModel<Action> {
     CardModel(
         check: check, title: title, notes: notes, subtasks: subtasks, subtaskField: subtaskField,
-        addSubtask: addSubtask, pills: pills, expand: expand, expandHitSide: expandHitSide, background: background,
-        cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
-        bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing, bodyBottom: bodyBottom,
-        subtasksToPills: subtasksToPills, pillSpacing: pillSpacing, shadow: shadow, animation: animation,
-        backgroundTapped: backgroundTapped
+        addSubtask: addSubtask, pills: pills, expand: expand, background: background, style: style,
+        animation: animation, backgroundTapped: backgroundTapped
     )
 }
 
@@ -310,28 +309,27 @@ private func card(
         "check": card(check: check(isChecked: true)),
         "title": card(title: field("Call the plumber today")),
         "notes": card(notes: field("Ask about the boiler")),
-        "subtasks": card(subtasks: [SubtaskRowModel(check: check(), title: text, strike: nil, height: 44)]),
+        "subtasks": card(subtasks: [
+            SubtaskRowModel(check: check(), title: text, strike: nil, style: .init(height: 44)),
+        ]),
         "subtaskField": card(subtaskField: field("")),
         "addSubtask": card(addSubtask: AddRowModel(
-            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2), iconCellWidth: 30, spacing: 0,
-            title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 30, width: nil,
-            cornerRadius: 7, topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil,
-            topMargin: 0, leadingMargin: 0, trailingMargin: 0, action: .first
+            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2),
+            title: TextModel(text: "Add subtask", font: .notes, color: .ink2),
+            style: .init(
+                iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0,
+                leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
+                trailingMargin: 0
+            ),
+            action: .first
         )),
         "pills": card(pills: [pill]),
         "expand": card(expand: ButtonModel(label: expand.label, action: .second)),
-        "expandHitSide": card(expandHitSide: 30),
         "background": card(background: .fill),
-        "cornerRadius": card(cornerRadius: 14),
-        "topMargin": card(topMargin: 4),
-        "horizontalMargin": card(horizontalMargin: 0),
-        "bottomMargin": card(bottomMargin: 8),
-        "bodyLeading": card(bodyLeading: 38),
-        "bodyTrailing": card(bodyTrailing: 12),
-        "bodyBottom": card(bodyBottom: 12),
-        "subtasksToPills": card(subtasksToPills: 8),
-        "pillSpacing": card(pillSpacing: 5),
-        "shadow": card(shadow: .lifted),
+        "style": card(style: .init(
+            expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
+            bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted
+        )),
         "animation": card(animation: .pushPop),
         "backgroundTapped": card(backgroundTapped: .second),
     ])
@@ -343,38 +341,30 @@ private let chevron = AccessoryModel<Action>.Chevron(
 )
 
 private func blockHeader(
-    title: TextModel = text, subtitle: TextModel? = nil, titleToSubtitle: Double = 8,
-    field: TextFieldModel<Action>? = nil,
+    title: TextModel = text, subtitle: TextModel? = nil, field: TextFieldModel<Action>? = nil,
     fold: BlockHeaderModel<Action>.Fold? = BlockHeaderModel.Fold(chevron: chevron, hitSide: 44),
-    rule: StrokeModel? = stroke, height: Double = 44, topMargin: Double = 6, trailingMargin: Double = 6,
-    bottomMargin: Double = 2, leadingMargin: Double = 12, topPadding: Double = 13, horizontalPadding: Double = 8,
-    bottomPadding: Double = 0, cornerRadius: Double = 0, titleTapped: Action = .first
+    style: BlockHeaderModel<Action>.Style = blockHeaderStyle, titleTapped: Action = .first
 ) -> BlockHeaderModel<Action> {
     BlockHeaderModel(
-        title: title, subtitle: subtitle, titleToSubtitle: titleToSubtitle, field: field, fold: fold, rule: rule,
-        height: height, topMargin: topMargin, trailingMargin: trailingMargin, bottomMargin: bottomMargin,
-        leadingMargin: leadingMargin, topPadding: topPadding, horizontalPadding: horizontalPadding,
-        bottomPadding: bottomPadding, cornerRadius: cornerRadius, titleTapped: titleTapped
+        title: title, subtitle: subtitle, field: field, fold: fold, style: style, titleTapped: titleTapped
     )
 }
+
+private let blockHeaderStyle = BlockHeaderModel<Action>.Style(
+    titleToSubtitle: 8, rule: stroke, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12,
+    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0
+)
 
 @Test func aBlockHeaderModelComparesEveryProperty() {
     expectEveryPropertyCompared({ blockHeader() }, [
         "title": blockHeader(title: TextModel(text: "Work", font: .sectionTitle, color: .ink)),
         "subtitle": blockHeader(subtitle: TextModel(text: "Tomorrow", font: .areaLabel, color: .ink2)),
-        "titleToSubtitle": blockHeader(titleToSubtitle: 6),
         "field": blockHeader(field: field("New list")),
         "fold": blockHeader(fold: nil),
-        "rule": blockHeader(rule: nil),
-        "height": blockHeader(height: 34),
-        "topMargin": blockHeader(topMargin: 14),
-        "trailingMargin": blockHeader(trailingMargin: 0),
-        "bottomMargin": blockHeader(bottomMargin: 0),
-        "leadingMargin": blockHeader(leadingMargin: 4),
-        "topPadding": blockHeader(topPadding: 9),
-        "horizontalPadding": blockHeader(horizontalPadding: 6),
-        "bottomPadding": blockHeader(bottomPadding: 9),
-        "cornerRadius": blockHeader(cornerRadius: 7),
+        "style": blockHeader(style: .init(
+            titleToSubtitle: 8, rule: nil, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2,
+            leadingMargin: 12, topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0
+        )),
         "titleTapped": blockHeader(titleTapped: .second),
     ])
 }
@@ -382,55 +372,45 @@ private func blockHeader(
 private let plus = IconModel(icon: .plus, size: 18, weight: .regular, color: .ink2)
 
 private func addRow(
-    icon: IconModel = plus, iconCellWidth: Double = 44, spacing: Double = 0, title: TextModel = text,
-    height: Double = 40, width: Double? = nil, cornerRadius: Double = 12, topPadding: Double = 0,
-    leadingPadding: Double = 0, trailingPadding: Double = 12, dash: StrokeModel? = nil, rule: StrokeModel? = nil,
-    topMargin: Double = 0, leadingMargin: Double = 8, trailingMargin: Double = 12, action: Action = .first
+    icon: IconModel = plus, title: TextModel = text, style: AddRowModel<Action>.Style = addRowStyle,
+    action: Action = .first
 ) -> AddRowModel<Action> {
-    AddRowModel(
-        icon: icon, iconCellWidth: iconCellWidth, spacing: spacing, title: title, height: height, width: width,
-        cornerRadius: cornerRadius, topPadding: topPadding, leadingPadding: leadingPadding,
-        trailingPadding: trailingPadding, dash: dash, rule: rule, topMargin: topMargin, leadingMargin: leadingMargin,
-        trailingMargin: trailingMargin, action: action
-    )
+    AddRowModel(icon: icon, title: title, style: style, action: action)
 }
+
+private let addRowStyle = AddRowModel<Action>.Style(
+    iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
+    trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+)
 
 @Test func anAddRowModelComparesEveryProperty() {
     let line = StrokeModel(color: .line, width: 1, dash: [])
     expectEveryPropertyCompared({ addRow() }, [
         "icon": addRow(icon: IconModel(icon: .plus, size: 17, weight: .regular, color: .ink2)),
-        "iconCellWidth": addRow(iconCellWidth: 40),
-        "spacing": addRow(spacing: 6),
         "title": addRow(title: TextModel(text: "Add list", font: .barLabel, color: .ink2)),
-        "height": addRow(height: 44),
-        "width": addRow(width: 200),
-        "cornerRadius": addRow(cornerRadius: 13),
-        "topPadding": addRow(topPadding: 4),
-        "leadingPadding": addRow(leadingPadding: 11),
-        "trailingPadding": addRow(trailingPadding: 16),
-        "dash": addRow(dash: line),
-        "rule": addRow(rule: line),
-        "topMargin": addRow(topMargin: 10),
-        "leadingMargin": addRow(leadingMargin: 12),
-        "trailingMargin": addRow(trailingMargin: 6),
+        "style": addRow(style: .init(
+            iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
+            trailingPadding: 12, dash: line, rule: line, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+        )),
         "action": addRow(action: .second),
     ])
 }
 
+private let doneStripStyle = DoneStripModel<Action>.Style(
+    height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
+    leadingMargin: 14, trailingMargin: 16
+)
+
 private func doneStrip(
     icon: IconModel = plus, label: TextModel = text, rotation: Double = 0, background: DesignSystem.Color = .fill,
-    height: Double = 36, cornerRadius: Double = 18, spacing: Double = 8, leadingPadding: Double = 10,
-    trailingPadding: Double = 14, topMargin: Double = 20, leadingMargin: Double = 14, trailingMargin: Double = 16,
-    isOpen: Bool = false, action: Action = .first
+    style: DoneStripModel<Action>.Style = doneStripStyle, isOpen: Bool = false, action: Action = .first
 ) -> DoneStripModel<Action> {
     DoneStripModel(
         icon: icon, label: label,
         chevron: AccessoryModel.Chevron(
             icon: plus, rotation: rotation, animation: .fold, accessibilityLabel: "Show done tasks", action: .first
         ),
-        background: background, height: height, cornerRadius: cornerRadius, spacing: spacing,
-        leadingPadding: leadingPadding, trailingPadding: trailingPadding, topMargin: topMargin,
-        leadingMargin: leadingMargin, trailingMargin: trailingMargin, isOpen: isOpen, action: action
+        background: background, style: style, isOpen: isOpen, action: action
     )
 }
 
@@ -440,14 +420,10 @@ private func doneStrip(
         "label": doneStrip(label: TextModel(text: "Done today · 3", font: .barLabel, color: .ink2)),
         "chevron": doneStrip(rotation: 180),
         "background": doneStrip(background: .surface),
-        "height": doneStrip(height: 30),
-        "cornerRadius": doneStrip(cornerRadius: 15),
-        "spacing": doneStrip(spacing: 7),
-        "leadingPadding": doneStrip(leadingPadding: 9),
-        "trailingPadding": doneStrip(trailingPadding: 12),
-        "topMargin": doneStrip(topMargin: 22),
-        "leadingMargin": doneStrip(leadingMargin: 6),
-        "trailingMargin": doneStrip(trailingMargin: 0),
+        "style": doneStrip(style: .init(
+            height: 30, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
+            leadingMargin: 14, trailingMargin: 16
+        )),
         "isOpen": doneStrip(isOpen: true),
         "action": doneStrip(action: .second),
     ])
