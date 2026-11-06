@@ -11,8 +11,8 @@ extension TaskList {
     /// this type's own stays only for a number that feeds a model nested in a component, such as a glyph's size, which
     /// the component's `Style` cannot hand over.
     struct Metrics {
-        /// A tile's side, its corners and the size of its glyph: the tile's own numbers, beside which its colour and which
-        /// glyph it draws are the list's.
+        /// A tile's side, its corners and the size of its glyph: the tile's own numbers, beside which its colour and
+        /// which glyph it draws are the list's.
         struct TileSize {
             let side: Double
             let cornerRadius: Double
@@ -146,12 +146,12 @@ extension TaskList {
 
         /// The phone's list (Task 8's table): the header, the tag bar, the empty state and the floating "+" the board
         /// shares; a block's header 44 high, 6 6 2 12 from what stands round it, padded 13 8 0, its date 8 after its
-        /// title, over the line's 1 pt rule, its chevron 18 in a 44 hit; the row and the open card below; "+ Add task" 40
-        /// high, 8 in and 12 short of the edges, its plus 18 in a 44 cell with its title right after it and 12 short of
-        /// its end, rounded 12; "+ Add list" 44 high over the line's 1 pt rule with 4 under it, 10 under what stands above
-        /// and 12 in and 6 short of the edges, its plus 18 in a 40 cell; the Done strip's capsule 36 high and 20 under what
-        /// stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14 short of its end, 8
-        /// on either side of its label.
+        /// title, over the line's 1 pt rule, its chevron 18 in a 44 hit; the row and the open card below; "+ Add task"
+        /// 40 high, 8 in and 12 short of the edges, its plus 18 in a 44 cell with its title right after it and 12 short
+        /// of its end, rounded 12; "+ Add list" 44 high over the line's 1 pt rule with 4 under it, 10 under what stands
+        /// above and 12 in and 6 short of the edges, its plus 18 in a 40 cell; the Done strip's capsule 36 high and 20
+        /// under what stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14
+        /// short of its end, 8 on either side of its label.
         static let phone = Metrics(
             header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .list(

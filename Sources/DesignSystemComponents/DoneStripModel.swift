@@ -8,9 +8,9 @@ import DesignSystem
 /// sides, in points. The tasks done under it, while the strip is open, are the feature module's rows, each a row or the
 /// open card, so the model holds none (list screen spec, section 3). Its numbers are the fields of its `Style`.
 ///
-/// A class, for the reason a list's row is one (`ListRowModel`): the screen's model holds one, every copy and comparison of
-/// that model copies and compares it, and inline it is some 500 bytes on wasm32. Its `==` compares every stored property,
-/// and a test changes them one at a time.
+/// A class, for the reason a list's row is one (`ListRowModel`): the screen's model holds one, every copy and
+/// comparison of that model copies and compares it, and inline it is some 500 bytes on wasm32. Its `==` compares every
+/// stored property, and a test changes them one at a time.
 public final class DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// The numbers the component is drawn with, in points, which a layout holds whole and a builder hands over as one
     /// value.

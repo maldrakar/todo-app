@@ -7,7 +7,8 @@ import DesignSystem
 /// while the list is being named, and `titleToSubtitle` after the title its subtitle where it has one, `topPadding`
 /// below its top, `horizontalPadding` in from either side and `bottomPadding` above its bottom; the chevron that folds
 /// and opens the block where it has one (`Fold`); its rule along its bottom where it has one; and what it draws under
-/// itself, the pointer's tint, rounded by `cornerRadius`, in points. Its numbers and its `rule` are the fields of its `Style`.
+/// itself, the pointer's tint, rounded by `cornerRadius`, in points. Its numbers and its `rule` are the fields of its
+/// `Style`.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block and a column each hold one, every comparison
 /// of the screen's model compares it, and inline, its field and chevron with it, it is some 770 bytes on wasm32. Its
@@ -26,8 +27,8 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         }
     }
 
-    /// The numbers the component is drawn with, in points, and the header's rule, which the layout knows whole and a builder hands
-    /// over as one value.
+    /// The numbers the component is drawn with, in points, and the header's rule, which the layout knows whole and a
+    /// builder hands over as one value.
     public struct Style: Equatable, Sendable {
         public let titleToSubtitle: Double
 

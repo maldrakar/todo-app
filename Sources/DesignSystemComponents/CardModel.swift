@@ -18,8 +18,8 @@ import DesignSystem
 /// the screen's model compares it, and inline, with its three fields, it is some 2,070 bytes on wasm32. Its `==`
 /// compares every stored property, and a test changes them one at a time.
 public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable {
-    /// The numbers the component is drawn with, in points, and the card's shadow, which the layout knows whole and a builder hands
-    /// over as one value.
+    /// The numbers the component is drawn with, in points, and the card's shadow, which the layout knows whole and a
+    /// builder hands over as one value.
     public struct Style: Equatable, Sendable {
         public let expandHitSide: Double
         public let cornerRadius: Double
