@@ -459,9 +459,9 @@ enum ListsTreeItem: Identifiable {
     /// rows of a branch join them into lines.
     struct Guides: View {
         private let centres: [Double]
-        private let guide: StrokeModel
+        private let guide: LineStyle
 
-        init(_ centres: some Sequence<Double>, in guide: StrokeModel) {
+        init(_ centres: some Sequence<Double>, in guide: LineStyle) {
             self.centres = Array(centres)
             self.guide = guide
         }

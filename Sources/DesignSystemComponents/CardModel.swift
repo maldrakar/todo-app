@@ -8,7 +8,7 @@ import DesignSystem
 /// side; under them its body, `bodyLeading` in from its leading edge, under the title, and `bodyTrailing` from its
 /// trailing edge, ending `bodyBottom` above its bottom: the notes' field, the subtasks, the field of the subtask being
 /// typed where there is one, the row that adds a subtask, and `subtasksToPills` under them its pills, `pillSpacing`
-/// apart, in points. Its numbers and its `shadow` are the fields of its `CardStyle`.
+/// apart, in points. Its numbers, its `background`, its `shadow` and its `animation` are the fields of its `CardStyle`.
 ///
 /// The actions the typed text of its three fields sends are not here, as no field's is (`TextFieldModel`): a card's
 /// view takes them beside the model. It holds no id of the store's: the feature module's row carries the task's id
@@ -36,9 +36,7 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
     /// The button that opens the task full screen.
     public let expand: ButtonModel<Action>
 
-    public let background: DesignSystem.Color
     public let style: CardStyle
-    public let animation: DesignSystem.Animation
 
     /// What a tap on the screen's background beside the card sends, a tap the view the card stands in takes.
     public let backgroundTapped: Action
@@ -52,9 +50,7 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
         addSubtask: AddRowModel<Action>,
         pills: [PillModel],
         expand: ButtonModel<Action>,
-        background: DesignSystem.Color,
         style: CardStyle,
-        animation: DesignSystem.Animation,
         backgroundTapped: Action
     ) {
         self.check = check
@@ -65,9 +61,7 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
         self.addSubtask = addSubtask
         self.pills = pills
         self.expand = expand
-        self.background = background
         self.style = style
-        self.animation = animation
         self.backgroundTapped = backgroundTapped
     }
 
@@ -82,8 +76,6 @@ public final class CardModel<Action: Equatable & Sendable>: Equatable, Sendable 
             && lhs.pills == rhs.pills
             && lhs.expand == rhs.expand
             && lhs.style == rhs.style
-            && lhs.background == rhs.background
-            && lhs.animation == rhs.animation
             && lhs.backgroundTapped == rhs.backgroundTapped
     }
 }

@@ -32,7 +32,7 @@ public struct TextFieldModel<Action: Equatable & Sendable>: Equatable, Sendable 
     public let cornerRadius: Double
 
     /// The ring around the field, along its rounded edge.
-    public let ring: StrokeModel
+    public let ring: LineStyle
 
     /// What Return in the field sends.
     public let submitted: Action
@@ -53,7 +53,7 @@ public struct TextFieldModel<Action: Equatable & Sendable>: Equatable, Sendable 
         height: Double,
         padding: Double,
         cornerRadius: Double,
-        ring: StrokeModel,
+        ring: LineStyle,
         submitted: Action,
         cancelled: Action,
         focusLost: Action

@@ -59,7 +59,7 @@ extension TaskList {
                 ),
                 action: .openFullScreenTapped
             ),
-            background: .surface, style: metrics.style, animation: .cardOpens, backgroundTapped: .backgroundTapped
+            style: metrics.style, backgroundTapped: .backgroundTapped
         )
     }
 
@@ -90,7 +90,7 @@ extension TaskList {
         ) -> PillModel {
             PillModel(
                 icon: IconModel(icon: icon, size: size, weight: .regular, color: iconColor),
-                text: TextModel(text: text, font: font, color: color), background: .fill, style: metrics.style
+                text: TextModel(text: text, font: font, color: color), style: metrics.style
             )
         }
         let when = task.when.map { whenPillText($0, today: today) }

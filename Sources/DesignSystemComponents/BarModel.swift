@@ -23,7 +23,7 @@ public struct BarModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let height: Double
 
     /// The rule along the bar's top edge, across its width, and nil for a bar with none.
-    public let rule: StrokeModel?
+    public let rule: LineStyle?
 
     public let controlHeight: Double
     public let spacing: Double
@@ -34,14 +34,14 @@ public struct BarModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let groupDividerHeight: Double
 
     /// The divider between two buttons of a group, whose width is how thick it is.
-    public let groupDivider: StrokeModel
+    public let groupDivider: LineStyle
 
     public let buttonShadow: DesignSystem.Shadow
 
     public init(
         items: [Item],
         height: Double,
-        rule: StrokeModel?,
+        rule: LineStyle?,
         controlHeight: Double,
         spacing: Double,
         padding: Double,
@@ -49,7 +49,7 @@ public struct BarModel<Action: Equatable & Sendable>: Equatable, Sendable {
         groupButtonSpacing: Double,
         groupPadding: Double,
         groupDividerHeight: Double,
-        groupDivider: StrokeModel,
+        groupDivider: LineStyle,
         buttonShadow: DesignSystem.Shadow
     ) {
         self.items = items

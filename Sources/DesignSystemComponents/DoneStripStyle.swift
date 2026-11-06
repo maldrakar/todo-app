@@ -1,7 +1,8 @@
 // Sources/DesignSystemComponents/DoneStripStyle.swift
+import DesignSystem
 
-/// The numbers a `DoneStripModel` is drawn with, in points, which a layout holds whole and a builder hands over as one
-/// value.
+/// The numbers a `DoneStripModel` is drawn with, in points, and its background, which a layout holds whole and a
+/// builder hands over as one value.
 public struct DoneStripStyle: Equatable, Sendable {
     public let height: Double
     public let cornerRadius: Double
@@ -11,6 +12,7 @@ public struct DoneStripStyle: Equatable, Sendable {
     public let topMargin: Double
     public let leadingMargin: Double
     public let trailingMargin: Double
+    public let background: DesignSystem.Color
 
     public init(
         height: Double,
@@ -20,7 +22,8 @@ public struct DoneStripStyle: Equatable, Sendable {
         trailingPadding: Double,
         topMargin: Double,
         leadingMargin: Double,
-        trailingMargin: Double
+        trailingMargin: Double,
+        background: DesignSystem.Color
     ) {
         self.height = height
         self.cornerRadius = cornerRadius
@@ -30,5 +33,6 @@ public struct DoneStripStyle: Equatable, Sendable {
         self.topMargin = topMargin
         self.leadingMargin = leadingMargin
         self.trailingMargin = trailingMargin
+        self.background = background
     }
 }

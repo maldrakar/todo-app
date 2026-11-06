@@ -3,13 +3,13 @@ import DesignSystem
 import DesignSystemComponents
 
 extension TaskList {
-    /// The numbers the screen's components are drawn with in one layout, in points, picked once by the layout
-    /// (`of(_:)`), so that no builder branches on it: the phone's list (`phone`) and the phone's board
-    /// (`phoneColumns`), which share the header, the tag bar, the empty state and the floating "+" and differ in their
-    /// blocks, their "+ Add list" and the Done strip, which only the list has. A component's numbers are its style,
-    /// `CheckStyle` for `CheckModel` and so on (`DesignSystemComponents`), declared here once per layout and handed to
-    /// its model whole; a struct of this type's own stays only for a number that feeds a model nested in a component,
-    /// such as a glyph's size, which the component's style cannot hand over.
+    /// The numbers the screen's components are drawn with in one layout, in points, and the colours and motions that go
+    /// with them, picked once by the layout (`of(_:)`), so that no builder branches on it: the phone's list (`phone`)
+    /// and the phone's board (`phoneColumns`), which share the header, the tag bar, the empty state and the floating
+    /// "+" and differ in their blocks, their "+ Add list" and the Done strip, which only the list has. A component's
+    /// values are its style, `CheckStyle` for `CheckModel` and so on (`DesignSystemComponents`), declared here once per
+    /// layout and handed to its model whole; a struct of this type's own stays only for a number that feeds a model
+    /// nested in a component, such as a glyph's size, which the component's style cannot hand over.
     struct Metrics {
         /// A tile's side, its corners and the size of its glyph: the tile's own numbers, beside which its colour and
         /// which glyph it draws are the list's.
@@ -103,24 +103,23 @@ extension TaskList {
         }
 
         /// The board: the gap between columns, its paddings, and whether it snaps, which `Model.Board` holds as they
-        /// are, the board being no component; a column's numbers and its drop ring's width; a column's header; a
-        /// card's row, and the card it opens into; and "+ Add task".
+        /// are, the board being no component; a column's style; a column's header; a card's row, and the card it opens
+        /// into; and "+ Add task".
         struct Board {
             let spacing: Double
             let horizontalPadding: Double
             let bottomPadding: Double
             let snaps: Bool
             let column: ColumnStyle
-            let dropRingWidth: Double
             let header: BlockHeaderStyle
             let card: Row
             let openCard: Card
             let addTask: AddRow
         }
 
-        /// The blocks' numbers in the layout: the list's header, its chevron, its row, its open card, its "+ Add task"
-        /// and its Done strip, or the board's, which has no strip (canvas). Indirect, as the layout's whole numbers are
-        /// some 1,300 to 1,400 bytes on wasm32, which a debug build would put on the stack at every copy of `Metrics`.
+        /// The blocks' values in the layout: the list's header, its chevron, its row, its open card, its "+ Add task"
+        /// and its Done strip, or the board's, which has no strip (canvas). Indirect, as the layout's whole values are
+        /// some 1,900 to 2,100 bytes on wasm32, which a debug build would put on the stack at every copy of `Metrics`.
         indirect enum Blocks {
             case list(
                 header: BlockHeaderStyle, chevron: Chevron, row: Row, card: Card, addTask: AddRow, doneStrip: DoneStrip
@@ -155,7 +154,7 @@ extension TaskList {
             header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .list(
                 header: .init(
-                    titleToSubtitle: 8, rule: StrokeModel(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
+                    titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
                     trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
                     bottomPadding: 0, cornerRadius: 0
                 ),
@@ -171,7 +170,7 @@ extension TaskList {
                 doneStrip: DoneStrip(
                     style: .init(
                         height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14,
-                        topMargin: 20, leadingMargin: 14, trailingMargin: 16
+                        topMargin: 20, leadingMargin: 14, trailingMargin: 16, background: .fill
                     ),
                     iconSize: 18, chevronSize: 15
                 )
@@ -180,7 +179,7 @@ extension TaskList {
                 style: .init(
                     iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 4,
                     leadingPadding: 0, trailingPadding: 12, dash: nil,
-                    rule: StrokeModel(color: .line, width: 1, dash: []), topMargin: 10, leadingMargin: 12,
+                    rule: LineStyle(color: .line, width: 1, dash: []), topMargin: 10, leadingMargin: 12,
                     trailingMargin: 6
                 ),
                 iconSize: 18, font: .barLabel
@@ -206,9 +205,9 @@ extension TaskList {
                 spacing: 10, horizontalPadding: 16, bottomPadding: 24, snaps: true,
                 column: .init(
                     width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
-                    cardRing: StrokeModel(color: .glassLine, width: 0.5, dash: [])
+                    cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill,
+                    cardBackground: .surface, cardShadow: .resting, dropRingWidth: 2
                 ),
-                dropRingWidth: 2,
                 header: .init(
                     titleToSubtitle: 8, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
                     leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0
@@ -216,10 +215,12 @@ extension TaskList {
                 card: Row(
                     style: .init(
                         titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
-                        titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13
+                        titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
+                        freshAnimation: .fresh
                     ),
                     check: .init(
-                        diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42, hitHeight: 44
+                        diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42, hitHeight: 44,
+                        animation: .check
                     ),
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil
                 ),
@@ -227,7 +228,7 @@ extension TaskList {
                     style: .init(
                         expandHitSide: 44, cornerRadius: 13, topMargin: 0, horizontalMargin: 0, bottomMargin: 0,
                         bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
-                        shadow: .resting
+                        shadow: .resting, background: .surface, animation: .cardOpens
                     ),
                     check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: .init(height: 44), titleHeight: 44,
                     titlePadding: 2, expandSize: 19, notesHeight: 22, subtaskFieldHeight: 40,
@@ -246,7 +247,7 @@ extension TaskList {
                 style: .init(
                     iconCellWidth: 18, spacing: 8, height: 52, width: 200, cornerRadius: 18, topPadding: 0,
                     leadingPadding: 16, trailingPadding: 16,
-                    dash: StrokeModel(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
+                    dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
                     leadingMargin: 0, trailingMargin: 0
                 ),
                 iconSize: 18, font: .barLabel
@@ -257,14 +258,16 @@ extension TaskList {
         /// A check of the phone's row and of its open card: 24 across with a 1.75 ring and the 15 pt mark stroked 1.75
         /// in a 44 hit (Task 8's table, Row).
         private static let phoneCheck = CheckStyle(
-            diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44
+            diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+            animation: .check
         )
 
         /// A subtask's check in the open card: 18 across with a 1.5 ring and the 12 pt mark in a 40 by 44 hit (Task 8's
         /// table, Card), the canvas's 2.8 in its 24-unit box stroked 1.4 at that size
         /// (`CheckStyle.markStrokeWidth`).
         private static let phoneSubtaskCheck = CheckStyle(
-            diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44
+            diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
+            animation: .check
         )
 
         /// The phone's row (Task 8's table, Row and Swipe): 8 in and 12 short of the edges, its check `phoneCheck`, its
@@ -276,12 +279,12 @@ extension TaskList {
         private static let phoneRow = Row(
             style: .init(
                 titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
-                titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12
+                titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh
             ),
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
             swipe: .init(
                 threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
-                buttonCornerRadius: 12
+                buttonCornerRadius: 12, background: .red, animation: .swipe
             )
         )
 
@@ -293,7 +296,8 @@ extension TaskList {
         private static let phoneCard = Card(
             style: .init(
                 expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10,
-                bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised
+                bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised,
+                background: .surface, animation: .cardOpens
             ),
             check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: .init(height: 44), titleHeight: 44,
             titlePadding: 2, expandSize: 19, notesHeight: 22, subtaskFieldHeight: 40, addSubtask: phoneAddSubtask,
@@ -315,12 +319,16 @@ extension TaskList {
         /// The phone's pill (Task 8's table, Card; `Phone.dc.html`, `.xpill`): 32 high, a capsule, padded 10 and 12,
         /// its glyph 6 before its text, the sun 16, the flag 15, the hash 14.
         private static let phonePill = Pill(
-            style: .init(height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6),
+            style: .init(
+                height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6, background: .fill
+            ),
             sunSize: 16, flagSize: 15, hashSize: 14
         )
 
         /// The phone's floating "+" (Task 8's table, Floating "+"): a 48 circle, its plus 22.
-        private static let phoneFloatingButton = FloatingButton(style: .init(diameter: 48), glyphSize: 22)
+        private static let phoneFloatingButton = FloatingButton(
+            style: .init(diameter: 48, fill: .accent, shadow: .raised), glyphSize: 22
+        )
 
         /// The phone's header (Task 8's table, Header): the tile 38 across, rounded 11, its glyph 23, 12 before the
         /// title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50 in.

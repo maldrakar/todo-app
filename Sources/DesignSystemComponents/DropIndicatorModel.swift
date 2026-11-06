@@ -11,24 +11,24 @@ import DesignSystem
 /// `Phone.dc.html`).
 public struct DropIndicatorModel: Equatable, Sendable {
     public let height: Double
-    public let line: StrokeModel
+    public let line: LineStyle
     public let lineOffset: Double
     public let lineCornerRadius: Double
     public let trailingGap: Double
     public let circleDiameter: Double
     public let circleOffset: Double
-    public let circleRing: StrokeModel
+    public let circleRing: LineStyle
     public let circleFill: DesignSystem.Color
 
     public init(
         height: Double,
-        line: StrokeModel,
+        line: LineStyle,
         lineOffset: Double,
         lineCornerRadius: Double,
         trailingGap: Double,
         circleDiameter: Double,
         circleOffset: Double,
-        circleRing: StrokeModel,
+        circleRing: LineStyle,
         circleFill: DesignSystem.Color
     ) {
         self.height = height

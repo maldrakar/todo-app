@@ -25,7 +25,7 @@ public final class AreaLineModel<Action: Equatable & Sendable>: Equatable, Senda
     public let field: TextFieldModel<Action>?
 
     /// The line, its colour and how thick it is.
-    public let line: StrokeModel
+    public let line: LineStyle
 
     /// The gap between the end of the line and the accessories, and the end where there are none.
     public let lineToAccessories: Double
@@ -48,7 +48,7 @@ public final class AreaLineModel<Action: Equatable & Sendable>: Equatable, Senda
         spacing: Double,
         label: TextModel?,
         field: TextFieldModel<Action>?,
-        line: StrokeModel,
+        line: LineStyle,
         lineToAccessories: Double,
         accessories: [AccessoryModel<Action>],
         cellMinimumWidth: Double,

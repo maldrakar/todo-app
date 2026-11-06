@@ -97,7 +97,7 @@ private func chevron(_ id: ViewID, folded: Bool) -> AccessoryModel<Action>.Chevr
 }
 
 /// The guides under every list's row, 1.5 pt in the line colour.
-private let guide = StrokeModel(color: .line, width: 1.5, dash: [])
+private let guide = LineStyle(color: .line, width: 1.5, dash: [])
 
 /// A field a name is typed into, the title's on a list's row and the name's on an area's line: in the ink on the
 /// surface with the accent's ring, sending Return, Esc and a lost focus as the title field's.
@@ -108,7 +108,7 @@ private func field(
     TextFieldModel(
         text: text, placeholder: placeholder, font: font, color: .ink, background: .surface, minimumWidth: minimumWidth,
         height: height, padding: padding, cornerRadius: cornerRadius,
-        ring: StrokeModel(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
+        ring: LineStyle(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
         cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
     )
 }
@@ -154,7 +154,7 @@ private func phoneLine(
     AreaLineModel(
         height: height, leading: 20, spacing: 10,
         label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: fieldText.map(areaField),
-        line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: hasGrip ? 10 : 20,
+        line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: hasGrip ? 10 : 20,
         accessories: hasGrip ? [.grip(grip)] : [], cellMinimumWidth: 0, endGap: hasGrip ? 12 : 0, tap: .rowSelected(id),
         menu: menu
     )
@@ -392,7 +392,7 @@ private func phoneBar(_ items: [BarModel<Action>.Item]) -> BarModel<Action> {
     BarModel(
         items: items, height: 48, rule: nil, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40,
         groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
-        groupDivider: StrokeModel(color: .line, width: 1, dash: []), buttonShadow: .raised
+        groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
     )
 }
 
@@ -417,7 +417,7 @@ private func phoneDrag() -> DragModel {
         look: .slot(
             .init(
                 height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
-                stroke: StrokeModel(color: .accent, width: 1.5, dash: [5, 4])
+                stroke: LineStyle(color: .accent, width: 1.5, dash: [5, 4])
             ),
             .init(
                 raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
@@ -538,7 +538,7 @@ private func homesPicker(
             .init(
                 row: .area(AreaLineModel(
                     height: 17, leading: 20, spacing: 10, label: nil, field: nil,
-                    line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20,
+                    line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: 20,
                     accessories: unchecked, cellMinimumWidth: 0, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
                 )),
                 isDisabled: false, isChecked: false
@@ -593,7 +593,7 @@ private func sidebarChevron(_ id: ViewID, folded: Bool) -> AccessoryModel<Action
 }
 
 /// The guides under every row of the sidebar, 1 pt in the guide colour.
-private let sidebarGuide = StrokeModel(color: .guide, width: 1, dash: [])
+private let sidebarGuide = LineStyle(color: .guide, width: 1, dash: [])
 
 /// A list's row whole as the sidebar draws it (`Mac.dc.html`, a list's row), but for what a test spells: its title and
 /// title font, its tile, where it starts, its need, whether it is highlighted, its guides, its count, its chevron,
@@ -696,7 +696,7 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
         AreaLineModel(
             height: height, leading: leading, spacing: 6,
             label: label.map { TextModel(text: $0, font: .areaCaption, color: .ink3) }, field: field,
-            line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: isEditing ? 8 : 18,
+            line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: isEditing ? 8 : 18,
             accessories: isEditing ? [.grip(grip)] : [], cellMinimumWidth: isEditing ? 20 : 0,
             endGap: isEditing ? 14 : 0, tap: .rowSelected(id), menu: menu
         )
@@ -823,9 +823,9 @@ private func barWithoutEditMode() -> BarModel<Action> {
         menu: addMenu(withShortcuts: true)
     )
     return BarModel(
-        items: [.search(search), .menuButton(add)], height: 48, rule: StrokeModel(color: .line, width: 1, dash: []),
+        items: [.search(search), .menuButton(add)], height: 48, rule: LineStyle(color: .line, width: 1, dash: []),
         controlHeight: 30, spacing: 8, padding: 10, groupButtonHeight: 40, groupButtonSpacing: 6, groupPadding: 4,
-        groupDividerHeight: 22, groupDivider: StrokeModel(color: .line, width: 1, dash: []), buttonShadow: .raised
+        groupDividerHeight: 22, groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
     )
 }
 
@@ -854,9 +854,9 @@ private func sidebarDrag() -> DragModel {
         indent: IndentModel(start: 18, step: 16), animation: .popover,
         look: .indicator(
             .init(
-                height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
+                height: 12, line: LineStyle(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
                 trailingGap: 18, circleDiameter: 10, circleOffset: -6,
-                circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .sidebar
+                circleRing: LineStyle(color: .accent, width: 2, dash: []), circleFill: .sidebar
             ),
             .init(
                 width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted,
@@ -919,7 +919,7 @@ private func sidebarDrag() -> DragModel {
                 row: .area(AreaLineModel(
                     height: 15, leading: 18, spacing: 6,
                     label: TextModel(text: "WORK", font: .areaCaption, color: .ink3),
-                    field: nil, line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: 20,
+                    field: nil, line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: 20,
                     accessories: unchecked, cellMinimumWidth: 0, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
                 )),
                 isDisabled: false, isChecked: false

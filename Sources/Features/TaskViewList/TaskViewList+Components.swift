@@ -93,7 +93,7 @@ extension TaskViewList {
     /// mode, so no group stands on it.
     private static let barWithoutEditMode = bar(
         [.search(filledSearchField), .menuButton(addButtonWithShortcuts)], height: 48,
-        rule: StrokeModel(color: .line, width: 1, dash: []), controlHeight: 30, spacing: 8, padding: 10
+        rule: LineStyle(color: .line, width: 1, dash: []), controlHeight: 30, spacing: 8, padding: 10
     )
 
     /// The menu of the platform's "+" (`bar(isEditing:hasEditMode:in:)`), in and out of edit mode alike: with its
@@ -107,13 +107,13 @@ extension TaskViewList {
     /// between two, as the edit bar's group draws them; and the raised shadow under a button alone on a fill of its
     /// own, the canvas's small shadow on both its boards.
     private static func bar(
-        _ items: [BarModel<UserAction>.Item], height: Double, rule: StrokeModel?, controlHeight: Double,
+        _ items: [BarModel<UserAction>.Item], height: Double, rule: LineStyle?, controlHeight: Double,
         spacing: Double, padding: Double
     ) -> BarModel<UserAction> {
         BarModel(
             items: items, height: height, rule: rule, controlHeight: controlHeight, spacing: spacing, padding: padding,
             groupButtonHeight: 40, groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
-            groupDivider: StrokeModel(color: .line, width: 1, dash: []), buttonShadow: .raised
+            groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
         )
     }
 
@@ -317,7 +317,7 @@ extension TaskViewList {
         return AreaLineModel(
             height: height, leading: field == nil ? line.leading : line.fieldLeading, spacing: line.spacing,
             label: label.map { TextModel(text: $0, font: line.labelFont, color: line.labelColor) }, field: field,
-            line: StrokeModel(color: .line, width: 1, dash: []), lineToAccessories: end.lineToAccessories,
+            line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: end.lineToAccessories,
             accessories: end.accessories, cellMinimumWidth: end.cellMinimumWidth, endGap: end.endGap, tap: tap,
             menu: menu
         )
@@ -342,7 +342,7 @@ extension TaskViewList {
         TextFieldModel(
             text: draft, placeholder: placeholder, font: font, color: .ink, background: .surface,
             minimumWidth: minimumWidth, height: size.height, padding: size.padding, cornerRadius: size.cornerRadius,
-            ring: StrokeModel(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
+            ring: LineStyle(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
             cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
         )
     }
@@ -599,7 +599,7 @@ extension TaskViewList {
         let rowCornerRadius: Double
 
         /// The guides down the branches.
-        let guide: StrokeModel
+        let guide: LineStyle
 
         /// A row's end: the fade before it; the least width of the count's cell, which a row with no count keeps
         /// empty; the least width of a glyph's cell, which an empty chevron's cell keeps; the room the accessories take
@@ -666,7 +666,7 @@ extension TaskViewList {
             ),
             emphasizesHighlight: false, tileToTitle: 12, titleWidth: 140,
             rowField: FieldSize(height: 34, padding: 10, cornerRadius: 10), background: .paper, highlight: .fill,
-            backgroundInset: 0, rowCornerRadius: 0, guide: StrokeModel(color: .line, width: 1.5, dash: []),
+            backgroundInset: 0, rowCornerRadius: 0, guide: LineStyle(color: .line, width: 1.5, dash: []),
             fadeWidth: 10, countWidth: 20, cellWidth: 36, accessoriesWidth: 72, chevronSize: 13,
             line: Line(
                 height: 17, labelledHeight: 36, fieldHeight: 36, leading: 20, fieldLeading: 20, spacing: 10,
@@ -712,7 +712,7 @@ extension TaskViewList {
             ),
             emphasizesHighlight: true, tileToTitle: 8, titleWidth: 90,
             rowField: FieldSize(height: 24, padding: 6, cornerRadius: 6), background: .sidebar, highlight: .selection,
-            backgroundInset: 10, rowCornerRadius: 7, guide: StrokeModel(color: .guide, width: 1, dash: []),
+            backgroundInset: 10, rowCornerRadius: 7, guide: LineStyle(color: .guide, width: 1, dash: []),
             fadeWidth: 8, countWidth: 18, cellWidth: 20, accessoriesWidth: 70, chevronSize: 12,
             line: Line(
                 height: 15, labelledHeight: 15, fieldHeight: 28, leading: 18, fieldLeading: 16, spacing: 6,
@@ -749,7 +749,7 @@ extension TaskViewList {
             look: .slot(
                 DragModel.Slot(
                     height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
-                    stroke: StrokeModel(color: .accent, width: 1.5, dash: [5, 4])
+                    stroke: LineStyle(color: .accent, width: 1.5, dash: [5, 4])
                 ),
                 DragModel.Card(
                     raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
@@ -773,9 +773,9 @@ extension TaskViewList {
             indent: sidebarIndent, animation: .popover,
             look: .indicator(
                 DropIndicatorModel(
-                    height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2,
+                    height: 12, line: LineStyle(color: .accent, width: 2, dash: []), lineOffset: 2,
                     lineCornerRadius: 1, trailingGap: 18, circleDiameter: 10, circleOffset: -6,
-                    circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .sidebar
+                    circleRing: LineStyle(color: .accent, width: 2, dash: []), circleFill: .sidebar
                 ),
                 DragModel.IndicatorCard(
                     width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted,

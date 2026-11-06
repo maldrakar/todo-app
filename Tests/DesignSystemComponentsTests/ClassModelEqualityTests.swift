@@ -35,7 +35,7 @@ private func expectEveryPropertyCompared<Model: Equatable>(
 
 private let text = TextModel(text: "Home", font: .rowTitle, color: .ink)
 private let icon = IconModel(icon: .grip, size: 18, weight: .regular, color: .ink3)
-private let stroke = StrokeModel(color: .line, width: 1, dash: [])
+private let stroke = LineStyle(color: .line, width: 1, dash: [])
 private let menu = MenuModel<Action>(sections: [])
 
 private func field(_ text: String) -> TextFieldModel<Action> {
@@ -50,7 +50,7 @@ private func listRow(
     tile: TileModel = TileModel(color: .stone, icon: .bullets, side: 30, cornerRadius: 8, glyphSize: 19),
     tileToTitle: Double = 12, title: TextModel = text, field: TextFieldModel<Action>? = nil, need: Double = 274,
     background: DesignSystem.Color = .paper, backgroundInset: Double = 0, cornerRadius: Double = 0,
-    guides: [Double] = [], childGuides: [Double] = [35], guide: StrokeModel = stroke,
+    guides: [Double] = [], childGuides: [Double] = [35], guide: LineStyle = stroke,
     accessories: [AccessoryModel<Action>] = [.space(20)], fadeWidth: Double = 10, textMinimumWidth: Double = 20,
     cellMinimumWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72, tap: Action = .first,
     menu: MenuModel<Action>? = nil
@@ -78,7 +78,7 @@ private func listRow(
         "cornerRadius": listRow(cornerRadius: 7),
         "guides": listRow(guides: [35]),
         "childGuides": listRow(childGuides: [35, 55]),
-        "guide": listRow(guide: StrokeModel(color: .line, width: 1.5, dash: [])),
+        "guide": listRow(guide: LineStyle(color: .line, width: 1.5, dash: [])),
         "accessories": listRow(accessories: [.space(20), .space(36)]),
         "fadeWidth": listRow(fadeWidth: 0),
         "textMinimumWidth": listRow(textMinimumWidth: 22),
@@ -92,7 +92,7 @@ private func listRow(
 
 private func areaLine(
     height: Double = 36, leading: Double = 20, spacing: Double = 10, label: TextModel? = text,
-    field: TextFieldModel<Action>? = nil, line: StrokeModel = stroke, lineToAccessories: Double = 20,
+    field: TextFieldModel<Action>? = nil, line: LineStyle = stroke, lineToAccessories: Double = 20,
     accessories: [AccessoryModel<Action>] = [], cellMinimumWidth: Double = 22, endGap: Double = 0, tap: Action = .first,
     menu: MenuModel<Action>? = nil
 ) -> AreaLineModel<Action> {
@@ -110,7 +110,7 @@ private func areaLine(
         "spacing": areaLine(spacing: 12),
         "label": areaLine(label: nil),
         "field": areaLine(field: field("Work")),
-        "line": areaLine(line: StrokeModel(color: .line, width: 2, dash: [])),
+        "line": areaLine(line: LineStyle(color: .line, width: 2, dash: [])),
         "lineToAccessories": areaLine(lineToAccessories: 10),
         "accessories": areaLine(accessories: [.grip(icon)]),
         "cellMinimumWidth": areaLine(cellMinimumWidth: 18),
@@ -138,8 +138,8 @@ private func drag(
 }
 
 private let indicator = DropIndicatorModel(
-    height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
-    trailingGap: 18, circleDiameter: 10, circleOffset: -6, circleRing: StrokeModel(color: .accent, width: 2, dash: []),
+    height: 12, line: LineStyle(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
+    trailingGap: 18, circleDiameter: 10, circleOffset: -6, circleRing: LineStyle(color: .accent, width: 2, dash: []),
     circleFill: .sidebar
 )
 
@@ -201,8 +201,11 @@ private func picker(
 
 private func check(isChecked: Bool = false) -> CheckModel<Action> {
     CheckModel(
-        style: .init(diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44),
-        colors: DesignSystem.Color.Components.Tile.blue.check, isChecked: isChecked, animation: .check,
+        style: .init(
+            diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+            animation: .check
+        ),
+        colors: DesignSystem.Color.Components.Tile.blue.check, isChecked: isChecked,
         accessibilityLabel: "Complete", action: .first
     )
 }
@@ -210,35 +213,34 @@ private func check(isChecked: Bool = false) -> CheckModel<Action> {
 private let swipe = SwipeModel<Action>(
     style: .init(
         threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
-        buttonCornerRadius: 12
+        buttonCornerRadius: 12, background: .red, animation: .swipe
     ),
-    button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), background: .red, animation: .swipe,
-    action: .second
+    button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), action: .second
 )
 
 private let lift = TaskLiftModel(
     scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
     indicator: DropIndicatorModel(
-        height: 10, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
+        height: 10, line: LineStyle(color: .accent, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
         trailingGap: 20, circleDiameter: 8, circleOffset: 52,
-        circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .paper
+        circleRing: LineStyle(color: .accent, width: 2, dash: []), circleFill: .paper
     )
 )
 
 private let taskRowStyle = TaskRowStyle(
     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
-    leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0
+    leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0, freshAnimation: .fresh
 )
 
 private func taskRow(
     check: CheckModel<Action> = check(), title: TextModel = text, strike: DesignSystem.Color? = nil,
     meta: [MetaItemModel] = [], style: TaskRowStyle = taskRowStyle, swipe: SwipeModel<Action>? = nil,
-    lift: TaskLiftModel? = nil, fresh: DesignSystem.Color? = nil, freshAnimation: DesignSystem.Animation = .fresh,
+    lift: TaskLiftModel? = nil, fresh: DesignSystem.Color? = nil,
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> TaskRowModel<Action> {
     TaskRowModel(
         check: check, title: title, strike: strike, meta: meta, style: style, swipe: swipe, lift: lift, fresh: fresh,
-        freshAnimation: freshAnimation, tap: tap, menu: menu
+        tap: tap, menu: menu
     )
 }
 
@@ -250,20 +252,21 @@ private func taskRow(
         "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, spacing: 3, capsule: nil)]),
         "style": taskRow(style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
-            leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9
+            leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9, freshAnimation: .fresh
         )),
         "swipe": taskRow(swipe: swipe),
         "lift": taskRow(lift: lift),
         "fresh": taskRow(fresh: .fresh),
-        "freshAnimation": taskRow(freshAnimation: .drop),
         "tap": taskRow(tap: .second),
         "menu": taskRow(menu: menu),
     ])
 }
 
 private let pill = PillModel(
-    icon: IconModel(icon: .flag, size: 15, weight: .medium, color: .red), text: text, background: .fill,
-    style: .init(height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6)
+    icon: IconModel(icon: .flag, size: 15, weight: .medium, color: .red), text: text,
+    style: .init(
+        height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6, background: .fill
+    )
 )
 
 private let addSubtask = AddRowModel<Action>(
@@ -286,21 +289,20 @@ private let expand = ButtonModel<Action>(
 
 private let cardStyle = CardStyle(
     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
-    bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised
+    bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised, background: .surface,
+    animation: .cardOpens
 )
 
 private func card(
     check: CheckModel<Action> = check(), title: TextFieldModel<Action> = field("Call the plumber"),
     notes: TextFieldModel<Action> = field(""), subtasks: [SubtaskRowModel<Action>] = [],
     subtaskField: TextFieldModel<Action>? = nil, addSubtask: AddRowModel<Action> = addSubtask,
-    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, background: DesignSystem.Color = .surface,
-    style: CardStyle = cardStyle, animation: DesignSystem.Animation = .cardOpens,
+    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, style: CardStyle = cardStyle,
     backgroundTapped: Action = .first
 ) -> CardModel<Action> {
     CardModel(
         check: check, title: title, notes: notes, subtasks: subtasks, subtaskField: subtaskField,
-        addSubtask: addSubtask, pills: pills, expand: expand, background: background, style: style,
-        animation: animation, backgroundTapped: backgroundTapped
+        addSubtask: addSubtask, pills: pills, expand: expand, style: style, backgroundTapped: backgroundTapped
     )
 }
 
@@ -325,12 +327,11 @@ private func card(
         )),
         "pills": card(pills: [pill]),
         "expand": card(expand: ButtonModel(label: expand.label, action: .second)),
-        "background": card(background: .fill),
         "style": card(style: .init(
             expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
-            bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted
+            bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted,
+            background: .surface, animation: .cardOpens
         )),
-        "animation": card(animation: .pushPop),
         "backgroundTapped": card(backgroundTapped: .second),
     ])
 }
@@ -384,7 +385,7 @@ private func addRow(
 }
 
 @Test func anAddRowModelComparesEveryProperty() {
-    let line = StrokeModel(color: .line, width: 1, dash: [])
+    let line = LineStyle(color: .line, width: 1, dash: [])
     expectEveryPropertyCompared({ addRow() }, [
         "icon": addRow(icon: IconModel(icon: .plus, size: 17, weight: .regular, color: .ink2)),
         "title": addRow(title: TextModel(text: "Add list", font: .barLabel, color: .ink2)),
@@ -398,11 +399,11 @@ private func addRow(
 
 private let doneStripStyle = DoneStripStyle(
     height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-    leadingMargin: 14, trailingMargin: 16
+    leadingMargin: 14, trailingMargin: 16, background: .fill
 )
 
 private func doneStrip(
-    icon: IconModel = plus, label: TextModel = text, rotation: Double = 0, background: DesignSystem.Color = .fill,
+    icon: IconModel = plus, label: TextModel = text, rotation: Double = 0,
     style: DoneStripStyle = doneStripStyle, isOpen: Bool = false, action: Action = .first
 ) -> DoneStripModel<Action> {
     DoneStripModel(
@@ -410,7 +411,7 @@ private func doneStrip(
         chevron: AccessoryModel.Chevron(
             icon: plus, rotation: rotation, animation: .fold, accessibilityLabel: "Show done tasks", action: .first
         ),
-        background: background, style: style, isOpen: isOpen, action: action
+        style: style, isOpen: isOpen, action: action
     )
 }
 
@@ -419,10 +420,9 @@ private func doneStrip(
         "icon": doneStrip(icon: IconModel(icon: .checkCircle, size: 18, weight: .regular, color: .ink2)),
         "label": doneStrip(label: TextModel(text: "Done today · 3", font: .barLabel, color: .ink2)),
         "chevron": doneStrip(rotation: 180),
-        "background": doneStrip(background: .surface),
         "style": doneStrip(style: .init(
             height: 30, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-            leadingMargin: 14, trailingMargin: 16
+            leadingMargin: 14, trailingMargin: 16, background: .fill
         )),
         "isOpen": doneStrip(isOpen: true),
         "action": doneStrip(action: .second),

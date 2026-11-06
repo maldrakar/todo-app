@@ -9,7 +9,7 @@ import DesignSystem
 /// what it draws under itself rounded by `cornerRadius`, in points. The model holds every value its platform needs to
 /// draw it, so a view decides nothing but what is the platform's: the gestures, the swipe and the lift as they move,
 /// focus and Reduce Motion (ADR-0007, amendment of 2026-10-30). It holds no id of the store's: the feature module's row
-/// carries the task's id beside it. Its numbers are the fields of its `TaskRowStyle`.
+/// carries the task's id beside it. Its numbers and its `freshAnimation` are the fields of its `TaskRowStyle`.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block holds many, every comparison of the screen's
 /// model compares them, and inline, its check, swipe and lift with it, a row is some 1,160 bytes on wasm32. Its `==`
@@ -35,11 +35,10 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     /// How the row looks while it is lifted to be moved, and nil for a row that cannot be.
     public let lift: TaskLiftModel?
 
-    /// The colour under the row where it was just dropped, which fades out over `freshAnimation` from the moment it
-    /// lands, and nil under any other row. The motion is held while the colour is nil too, so the fade does not stop
-    /// when the colour goes.
+    /// The colour under the row where it was just dropped, which fades out over its style's `freshAnimation` from the
+    /// moment it lands, and nil under any other row. The motion is held while the colour is nil too, so the fade does
+    /// not stop when the colour goes.
     public let fresh: DesignSystem.Color?
-    public let freshAnimation: DesignSystem.Animation
 
     /// What a tap on the row, beside its check, sends.
     public let tap: Action
@@ -56,7 +55,6 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         swipe: SwipeModel<Action>?,
         lift: TaskLiftModel?,
         fresh: DesignSystem.Color?,
-        freshAnimation: DesignSystem.Animation,
         tap: Action,
         menu: MenuModel<Action>?
     ) {
@@ -68,7 +66,6 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         self.swipe = swipe
         self.lift = lift
         self.fresh = fresh
-        self.freshAnimation = freshAnimation
         self.tap = tap
         self.menu = menu
     }
@@ -83,7 +80,6 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
             && lhs.swipe == rhs.swipe
             && lhs.lift == rhs.lift
             && lhs.fresh == rhs.fresh
-            && lhs.freshAnimation == rhs.freshAnimation
             && lhs.tap == rhs.tap
             && lhs.menu == rhs.menu
     }

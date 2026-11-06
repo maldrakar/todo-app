@@ -47,7 +47,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     /// the slot of a drag after it takes as far as its depth.
     public let guides: [Double]
     public let childGuides: [Double]
-    public let guide: StrokeModel
+    public let guide: LineStyle
 
     /// What stands at the right of the row, in the order given (`Phone.dc.html`, the row's sticky end): over a fade
     /// `fadeWidth` wide from clear to the row's background, so that a title running under them ends softly, a text set
@@ -83,7 +83,7 @@ public final class ListRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         cornerRadius: Double,
         guides: [Double],
         childGuides: [Double],
-        guide: StrokeModel,
+        guide: LineStyle,
         accessories: [AccessoryModel<Action>],
         fadeWidth: Double,
         textMinimumWidth: Double,

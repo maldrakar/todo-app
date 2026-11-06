@@ -1,8 +1,8 @@
 // Sources/DesignSystemComponents/CardStyle.swift
 import DesignSystem
 
-/// The numbers a `CardModel` is drawn with, in points, and the card's shadow, which the layout knows whole and a
-/// builder hands over as one value.
+/// The numbers a `CardModel` is drawn with, in points, and the card's background, shadow and animation, which the
+/// layout knows whole and a builder hands over as one value.
 public struct CardStyle: Equatable, Sendable {
     public let expandHitSide: Double
     public let cornerRadius: Double
@@ -15,6 +15,8 @@ public struct CardStyle: Equatable, Sendable {
     public let subtasksToPills: Double
     public let pillSpacing: Double
     public let shadow: DesignSystem.Shadow
+    public let background: DesignSystem.Color
+    public let animation: DesignSystem.Animation
 
     public init(
         expandHitSide: Double,
@@ -27,7 +29,9 @@ public struct CardStyle: Equatable, Sendable {
         bodyBottom: Double,
         subtasksToPills: Double,
         pillSpacing: Double,
-        shadow: DesignSystem.Shadow
+        shadow: DesignSystem.Shadow,
+        background: DesignSystem.Color,
+        animation: DesignSystem.Animation
     ) {
         self.expandHitSide = expandHitSide
         self.cornerRadius = cornerRadius
@@ -40,5 +44,7 @@ public struct CardStyle: Equatable, Sendable {
         self.subtasksToPills = subtasksToPills
         self.pillSpacing = pillSpacing
         self.shadow = shadow
+        self.background = background
+        self.animation = animation
     }
 }

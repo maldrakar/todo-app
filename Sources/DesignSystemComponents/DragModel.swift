@@ -32,11 +32,11 @@ public final class DragModel: Equatable, Sendable {
         public let verticalInset: Double
         public let cornerRadius: Double
         public let fill: DesignSystem.Color
-        public let stroke: StrokeModel
+        public let stroke: LineStyle
 
         public init(
             height: Double, inset: Double, trailingGap: Double, verticalInset: Double, cornerRadius: Double,
-            fill: DesignSystem.Color, stroke: StrokeModel
+            fill: DesignSystem.Color, stroke: LineStyle
         ) {
             self.height = height
             self.inset = inset

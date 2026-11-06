@@ -1,7 +1,8 @@
 // Sources/DesignSystemComponents/TaskRowStyle.swift
+import DesignSystem
 
-/// The numbers a `TaskRowModel` is drawn with, in points, which a layout holds whole and a builder hands over as one
-/// value.
+/// The numbers a `TaskRowModel` is drawn with, in points, and the fade of its fresh colour, which a layout holds whole
+/// and a builder hands over as one value.
 public struct TaskRowStyle: Equatable, Sendable {
     public let titleToMeta: Double
     public let metaSpacing: Double
@@ -17,6 +18,7 @@ public struct TaskRowStyle: Equatable, Sendable {
 
     /// The radius of the corners of what the row draws under itself, its fresh colour and the pointer's tint.
     public let cornerRadius: Double
+    public let freshAnimation: DesignSystem.Animation
 
     public init(
         titleToMeta: Double,
@@ -28,7 +30,8 @@ public struct TaskRowStyle: Equatable, Sendable {
         leading: Double,
         trailing: Double,
         minimumHeight: Double,
-        cornerRadius: Double
+        cornerRadius: Double,
+        freshAnimation: DesignSystem.Animation
     ) {
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing
@@ -40,5 +43,6 @@ public struct TaskRowStyle: Equatable, Sendable {
         self.trailing = trailing
         self.minimumHeight = minimumHeight
         self.cornerRadius = cornerRadius
+        self.freshAnimation = freshAnimation
     }
 }

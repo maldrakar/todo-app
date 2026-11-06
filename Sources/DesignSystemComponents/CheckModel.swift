@@ -5,8 +5,8 @@ import DesignSystem
 /// `diameter` across, its ring `ringWidth` thick, centred in a tap area `hitWidth` wide and `hitHeight` high, and on it
 /// the mark, the canvas's drawn tick, `markSize` across and stroked `markStrokeWidth` thick, in points. An open check
 /// draws its colours' ring and is clear inside; a checked one draws their fill as its ring and inside it, with the mark
-/// on the fill, and pops on `animation` as it is checked (ADR-0007, amendment of 2026-10-30). Its numbers are the
-/// fields of its `CheckStyle`.
+/// on the fill, and pops on `animation` as it is checked (ADR-0007, amendment of 2026-10-30). Its numbers and its
+/// `animation` are the fields of its `CheckStyle`.
 public struct CheckModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let style: CheckStyle
 
@@ -15,8 +15,6 @@ public struct CheckModel<Action: Equatable & Sendable>: Equatable, Sendable {
 
     /// Whether the task is done, or being completed, which the check draws and VoiceOver reads.
     public let isChecked: Bool
-
-    public let animation: DesignSystem.Animation
 
     /// The words the check reads aloud, which say what a tap on it will do.
     public let accessibilityLabel: String
@@ -28,14 +26,12 @@ public struct CheckModel<Action: Equatable & Sendable>: Equatable, Sendable {
         style: CheckStyle,
         colors: DesignSystem.Color.Components.Check,
         isChecked: Bool,
-        animation: DesignSystem.Animation,
         accessibilityLabel: String,
         action: Action
     ) {
         self.style = style
         self.colors = colors
         self.isChecked = isChecked
-        self.animation = animation
         self.accessibilityLabel = accessibilityLabel
         self.action = action
     }

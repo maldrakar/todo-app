@@ -9,11 +9,11 @@ import TodoCore
 /// points, every colour, font, icon, animation and shadow a token of the design system, every word finished, in English
 /// until the formatting service arrives, and every control's action a value (ADR-0007, amendment of 2026-10-30). The
 /// numbers are one value per layout (`Metrics`), picked once where the model is built, so that no builder branches on
-/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`); a component's are its
-/// style, `CheckStyle` for `CheckModel` and so on, which a builder hands over whole, and what stays in `Metrics` beside
-/// the styles is a number a nested model takes, such as a glyph's size, and a font. The open card is in
-/// `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete in
-/// `TaskList+Controls.swift`.
+/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`); a component's are its style,
+/// `CheckStyle` for `CheckModel` and so on, which also holds the colours and motions the component draws alike in every
+/// row, and which a builder hands over whole; what stays in `Metrics` beside the styles is a number a nested model
+/// takes, such as a glyph's size, and a font. The open card is in `TaskList+Card.swift`, and the rows that add, the
+/// floating "+", the Done strip and Delete in `TaskList+Controls.swift`.
 extension TaskList {
     /// What the rows and the headers of a model are built from beside their own tasks: the device's day, the tags'
     /// names, the open card and the list being named.
@@ -138,9 +138,8 @@ extension TaskList {
     ) -> ColumnModel<UserAction> {
         ColumnModel(
             header: blockHeader(heading, of: block, fold: nil, background: .fill, context, metrics.header),
-            style: metrics.column, fill: .fill, dropTint: block.color.dropTint, isDropTarget: block.edit != nil,
-            dropRing: StrokeModel(color: block.color.check.fill, width: metrics.dropRingWidth, dash: []),
-            cardBackground: .surface, cardShadow: .resting
+            style: metrics.column, dropTint: block.color.dropTint, isDropTarget: block.edit != nil,
+            dropRing: block.color.check.fill
         )
     }
 
@@ -223,7 +222,7 @@ extension TaskList {
             check: check(title: title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
             title: TextModel(text: title, font: metrics.title, color: isOpen ? .ink : .ink2),
             strike: isOpen ? nil : .ink3, meta: meta, style: metrics.style, swipe: swipe, lift: nil, fresh: nil,
-            freshAnimation: .fresh, tap: .rowTapped(task.id), menu: menu
+            tap: .rowTapped(task.id), menu: menu
         )
     }
 
@@ -233,7 +232,7 @@ extension TaskList {
         title: String, isOpen: Bool, _ color: Tile, action: UserAction, _ style: CheckStyle
     ) -> CheckModel<UserAction> {
         CheckModel(
-            style: style, colors: color.check, isChecked: !isOpen, animation: .check,
+            style: style, colors: color.check, isChecked: !isOpen,
             accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: action
         )
     }
@@ -247,7 +246,7 @@ extension TaskList {
     ) -> TextFieldModel<UserAction> {
         TextFieldModel(
             text: text, placeholder: placeholder, font: font, color: color, background: background, minimumWidth: 0,
-            height: height, padding: padding, cornerRadius: 0, ring: StrokeModel(color: background, width: 0, dash: []),
+            height: height, padding: padding, cornerRadius: 0, ring: LineStyle(color: background, width: 0, dash: []),
             submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )
     }

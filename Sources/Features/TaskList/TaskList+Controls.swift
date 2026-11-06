@@ -39,7 +39,7 @@ extension TaskList {
     static func floatingButton(_ metrics: Metrics.FloatingButton) -> FloatingButtonModel<UserAction> {
         FloatingButtonModel(
             icon: IconModel(icon: .plus, size: metrics.glyphSize, weight: .semibold, color: .onAccent),
-            style: metrics.style, fill: .accent, shadow: .raised, accessibilityLabel: newTaskTitle,
+            style: metrics.style, accessibilityLabel: newTaskTitle,
             action: .addTaskButtonTapped
         )
     }
@@ -58,7 +58,7 @@ extension TaskList {
                 rotation: isOpen ? 180 : 0, animation: .fold,
                 accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped
             ),
-            background: .fill, style: metrics.style, isOpen: isOpen, action: .doneStripTapped
+            style: metrics.style, isOpen: isOpen, action: .doneStripTapped
         )
     }
 
@@ -69,8 +69,7 @@ extension TaskList {
     static func swipe(of id: TaskID, _ style: SwipeStyle) -> SwipeModel<UserAction> {
         SwipeModel(
             style: style,
-            button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), background: .red,
-            animation: .swipe, action: .deleteSwiped(id)
+            button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), action: .deleteSwiped(id)
         )
     }
 

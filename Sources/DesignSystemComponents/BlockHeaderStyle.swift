@@ -7,7 +7,7 @@ public struct BlockHeaderStyle: Equatable, Sendable {
 
     /// The rule under the header, across its width, whose width is how thick it is, and nil for a header with none, as
     /// a column's is.
-    public let rule: StrokeModel?
+    public let rule: LineStyle?
 
     public let height: Double
     public let topMargin: Double
@@ -21,7 +21,7 @@ public struct BlockHeaderStyle: Equatable, Sendable {
 
     public init(
         titleToSubtitle: Double,
-        rule: StrokeModel?,
+        rule: LineStyle?,
         height: Double,
         topMargin: Double,
         trailingMargin: Double,

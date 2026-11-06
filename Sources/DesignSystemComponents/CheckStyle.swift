@@ -1,7 +1,8 @@
 // Sources/DesignSystemComponents/CheckStyle.swift
+import DesignSystem
 
-/// The numbers a `CheckModel` is drawn with, in points, which a layout holds whole and a builder hands over as one
-/// value.
+/// The numbers a `CheckModel` is drawn with, in points, and its animation, which a layout holds whole and a builder
+/// hands over as one value.
 public struct CheckStyle: Equatable, Sendable {
     public let diameter: Double
     public let ringWidth: Double
@@ -13,6 +14,7 @@ public struct CheckStyle: Equatable, Sendable {
 
     public let hitWidth: Double
     public let hitHeight: Double
+    public let animation: DesignSystem.Animation
 
     public init(
         diameter: Double,
@@ -20,7 +22,8 @@ public struct CheckStyle: Equatable, Sendable {
         markSize: Double,
         markStrokeWidth: Double,
         hitWidth: Double,
-        hitHeight: Double
+        hitHeight: Double,
+        animation: DesignSystem.Animation
     ) {
         self.diameter = diameter
         self.ringWidth = ringWidth
@@ -28,5 +31,6 @@ public struct CheckStyle: Equatable, Sendable {
         self.markStrokeWidth = markStrokeWidth
         self.hitWidth = hitWidth
         self.hitHeight = hitHeight
+        self.animation = animation
     }
 }

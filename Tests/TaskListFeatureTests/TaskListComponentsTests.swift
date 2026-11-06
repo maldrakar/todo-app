@@ -29,26 +29,26 @@ private func phoneRow(
     TaskRowModel(
         check: CheckModel(
             style: .init(
-                diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44
+                diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+                animation: .check
             ),
-            colors: colors, isChecked: !isOpen, animation: .check,
+            colors: colors, isChecked: !isOpen,
             accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: .checkTapped(id)
         ),
         title: TextModel(text: title, font: .rowTitle, color: isOpen ? .ink : .ink2), strike: isOpen ? nil : .ink3,
         meta: meta,
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
-            titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12
+            titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
                 threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
-                buttonCornerRadius: 12
+                buttonCornerRadius: 12, background: .red, animation: .swipe
             ),
-            button: TextModel(text: "Delete", font: .barLabel, color: .onAccent),
-            background: .red, animation: .swipe, action: .deleteSwiped(id)
+            button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), action: .deleteSwiped(id)
         ) : nil,
-        lift: nil, fresh: nil, freshAnimation: .fresh, tap: .rowTapped(id), menu: deletes ? deleteMenu(id) : nil
+        lift: nil, fresh: nil, tap: .rowTapped(id), menu: deletes ? deleteMenu(id) : nil
     )
 }
 
@@ -159,7 +159,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 hitSide: 44
             ),
             style: .init(
-                titleToSubtitle: 8, rule: StrokeModel(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
+                titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
                 trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
                 bottomPadding: 0, cornerRadius: 0
             ),
@@ -252,26 +252,27 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         ),
         style: .init(
             width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
-            cardRing: StrokeModel(color: .glassLine, width: 0.5, dash: [])
+            cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill, cardBackground: .surface,
+            cardShadow: .resting, dropRingWidth: 2
         ),
-        fill: .fill, dropTint: Tile.rose.dropTint, isDropTarget: true,
-        dropRing: StrokeModel(color: Tile.rose.check.fill, width: 2, dash: []), cardBackground: .surface,
-        cardShadow: .resting
+        dropTint: Tile.rose.dropTint, isDropTarget: true,
+        dropRing: Tile.rose.check.fill
     ))
     #expect(block.rows.map(row) == [TaskRowModel(
         check: CheckModel(
             style: .init(
-                diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42, hitHeight: 44
+                diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42, hitHeight: 44,
+                animation: .check
             ),
-            colors: Tile.rose.check, isChecked: false, animation: .check, accessibilityLabel: "Complete: Buy milk",
+            colors: Tile.rose.check, isChecked: false, accessibilityLabel: "Complete: Buy milk",
             action: .checkTapped(id)
         ),
         title: TextModel(text: "Buy milk", font: .nestedRowTitle, color: .ink), strike: nil, meta: [],
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
-            leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13
+            leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh
         ),
-        swipe: nil, lift: nil, fresh: nil, freshAnimation: .fresh,
+        swipe: nil, lift: nil, fresh: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)
     )])
 }
@@ -339,7 +340,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         icon: plus(18), title: TextModel(text: "Add list", font: .barLabel, color: .ink2),
         style: .init(
             iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 4, leadingPadding: 0,
-            trailingPadding: 12, dash: nil, rule: StrokeModel(color: .line, width: 1, dash: []), topMargin: 10,
+            trailingPadding: 12, dash: nil, rule: LineStyle(color: .line, width: 1, dash: []), topMargin: 10,
             leadingMargin: 12, trailingMargin: 6
         ),
         action: .addListTapped
@@ -358,7 +359,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         icon: plus(18), title: TextModel(text: "Add list", font: .barLabel, color: .ink2),
         style: .init(
             iconCellWidth: 18, spacing: 8, height: 52, width: 200, cornerRadius: 18, topPadding: 0, leadingPadding: 16,
-            trailingPadding: 16, dash: StrokeModel(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
+            trailingPadding: 16, dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
             leadingMargin: 0, trailingMargin: 0
         ),
         action: .addListTapped
@@ -370,8 +371,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 @Test func theFloatingPlusCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     #expect(try list(BuiltInTaskViews.inbox, in: store).model.addTask == FloatingButtonModel(
-        icon: IconModel(icon: .plus, size: 22, weight: .semibold, color: .onAccent), style: .init(diameter: 48),
-        fill: .accent, shadow: .raised, accessibilityLabel: "New task", action: .addTaskButtonTapped
+        icon: IconModel(icon: .plus, size: 22, weight: .semibold, color: .onAccent),
+        style: .init(diameter: 48, fill: .accent, shadow: .raised),
+        accessibilityLabel: "New task", action: .addTaskButtonTapped
     ))
 }
 
@@ -395,10 +397,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 animation: .fold, accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks",
                 action: .doneStripTapped
             ),
-            background: .fill,
             style: .init(
                 height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-                leadingMargin: 14, trailingMargin: 16
+                leadingMargin: 14, trailingMargin: 16, background: .fill
             ),
             isOpen: isOpen, action: .doneStripTapped
         )
@@ -439,16 +440,18 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         side == 24
             ? CheckModel(
                 style: .init(
-                    diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44
+                    diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+                    animation: .check
                 ),
-                colors: colors, isChecked: false, animation: .check, accessibilityLabel: "Complete: \(title)",
+                colors: colors, isChecked: false, accessibilityLabel: "Complete: \(title)",
                 action: action
             )
             : CheckModel(
                 style: .init(
-                    diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44
+                    diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
+                    animation: .check
                 ),
-                colors: colors, isChecked: false, animation: .check, accessibilityLabel: "Complete: \(title)",
+                colors: colors, isChecked: false, accessibilityLabel: "Complete: \(title)",
                 action: action
             )
     }
@@ -458,15 +461,17 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ) -> TextFieldModel<Action> {
         TextFieldModel(
             text: text, placeholder: placeholder, font: font, color: color, background: .surface, minimumWidth: 0,
-            height: height, padding: padding, cornerRadius: 0, ring: StrokeModel(color: .surface, width: 0, dash: []),
+            height: height, padding: padding, cornerRadius: 0, ring: LineStyle(color: .surface, width: 0, dash: []),
             submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )
     }
     func pill(_ icon: DesignSystem.Icon, size: Double, iconColor: DesignSystem.Color, _ text: String, font: DesignSystem.Font = .pill) -> PillModel {
         PillModel(
             icon: IconModel(icon: icon, size: size, weight: .regular, color: iconColor),
-            text: TextModel(text: text, font: font, color: .ink), background: .fill,
-            style: .init(height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6)
+            text: TextModel(text: text, font: font, color: .ink),
+            style: .init(
+                height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6, background: .fill
+            )
         )
     }
     func card(
@@ -513,13 +518,13 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 ),
                 action: .openFullScreenTapped
             ),
-            background: .surface,
             style: .init(
                 expandHitSide: 44, cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
                 bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing,
-                bodyBottom: bodyBottom, subtasksToPills: 10, pillSpacing: 6, shadow: shadow
+                bodyBottom: bodyBottom, subtasksToPills: 10, pillSpacing: 6, shadow: shadow, background: .surface,
+                animation: .cardOpens
             ),
-            animation: .cardOpens, backgroundTapped: .backgroundTapped
+            backgroundTapped: .backgroundTapped
         )
     }
     #expect(openCard(in: module.model)?.card == card(
@@ -551,7 +556,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         TextFieldModel(
             text: "New list", placeholder: "", font: .sectionTitle, color: Tile.indigo.glyph, background: background,
             minimumWidth: 0, height: height, padding: 0, cornerRadius: 0,
-            ring: StrokeModel(color: background, width: 0, dash: []), submitted: .listNameFieldSubmitted,
+            ring: LineStyle(color: background, width: 0, dash: []), submitted: .listNameFieldSubmitted,
             cancelled: .listNameFieldCancelled, focusLost: .listNameFieldLostFocus
         )
     }

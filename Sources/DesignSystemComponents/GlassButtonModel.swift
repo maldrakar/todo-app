@@ -17,7 +17,7 @@ public struct GlassButtonModel<Action: Equatable & Sendable>: Equatable, Sendabl
     public let surface: DesignSystem.Color
 
     /// The hairline round the button, whose width is how thick it is.
-    public let line: StrokeModel
+    public let line: LineStyle
 
     public let shadow: DesignSystem.Shadow
 
@@ -32,7 +32,7 @@ public struct GlassButtonModel<Action: Equatable & Sendable>: Equatable, Sendabl
         iconOffset: Double,
         diameter: Double,
         surface: DesignSystem.Color,
-        line: StrokeModel,
+        line: LineStyle,
         shadow: DesignSystem.Shadow,
         accessibilityLabel: String,
         action: Action

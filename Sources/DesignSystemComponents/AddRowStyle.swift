@@ -17,11 +17,11 @@ public struct AddRowStyle: Equatable, Sendable {
     public let trailingPadding: Double
 
     /// The dashed edge along the row's rounded corners, and nil for a row with none: "+ Add list" on the board has one.
-    public let dash: StrokeModel?
+    public let dash: LineStyle?
 
     /// The rule along the row's top edge, across its width, and nil for a row with none: "+ Add list" under the blocks
     /// has one.
-    public let rule: StrokeModel?
+    public let rule: LineStyle?
 
     public let topMargin: Double
     public let leadingMargin: Double
@@ -36,8 +36,8 @@ public struct AddRowStyle: Equatable, Sendable {
         topPadding: Double,
         leadingPadding: Double,
         trailingPadding: Double,
-        dash: StrokeModel?,
-        rule: StrokeModel?,
+        dash: LineStyle?,
+        rule: LineStyle?,
         topMargin: Double,
         leadingMargin: Double,
         trailingMargin: Double
