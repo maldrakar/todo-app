@@ -77,7 +77,7 @@ from.
 | `Sources/Features/TaskList/TaskList+Components.swift` | 6, 7, 8, 9 | the builders of the rows, the blocks and the columns, the header, the tag bar, the empty state |
 | `Sources/Features/TaskList/TaskList+Metrics.swift` | 7 (moved out of `+Components`), 8, 9 | `Metrics` per width and layout |
 | `Sources/Features/TaskList/TaskList+Card.swift`, `TaskList+Controls.swift` | 7 | the builders of the open card; of the rows that add, the floating "+", the strip's capsule, the swipe and the menu |
-| `Sources/Features/TaskList/TaskList+Rule.swift` | 7 | `Edits`: a rule read as edits, and the drop table |
+| `Sources/Features/TaskList/TaskList+Rule.swift` | 7 | `TaskList.TaskEdit`: a rule read as an edit, and the drop table |
 | `Sources/TodoCore/Storage/Store+Views.swift` | 7 | `pin(tasks:in:at:)`, several pins in one transaction |
 | `Package.swift` | 6 | `TaskListFeature` and its tests depend on `DesignSystem` and `DesignSystemComponents` |
 | `Sources/DesignSystem/Color.swift`, `Color+Components.swift` | 4 | `Color.glass`, `glassLine`, `fresh`; `Color.Components.Check` per tile colour, ring, fill and mark, the mark written down per tile; `Tile.dropTint` |
@@ -750,7 +750,7 @@ Section by section of the spec, which task covers it.
 | 1. What the screen is | 6 (header, Show as, Logbook and Trash by their rules), 8, 9 |
 | 2. Blocks | 1 (the page), 2 (the manual list; the group's row, removed by 2b), 6 (blocks, folds, a list over a list, a group's screen) |
 | 3. Rows, the card, completing | 1 (the flags, the done read), 4 (the models), 7 (the card, completing, the strip), 8 |
-| 4. Adding a task, a list | 2 (`createManualList`), 7 (`Edits`, adding, naming) |
+| 4. Adding a task, a list | 2 (`createManualList`), 7 (`TaskEdit`, adding, naming) |
 | 5. Columns | 6 (the layout per device, Show as), 8 (the board), 9 (no snap) |
 | 6. Moving a task | 5 (the spike), 7 (`pin(tasks:)`, the reorder, the drop, deleting), 8, 9 |
 | 7. The tag bar | 6 |

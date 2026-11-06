@@ -7,9 +7,9 @@ import TodoCore
 /// and its menu (Task 8's table, Add rows, Done strip, Floating "+" and Swipe; the controller's ruling on #176,
 /// 2026-11-05, their words).
 extension TaskList {
-    /// A block's "+ Add task", and none where the block's rule reads as no edits.
+    /// A block's "+ Add task", and none where the block's rule reads as no edit.
     static func addTaskRow(for block: PageBlock, _ metrics: Metrics.AddRow) -> AddRowModel<UserAction>? {
-        block.edits.map { _ in addRow(title: "Add task", action: .addTaskRowTapped(in: block.id), metrics) }
+        block.edit.map { _ in addRow(title: "Add task", action: .addTaskRowTapped(in: block.id), metrics) }
     }
 
     /// "+ Add list", in the list and on the board.

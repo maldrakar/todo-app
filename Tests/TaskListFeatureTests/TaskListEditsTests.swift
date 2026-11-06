@@ -145,7 +145,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(try store.manualList(of: unsorted).isEmpty)
 }
 
-/// A grouped list with no tasks has no block, and its floating "+" takes the rule's edits (the controller's ruling on
+/// A grouped list with no tasks has no block, and its floating "+" takes the rule's edit (the controller's ruling on
 /// #176, 2026-11-05).
 @Test func theFloatingPlusOnAnEmptyGroupedListTakesTheRulesEdits() throws {
     let store = try makeStore()
@@ -198,7 +198,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     #expect(commits(of: store) { module.tap(.addTaskRowTapped(in: id)) } == 0)
 }
 
-/// A rule read as no edits has no "+ Add task" and no floating "+", which is how Logbook and Trash have none, and
+/// A rule read as no edit has no "+ Add task" and no floating "+", which is how Logbook and Trash have none, and
 /// neither has a list inside that this app cannot read, which reads as no rule and is no folder (spec section 4).
 @Test func aListThatRefusesHasNoWayToAdd() throws {
     let store = try makeStore()
@@ -252,7 +252,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
 }
 
 /// An own block of a grouping by tag, parent or status has no one field to set: no "+ Add task", no drop, no reorder.
-/// The list's floating "+" takes the rule's edits, and its group's screen has none (the controller's ruling on #176,
+/// The list's floating "+" takes the rule's edit, and its group's screen has none (the controller's ruling on #176,
 /// 2026-11-05).
 @Test func aListThatGroupsByTagHasNoEditsOnItsBlocks() throws {
     let store = try makeStore()
@@ -291,7 +291,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
 // MARK: - A group's screen
 
 /// A group's "+" and its block's "+ Add task" give what that block's "+ Add task" gives on the list's screen: the
-/// list's edits with the group's day (spec section 2).
+/// list's edit with the group's day (spec section 2).
 @Test func aGroupsScreenAddsWhatItsBlockAdds() throws {
     let store = try makeStore()
     let work = try store.createTag(title: "work")

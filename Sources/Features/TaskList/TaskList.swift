@@ -415,40 +415,40 @@ public final class TaskList: Routable {
             in: state.pageBlocks, of: state.snapshot, head: state.head, today: state.day.day
         )
         guard let target else { return }
-        addTask(target.edits, at: .start, onTopOf: target.view)
+        addTask(target.edit, at: .start, onTopOf: target.view)
     }
 
     /// "+ Add task": a new task at the end of its block, by what the block's rule asks (spec section 4). The block's
-    /// edits are read before the card that was open closes, which can take the block with it, a day whose one task it
+    /// edit is read before the card that was open closes, which can take the block with it, a day whose one task it
     /// was; a close the store refused stops the add, as the floating "+"'s does.
     private func addFromRow(in id: Model.BlockID) {
         guard TaskList.blocks(in: model.layout).first(where: { $0.id == id })?.addTask != nil,
-              let edits = state.pageBlocks.first(where: { $0.id == id })?.edits
+              let edit = state.pageBlocks.first(where: { $0.id == id })?.edit
         else { return }
         state.problem = nil
         closeCard()
         guard state.problem == nil else { return }
-        addTask(edits, at: .end, onTopOf: nil)
+        addTask(edit, at: .end, onTopOf: nil)
     }
 
-    /// Writes a new empty task with what the edits give it and the tags picked in the tag bar but one the rule takes
-    /// off, pinned where they pin. `onTopOf` names the view whose top it must stand at, where they do not pin: it is
+    /// Writes a new empty task with what the edit gives it and the tags picked in the tag bar but one the rule takes
+    /// off, pinned where it pins. `onTopOf` names the view whose top it must stand at, where it does not pin: it is
     /// pinned first there unless that view orders by rank with an empty manual list, where its rank at `.start` is the
     /// top already, and a pin would put the `.start` tasks quick entry and the command line write under it (the
     /// controller's ruling on #176, 2026-11-05). A pin refused takes the task back, so that the sentence saying nothing
     /// was written is true. Its card opens, its block unfolding in the list if it was folded, columns not folding (spec
     /// section 5); and a task that landed nowhere the screen draws has no card to close, so it is taken back, and not
     /// left behind untitled.
-    private func addTask(_ edits: Edits, at placement: Placement, onTopOf view: TaskView?) {
+    private func addTask(_ edit: TaskEdit, at placement: Placement, onTopOf view: TaskView?) {
         let new = NewTask(
-            title: "", when: edits.when ?? nil, deadline: edits.deadline ?? nil,
-            tags: edits.addTags.union(state.picks.subtracting(edits.removeTags))
+            title: "", when: edit.when ?? nil, deadline: edit.deadline ?? nil,
+            tags: edit.addTags.union(state.picks.subtracting(edit.removeTags))
         )
         var created: TaskID?
         let written = writeAndReread { () throws(StoreError) in
             let id = try store.createTask(new, at: placement)
             do throws(StoreError) {
-                if let list = edits.pinIn {
+                if let list = edit.pinIn {
                     try store.pin(task: id, in: list, at: placement)
                 } else if let view, try !isAtTheTopAlready(of: view) {
                     try store.pin(task: id, in: view.id, at: .start)
@@ -761,23 +761,23 @@ public final class TaskList: Routable {
     /// (spec section 6's table), and gives back the tags and the pins of the lists it was dragged out of: a list
     /// inside's, and a folder's every list's, so that it leaves the block it came from whichever of them held it. An
     /// own block gives nothing back, a day block's task leaving by its new day and an own block's by being claimed; a
-    /// list whose rule reads as no edits gives nothing back; and what the target asks is not given back. A task two
+    /// list whose rule reads as no edit gives nothing back; and what the target asks is not given back. A task two
     /// blocks draw leaves only the one it was dragged from, and the target's fold stays (the controller's ruling on
     /// #176, 2026-11-05).
     private func move(_ task: TodoTask, from source: PageBlock, to target: PageBlock) {
-        guard let edits = target.edits else { return }
+        guard let edit = target.edit else { return }
         let view = state.snapshot.page.view
         let ownDay: GroupBy? = if case .own(.day?) = target.id { view.groupBy } else { nil }
-        let changes = edits.dayChanges(of: task, rule: target.rule, ownDay: ownDay, today: state.day.day)
-        let givenBack = source.listRules.compactMap { Edits.of($0, today: state.day.day, day: nil) }
-        let leaving = edits.removeTags.union(givenBack.flatMap(\.addTags)).subtracting(edits.addTags)
-        var unpinning = edits.unpinFrom.union(givenBack.compactMap(\.pinIn))
-        if let list = edits.pinIn { unpinning.remove(list) }
+        let changes = edit.dayChanges(of: task, rule: target.rule, ownDay: ownDay, today: state.day.day)
+        let givenBack = source.listRules.compactMap { TaskEdit.of($0, today: state.day.day, day: nil) }
+        let leaving = edit.removeTags.union(givenBack.flatMap(\.addTags)).subtracting(edit.addTags)
+        var unpinning = edit.unpinFrom.union(givenBack.compactMap(\.pinIn))
+        if let list = edit.pinIn { unpinning.remove(list) }
         writeAndReread(refusal: .couldNotMove) { () throws(StoreError) in
             try store.update(task: task.id, changes)
-            for tag in edits.addTags.subtracting(task.tags) { try store.add(tag: tag, to: task.id) }
+            for tag in edit.addTags.subtracting(task.tags) { try store.add(tag: tag, to: task.id) }
             for tag in leaving.intersection(task.tags) { try store.remove(tag: tag, from: task.id) }
-            if let list = edits.pinIn { try store.pin(task: task.id, in: list, at: .end) }
+            if let list = edit.pinIn { try store.pin(task: task.id, in: list, at: .end) }
             for list in unpinning where try store.manualList(of: list).contains(task.id) {
                 try store.unpin(task: task.id, from: list)
             }

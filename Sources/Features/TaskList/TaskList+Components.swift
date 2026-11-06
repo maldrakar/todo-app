@@ -70,7 +70,7 @@ extension TaskList {
     /// block is, the own block of a list that groups by nothing titled with the list's own title, its cards drawn
     /// whatever the folds, since columns do not fold, and the block itself with no header, so that it has one and not
     /// two (spec section 5; the controller's ruling on #175, 2026-11-04). "+ Add task" ends every block whose rule
-    /// reads as edits, the folded ones but in the list (canvas); the board ends with `addList`.
+    /// reads as an edit, the folded ones but in the list (canvas); the board ends with `addList`.
     static func layout(
         _ blocks: [PageBlock], title: String, folded: Set<String>, addList: AddRowModel<UserAction>?,
         _ context: RowContext, _ metrics: Metrics.Blocks
@@ -88,7 +88,7 @@ extension TaskList {
                         row($0, block.color, context, rowMetrics, card: cardMetrics)
                     },
                     isFolded: isFolded, column: nil,
-                    addTask: isFolded ? nil : addTaskRow(for: block, addTaskMetrics), takesDrop: block.edits != nil
+                    addTask: isFolded ? nil : addTaskRow(for: block, addTaskMetrics), takesDrop: block.edit != nil
                 )
             })
         case .columns(let board):
@@ -101,7 +101,7 @@ extension TaskList {
                         column: column(
                             block.heading ?? Heading(title: title, subtitle: nil), of: block, context, board
                         ),
-                        addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edits != nil
+                        addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edit != nil
                     )
                 },
                 spacing: board.spacing, horizontalPadding: board.horizontalPadding, bottomPadding: board.bottomPadding,
@@ -134,7 +134,7 @@ extension TaskList {
     /// A block's column (Task 8's table, Board): its header as a block's but with no rule and no chevron, since columns
     /// do not fold; the column on the fill, rounded; its cards on the surface, rounded, ringed with the glass line and
     /// casting the resting shadow; the drop's tint and ring in the block's list's colours, where the block's rule reads
-    /// as edits (spec section 6).
+    /// as an edit (spec section 6).
     private static func column(
         _ heading: Heading, of block: PageBlock, _ context: RowContext, _ metrics: Metrics.Board
     ) -> ColumnModel<UserAction> {
@@ -142,7 +142,7 @@ extension TaskList {
             header: blockHeader(heading, of: block, fold: nil, background: .fill, context, metrics.header),
             width: metrics.columnWidth, cornerRadius: metrics.columnCornerRadius, cardSpacing: metrics.cardSpacing,
             padding: metrics.columnPadding, fill: .fill, dropTint: block.color.dropTint,
-            isDropTarget: block.edits != nil,
+            isDropTarget: block.edit != nil,
             dropRing: StrokeModel(color: block.color.check.fill, width: metrics.dropRingWidth, dash: []),
             cardCornerRadius: metrics.cardCornerRadius, cardBackground: .surface,
             cardRing: StrokeModel(color: .glassLine, width: metrics.cardRingWidth, dash: []), cardShadow: .resting
@@ -219,9 +219,10 @@ extension TaskList {
 
     /// A task's row, or a column's card in the card look (spec section 3; Task 8's table, Row and Board): the check in
     /// the block's list's colour, filled for a task that is not open and saying what a tap will do (the controller's
-    /// ruling on #175, 2026-11-04); the title, struck in ink 3 over ink 2 for a task that is not open, and "New task" for a
-    /// task with no title or a blank one, in the title and in what the check reads aloud (spec, "Risks"; the controller's
-    /// ruling on #176, 2026-11-05); what stands under it and what it slides off and holds; and the row's tap.
+    /// ruling on #175, 2026-11-04); the title, struck in ink 3 over ink 2 for a task that is not open, and "New task"
+    /// for a task with no title or a blank one, in the title and in what the check reads aloud (spec, "Risks"; the
+    /// controller's ruling on #176, 2026-11-05); what stands under it and what it slides off and holds; and the row's
+    /// tap.
     private static func taskRow(
         _ task: TodoTask, _ color: Tile, meta: [MetaItemModel], swipe: SwipeModel<UserAction>?,
         menu: MenuModel<UserAction>?, _ metrics: Metrics.Row

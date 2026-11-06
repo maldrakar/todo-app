@@ -97,11 +97,11 @@ extension TaskList {
             /// The column's look in columns, its header among it, and nil in the list.
             public let column: ColumnModel<UserAction>?
 
-            /// "+ Add task" at the block's end, nil where the block's rule reads as no edits and while it is folded
+            /// "+ Add task" at the block's end, nil where the block's rule reads as no edit and while it is folded
             /// (spec section 4; canvas).
             public let addTask: AddRowModel<UserAction>?
 
-            /// Whether the block takes a dropped task, by its rule read as edits, as its column's `isDropTarget` says
+            /// Whether the block takes a dropped task, by its rule read as an edit, as its column's `isDropTarget` says
             /// it: a view draws no slot and no tint where it does not (spec section 6).
             public let takesDrop: Bool
         }

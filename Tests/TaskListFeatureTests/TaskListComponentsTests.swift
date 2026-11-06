@@ -210,7 +210,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 /// surface with a 0.5 hairline of the glass line and the resting shadow; its header 44 high, padded 13 14 9, with no
 /// rule and no chevron; a card's check 22 across in a 42 by 44 hit and its title callout-sized (Task 8's table; the
 /// controller's ruling on #175, 2026-11-04). A card has the row's menu and no swipe (canvas), and the column takes a
-/// drop where the block's rule reads as edits.
+/// drop where the block's rule reads as an edit.
 @Test func aColumnCarriesTheBoardsNumbers() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk", when: day(1)))
