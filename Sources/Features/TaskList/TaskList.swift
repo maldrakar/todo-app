@@ -441,7 +441,7 @@ public final class TaskList: Routable {
     /// left behind untitled.
     private func addTask(_ edit: TaskEdit, at placement: Placement, onTopOf view: TaskView?) {
         let new = NewTask(
-            title: "", when: edit.when ?? nil, deadline: edit.deadline ?? nil,
+            title: "", when: edit.when?.day, deadline: edit.deadline?.day,
             tags: edit.addTags.union(state.picks.subtracting(edit.removeTags))
         )
         var created: TaskID?

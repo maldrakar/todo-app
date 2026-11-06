@@ -224,7 +224,7 @@ extension TaskList {
         case .day(let day)? where view.groupBy == .deadlineDay:
             return TaskEdit.of(rule, today: today, day: nil)?.settingDeadline(day)
         case .day(let day)?:
-            return TaskEdit.of(rule, today: today, day: .some(day))
+            return TaskEdit.of(rule, today: today, day: TaskEdit.DayEdit(day))
         case .tag?, .parent?, .status?:
             return nil
         }

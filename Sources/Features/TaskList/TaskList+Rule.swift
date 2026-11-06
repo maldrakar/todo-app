@@ -4,10 +4,25 @@ import TodoCore
 extension TaskList {
     /// What a rule asks of a task for it to match, one edit per condition (spec sections 4 and 6): what "+" and "+ Add
     /// task" give a new task, and what a drop into a block writes on the task it takes. `when` and `deadline` are nil
-    /// for no edit, `.some(nil)` for no day and `.some(day)` for that day.
+    /// for no edit of that day.
     struct TaskEdit: Equatable {
-        let when: Day??
-        let deadline: Day??
+        /// What an edit writes to one of a task's days: no day, or that day.
+        enum DayEdit: Equatable {
+            case noDay
+            case on(Day)
+
+            init(_ day: Day?) {
+                self = day.map(DayEdit.on) ?? .noDay
+            }
+
+            /// The day a task holds once this is written.
+            var day: Day? {
+                if case .on(let day) = self { day } else { nil }
+            }
+        }
+
+        let when: DayEdit?
+        let deadline: DayEdit?
         let addTags: Set<TagID>
         let removeTags: Set<TagID>
         let pinIn: ViewID?
@@ -17,7 +32,7 @@ extension TaskList {
         /// Trash ask of a task the screen adds or drags, which is open, at the root and out of the Trash, and what a
         /// conjunction starts from.
         init(
-            when: Day?? = nil, deadline: Day?? = nil, addTags: Set<TagID> = [], removeTags: Set<TagID> = [],
+            when: DayEdit? = nil, deadline: DayEdit? = nil, addTags: Set<TagID> = [], removeTags: Set<TagID> = [],
             pinIn: ViewID? = nil, unpinFrom: Set<ViewID> = []
         ) {
             self.when = when
@@ -32,7 +47,7 @@ extension TaskList {
         /// is the When of the day block it is for, which replaces what the rule's When gives and stands where the
         /// rule has none, and nil outside a day block; a rule that refuses refuses there too (the controller's ruling
         /// on #176, 2026-11-05).
-        static func of(_ filter: Filter, today: Day, day: Day??) -> TaskEdit? {
+        static func of(_ filter: Filter, today: Day, day: DayEdit?) -> TaskEdit? {
             guard let edit = read(filter, today: today) else { return nil }
             guard let day else { return edit }
             return TaskEdit(
@@ -45,7 +60,7 @@ extension TaskList {
         /// controller's ruling on #176, 2026-11-05).
         func settingDeadline(_ day: Day?) -> TaskEdit {
             TaskEdit(
-                when: when, deadline: .some(day), addTags: addTags, removeTags: removeTags, pinIn: pinIn,
+                when: when, deadline: DayEdit(day), addTags: addTags, removeTags: removeTags, pinIn: pinIn,
                 unpinFrom: unpinFrom
             )
         }
@@ -62,9 +77,9 @@ extension TaskList {
             let deadlineHolds = TaskEdit.holds(rule, on: task.deadline, today: today) {
                 if case .deadline(let condition) = $0 { condition } else { nil }
             }
-            if let when, when != task.when, ownDay == .whenDay || !whenHolds { changes.append(.when(when)) }
-            if let deadline, deadline != task.deadline, ownDay == .deadlineDay || !deadlineHolds {
-                changes.append(.deadline(deadline))
+            if let when, when.day != task.when, ownDay == .whenDay || !whenHolds { changes.append(.when(when.day)) }
+            if let deadline, deadline.day != task.deadline, ownDay == .deadlineDay || !deadlineHolds {
+                changes.append(.deadline(deadline.day))
             }
             return changes
         }
@@ -106,18 +121,17 @@ extension TaskList {
             }
         }
 
-        /// The day nearest today a condition allows: `.some(nil)` for no day, and nil where no day satisfies it, a
-        /// range with no day in it. The offset is a filter's, an `Int64` a peer wrote, and `TaskList.day(_:from:)`
-        /// clamps it.
-        private static func day(_ condition: DayCondition, today: Day) -> Day?? {
+        /// The day nearest today a condition allows, and nil where no day satisfies it, a range with no day in it. The
+        /// offset is a filter's, an `Int64` a peer wrote, and `TaskList.day(_:from:)` clamps it.
+        private static func day(_ condition: DayCondition, today: Day) -> DayEdit? {
             switch condition {
-            case .empty: return .some(nil)
-            case .on(let offset): return TaskList.day(offset, from: today)
-            case .onOrBefore(let offset): return TaskList.day(min(offset, 0), from: today)
-            case .onOrAfter(let offset): return TaskList.day(max(offset, 0), from: today)
+            case .empty: return .noDay
+            case .on(let offset): return .on(TaskList.day(offset, from: today))
+            case .onOrBefore(let offset): return .on(TaskList.day(min(offset, 0), from: today))
+            case .onOrAfter(let offset): return .on(TaskList.day(max(offset, 0), from: today))
             case .between(let first, let last):
                 guard first <= last else { return nil }
-                return TaskList.day(min(max(0, first), last), from: today)
+                return .on(TaskList.day(min(max(0, first), last), from: today))
             }
         }
 
