@@ -73,8 +73,12 @@ private func draft(of row: TaskViewList.Model.Row) -> String? {
 /// The model of a list made now on a view, as an element of the window's stack holds it, which is what a list
 /// standing in the window is compared with: the rows as a read now answers them on the day, the test's unless another
 /// is named, and no sentence.
-private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay) throws -> AppModule.ScreenModel {
-    .list(try TaskList(store: store, route: .init(head: .init(view: view)), day: day).model)
+private func listOn(
+    _ view: ViewID, in store: Store, on day: DeviceDay = testDay, card: TaskID? = nil
+) throws -> AppModule.ScreenModel {
+    let list = try TaskList(store: store, route: .init(head: .init(view: view)), day: day)
+    if let card { _ = list.send(.action(.rowTapped(card))) }
+    return .list(list.model)
 }
 
 /// The model of the screen of one of a list's own groups made now, as an element of the window's stack holds it, which
@@ -132,6 +136,7 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     return blocks.flatMap(\.rows).map { row in
         switch row {
         case .task(let id, let model): (id, model.title.text)
+        case .card(let id, let card): (id, card.title.text)
         }
     }
 }
@@ -231,10 +236,12 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     let list = try #require(idsOverTheSidebar(in: app.model).first)
     try #require(idsOverTheSidebar(in: app.model) == [list])
     #expect(app.send(.action(.screen(list, .list(.rowTapped(id))))) == nil)
+    #expect(idsOverTheSidebar(in: app.model) == [list], "a tap opens the card in place and pushes nothing")
+    #expect(app.send(.action(.screen(list, .list(.openFullScreenTapped)))) == nil)
     let path = idsOverTheSidebar(in: app.model)
     #expect(path.count == 2)
     #expect(path.first == list, "the list stays, by its id")
-    #expect(try standing(in: app) == [listOn(inbox, in: store), taskOn(id, in: store)])
+    #expect(try standing(in: app) == [listOn(inbox, in: store, card: id), taskOn(id, in: store)])
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
     #expect(app.route.path == "/view/\(inbox)/task/\(id)")
 }
@@ -809,7 +816,8 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     #expect(app.send(.action(.quickEntry(.titleFieldChanged("Buy milk")))) == nil)
     #expect(app.model.quickEntry?.draft == "Buy milk", "quick entry took the keystroke")
     #expect(app.send(.action(.screen(list, .list(.rowTapped(report))))) == nil)
-    #expect(try standing(in: app) == [listOn(work.view, in: store), taskOn(report, in: store)], "the list took the tap")
+    #expect(app.send(.action(.screen(list, .list(.openFullScreenTapped)))) == nil)
+    #expect(try standing(in: app) == [listOn(work.view, in: store, card: report), taskOn(report, in: store)], "the list took the tap")
     #expect(app.model.taskViewList.problem == sentence)
 }
 
@@ -1216,11 +1224,12 @@ private let linkSentence = "The link could not be opened."
         for choice in choices { #expect(window.send(.action(choice)) == nil) }
         let list = try #require(idsOverTheSidebar(in: window.model).first)
         #expect(window.send(.action(.screen(list, .list(.rowTapped(open))))) == nil)
-        #expect(try standing(in: window) == [listOn(inbox, in: store), taskOn(open, in: store)], "the tap pushed the task; this is the setup")
+        #expect(window.send(.action(.screen(list, .list(.openFullScreenTapped)))) == nil)
+        #expect(try standing(in: window) == [listOn(inbox, in: store, card: open), taskOn(open, in: store)], "Open full screen pushed the task; this is the setup")
         #expect(window.send(.action(.wentBack(to: [list]))) == nil)
         #expect(window.send(.action(.quickEntry(.titleFieldChanged("Call the bank")))) == nil)
     }
-    #expect(try standing(in: twin) == [listOn(inbox, in: store)], "the way back closed the task; this is the setup")
+    #expect(try standing(in: twin) == [listOn(inbox, in: store, card: open)], "the way back closed the task, and left its card; this is the setup")
     #expect(twin.model.quickEntry?.draft == "Call the bank", "and quick entry took the keystroke")
     #expect(app.model.taskViewList == twin.model.taskViewList)
     #expect(app.model.layout == twin.model.layout)

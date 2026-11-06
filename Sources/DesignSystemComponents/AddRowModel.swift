@@ -7,7 +7,11 @@ import DesignSystem
 /// `iconCellWidth` wide and as high as the row, as a row's check is in its tap area, so that the plus stands under the
 /// checks, then `spacing` after the cell its title, `trailingPadding` short of its trailing edge; `topMargin` below
 /// what stands before it and `leadingMargin` and `trailingMargin` in from the sides, in points.
-public struct AddRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
+///
+/// A class, for the reason a list's row is one (`ListRowModel`): a block, a card, a board and the screen's model each hold
+/// one, every copy and comparison of the screen's model copies and compares them, and inline it is some 440 bytes on
+/// wasm32. Its `==` compares every stored property, and a test changes them one at a time.
+public final class AddRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
     public let iconCellWidth: Double
     public let spacing: Double
@@ -71,5 +75,25 @@ public struct AddRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
         self.leadingMargin = leadingMargin
         self.trailingMargin = trailingMargin
         self.action = action
+    }
+
+    public static func == (lhs: AddRowModel, rhs: AddRowModel) -> Bool {
+        if lhs === rhs { return true }
+        return lhs.icon == rhs.icon
+            && lhs.iconCellWidth == rhs.iconCellWidth
+            && lhs.spacing == rhs.spacing
+            && lhs.title == rhs.title
+            && lhs.height == rhs.height
+            && lhs.width == rhs.width
+            && lhs.cornerRadius == rhs.cornerRadius
+            && lhs.topPadding == rhs.topPadding
+            && lhs.leadingPadding == rhs.leadingPadding
+            && lhs.trailingPadding == rhs.trailingPadding
+            && lhs.dash == rhs.dash
+            && lhs.rule == rhs.rule
+            && lhs.topMargin == rhs.topMargin
+            && lhs.leadingMargin == rhs.leadingMargin
+            && lhs.trailingMargin == rhs.trailingMargin
+            && lhs.action == rhs.action
     }
 }

@@ -86,17 +86,20 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     #expect(list.destination.pushed == route.tail)
 }
 
-/// A tap on a row declares the row's task, the route a link to it declares, so what a tap opens and what a link
-/// opens are one thing, and the route says so.
+/// Open full screen on a card declares the card's task, the route a link to it declares, so what the button opens and what
+/// a link opens are one thing, and the route says so.
 @Test func aTapDeclaresTheTaskAndTheRouteSaysSo() throws {
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     try store.createTask(NewTask(title: "Call the bank"))
     let list = try TaskList(store: store, route: on(inbox), day: testDay)
     #expect(list.send(.action(.rowTapped(id))) == nil)
+    #expect(list.destination.pushed == nil, "a tap opens the card in place")
+    #expect(list.send(.action(.openFullScreenTapped)) == nil)
     let linked = try TaskList(store: store, route: on(inbox, task: id), day: testDay)
+    #expect(linked.send(.action(.rowTapped(id))) == nil)
     #expect(list.destination.pushed == .task(TaskScreen.Route(head: id)))
-    #expect(list.model == linked.model, "what a tap opens and what a link opens are one thing")
+    #expect(list.model == linked.model, "what the button opens and what a link opens are one thing")
     #expect(list.route == linked.route)
     #expect(list.route == on(inbox, task: id))
 }
@@ -207,9 +210,10 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let tapped = try TaskList(store: store, route: on(inbox, task: open), day: testDay)
     let linked = try TaskList(store: store, route: on(inbox, task: gone), day: testDay)
     let unread = try TaskList(store: store, route: on(inbox, task: open), day: testDay)
+    for list in [tapped, linked, unread] { #expect(list.send(.action(.rowTapped(gone))) == nil) }
     try store.delete(task: gone)
-    #expect(tapped.send(.action(.rowTapped(gone))) == nil)
-    #expect(tapped.destination.pushed == .task(.init(head: gone)), "the tap declared the task; this is the setup")
+    #expect(tapped.send(.action(.openFullScreenTapped)) == nil)
+    #expect(tapped.destination.pushed == .task(.init(head: gone)), "the button declared the task; this is the setup")
     #expect(tapped.send(.notOpened(.notFound(gone), stillOpen: .task(.init(head: open)))) == nil)
     #expect(tapped.destination.pushed == .task(.init(head: open)), "the screen that was open stays")
     #expect(tapped.route == on(inbox, task: open))
@@ -295,8 +299,9 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     #expect(titles(of: list.model) == ["Buy milk", "Write it down"], "the change was read")
     #expect(list.model.problem == "The task is gone.", "and it left the sentence")
     #expect(list.send(.action(.rowTapped(id))) == nil)
+    #expect(list.model.problem == nil, "the tap took it")
+    #expect(list.send(.action(.backgroundTapped)) == nil)
     #expect(list.model == (try listOn(inbox, in: store)))
-    #expect(list.destination.pushed == .task(.init(head: id)))
 }
 
 @Test func aChangeNamingATaskRereadsTheRows() throws {
@@ -387,7 +392,8 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     #expect(list.model.problem == "The tasks could not be read, so this list may be out of date.")
     #expect(list.destination.pushed == .task(.init(head: id)))
     #expect(list.send(.action(.rowTapped(id))) == nil)
-    #expect(list.model == before)
+    #expect(list.model.problem == nil, "the tap took the sentence away")
+    #expect(list.send(.action(.openFullScreenTapped)) == nil)
     #expect(list.destination.pushed == .task(.init(head: id)))
 }
 

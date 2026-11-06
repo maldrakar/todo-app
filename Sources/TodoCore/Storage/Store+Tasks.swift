@@ -185,13 +185,20 @@ extension Store {
     /// show and leaves out the item being placed, so `.after` finds its anchor among exactly the rows a
     /// person sees, and a placement never ranks among a list nobody does.
     static func rank(among ordered: [(id: String, rank: String)], placement: Placement) throws(StoreError) -> String {
+        let (lower, upper) = try neighbours(among: ordered, placement: placement)
+        return Rank.between(lower, upper)
+    }
+
+    /// The ranks a placement falls between in an ordered list, nil past either end.
+    static func neighbours(
+        among ordered: [(id: String, rank: String)], placement: Placement
+    ) throws(StoreError) -> (lower: String?, upper: String?) {
         switch placement {
-        case .end: return Rank.between(ordered.last?.rank, nil)
-        case .start: return Rank.between(nil, ordered.first?.rank)
+        case .end: return (ordered.last?.rank, nil)
+        case .start: return (nil, ordered.first?.rank)
         case .after(let anchor):
             guard let index = ordered.firstIndex(where: { $0.id == anchor.rawValue }) else { throw .notFound(anchor) }
-            let upper = index + 1 < ordered.count ? ordered[index + 1].rank : nil
-            return Rank.between(ordered[index].rank, upper)
+            return (ordered[index].rank, index + 1 < ordered.count ? ordered[index + 1].rank : nil)
         }
     }
 

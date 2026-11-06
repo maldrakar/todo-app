@@ -159,12 +159,28 @@ extension Store {
     /// operations share one stamp: a device that saw only the rank would hold a position in a list the task
     /// is not in, which is the case `writePairRow` seeds `present = 0` for.
     public func pin(task: TaskID, in view: ViewID, at placement: Placement = .end) throws(StoreError) {
-        try requireTask(task)
+        try pin(tasks: [task], in: view, at: placement)
+    }
+
+    /// Pins several tasks in a view's manual list in one transaction: the first at the placement, each next after the
+    /// one before, so that a dropped task and the unpinned tasks above it land where they stood (list screen spec,
+    /// section 6). A task already pinned there moves with them, and the anchor of `.after` is a task of the list that
+    /// stays where it is, one of those moving being as gone as one never pinned. Their ranks share the gap the placement
+    /// falls in among the tasks that stay (`Rank.between(_:_:count:)`), and every operation shares one stamp, for the
+    /// reason written on `pin(task:in:at:)`.
+    public func pin(tasks: [TaskID], in view: ViewID, at placement: Placement) throws(StoreError) {
+        for task in tasks { try requireTask(task) }
         try requireView(view)
-        let rank = try Store.rank(among: try pinnedItems(of: view, excluding: task), placement: placement)
+        let moving = Set(tasks.map(\.rawValue))
+        let staying = try pinnedItems(of: view).filter { !moving.contains($0.id) }
+        let (lower, upper) = try Store.neighbours(among: staying, placement: placement)
         let stamp = clock.next()
-        let id = JournalOperation.pairID(view, task)
-        try apply([op(.viewItem, id, "present", Value(true), stamp), op(.viewItem, id, "rank", .text(rank), stamp)])
+        var ops: [JournalOperation] = []
+        for (task, rank) in zip(tasks, Rank.between(lower, upper, count: tasks.count)) {
+            let id = JournalOperation.pairID(view, task)
+            ops += [op(.viewItem, id, "present", Value(true), stamp), op(.viewItem, id, "rank", .text(rank), stamp)]
+        }
+        try apply(ops)
     }
 
     /// Takes the task out of the manual list. `present = 0` and not a deleted row, for the reason written on
@@ -178,7 +194,7 @@ extension Store {
 
     /// The pinned tasks of a view in their manual order.
     public func manualList(of view: ViewID) throws(StoreError) -> [TaskID] {
-        try pinnedItems(of: view, excluding: nil).map { TaskID($0.id) }
+        try pinnedItems(of: view).map { TaskID($0.id) }
     }
 
     // MARK: - Reads
@@ -302,14 +318,14 @@ extension Store {
     /// while the copy drifted away from the query a person waits on.
     static let manualListQuery = """
         SELECT v.task_id, v.rank FROM view_items v JOIN tasks t ON t.id = v.task_id AND t.deleted = 0
-        WHERE v.view_id = ? AND v.present = 1 AND v.task_id != ? ORDER BY v.rank, v.task_id
+        WHERE v.view_id = ? AND v.present = 1 ORDER BY v.rank, v.task_id
         """
 
     /// The manual list of a view as a read shows it, with the ranks a placement needs. A deleted task is
     /// skipped here rather than in every caller: the pair row stays for sync, and nothing shows it again.
-    private func pinnedItems(of view: ViewID, excluding: TaskID?) throws(StoreError) -> [(id: String, rank: String)] {
+    private func pinnedItems(of view: ViewID) throws(StoreError) -> [(id: String, rank: String)] {
         try sql { () throws(SQLiteError) in
-            try db.rows(Store.manualListQuery, [.text(view.rawValue), .text(excluding?.rawValue ?? "")])
+            try db.rows(Store.manualListQuery, [.text(view.rawValue)])
                 .map { (id: $0[0].string ?? "", rank: $0[1].string ?? Rank.initial) }
         }
     }

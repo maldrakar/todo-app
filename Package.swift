@@ -104,7 +104,7 @@ let package = Package(
         .executableTarget(name: "todo", dependencies: ["TodoCLI"]),
         .executableTarget(
             name: "WasmSizeProbe",
-            dependencies: ["TodoCore", "FeatureModule", "AppFeature"]
+            dependencies: ["TodoCore", "FeatureModule", "AppFeature", "TaskListFeature"]
         ),
         .testTarget(name: "SQLiteKitTests", dependencies: ["SQLiteKit"]),
         .testTarget(name: "TodoCoreTests", dependencies: ["TodoCore", "TestSupport"]),

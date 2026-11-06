@@ -87,6 +87,34 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
     #expect(page.sections[0].groups[1].tasks.map(\.title) == ["later", "loose", "much later", "overdue"])
 }
 
+/// A task's key under a grouping is the one the page puts it under, for every grouping, and a task with several tags
+/// goes under the least of them, so that a group's screen keeps the strip's tasks of its group by the page's own rule
+/// (list screen spec, section 2).
+@Test func aTasksKeyIsTheOneThePageGroupsItUnder() throws {
+    let store = try makeStore()
+    let work = try store.createTag(title: "work")
+    let home = try store.createTag(title: "home")
+    let parent = try store.createTask(NewTask(title: "parent", when: today, deadline: today.advanced(by: 1), tags: [work, home]))
+    try store.createTask(NewTask(title: "child", parent: parent))
+    try store.createTask(NewTask(title: "bare"))
+    let finished = try store.createTask(NewTask(title: "finished", when: today.advanced(by: 2)))
+    try store.update(task: finished, [.status(.done)])
+    for groupBy in GroupBy.allCases {
+        let view = try store.createView(NewTaskView(title: groupBy.rawValue, filter: .trashed(false), groupBy: groupBy))
+        let groups = try #require(try store.page(of: view, today: today).sections.first).groups
+        #expect(groups.flatMap(\.tasks).count == 4)
+        for group in groups {
+            for task in group.tasks { #expect(group.key == GroupKey(of: task, by: groupBy), "\(task.title) by \(groupBy)") }
+        }
+    }
+    let task = try #require(try store.task(parent))
+    #expect(GroupKey(of: task, by: .tag) == .tag(min(work, home)))
+    #expect(GroupKey(of: task, by: .whenDay) == .day(today))
+    #expect(GroupKey(of: task, by: .deadlineDay) == .day(today.advanced(by: 1)))
+    #expect(GroupKey(of: task, by: .parent) == .parent(nil))
+    #expect(GroupKey(of: task, by: .status) == .status(.open))
+}
+
 /// The case this thread of the review found: a task dragged to the top of its own group must not carry the
 /// group with it. Groups take their order from the sort, and the manual list orders tasks inside a group —
 /// pinning `b2` used to put it at the head of the flat list, which lifted the whole of its day above the
@@ -214,7 +242,7 @@ private func sectionTasks(_ page: TaskViewPage) -> [[TaskID]] {
         // The manual list is a read of its own, so it needs its own guard: it is driven by the view it
         // belongs to, and reading every pin of every view to answer for one of them is the failure here.
         let manual = try store.sql { () throws(SQLiteError) in
-            try store.db.rows("EXPLAIN QUERY PLAN " + Store.manualListQuery, [.text(view.id.rawValue), .text("")]).map { $0[3].string ?? "" }
+            try store.db.rows("EXPLAIN QUERY PLAN " + Store.manualListQuery, [.text(view.id.rawValue)]).map { $0[3].string ?? "" }
         }
         #expect(try #require(manual.first).hasPrefix("SEARCH v USING PRIMARY KEY (view_id=?)"), "the manual list of \(view.title) is read by \(manual)")
         #expect(!manual.contains { $0.hasPrefix("SCAN t ") || $0 == "SCAN t" }, "the manual list of \(view.title) walks the tasks table: \(manual)")

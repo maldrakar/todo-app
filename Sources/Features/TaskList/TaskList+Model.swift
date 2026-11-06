@@ -4,10 +4,10 @@ import TodoCore
 
 extension TaskList {
     /// What a view draws: the screen's header, the tag bar, the blocks in the layout the list is shown as, Show as, the
-    /// empty state and the sentence, each a model of the design system's components with every size, colour and word
-    /// finished, so that a platform draws them and decides nothing but its containers, its gestures, scrolling and
-    /// focus (spec sections 1, 2, 5 and 7; ADR-0007, amendment of 2026-10-30). It is computed from the module's state
-    /// on every read and never kept beside it (owner's review of #101).
+    /// empty state, the Done strip, the rows that add and the sentence, each a model of the design system's components
+    /// with every size, colour and word finished, so that a platform draws them and decides nothing but its containers,
+    /// its gestures, scrolling and focus (spec sections 1 to 7; ADR-0007, amendment of 2026-10-30). It is computed from
+    /// the module's state on every read and never kept beside it (owner's review of #101).
     public struct Model: Equatable, Sendable {
         /// The list's tile and title, and under them its date where its rule names one day, Today's; on a group's
         /// screen the list's tile, the group's name, and the list's title with the group's date (spec sections 1 and
@@ -27,6 +27,23 @@ extension TaskList {
         /// What the screen shows when no block has a row, after the tag bar's filter, and the list has no lists inside,
         /// and nil otherwise (canvas, the empty state).
         public let empty: EmptyScreenModel?
+
+        /// The Done strip's capsule, "Done today · N", after "+ Add list": nil for a list that draws finished tasks as
+        /// its rows, Logbook's and Trash's, where nothing was done today or the tag bar's filter leaves none of it, and
+        /// in columns, which have no strip (spec section 3; canvas).
+        public let done: DoneStripModel<UserAction>?
+
+        /// What stands under the capsule while it is open, none while it is closed: the tasks done, each a row, or the
+        /// open card in its place, since a tap on a row of the strip opens its card like any row's (spec section 3; the
+        /// controller's ruling on #176, 2026-11-05).
+        public let doneRows: [Row]
+
+        /// The floating "+", nil where no task can be added (spec section 4).
+        public let addTask: FloatingButtonModel<UserAction>?
+
+        /// "+ Add list" after the last block, nil on a group's screen, for a list that draws finished tasks as its
+        /// rows, and in columns, where the board holds it (`Board.addList`; spec section 4).
+        public let addList: AddRowModel<UserAction>?
 
         /// What went wrong, as the finished sentence the view shows, and nil when there is nothing to say: `send`
         /// cannot throw, so a failure inside it has nowhere else to go, and a view that had to spell one would be a
@@ -57,6 +74,9 @@ extension TaskList {
             public let horizontalPadding: Double
             public let bottomPadding: Double
             public let snaps: Bool
+
+            /// The dashed last column, "+ Add list", nil where the list has none to add (spec section 4).
+            public let addList: AddRowModel<UserAction>?
         }
 
         /// A block of the screen: one of the list's own groups, or a list inside it (spec section 2).
@@ -76,6 +96,14 @@ extension TaskList {
 
             /// The column's look in columns, its header among it, and nil in the list.
             public let column: ColumnModel<UserAction>?
+
+            /// "+ Add task" at the block's end, nil where the block's rule reads as no edit and while it is folded
+            /// (spec section 4; canvas).
+            public let addTask: AddRowModel<UserAction>?
+
+            /// Whether the block takes a dropped task, by its rule read as an edit, as its column's `isDropTarget` says
+            /// it: a view draws no slot and no tint where it does not (spec section 6).
+            public let takesDrop: Bool
         }
 
         /// A row of a block, a view switching over its kind to pick the row to draw, every case drawn (`docs/style.md`,
@@ -83,9 +111,12 @@ extension TaskList {
         public enum Row: Equatable, Sendable, Identifiable {
             case task(TaskID, TaskRowModel<UserAction>)
 
+            /// The task opened in place, one at a time, where its row stood (spec section 3).
+            case card(TaskID, CardModel<UserAction>)
+
             public var id: TaskID {
                 switch self {
-                case .task(let id, _): id
+                case .task(let id, _), .card(let id, _): id
                 }
             }
         }

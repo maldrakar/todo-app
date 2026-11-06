@@ -5,11 +5,16 @@ import DesignSystem
 /// `height` high on `background`, with corners of `cornerRadius`, its glyph `leadingPadding` in from its leading edge,
 /// then its label and its chevron, each `spacing` after what stands before it, the chevron `trailingPadding` short of
 /// its trailing edge; the capsule `topMargin` below the blocks and `leadingMargin` and `trailingMargin` in from the
-/// sides; and under it, while the strip is open, the tasks done, in points.
-public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable {
+/// sides, in points. The tasks done under it, while the strip is open, are the feature module's rows, each a row or the
+/// open card, so the model holds none (list screen spec, section 3).
+///
+/// A class, for the reason a list's row is one (`ListRowModel`): the screen's model holds one, every copy and comparison of
+/// that model copies and compares it, and inline it is some 500 bytes on wasm32. Its `==` compares every stored property,
+/// and a test changes them one at a time.
+public final class DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
 
-    /// The label, finished, such as "Done · 3".
+    /// The label, finished, such as "Done today · 3".
     public let label: TextModel
 
     /// The chevron, which turns as the strip opens and closes.
@@ -28,9 +33,6 @@ public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable 
     /// Whether the strip is open, which shows its rows and which VoiceOver reads.
     public let isOpen: Bool
 
-    /// The tasks done, as rows, struck, in the order they stand under the capsule while the strip is open.
-    public let rows: [TaskRowModel<Action>]
-
     /// What a tap on the capsule sends.
     public let action: Action
 
@@ -48,7 +50,6 @@ public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable 
         leadingMargin: Double,
         trailingMargin: Double,
         isOpen: Bool,
-        rows: [TaskRowModel<Action>],
         action: Action
     ) {
         self.icon = icon
@@ -64,7 +65,24 @@ public struct DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable 
         self.leadingMargin = leadingMargin
         self.trailingMargin = trailingMargin
         self.isOpen = isOpen
-        self.rows = rows
         self.action = action
+    }
+
+    public static func == (lhs: DoneStripModel, rhs: DoneStripModel) -> Bool {
+        if lhs === rhs { return true }
+        return lhs.icon == rhs.icon
+            && lhs.label == rhs.label
+            && lhs.chevron == rhs.chevron
+            && lhs.background == rhs.background
+            && lhs.height == rhs.height
+            && lhs.cornerRadius == rhs.cornerRadius
+            && lhs.spacing == rhs.spacing
+            && lhs.leadingPadding == rhs.leadingPadding
+            && lhs.trailingPadding == rhs.trailingPadding
+            && lhs.topMargin == rhs.topMargin
+            && lhs.leadingMargin == rhs.leadingMargin
+            && lhs.trailingMargin == rhs.trailingMargin
+            && lhs.isOpen == rhs.isOpen
+            && lhs.action == rhs.action
     }
 }
