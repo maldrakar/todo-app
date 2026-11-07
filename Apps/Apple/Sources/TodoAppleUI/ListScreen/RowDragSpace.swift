@@ -31,6 +31,9 @@ final class RowDragSpace {
     /// the menu asks too. A drag gone out of the scroll view and back still carries it.
     var carried: BlockRowID?
 
+    /// When the drop's delegate last heard of the drag.
+    var lastHeard = ContinuousClock.now
+
     /// Where the drop's view stands in the window, and the content and the scroll view it is drawn in.
     var dropOrigin = CGPoint.zero
     weak var content: UIView?

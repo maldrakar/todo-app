@@ -84,9 +84,8 @@ private func itemProvider(of task: TaskID) -> NSItemProvider {
 }
 
 /// The drop's side of the system's drag, which stands on the screen's `ScrollView`s, hands each stage to `RowLift` in
-/// the content's space and sends what it reports. SwiftUI on iOS 17 has no end of a drag, so leaving the scroll view is
-/// the last a drag cancelled outside it ever says: it clears the lift, and a drag that comes back lifts again (spike
-/// #174).
+/// the content's space and sends what it reports. Leaving the scroll view clears the lift, and a drag that comes back
+/// lifts again (spike #174).
 private struct RowDropDelegate: DropDelegate {
     let space: RowDragSpace
     let lift: () -> RowLift?
@@ -121,6 +120,7 @@ private struct RowDropDelegate: DropDelegate {
     }
 
     private func moved(to location: CGPoint) {
+        space.lastHeard = .now
         let point = space.contentPoint(fromDrop: location)
         guard let carried = space.carried else { return }
         if let lift = lift(), lift.task == carried.task, lift.source == carried.block {
@@ -168,12 +168,30 @@ struct RowDropTarget: ViewModifier {
                 of: [.todoTask],
                 delegate: RowDropDelegate(space: gestures.space, lift: { lift }, step: step)
             )
+            .task(id: lift != nil) {
+                if lift != nil { await cancelOnSilence() }
+            }
         #else
         content
         #endif
     }
 
     #if os(iOS)
+    /// Ends a lift no call ends. The system calls the delegate every frame for as long as a drag stands over the target,
+    /// moving or not, and a drag can end with no call at all: let go at the very edge of the screen, neither
+    /// `performDrop` nor `dropExited` came, and the card stayed dimmed (the iOS 26.3 simulator, 2026-11-07). SwiftUI has
+    /// no end of a drag before iOS 26. A silence that was only a slow frame costs nothing: the next call lifts again.
+    private func cancelOnSilence() async {
+        let silence = Duration.milliseconds(250)
+        while !Task.isCancelled {
+            try? await Task.sleep(for: silence)
+            if !Task.isCancelled, ContinuousClock.now - gestures.space.lastHeard >= silence {
+                step(.cancelled)
+                return
+            }
+        }
+    }
+
     private func step(_ phase: RowLift.Phase) {
         let step = RowLift.after(phase, from: lift, among: blocks, frames: gestures.space.frames)
         if case .began = phase { gestures.swipe.current = nil }
