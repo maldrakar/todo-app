@@ -42,8 +42,8 @@ private func field(_ text: String) -> TextFieldModel<Action> {
     TextFieldModel(
         text: text, placeholder: "Title",
         style: FieldStyle(
-            font: .rowTitle, color: .ink, background: .surface, minimumWidth: 140, height: 34, padding: 10,
-            cornerRadius: 10, ring: stroke
+            font: .rowTitle, color: .ink, placeholder: .placeholder, background: .surface, minimumWidth: 140,
+            height: 34, padding: 10, cornerRadius: 10, ring: stroke
         ),
         submitted: .first, cancelled: .first, focusLost: .first
     )
@@ -269,7 +269,7 @@ private let expand = ButtonModel<Action>(
 private let cardStyle = CardStyle(
     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
     bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised, background: .surface,
-    animation: .cardOpens, subtasksOutdent: 12, notesToSubtasks: 4, subtaskDraftCircle: draftCircle
+    animation: .cardOpens, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: draftCircle
 )
 
 private let draftCircle = CheckStyle(
@@ -314,7 +314,7 @@ private func card(
         "style": card(style: .init(
             expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
             bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted,
-            background: .surface, animation: .cardOpens, subtasksOutdent: 12, notesToSubtasks: 4,
+            background: .surface, animation: .cardOpens, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4,
             subtaskDraftCircle: draftCircle
         )),
         "backgroundTapped": card(backgroundTapped: .second),

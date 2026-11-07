@@ -26,6 +26,15 @@ private typealias RGB = DesignSystem.RGB
     #expect(DesignSystem.Color.onAccent.dark == RGB(hex: 0xFFFFFF))
 }
 
+/// What a field shows while it holds nothing (`Phone.dc.html`, `input::placeholder`): the second ink at 80 %, in both
+/// appearances.
+@Test func aPlaceholderIsTheSecondInkAtEightyPercent() {
+    let placeholder = DesignSystem.Color.placeholder
+    let ink2 = DesignSystem.Color.ink2
+    #expect(placeholder.light == ink2.light.withOpacity(0.8))
+    #expect(placeholder.dark == ink2.dark.withOpacity(0.8))
+}
+
 /// The canvas's highlight of a chosen row on the sidebar (`Mac.dc.html`, `selBg`): the accent at 14 % over the sidebar
 /// colour in the light, about #D8D7E1, and in the dark the accent lifted 32 % toward white, #768ADA, at 22 % over it,
 /// about #323645, each mixed into one opaque colour.

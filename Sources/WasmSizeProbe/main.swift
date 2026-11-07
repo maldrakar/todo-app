@@ -538,7 +538,8 @@ private enum WasmSizeProbe {
         let header = list.header.title.text + (list.header.subtitle.map { " (\($0.text))" } ?? "")
             + " in \(list.header.style.horizontalPadding), then \(list.header.style.bottomMargin)"
         let chips = list.tagBar.map {
-            "\($0.chips.count) chips, \($0.chips.filter(\.isLit).count) lit, \($0.style.topMargin) under"
+            "\($0.chips.count) chips, \($0.chips.filter(\.isLit).count) lit, \($0.style.topMargin) under, "
+                + "\($0.style.endRoom) after"
         } ?? "no tag bar"
         let shape: String
         let rows = switch list.layout {
@@ -552,7 +553,7 @@ private enum WasmSizeProbe {
             shape = "\(blocks.count) blocks, \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):
             let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, \($0.isDropTarget ? "taking" : "refusing") a drop" } }
-            shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), headed \(headers.joined(separator: "/")), then \(board.addList?.title.text ?? "no list to add")"
+            shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), \(board.endRoom) after, headed \(headers.joined(separator: "/")), then \(board.addList?.title.text ?? "no list to add")"
         }
         let first = rows.first.map { row in
             switch row {
@@ -573,7 +574,8 @@ private enum WasmSizeProbe {
         let fade = bar.fade.map { "fade \($0.height)/\($0.solidDepth)" } ?? "no fade"
         let glass = "\(list.back.accessibilityLabel) \(list.back.style.diameter) at \(list.back.style.iconOffset), "
             + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "
-            + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop), \(fade)"
+            + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
+            + "on \(bar.background.light.red)"
         let empty = list.empty.map { "empty: \($0.title.text)" } ?? "not empty"
         let plus = list.addTask.map { "\($0.accessibilityLabel) \($0.style.trailingMargin)/\($0.style.bottomMargin)" } ?? "no floating button"
         return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(glass), \(empty), \(plus)"
@@ -587,7 +589,7 @@ private enum WasmSizeProbe {
             let subtasks = card.subtasks.map { "\($0.check.accessibilityLabel) \($0.title.text)" }
             let pills = card.pills.map(\.text.text)
             let circle = card.style.subtaskDraftCircle
-            return "card \(card.title.text) (\(card.notes.text)), \(card.style.notesToSubtasks) under, \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
+            return "card \(card.title.text) (\(card.notes.text), \(card.notes.style.placeholder.light.opacity)), \(card.style.titleToNotes) then \(card.style.notesToSubtasks) under, \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
         }
         return "no card"
     }

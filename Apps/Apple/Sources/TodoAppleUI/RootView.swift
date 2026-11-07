@@ -2,20 +2,21 @@
 import AppFeature
 import FeatureModule
 import SwiftUI
+import TaskListFeature
 
 /// The root of the tree of views, and beside the window's view, which holds the window and its host, the one view that
 /// names the host: it hands the list of views, the sidebar of a wide window or the Lists screen of a narrow one, its
 /// model and a closure that wraps its actions in the root's, draws the layout the model gives it, binds each stack to
-/// the path of ids the layout carries, draws each element of the window's stack through one switch, and sends a pop
-/// back whole (navigation state spec, sections 3, 4 and 6), with the root's own sentence across the bottom of the
-/// window and quick entry as a sheet over all of it. A wide window, the Mac's and a wide iPad window, is a split view
-/// with the sidebar beside a stack whose root is the layout's column, the list of the chosen view's tasks, and the
-/// layout's path pushed in that stack. A narrow window, iPhone's and a narrow iPad window, is one stack with the views
-/// at its root and every screen of the layout's path pushed over them. The containers are the view's and the modules
-/// know nothing of them; which of the two a window has is the root module's, decided from the width the window's view
-/// reports, and this view switches over the layout once and chooses nothing by the width (`docs/style.md`, "Views").
-/// Every binding is read from the model and set only by sending an action, and a stack's path only by `.wentBack(to:)`.
-/// It reads neither the window's route nor which screen opens which.
+/// the path of ids the layout carries, draws each element of the window's stack through one switch, a list as the tree
+/// it stands in draws one, and sends a pop back whole (navigation state spec, sections 3, 4 and 6), with the root's own
+/// sentence across the bottom of the window and quick entry as a sheet over all of it. A wide window, the Mac's and a
+/// wide iPad window, is a split view with the sidebar beside a stack whose root is the layout's column, the list of the
+/// chosen view's tasks, and the layout's path pushed in that stack. A narrow window, iPhone's and a narrow iPad window,
+/// is one stack with the views at its root and every screen of the layout's path pushed over them. The containers are
+/// the view's and the modules know nothing of them; which of the two a window has is the root module's, decided from
+/// the width the window's view reports, and this view switches over the layout once and chooses nothing by the width
+/// (`docs/style.md`, "Views"). Every binding is read from the model and set only by sending an action, and a stack's
+/// path only by `.wentBack(to:)`. It reads neither the window's route nor which screen opens which.
 struct RootView: View {
     private let host: ModuleHost<AppModule>
 
@@ -91,7 +92,7 @@ struct RootView: View {
             NavigationStack(path: stackPath(path)) {
                 Group {
                     if let column {
-                        screen(column)
+                        wideScreen(column)
                     } else {
                         Text("Nothing to show")
                             .foregroundStyle(.secondary)
@@ -104,7 +105,7 @@ struct RootView: View {
                     HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
                 }
                 .navigationDestination(for: StackElementID.self) { id in
-                    screen(id)
+                    wideScreen(id)
                         .safeAreaInset(edge: .bottom) {
                             HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
                         }
@@ -125,11 +126,17 @@ struct RootView: View {
         NavigationStack(path: stackPath(path)) {
             ListsScreen(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
                 .navigationDestination(for: StackElementID.self) { id in
-                    screen(id)
-                        // The sidebar's sentence on every screen pushed over the Lists screen, which draws it above its
-                        // bar when it is on top, so it shows once on whichever screen is on top, a task's included
-                        // (#110).
-                        .safeAreaInset(edge: .bottom) { sidebarSentence }
+                    screen(id) { list in
+                        // The way back is the root's (ADR-0009, amendment of 2026-10-22, point 4): the stack's path
+                        // with this element dropped, sent as a pop is, with what stands over it dropped too.
+                        ListScreen(model: list) { host.send(.screen(id, .list($0))) } back: {
+                            host.send(.wentBack(to: Array(path.prefix { $0 != id })))
+                        }
+                    }
+                    // The sidebar's sentence on every screen pushed over the Lists screen, which draws it above its
+                    // bar when it is on top, so it shows once on whichever screen is on top, a task's included
+                    // (#110).
+                    .safeAreaInset(edge: .bottom) { sidebarSentence }
                 }
         }
     }
@@ -163,17 +170,27 @@ struct RootView: View {
     /// animations on an iPhone 17, the first frame of the pop showed the back button alone over a blank screen
     /// sliding away (the iOS 26.3 simulator, 2026-10-25, #126).
     ///
-    /// The list carries the Quick Entry button on its toolbar, and the task pushed over it carries none (the owner,
-    /// 2026-10-20).
-    @ViewBuilder private func screen(_ id: StackElementID) -> some View {
+    /// How a list is drawn is the tree's that the stack stands in, which hands it here: the narrow tree's is the list
+    /// screen, and the wide tree's its plain list until the pane arrives (list screen plan, Task 9).
+    @ViewBuilder private func screen(
+        _ id: StackElementID, @ViewBuilder list: (TaskList.Model) -> some View
+    ) -> some View {
         switch host.model.screens[id] {
         case .list(let model)?:
-            TaskListView(model: model) { host.send(.screen(id, .list($0))) }
-                .toolbar { quickEntryButton }
+            list(model)
         case .task(let model)?:
             TaskScreenView(model: model)
         case nil:
             Color.clear
+        }
+    }
+
+    /// A screen of the wide tree's stack. Its list carries the Quick Entry button on its toolbar, and the task pushed
+    /// over it carries none (the owner, 2026-10-20).
+    private func wideScreen(_ id: StackElementID) -> some View {
+        screen(id) { list in
+            TaskListView(model: list) { host.send(.screen(id, .list($0))) }
+                .toolbar { quickEntryButton }
         }
     }
 

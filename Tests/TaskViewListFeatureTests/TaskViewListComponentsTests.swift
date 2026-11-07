@@ -109,8 +109,9 @@ private func field(
     TextFieldModel(
         text: text, placeholder: placeholder,
         style: FieldStyle(
-            font: font, color: .ink, background: .surface, minimumWidth: minimumWidth, height: height, padding: padding,
-            cornerRadius: cornerRadius, ring: LineStyle(color: .accent, width: 2, dash: [])
+            font: font, color: .ink, placeholder: .placeholder, background: .surface, minimumWidth: minimumWidth,
+            height: height, padding: padding, cornerRadius: cornerRadius,
+            ring: LineStyle(color: .accent, width: 2, dash: [])
         ),
         submitted: .titleFieldSubmitted, cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
     )

@@ -110,8 +110,8 @@ extension TaskList {
                         addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edit != nil
                     )
                 },
-                spacing: board.spacing, horizontalPadding: board.horizontalPadding, bottomPadding: board.bottomPadding,
-                snaps: board.snaps, addList: addList
+                spacing: board.spacing, horizontalPadding: board.horizontalPadding, endRoom: board.endRoom,
+                bottomPadding: board.bottomPadding, snaps: board.snaps, addList: addList
             ))
         }
     }
@@ -126,7 +126,7 @@ extension TaskList {
         _ style: BlockHeaderStyle, chevronSize: Double
     ) -> BlockHeaderModel<UserAction> {
         let fold = AccessoryModel<UserAction>.Chevron(
-            icon: IconModel(icon: .chevron, style: IconStyle(size: chevronSize, weight: .semibold, color: .ink3)),
+            icon: IconModel(icon: .chevron, style: IconStyle(size: chevronSize, weight: .semibold, color: .ink2)),
             accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
             action: .blockChevronTapped(block.id), style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .fold)
         )
@@ -256,8 +256,9 @@ extension TaskList {
         TextFieldModel(
             text: text, placeholder: placeholder,
             style: FieldStyle(
-                font: font, color: color, background: background, minimumWidth: 0, height: height, padding: padding,
-                cornerRadius: 0, ring: LineStyle(color: background, width: 0, dash: [])
+                font: font, color: color, placeholder: .placeholder, background: background, minimumWidth: 0,
+                height: height, padding: padding, cornerRadius: 0,
+                ring: LineStyle(color: background, width: 0, dash: [])
             ),
             submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )

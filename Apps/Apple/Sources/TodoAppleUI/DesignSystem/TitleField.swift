@@ -23,7 +23,11 @@ struct TitleField<Action: Equatable & Sendable>: View {
     }
 
     var body: some View {
-        TextField(model.placeholder, text: Binding(get: { model.text }, set: { send(changed($0)) }))
+        TextField(
+            model.placeholder,
+            text: Binding(get: { model.text }, set: { send(changed($0)) }),
+            prompt: Text(model.placeholder).foregroundStyle(Color(model.style.placeholder))
+        )
             // Plain, its look the model's (`fieldLook(_:)`): the Mac's default style draws a bezel of its own inside
             // it, where iOS's draws none.
             .textFieldStyle(.plain)
@@ -48,13 +52,14 @@ struct TitleField<Action: Equatable & Sendable>: View {
 
 extension View {
     /// A field in its model's look (`TextFieldModel`): its text in the model's font and colour, `padding` in from
-    /// either end, `height` high, on its background rounded by `cornerRadius`, with the ring along that edge. How wide
-    /// it is is the row's or the line's that it stands in, by the model's minimum width.
+    /// either end, at least `height` high, more for a field that grows down as it is typed in, on its background rounded
+    /// by `cornerRadius`, with the ring along that edge. How wide it is is the row's or the line's that it stands in, by
+    /// the model's minimum width.
     func fieldLook<Action>(_ field: TextFieldModel<Action>) -> some View {
         font(Font(field.style.font))
             .foregroundStyle(Color(field.style.color))
             .padding(.horizontal, field.style.padding)
-            .frame(height: field.style.height)
+            .frame(minHeight: field.style.height)
             .background(Color(field.style.background), in: .rect(cornerRadius: field.style.cornerRadius))
             .overlay { RoundedRectangle(cornerRadius: field.style.cornerRadius).stroke(field.style.ring) }
     }

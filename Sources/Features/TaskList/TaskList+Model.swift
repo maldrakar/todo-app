@@ -76,12 +76,14 @@ extension TaskList {
         }
 
         /// The blocks as the board's columns, each with its column's look, `spacing` apart, the board
-        /// `horizontalPadding` in from the screen's sides and `bottomPadding` above its bottom, in points, snapping to
-        /// a column as it scrolls where `snaps` says so: the phone's does, the Mac's scrolls freely (spec section 5).
+        /// `horizontalPadding` in from the screen's sides, with `endRoom` more after the last column, and
+        /// `bottomPadding` above its bottom, in points, snapping to a column as it scrolls where `snaps` says so: the
+        /// phone's does, the Mac's scrolls freely (spec section 5).
         public struct Board: Equatable, Sendable {
             public let columns: [Block]
             public let spacing: Double
             public let horizontalPadding: Double
+            public let endRoom: Double
             public let bottomPadding: Double
             public let snaps: Bool
 

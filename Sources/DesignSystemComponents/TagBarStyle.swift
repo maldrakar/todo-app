@@ -7,6 +7,10 @@ public struct TagBarStyle: Equatable, Sendable {
     public let topMargin: Double
     public let spacing: Double
     public let padding: Double
+
+    /// The room after the last chip beyond the padding, so that the row scrolled to its end leaves that chip clear of
+    /// the fade (`Phone.dc.html`, the gap and `.tagbar::after`).
+    public let endRoom: Double
     public let fadeIn: Double
     public let fadeOut: Double
     public let leadingMargin: Double
@@ -16,6 +20,7 @@ public struct TagBarStyle: Equatable, Sendable {
         topMargin: Double,
         spacing: Double,
         padding: Double,
+        endRoom: Double,
         fadeIn: Double,
         fadeOut: Double,
         leadingMargin: Double,
@@ -24,6 +29,7 @@ public struct TagBarStyle: Equatable, Sendable {
         self.topMargin = topMargin
         self.spacing = spacing
         self.padding = padding
+        self.endRoom = endRoom
         self.fadeIn = fadeIn
         self.fadeOut = fadeOut
         self.leadingMargin = leadingMargin

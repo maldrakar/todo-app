@@ -6,7 +6,8 @@ import DesignSystem
 /// `background` with corners of `cornerRadius`, casting `shadow`, opening on `animation`. Along its top stand its
 /// check, its title's field and the button that opens it full screen, centred in a square cell `expandHitSide` on a
 /// side; under them its body, `bodyLeading` in from its leading edge, under the title, and `bodyTrailing` from its
-/// trailing edge, ending `bodyBottom` above its bottom: the notes' field; `notesToSubtasks` under it the subtasks,
+/// trailing edge, ending `bodyBottom` above its bottom: `titleToNotes` under the top row the notes' field;
+/// `notesToSubtasks` under it the subtasks,
 /// `subtasksOutdent` outside the body's leading edge, and after them, as far outside, the field of the subtask being
 /// typed where there is one, led by `subtaskDraftCircle`, and the row that adds a subtask; and `subtasksToPills` under
 /// them its pills, `pillSpacing` apart, in points. Its numbers, its `background`, its `shadow`, its `animation` and its

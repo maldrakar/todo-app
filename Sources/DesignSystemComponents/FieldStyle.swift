@@ -9,6 +9,9 @@ public struct FieldStyle: Equatable, Sendable {
     /// The colour of the text.
     public let color: DesignSystem.Color
 
+    /// The colour of what the field shows while it holds nothing.
+    public let placeholder: DesignSystem.Color
+
     /// The colour under the text, out to the field's rounded edge.
     public let background: DesignSystem.Color
 
@@ -25,6 +28,7 @@ public struct FieldStyle: Equatable, Sendable {
     public init(
         font: DesignSystem.Font,
         color: DesignSystem.Color,
+        placeholder: DesignSystem.Color,
         background: DesignSystem.Color,
         minimumWidth: Double,
         height: Double,
@@ -34,6 +38,7 @@ public struct FieldStyle: Equatable, Sendable {
     ) {
         self.font = font
         self.color = color
+        self.placeholder = placeholder
         self.background = background
         self.minimumWidth = minimumWidth
         self.height = height

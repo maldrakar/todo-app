@@ -22,6 +22,9 @@ public struct CardStyle: Equatable, Sendable {
     /// leading edge, so that their checks stand under the card's own.
     public let subtasksOutdent: Double
 
+    /// How far the notes stand below the card's top row (`Phone.dc.html`, the notes' `margin`).
+    public let titleToNotes: Double
+
     /// How far the subtasks stand below the notes.
     public let notesToSubtasks: Double
 
@@ -44,6 +47,7 @@ public struct CardStyle: Equatable, Sendable {
         background: DesignSystem.Color,
         animation: DesignSystem.Animation,
         subtasksOutdent: Double,
+        titleToNotes: Double,
         notesToSubtasks: Double,
         subtaskDraftCircle: CheckStyle
     ) {
@@ -61,6 +65,7 @@ public struct CardStyle: Equatable, Sendable {
         self.background = background
         self.animation = animation
         self.subtasksOutdent = subtasksOutdent
+        self.titleToNotes = titleToNotes
         self.notesToSubtasks = notesToSubtasks
         self.subtaskDraftCircle = subtaskDraftCircle
     }

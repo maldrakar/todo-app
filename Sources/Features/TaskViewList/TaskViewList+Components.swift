@@ -358,8 +358,8 @@ extension TaskViewList {
         TextFieldModel(
             text: draft, placeholder: placeholder,
             style: FieldStyle(
-                font: font, color: .ink, background: .surface, minimumWidth: minimumWidth, height: size.height,
-                padding: size.padding, cornerRadius: size.cornerRadius,
+                font: font, color: .ink, placeholder: .placeholder, background: .surface, minimumWidth: minimumWidth,
+                height: size.height, padding: size.padding, cornerRadius: size.cornerRadius,
                 ring: LineStyle(color: .accent, width: 2, dash: [])
             ),
             submitted: .titleFieldSubmitted, cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus

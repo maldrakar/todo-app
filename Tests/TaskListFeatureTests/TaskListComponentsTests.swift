@@ -168,7 +168,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         TagBarModel(
             chips: chips,
             style: .init(
-                topMargin: 7, spacing: 6, padding: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20, trailingMargin: -20
+                topMargin: 7, spacing: 6, padding: 20, endRoom: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20,
+                trailingMargin: -20
             )
         )
     }
@@ -189,7 +190,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             title: TextModel(text: "Tomorrow", style: TextStyle(font: .sectionTitle, color: Tile.rose.glyph)),
             subtitle: TextModel(text: "Thu, Sep 11", style: TextStyle(font: .areaLabel, color: .ink2)), field: nil,
             fold: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, style: IconStyle(size: 18, weight: .semibold, color: .ink3)),
+                icon: IconModel(icon: .chevron, style: IconStyle(size: 18, weight: .semibold, color: .ink2)),
                 accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id),
                 style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .fold)
             ),
@@ -267,7 +268,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         let model = module.model
         #expect(model.back == button(.chevronLeft, size: 24, offset: -2, "Back"))
         #expect(model.more == button(.ellipsis, size: 22, offset: 0, "More"))
-        let bar = GlassBarStyle(edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56)
+        let bar = GlassBarStyle(
+            edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56, contentBottom: 116, background: .paper
+        )
         #expect(model.glassBar == bar, "the fade is the list's alone; the board's circles stand in the flow")
     }
 }
@@ -315,7 +318,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     _ = module.send(.action(.showAsChosen(.columns)))
     let model = module.model
     let board = try #require(board(of: model))
-    #expect([board.spacing, board.horizontalPadding, board.bottomPadding] == [10, 16, 24])
+    #expect([board.spacing, board.horizontalPadding, board.endRoom, board.bottomPadding] == [10, 16, 16, 24])
     #expect(board.snaps)
     let block = try #require(board.columns.first)
     let blockID = TaskList.Model.BlockID.own(.day(day(1)))
@@ -575,8 +578,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         TextFieldModel(
             text: text, placeholder: placeholder,
             style: FieldStyle(
-                font: font, color: color, background: .surface, minimumWidth: 0, height: height, padding: padding,
-                cornerRadius: 0, ring: LineStyle(color: .surface, width: 0, dash: [])
+                font: font, color: color, placeholder: .placeholder, background: .surface, minimumWidth: 0,
+                height: height, padding: padding, cornerRadius: 0, ring: LineStyle(color: .surface, width: 0, dash: [])
             ),
             submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )
@@ -643,7 +646,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 expandHitSide: 44, cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
                 bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing,
                 bodyBottom: bodyBottom, subtasksToPills: 10, pillSpacing: 6, shadow: shadow, background: .surface,
-                animation: .cardOpens, subtasksOutdent: 12, notesToSubtasks: 4, subtaskDraftCircle: subtaskCircle
+                animation: .cardOpens, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4,
+                subtaskDraftCircle: subtaskCircle
             ),
             backgroundTapped: .backgroundTapped
         )
@@ -677,8 +681,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         TextFieldModel(
             text: "New list", placeholder: "",
             style: FieldStyle(
-                font: .sectionTitle, color: Tile.indigo.glyph, background: background, minimumWidth: 0, height: height,
-                padding: 0, cornerRadius: 0, ring: LineStyle(color: background, width: 0, dash: [])
+                font: .sectionTitle, color: Tile.indigo.glyph, placeholder: .placeholder, background: background,
+                minimumWidth: 0, height: height, padding: 0, cornerRadius: 0,
+                ring: LineStyle(color: background, width: 0, dash: [])
             ),
             submitted: .listNameFieldSubmitted, cancelled: .listNameFieldCancelled, focusLost: .listNameFieldLostFocus
         )
