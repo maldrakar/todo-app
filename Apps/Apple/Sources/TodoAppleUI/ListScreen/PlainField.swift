@@ -104,7 +104,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
             text: Binding(get: { typed.text }, set: { text in
                 if typed.typed(text, goesUp: isFocused) { send(changed(text)) }
             }),
-            prompt: Text(model.placeholder).foregroundStyle(Color(model.style.placeholder)),
+            prompt: model.prompt,
             axis: axis
         )
         #if os(watchOS)

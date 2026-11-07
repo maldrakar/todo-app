@@ -27,7 +27,7 @@ struct TitleField<Action: Equatable & Sendable>: View {
         TextField(
             model.placeholder,
             text: Binding(get: { model.text }, set: { send(changed($0)) }),
-            prompt: Text(model.placeholder).foregroundStyle(Color(model.style.placeholder))
+            prompt: model.prompt
         )
             // Plain, its look the model's (`fieldLook(_:)`): the Mac's default style draws a bezel of its own inside
             // it, where iOS's draws none.
@@ -48,6 +48,13 @@ struct TitleField<Action: Equatable & Sendable>: View {
                 // name the module refused.
                 isFocused = true
             }
+    }
+}
+
+extension TextFieldModel {
+    /// What a field shows with nothing typed, in the model's colour.
+    var prompt: Text {
+        Text(placeholder).foregroundStyle(Color(style.placeholder))
     }
 }
 
