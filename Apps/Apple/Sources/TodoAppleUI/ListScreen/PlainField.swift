@@ -38,7 +38,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
     #endif
 
     /// The field, on one line unless `axis` says it grows down, as a card's notes do, in its model's colour unless
-    /// `color` gives another, and with a line through it in `strike`, as a done task's title has on its card.
+    /// `color` gives another, and with a line through its text in `strike`, as a done task's title has on its card, and none through its prompt.
     init(
         _ model: TextFieldModel<Action>, axis: Axis = .horizontal, focusesOnAppear: Bool,
         keepsFocusOnSubmit: Bool = false, selectsAllOnFocus: Bool = false, color: DesignSystem.Color? = nil,
@@ -61,7 +61,9 @@ struct PlainField<Action: Equatable & Sendable>: View {
             // Plain, its look the model's: the Mac's default style draws a bezel of its own inside it, where iOS's
             // draws none.
             .textFieldStyle(.plain)
-            .strikethrough(strike != nil, color: strike.map { Color($0) })
+            // Not through the placeholder: a done task with no title shows "New task" in the field's prompt, which
+            // a line would strike as if it were a title.
+            .strikethrough(strike != nil && !typed.text.isEmpty, color: strike.map { Color($0) })
             .fieldLook(model, color: color)
             .focused($isFocused)
             .onSubmit {
