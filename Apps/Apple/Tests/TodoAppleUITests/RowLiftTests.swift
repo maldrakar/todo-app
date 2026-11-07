@@ -121,8 +121,8 @@ import TodoCore
     #expect(list.drops == [.rowDropped(list.a, from: own, in: own, after: list.b)])
 }
 
-/// A cancel, the drag leaving the screen's scroll view, drops nothing and clears the lift, which is all a drag cancelled
-/// outside it ever says; come back, the drag lifts again and can still drop.
+/// A cancel, the drag leaving the screen's scroll view, drops nothing and clears the lift, which is all a drag
+/// cancelled outside it ever says; come back, the drag lifts again and can still drop.
 @Test func aCancelDropsNothing() throws {
     var list = try LiftedList()
     let own = TaskList.Model.BlockID.own(nil)
@@ -179,7 +179,8 @@ import TodoCore
     let empty = TaskList.Model.BlockID.list(list.empty)
     let both = try #require(list.both)
     #expect(list.rowIDs(of: house).contains(both) && list.rowIDs(of: office).contains(both))
-    #expect(list.frames.rows[BlockRowID(block: house, task: both)] != list.frames.rows[BlockRowID(block: office, task: both)])
+    let rows = list.frames.rows
+    #expect(rows[BlockRowID(block: house, task: both)] != rows[BlockRowID(block: office, task: both)])
 
     list.press(.began(task: both, block: office, at: list.centre(of: both, in: office)))
     #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o2), "its place in the block it was lifted from")
@@ -189,7 +190,7 @@ import TodoCore
 
     list.press(.began(task: both, block: house, at: list.centre(of: both, in: house)))
     list.press(.changed(list.top(of: office)))
-    #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o2), "its own row there is no place to stand after")
+    #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o2), "not after its own row there")
     list.press(.changed(list.top(of: empty)))
     list.press(.ended)
     #expect(list.drops == [.rowDropped(both, from: house, in: empty, after: nil)])
@@ -197,6 +198,36 @@ import TodoCore
     #expect(!list.rowIDs(of: house).contains(both))
     #expect(list.rowIDs(of: office).contains(both))
     #expect(list.rowIDs(of: empty) == [both])
+}
+
+/// A pan takes the row under where it started, by that block's frame, where it has a swipe: leftward, or either way
+/// where that row stands open. Over no row, on a board, whose cards have no swipe, it takes nothing, and the scroll has
+/// it.
+@Test func aPanTakesTheRowUnderItsStartWhereItHasASwipe() throws {
+    let list = try LiftedList(taskInHouseAndOffice: true)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let both = try #require(list.both)
+    func taken(_ point: CGPoint, moved: CGFloat, from swipe: RowSwipe? = nil) -> BlockRowID? {
+        RowSwipe.row(at: point, moved: moved, from: swipe, among: list.blocks, frames: list.frames)?.row
+    }
+    let inOffice = BlockRowID(block: office, task: both)
+    #expect(taken(list.centre(of: both, in: office), moved: -10) == inOffice)
+    #expect(taken(list.centre(of: both, in: house), moved: -10) == BlockRowID(block: house, task: both))
+    #expect(taken(list.centre(of: both, in: office), moved: 10) == nil, "rightward, a row at rest has nothing to close")
+    #expect(taken(CGPoint(x: 10, y: -500), moved: -10) == nil)
+
+    let style = try #require(RowSwipe.row(
+        at: list.centre(of: both, in: office), moved: -10, from: nil, among: list.blocks, frames: list.frames
+    )?.style)
+    let open = RowSwipe.after(.ended(-60), from: RowSwipe.after(.began(inOffice, style), from: nil))
+    #expect(taken(list.centre(of: both, in: office), moved: 10, from: open) == inOffice)
+    #expect(taken(list.centre(of: both, in: house), moved: 10, from: open) == nil, "the task's other row is another")
+
+    let board = try LiftedList(columns: true)
+    let own = TaskList.Model.BlockID.own(nil)
+    let card = board.centre(of: board.a, in: own)
+    #expect(RowSwipe.row(at: card, moved: -10, from: nil, among: board.blocks, frames: board.frames) == nil)
 }
 
 /// The list of the tests, the module that draws it, the frames its layout would report and a drag over it, driven as
@@ -227,11 +258,15 @@ private struct LiftedList {
         let spare = try store.createTag(title: "spare")
         let x = try store.createTag(title: "x")
         let y = try store.createTag(title: "y")
-        let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open]), sort: [SortKey(.rank)]))
+        let parent = try store.createView(
+            NewTaskView(title: "Projects", filter: .status([.open]), sort: [SortKey(.rank)])
+        )
         house = try store.createView(NewTaskView(title: "House", parent: parent, filter: .hasTag(home)))
         office = try store.createView(NewTaskView(title: "Office", parent: parent, filter: .hasTag(work)))
         empty = try store.createView(NewTaskView(title: "Empty", parent: parent, filter: .hasTag(spare)))
-        either = try store.createView(NewTaskView(title: "Either", parent: parent, filter: .or([.hasTag(x), .hasTag(y)])))
+        either = try store.createView(
+            NewTaskView(title: "Either", parent: parent, filter: .or([.hasTag(x), .hasTag(y)]))
+        )
         a = try store.createTask(NewTask(title: "A"))
         b = try store.createTask(NewTask(title: "B"))
         c = try store.createTask(NewTask(title: "C"))
@@ -276,7 +311,8 @@ private struct LiftedList {
             if block.header != nil { y += Self.header }
             if lift?.slot == RowLift.Slot(block: block.id, after: nil) { y += Self.gap }
             for row in block.rows {
-                frames.rows[BlockRowID(block: block.id, task: row.id)] = CGRect(x: 0, y: y, width: 400, height: Self.row)
+                let id = BlockRowID(block: block.id, task: row.id)
+                frames.rows[id] = CGRect(x: 0, y: y, width: 400, height: Self.row)
                 y += Self.row
                 if lift?.slot == RowLift.Slot(block: block.id, after: row.id) { y += Self.gap }
             }
@@ -292,10 +328,13 @@ private struct LiftedList {
             let x = CGFloat(index) * (Self.columnWidth + Self.columnGap)
             let height = Self.columnHeader + Self.columnArea
             frames.blocks[block.id] = CGRect(x: x, y: 0, width: Self.columnWidth, height: height)
-            frames.columns[block.id] = CGRect(x: x, y: Self.columnHeader, width: Self.columnWidth, height: Self.columnArea)
+            frames.columns[block.id] = CGRect(
+                x: x, y: Self.columnHeader, width: Self.columnWidth, height: Self.columnArea
+            )
             var y = Self.columnHeader - (scrolled[block.id] ?? 0)
             for row in block.rows {
-                frames.rows[BlockRowID(block: block.id, task: row.id)] = CGRect(x: x, y: y, width: Self.columnWidth, height: Self.card)
+                let id = BlockRowID(block: block.id, task: row.id)
+                frames.rows[id] = CGRect(x: x, y: y, width: Self.columnWidth, height: Self.card)
                 y += Self.card + Self.cardGap
             }
         }

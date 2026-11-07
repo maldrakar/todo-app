@@ -26,6 +26,7 @@ private let second = BlockRowID(block: .own(nil), task: TaskID())
     #expect(swipe?.x == 0)
     swipe = RowSwipe.after(.changed(-500), from: swipe)
     #expect(swipe?.x == -128)
+    #expect(swipe?.isFollowingFinger == true)
 }
 
 /// Let go past the threshold it stays moved by its shift; short of it, it goes back.
@@ -33,6 +34,7 @@ private let second = BlockRowID(block: .own(nil), task: TaskID())
     let moved = RowSwipe.after(.began(first, style), from: nil)
     let open = RowSwipe.after(.ended(-41), from: moved)
     #expect(open?.x == -88)
+    #expect(open?.isFollowingFinger == false)
     #expect(RowSwipe.after(.ended(-40), from: moved) == nil)
     #expect(RowSwipe.after(.ended(40), from: moved) == nil)
 }

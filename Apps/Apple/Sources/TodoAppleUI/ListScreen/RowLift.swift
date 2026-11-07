@@ -1,14 +1,13 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowLift.swift
 import CoreGraphics
 import DesignSystemComponents
-import SwiftUI
 import TaskListFeature
 import TodoCore
 
 /// A row of a block by the block that draws it and its task, since a task two blocks both select has a row in each.
 ///
-/// `BlockRowID` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and Observation
-/// for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
+/// `BlockRowID` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 struct BlockRowID: Hashable {
     let block: TaskList.Model.BlockID
     let task: TaskID
@@ -21,13 +20,13 @@ struct BlockRowID: Hashable {
 /// `after(_:from:among:frames:)`, which knows no platform, so that the drag is tested on the host (`RowLiftTests`).
 ///
 /// The point picks the block whose frame holds it, or the nearest where none does: a list's blocks stand under one
-/// another and a board's side by side, so one rule reads both, a point above the first block being the first block's and
-/// one in the gap between two columns the nearer column's. A block that takes no drop offers no slot. In its own block
-/// the task takes the place the point names, the upper half of a row being before it and the lower half after it, read
-/// by the rows' middles alone, so that the gap the mark opens, which moves the rows under a still finger, does not move
-/// the slot; on a column only among the cards in sight, since a card scrolled out of it keeps a frame under its header.
-/// In another block the module writes no place, a manual list taking the task last and any other standing it by its
-/// sort, so wherever the finger is in that block the slot stands at its end.
+/// another and a board's side by side, so one rule reads both, a point above the first block being the first block's
+/// and one in the gap between two columns the nearer column's. A block that takes no drop offers no slot. In its own
+/// block the task takes the place the point names, the upper half of a row being before it and the lower half after it,
+/// read by the rows' middles alone, so that the gap the mark opens, which moves the rows under a still finger, does not
+/// move the slot; on a column only among the cards in sight, since a card scrolled out of it keeps a frame under its
+/// header. In another block the module writes no place, a manual list taking the task last and any other standing it by
+/// its sort, so wherever the finger is in that block the slot stands at its end.
 struct RowLift: Equatable {
     /// A stage of the drag, as its drop delegate reports it, with the point in the content's own coordinates where it
     /// has one: the drag is first seen, moves, is let go once, or leaves. `onDrag` says what is carried and the first
@@ -46,9 +45,9 @@ struct RowLift: Equatable {
         let after: TaskID?
     }
 
-    /// What the last layout reported, in the content's own coordinates, which a drag finds its place by: each row's frame,
-    /// each block's or column's, and the part of each column its cards are seen through.
-    struct Frames {
+    /// What the last layout reported, in the content's own coordinates, which a drag finds its place by: each row's
+    /// frame, each block's or column's, and the part of each column its cards are seen through.
+    struct Frames: Equatable {
         var rows: [BlockRowID: CGRect] = [:]
         var blocks: [TaskList.Model.BlockID: CGRect] = [:]
         var columns: [TaskList.Model.BlockID: CGRect] = [:]
@@ -67,8 +66,8 @@ struct RowLift: Equatable {
 
     /// The drag after a stage, among the blocks drawn and the frames their last layout reported, and the drop that
     /// stage reports: the first point lifts the row `onDrag` named, where it is still drawn and lifts; a move moves the
-    /// slot; the release reports the drop once, where there is a slot, and puts the task down; and a cancel puts it down
-    /// and reports nothing. A stage with no task lifted moves nothing.
+    /// slot; the release reports the drop once, where there is a slot, and puts the task down; and a cancel puts it
+    /// down and reports nothing. A stage with no task lifted moves nothing.
     static func after(
         _ phase: Phase, from lift: RowLift?, among blocks: [TaskList.Model.Block], frames: Frames
     ) -> (lift: RowLift?, drop: TaskList.UserAction?) {
@@ -97,8 +96,8 @@ struct RowLift: Equatable {
         moved.slot = Self.block(at: point, among: blocks, frames: frames).flatMap { block in
             guard block.takesDrop else { return nil }
             let rows = block.rows.map(\.id).filter { $0 != task }
-            let after = block.id == source ? Self.place(at: point.y, among: rows, of: block.id, frames: frames) : rows.last
-            return Slot(block: block.id, after: after)
+            guard block.id == source else { return Slot(block: block.id, after: rows.last) }
+            return Slot(block: block.id, after: Self.place(at: point.y, among: rows, of: block.id, frames: frames))
         }
         return moved
     }
@@ -117,8 +116,8 @@ struct RowLift: Equatable {
         return hypot(x, y)
     }
 
-    /// The row a task let go at the height stands after, among the rest of its own block, above a column's cards in sight
-    /// its top and below them its end.
+    /// The row a task let go at the height stands after, among the rest of its own block, above a column's cards in
+    /// sight its top and below them its end.
     private static func place(
         at y: CGFloat, among rows: [TaskID], of block: TaskList.Model.BlockID, frames: Frames
     ) -> TaskID? {
@@ -138,8 +137,8 @@ struct RowLift: Equatable {
 }
 
 extension TaskList.Model.Row {
-    /// How the row looks lifted, and nil for one that cannot be: an open card, which is neither lifted nor has a menu, and
-    /// a row with no menu, by the module's one rule (`TaskRowStyle.lift`).
+    /// How the row looks lifted, and nil for one that cannot be: an open card, which is neither lifted nor has a menu,
+    /// and a row with no menu, by the module's one rule (`TaskRowStyle.lift`).
     var lift: TaskLiftStyle? {
         switch self {
         case .task(_, let row): row.style.lift

@@ -32,6 +32,19 @@ struct ListScreen: View {
     /// How high the sentence's strip stands, which only the view can know and which the floating "+" stands above.
     @State private var sentenceHeight: CGFloat = 0
 
+    /// What the safe area covers at the bottom, the home indicator and the sentence, which the list's scroll view goes
+    /// under and its content keeps clear of.
+    @State private var bottomInset: CGFloat = 0
+
+    /// The task the system's drag has lifted, and nil while none is.
+    @State private var lift: RowLift?
+
+    /// What the drag and the swipe read of the layout, which nothing observes.
+    @State private var dragSpace = RowDragSpace()
+
+    /// The row a swipe has moved aside.
+    @State private var swipe = ScreenSwipe()
+
     /// The list's model, what its gestures send, and the way back, which is the window's stack's and no action of the
     /// list's (ADR-0009, amendment of 2026-10-22, point 4).
     init(
@@ -45,7 +58,19 @@ struct ListScreen: View {
     var body: some View {
         content
             .contentShape(.rect)
-            .onTapGesture { send(.backgroundTapped) }
+            .onTapGesture { sent(.backgroundTapped) }
+            // The content goes down under the home indicator, whichever its layout, for the drop (`RowDropTarget`) and
+            // so that the board's columns end above the screen's bottom and not the safe area's (`.board`'s padding); and
+            // here, outside the shape above, which ends a hit where it ends: inside it, a drop's point left the target at
+            // the safe area's foot (the iOS 26.3 simulator, 2026-11-07). The keyboard still shortens it, its region not
+            // ignored.
+            .ignoresSafeArea(.container, edges: .bottom)
+            .background {
+                // The keyboard's region apart: the scroll view stands above the keyboard.
+                Color.clear
+                    .ignoresSafeArea(.keyboard)
+                    .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) { sentence }
             .overlay(alignment: .top) { glassButtons }
             .overlay { floatingButton }
@@ -74,26 +99,57 @@ struct ListScreen: View {
         }
     }
 
-    /// The list: everything scrolls, under the glass bar, from under the safe area's top.
+    /// What the screen's gestures stand at now.
+    private var gestures: ScreenGestures {
+        ScreenGestures(lift: lift, space: dragSpace, swipe: swipe, ground: model.style.background)
+    }
+
+    /// What a control of the content sends: any of them closes the row a swipe left open.
+    private func sent(_ action: TaskList.UserAction) {
+        swipe.current = nil
+        send(action)
+    }
+
+    /// The scroll view as the system's drag's target over the blocks drawn.
+    private func dropTarget(_ blocks: [TaskList.Model.Block], settleInset: CGFloat?) -> RowDropTarget {
+        RowDropTarget(blocks, lift: $lift, gestures: gestures, settleInset: settleInset, send: send)
+    }
+
+    /// The list's content as the space a drag finds its place in, and what its rows' swipe reads there.
+    private func rowDragContent(_ blocks: [TaskList.Model.Block]) -> RowDragContent {
+        #if os(iOS)
+        RowDragContent(
+            space: dragSpace,
+            finder: ScrollContentFinder(space: dragSpace, swipe: swipe) { [space = dragSpace, swipe] point, moved in
+                RowSwipe.row(at: point, moved: moved, from: swipe.current, among: blocks, frames: space.frames)
+            }
+        )
+        #else
+        RowDragContent(space: dragSpace)
+        #endif
+    }
+
+    /// The list: everything scrolls, under the glass bar, from under the safe area's top, and down to the screen's foot,
+    /// what it holds ending as far above what the safe area covers there as its style says.
     private func list(_ blocks: [TaskList.Model.Block]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 ForEach(blocks) { block in
-                    BlockView(block, send: send)
+                    BlockView(block, gestures: gestures, send: sent)
                 }
                 if let empty = model.empty {
                     EmptyScreenView(empty)
                 }
                 if let addList = model.addList {
-                    AddRowView(addList, send: send)
+                    AddRowView(addList, send: sent)
                 }
                 if let done = model.done {
-                    DoneStripView(done, send: send)
+                    DoneStripView(done, send: sent)
                     if !model.doneRows.isEmpty {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(model.doneRows) { row in
-                                BlockRow(row, send: send)
+                                BlockRow(row, send: sent)
                             }
                         }
                         .modifier(Entrance(done.style.rowsEntrance))
@@ -102,9 +158,13 @@ struct ListScreen: View {
                 }
             }
             .padding(.top, model.style.contentTop)
-            .padding(.bottom, model.style.contentBottom)
+            .padding(.bottom, model.style.contentBottom + bottomInset)
+            .modifier(rowDragContent(blocks))
         }
         .scrollIndicators(.hidden)
+        .modifier(dropTarget(blocks, settleInset: nil))
+        // A row left open is not open when the list comes back, from the board or from a screen over it.
+        .onDisappear { swipe.current = nil }
     }
 
     /// The board: the header stays under the circles, and the board takes the rest of the screen. The canvas draws no
@@ -116,7 +176,8 @@ struct ListScreen: View {
                 EmptyScreenView(empty)
                     .padding(.bottom, model.header.style.bottomMargin)
             }
-            BoardView(board, send: send)
+            BoardView(board, gestures: gestures, send: sent)
+                .modifier(dropTarget(board.columns, settleInset: board.snaps ? board.horizontalPadding : nil))
         }
         .padding(.top, model.style.contentTop)
         // The whole screen whatever the board holds: a sideways scroll view is as high as its content, and with no
@@ -141,7 +202,7 @@ struct ListScreen: View {
             }
             .allowsHitTesting(false)
             if let tagBar = model.tagBar {
-                TagBarView(tagBar, send: send)
+                TagBarView(tagBar, send: sent)
             }
         }
         .padding(.horizontal, style.horizontalPadding)
@@ -201,7 +262,7 @@ struct ListScreen: View {
     /// The frame takes the room the safe area gave back, which the button alone, at its own size, stayed clear of.
     @ViewBuilder private var floatingButton: some View {
         if let addTask = model.addTask {
-            FloatingButton(addTask, send: send)
+            FloatingButton(addTask, send: sent)
                 .padding(.trailing, addTask.style.trailingMargin)
                 .padding(.bottom, addTask.style.bottomMargin + sentenceHeight)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)

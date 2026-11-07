@@ -9,7 +9,7 @@ import SwiftUI
 ///
 /// A tap on an open row's check takes the row away as `CompletingTask` says.
 ///
-/// The drag, the menu, the swipe and the fresh fade wrap this view from outside (list screen plan, Task 8).
+/// The drag, the menu, the swipe and the fresh fade wrap this view from outside (`BlockRow`).
 struct TaskRowView<Action: Equatable & Sendable>: View {
     private let model: TaskRowModel<Action>
     private let send: (Action) -> Void

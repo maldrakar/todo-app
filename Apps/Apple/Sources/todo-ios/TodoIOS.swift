@@ -15,7 +15,10 @@ import TodoAppleUI
 /// open more than one window (section 9). `UILaunchScreen`, empty, keeps iOS from running the app letterboxed at a
 /// legacy size (the iOS 26.3 simulator, 2026-10-20). `UISupportedInterfaceOrientations~ipad` lists all four, without
 /// which iPadOS 18.4 opened no second scene, with portrait alone or with none (iPadOS 26.3 opened one either way,
-/// 2026-10-20). No version key is there, since no install or launch asked for one.
+/// 2026-10-20). `UTExportedTypeDeclarations` declares `dev.maldrakar.todo.task`, the type a task's row is dragged as
+/// (`RowDrag`): `UTType(exportedAs:)` says of a type the app does not declare that the lookup is a programmer's error,
+/// and a private type stays out of the way of what other apps take. No version key is there, since no install or launch
+/// asked for one.
 @main
 struct TodoIOS: App {
     var body: some Scene { AppScene() }

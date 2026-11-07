@@ -2,10 +2,10 @@
 import DesignSystemComponents
 import SwiftUI
 
-/// The Finder's mark of the place where a lifted row would land, as its style describes it (`DropIndicatorStyle`): a gap
-/// between the rows with the line, a rule rounded at its ends, and the circle over its start, ringed inside its diameter
-/// as the canvas's border is, each placed from the edge its caller gives: the tile of the drop's depth in the Lists
-/// tree, the rows' leading edge in a list of tasks. It is a view's own feedback and sends nothing.
+/// The Finder's mark of the place where a lifted row would land, as its style describes it (`DropIndicatorStyle`): a
+/// gap between the rows with the line, a rule rounded at its ends, and the circle over its start, ringed inside its
+/// diameter as the canvas's border is, each placed from the edge its caller gives: the tile of the drop's depth in the
+/// Lists tree, the rows' leading edge in a list of tasks. It is a view's own feedback and sends nothing.
 ///
 /// `DropIndicator` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).

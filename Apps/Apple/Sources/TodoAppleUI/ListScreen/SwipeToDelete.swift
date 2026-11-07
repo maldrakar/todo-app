@@ -1,55 +1,75 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/SwipeToDelete.swift
-import CoreGraphics
 import DesignSystemComponents
+import SwiftUI
+import TaskListFeature
 
-/// The row a swipe has moved aside, or that one is moving, as far as it stands now. It is the view's own state, which
-/// nothing else can know, and each stage of the swipe moves it through one step, `after(_:from:)`, which knows no
-/// platform, so that it is tested on the host (`RowSwipeTests`). Only one row stands aside: another taken starts from
-/// rest, and the one open goes back. The numbers are the row's `SwipeStyle`.
-struct RowSwipe: Equatable {
-    /// A stage of the pan: a row taken, with the look of its swipe, and how far the finger has moved since, leftward
-    /// negative, as it moves and where it is let go; or a pan the system took back.
-    enum Phase {
-        case began(BlockRowID, SwipeStyle)
-        case changed(CGFloat)
-        case ended(CGFloat)
-        case cancelled
+/// The screen's one swipe, which every row that can be swiped reads, so that a move of the finger draws those rows' few
+/// lines again and not the screen: an observed class and not the screen's state.
+///
+/// `ScreenSwipe` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
+@MainActor @Observable
+final class ScreenSwipe {
+    var current: RowSwipe?
+}
+
+/// A row's swipe to its Delete as its model describes it (`SwipeModel`; `Phone.dc.html`, the row's swipe): the row
+/// moved aside by as far as the screen's swipe says, on the swipe's motion where no finger moves it, and behind it the
+/// button at the style's numbers. The button reads aloud what it deletes, and VoiceOver has the same as an action of
+/// the row, since no swipe reaches it. A row with no swipe has none of this.
+struct SwipeToDelete: ViewModifier {
+    private let model: SwipeModel<TaskList.UserAction>?
+    private let row: BlockRowID
+    private let swipe: ScreenSwipe
+    private let delete: (TaskList.UserAction) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(
+        _ model: SwipeModel<TaskList.UserAction>?, of row: BlockRowID, in swipe: ScreenSwipe,
+        delete: @escaping (TaskList.UserAction) -> Void
+    ) {
+        self.model = model
+        self.row = row
+        self.swipe = swipe
+        self.delete = delete
     }
 
-    let row: BlockRowID
-
-    /// How far the row stands from its place, leftward negative.
-    let x: CGFloat
-
-    private let style: SwipeStyle
-
-    /// Where the row stood when the finger took it, its shift if it was open, and otherwise its place.
-    private let start: CGFloat
-
-    /// The swipe after a stage: a row follows the finger from where it stood, and not rightward of its place, nor more
-    /// than the threshold past its shift; let go past the threshold it stays moved by its shift, short of it it goes back,
-    /// and a pan taken back leaves it where it rested. With no row taken, nothing moves.
-    static func after(_ phase: Phase, from swipe: RowSwipe?) -> RowSwipe? {
-        switch phase {
-        case .began(let row, let style):
-            let start: CGFloat = swipe?.row == row ? style.shift : 0
-            return RowSwipe(row: row, x: start, style: style, start: start)
-        case .changed(let move):
-            return swipe?.moved(move)
-        case .ended(let move):
-            return swipe?.moved(move).resting(isOpen: swipe?.moved(move).isPastThreshold ?? false)
-        case .cancelled:
-            return swipe?.resting(isOpen: swipe?.start != 0)
+    func body(content: Content) -> some View {
+        if let model {
+            let current = swipe.current?.row == row ? swipe.current : nil
+            let x = current?.x ?? 0
+            content
+                .offset(x: x)
+                .background(alignment: .trailing) {
+                    if x < 0 {
+                        button(model)
+                    }
+                }
+                .animation(
+                    current?.isFollowingFinger == true || reduceMotion ? nil : Animation(model.style.animation),
+                    value: x
+                )
+                .accessibilityAction(named: Text(model.accessibilityLabel)) { delete(model.action) }
+        } else {
+            content
         }
     }
 
-    private func moved(_ move: CGFloat) -> RowSwipe {
-        RowSwipe(row: row, x: min(0, max(style.shift - style.threshold, start + move)), style: style, start: start)
-    }
-
-    private var isPastThreshold: Bool { x < -style.threshold }
-
-    private func resting(isOpen: Bool) -> RowSwipe? {
-        isOpen ? RowSwipe(row: row, x: style.shift, style: style, start: style.shift) : nil
+    private func button(_ model: SwipeModel<TaskList.UserAction>) -> some View {
+        Button { delete(model.action) } label: {
+            Text(model.button)
+                .frame(width: model.style.buttonWidth)
+                .frame(maxHeight: .infinity)
+                .background(
+                    Color(model.style.background),
+                    in: .rect(cornerRadius: model.style.buttonCornerRadius, style: .circular)
+                )
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(model.accessibilityLabel)
+        .padding(.vertical, model.style.buttonVerticalInset)
+        .padding(.trailing, model.style.buttonTrailingInset)
     }
 }

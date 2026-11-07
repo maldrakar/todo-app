@@ -11,17 +11,19 @@ struct ColumnView: View {
     private let block: TaskList.Model.Block
     private let column: ColumnModel<TaskList.UserAction>
     private let isDragOver: Bool
+    private let gestures: ScreenGestures
     private let send: (TaskList.UserAction) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         _ block: TaskList.Model.Block, column: ColumnModel<TaskList.UserAction>, isDragOver: Bool,
-        send: @escaping (TaskList.UserAction) -> Void
+        gestures: ScreenGestures, send: @escaping (TaskList.UserAction) -> Void
     ) {
         self.block = block
         self.column = column
         self.isDragOver = isDragOver
+        self.gestures = gestures
         self.send = send
     }
 
@@ -32,7 +34,7 @@ struct ColumnView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: column.style.cardSpacing) {
                     ForEach(block.rows) { row in
-                        BlockRow(row, column: column.style, send: send)
+                        BlockRow(row, in: block.id, column: column.style, gestures: gestures, send: send)
                     }
                     if let addTask = block.addTask {
                         AddRowView(addTask, send: send)
@@ -42,6 +44,8 @@ struct ColumnView: View {
                 .padding(.bottom, column.style.padding)
             }
             .scrollIndicators(.hidden)
+            // What of its cards is in sight, since a card scrolled out of it keeps a frame under its header.
+            .reportsLiftFrame { [id = block.id] in RowLift.Frames(columns: [id: $0]) }
         }
         .frame(width: column.style.width)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -56,5 +60,6 @@ struct ColumnView: View {
                 .allowsHitTesting(false)
         }
         .animation(reduceMotion ? nil : Animation(column.style.dropAnimation), value: isTinted)
+        .reportsLiftFrame { [id = block.id] in RowLift.Frames(blocks: [id: $0]) }
     }
 }
