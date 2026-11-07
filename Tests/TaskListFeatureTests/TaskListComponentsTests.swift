@@ -20,11 +20,13 @@ private func board(of model: TaskList.Model) -> TaskList.Model.Board? {
 /// and the 15 pt mark stroked 1.75 in a 44 pt hit, popping on the check's motion; the title in the row title, 11 above
 /// and below, 2 after the check's hit and 4 short of the end; the meta 3 under it, its items 10 apart and its lines 3;
 /// at least 44 high and rounded 12; dragged 40 leftward it stays moved 88 over its Delete, 78 wide, 3 and 10 in from
-/// its edges, rounded 12, and its menu holds Delete; no lift yet (Task 8). A row of the strip has neither, and no meta
+/// its edges, rounded 12, reading "Delete" and its title aloud, and its menu holds Delete; it lifts to 1.03, opaque, on
+/// the surface rounded 14 with the lifted shadow, over a slot of the list's check fill (Task 8's table, Lift and
+/// slot), and is fresh where it is the task just dropped. A row of the strip has neither a menu nor a lift, and no meta
 /// line.
 private func phoneRow(
     _ title: String, id: TaskID, colors: DesignSystem.Color.Components.Check, isOpen: Bool = true,
-    meta: [MetaItemModel] = [], deletes: Bool = true
+    meta: [MetaItemModel] = [], deletes: Bool = true, isFresh: Bool = false
 ) -> TaskRowModel<Action> {
     TaskRowModel(
         check: CheckModel(
@@ -40,7 +42,7 @@ private func phoneRow(
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
             titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh,
-            strike: isOpen ? nil : .ink3, lift: nil, fresh: nil
+            strike: isOpen ? nil : .ink3, lift: deletes ? lift(colors) : nil, fresh: isFresh ? .fresh : nil
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
@@ -50,11 +52,31 @@ private func phoneRow(
             button: TextModel(
                 text: "Delete",
                 style: TextStyle(font: .barLabel, color: .onAccent)
-            ), action: .deleteSwiped(id)
+            ), accessibilityLabel: "Delete \(title)", action: .deleteSwiped(id)
         ) : nil,
         tap: .rowTapped(id), menu: deletes ? deleteMenu(id) : nil
     )
 }
+
+/// A row lifted: grown to 1.03, opaque, rounded 14 on the surface with the lifted shadow, and over it the slot of the
+/// list's check fill, 10 high: the circle 8 across 52 in, ringed 2 and filled with the paper, the line 2 thick and
+/// rounded 1 from 62 in to 20 short of the right edge (Task 8's table, Lift and slot).
+private func lift(_ colors: DesignSystem.Color.Components.Check) -> TaskLiftStyle {
+    TaskLiftStyle(
+        scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
+        indicator: DropIndicatorStyle(
+            height: 10, line: LineStyle(color: colors.fill, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
+            trailingGap: 20, circleDiameter: 8, circleOffset: 52,
+            circleRing: LineStyle(color: colors.fill, width: 2, dash: []), circleFill: .paper
+        )
+    )
+}
+
+/// A column's card lifted: the row's, but dimmed to .35 where it is dragged from, rounded as the card is, 13, and with
+/// no slot, the column's tint marking the drop.
+private let cardLift = TaskLiftStyle(
+    scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil
+)
 
 /// A row's menu: Delete with the trash's glyph, drawn as what destroys something (spec section 6).
 private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
@@ -144,7 +166,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let bar = { (chips: [TagChipModel<Action>]) in
         TagBarModel(
             chips: chips,
-            style: .init(spacing: 6, padding: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20, trailingMargin: -20)
+            style: .init(
+                topMargin: 7, spacing: 6, padding: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20, trailingMargin: -20
+            )
         )
     }
     #expect(module.model.tagBar == bar([chip(isLit: false)]))
@@ -182,7 +206,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 }
 
 /// The screen's header carries the phone's numbers: the list's tile 38 across, rounded 11, its glyph 23, 12 before the
-/// large title, the subtitle in ink 2 6 under it and 50 in (Task 8's table).
+/// large title, the subtitle in ink 2 6 under it and 50 in, the header 20 in from the screen's sides (Task 8's table).
 @Test func theHeaderCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     let header = try list(BuiltInTaskViews.today, in: store).model.header
@@ -193,7 +217,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         ),
         title: TextModel(text: "Today", style: TextStyle(font: .largeTitle, color: .ink)),
         subtitle: TextModel(text: "Wednesday, September 10", style: TextStyle(font: .count, color: .ink2)),
-        style: .init(spacing: 12, titleToSubtitle: 6, subtitleLeading: 50)
+        style: .init(horizontalPadding: 20, spacing: 12, titleToSubtitle: 6, subtitleLeading: 50)
     ))
 }
 
@@ -215,31 +239,62 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ))
 }
 
-/// Show as is "…" on the platform's container, reading "More", with List and Columns, Columns disabled with its reason
-/// where there is nothing to show as columns (canvas, section 2; spec section 5).
-@Test func showAsIsMoreWithListAndAColumnsItemDisabledWithItsReason() throws {
+/// The glass buttons are 44 circles on the glass edged with its 0.5 hairline and casting the raised shadow: the back
+/// chevron 24 across set 2 left of centre, reading "Back", and "…" 22 across, reading "More"; they stand 14 in from the
+/// screen's sides at the safe area's top, over a fade of the paper 54 under it, solid to 15.12 under it, with the
+/// content 56 under it (Task 8's table, Glass buttons; the controller's ruling on #177, 2026-11-07: the canvas's 108 fade
+/// less its 54 status bar, solid to 64 % of the 108).
+@Test func theGlassButtonsCarryThePhonesNumbers() throws {
     let store = try makeStore()
-    func showAs(canBoard: Bool) -> MenuButtonModel<Action> {
-        MenuButtonModel(
-            label: ButtonLabelModel(
-                icon: IconModel(icon: .ellipsis, style: IconStyle(size: 22, weight: .semibold, color: .ink)),
-                title: nil, accessibilityLabel: "More",
-                style: ButtonLabelStyle(fill: .container)
+    func button(_ icon: DesignSystem.Icon, size: Double, offset: Double, _ label: String) -> GlassButtonModel {
+        GlassButtonModel(
+            icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .semibold, color: .ink)),
+            style: GlassControlStyle(
+                iconOffset: offset, diameter: 44, surface: .glass,
+                line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
             ),
-            menu: MenuModel(sections: [
-                .init(items: [
-                    .init(title: "List", icon: .list, isDestructive: false, shortcut: nil, action: .showAsChosen(.list)),
-                    .init(
-                        title: "Columns", subtitle: canBoard ? nil : "Group the list in its settings to get columns",
-                        icon: .columns, isDestructive: false, isDisabled: !canBoard, shortcut: nil,
-                        action: .showAsChosen(.columns)
-                    ),
-                ]),
-            ])
+            accessibilityLabel: label
         )
     }
-    #expect(try list(BuiltInTaskViews.inbox, in: store).model.showAs == showAs(canBoard: false))
-    #expect(try list(BuiltInTaskViews.upcoming, in: store).model.showAs == showAs(canBoard: true))
+    let bar = GlassBarStyle(edgeInset: 14, fadeColor: .paper, fadeHeight: 54, fadeSolidDepth: 15.12, contentTop: 56)
+    for layout in [TaskList.Model.Layout.Kind.list, .columns] {
+        let module = try list(BuiltInTaskViews.upcoming, in: store)
+        module.tap(.showAsChosen(layout))
+        let model = module.model
+        #expect(model.back == button(.chevronLeft, size: 24, offset: -2, "Back"))
+        #expect(model.more == button(.ellipsis, size: 22, offset: 0, "More"))
+        #expect(model.glassBar == bar)
+    }
+}
+
+/// Show as, the menu "…" opens, is headed "Show as" and holds List and Columns with the layout the list is shown as
+/// checked, Columns disabled with its reason where there is nothing to show as columns (canvas, section 2; spec section
+/// 5; the plan's rule for the menu's heading and check).
+@Test func showAsIsHeadedAndChecksTheLayoutWithColumnsDisabledWithItsReason() throws {
+    let store = try makeStore()
+    func showAs(current: TaskList.Model.Layout.Kind, canBoard: Bool) -> MenuModel<Action> {
+        MenuModel(
+            heading: "Show as",
+            sections: [
+                .init(items: [
+                    .init(
+                        title: "List", icon: .list, isDestructive: false, isChecked: current == .list, shortcut: nil,
+                        action: .showAsChosen(.list)
+                    ),
+                    .init(
+                        title: "Columns", subtitle: canBoard ? nil : "Group the list in its settings to get columns",
+                        icon: .columns, isDestructive: false, isDisabled: !canBoard, isChecked: current == .columns,
+                        shortcut: nil, action: .showAsChosen(.columns)
+                    ),
+                ]),
+            ]
+        )
+    }
+    #expect(try list(BuiltInTaskViews.inbox, in: store).model.showAs == showAs(current: .list, canBoard: false))
+    let upcoming = try list(BuiltInTaskViews.upcoming, in: store)
+    #expect(upcoming.model.showAs == showAs(current: .list, canBoard: true))
+    upcoming.tap(.showAsChosen(.columns))
+    #expect(upcoming.model.showAs == showAs(current: .columns, canBoard: true), "the choice moves the check")
 }
 
 /// A column and its cards carry the board's numbers: the board 10 between columns, 16 in at its sides and 24 at its
@@ -292,7 +347,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
-            strike: nil, lift: nil, fresh: nil
+            strike: nil, lift: cardLift, fresh: nil
         ),
         swipe: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)
@@ -396,7 +451,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let store = try makeStore()
     #expect(try list(BuiltInTaskViews.inbox, in: store).model.addTask == FloatingButtonModel(
         icon: IconModel(icon: .plus, style: IconStyle(size: 22, weight: .semibold, color: .onAccent)),
-        style: .init(diameter: 48, fill: .accent, shadow: .raised),
+        style: .init(diameter: 48, fill: .accent, shadow: .raised, trailingMargin: 16, bottomMargin: 30),
         accessibilityLabel: "New task", action: .addTaskButtonTapped
     ))
 }
@@ -423,7 +478,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             ),
             style: .init(
                 height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-                leadingMargin: 14, trailingMargin: 16, background: .fill
+                leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6
             ),
             isOpen: isOpen, action: .doneStripTapped
         )
@@ -445,6 +500,35 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     try store.trash(task: id)
     let rows = blocks(of: try list(BuiltInTaskViews.trash, in: store).model).flatMap(\.rows).map(row)
     #expect(rows == [phoneRow("Binned", id: id, colors: Tile.stone.check, deletes: false)])
+}
+
+/// A row or a column's card lifts exactly where it has a menu: not a row of the Done strip, not a task in the Trash (the
+/// controller's ruling on #177, 2026-11-07). Its swipe reads Delete and the title the row draws aloud, "New task" for a
+/// task with none.
+@Test func aRowLiftsExactlyWhereItHasAMenu() throws {
+    let store = try makeStore()
+    try store.createTask(NewTask(title: "Buy milk", when: day(1)))
+    try store.createTask(NewTask(title: " ", when: day(1)))
+    let finished = try store.createTask(NewTask(title: "Filed", when: day(2)))
+    try store.update(task: finished, [.status(.done)])
+    let binned = try store.createTask(NewTask(title: "Binned"))
+    try store.trash(task: binned)
+    func lifts(_ model: TaskList.Model) -> [Bool] {
+        (blocks(of: model).flatMap(\.rows) + model.doneRows).map { row($0).style.lift != nil }
+    }
+    func menus(_ model: TaskList.Model) -> [Bool] {
+        (blocks(of: model).flatMap(\.rows) + model.doneRows).map { row($0).menu != nil }
+    }
+    let upcoming = try list(BuiltInTaskViews.upcoming, in: store)
+    upcoming.tap(.doneStripTapped)
+    #expect(lifts(upcoming.model) == menus(upcoming.model))
+    #expect(lifts(upcoming.model) == [true, true, false])
+    let rows = blocks(of: upcoming.model).flatMap(\.rows).map(row)
+    #expect(rows.compactMap { $0.swipe?.accessibilityLabel } == ["Delete Buy milk", "Delete New task"])
+    upcoming.tap(.showAsChosen(.columns))
+    #expect(lifts(upcoming.model) == [true, true])
+    let trash = try list(BuiltInTaskViews.trash, in: store)
+    #expect(lifts(trash.model) == [false] && menus(trash.model) == [false])
 }
 
 /// The open card carries the phone's numbers, in the list and in a column; its pills, its fields and its subtasks read
@@ -505,7 +589,11 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         topMargin: Double, horizontalMargin: Double, bottomMargin: Double, cornerRadius: Double,
         shadow: DesignSystem.Shadow, bodyLeading: Double, bodyTrailing: Double, bodyBottom: Double
     ) -> CardModel<Action> {
-        CardModel(
+        let subtaskCircle = CheckStyle(
+            diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
+            animation: .check, colors: colors
+        )
+        return CardModel(
             check: check("Buy milk", .checkTapped(id)),
             title: field(
                 "Buy milk", "New task", .rowTitleEmphasized, .ink, height: 44, padding: 2, submitted: .titleFieldSubmitted,
@@ -550,7 +638,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 expandHitSide: 44, cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
                 bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing,
                 bodyBottom: bodyBottom, subtasksToPills: 10, pillSpacing: 6, shadow: shadow, background: .surface,
-                animation: .cardOpens
+                animation: .cardOpens, subtasksOutdent: 12, notesToSubtasks: 4, subtaskDraftCircle: subtaskCircle
             ),
             backgroundTapped: .backgroundTapped
         )

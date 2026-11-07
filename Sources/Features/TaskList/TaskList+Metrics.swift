@@ -35,11 +35,12 @@ extension TaskList {
             let hashSize: Double
         }
 
-        /// A task's row, or a column's card: its style for whether the task is open, its check's for the block's
-        /// colour, the title's font, the meta line's glyph and its gap to its text, and its swipe, nil for a column's
-        /// card, which has none (canvas).
+        /// A task's row, or a column's card: its style for the block's colour, whether the task is open, whether it can
+        /// be lifted, which it can where it has a menu, and whether it is the task just dropped; its check's for the
+        /// block's colour, the title's font, the meta line's glyph and its gap to its text, and its swipe, nil for a
+        /// column's card, which has none (canvas).
         struct Row {
-            let style: @Sendable (_ isOpen: Bool) -> TaskRowStyle
+            let style: @Sendable (_ color: Tile, _ isOpen: Bool, _ lifts: Bool, _ isFresh: Bool) -> TaskRowStyle
             let check: @Sendable (Tile) -> CheckStyle
             let title: DesignSystem.Font
             let metaIconSize: Double
@@ -62,11 +63,12 @@ extension TaskList {
             let font: DesignSystem.Font
         }
 
-        /// The open card: its style; its check's and its subtasks' for the block's colour, and a subtask row's for
-        /// whether the subtask is open; its title field's height and padding, the size of the button that opens it full
-        /// screen, the notes' height and the subtask field's; and the row that adds a subtask and its pills.
+        /// The open card: its style, its subtask draft's circle in the block's colour; its check's and its subtasks'
+        /// for the block's colour, and a subtask row's for whether the subtask is open; its title field's height and
+        /// padding, the size of the button that opens it full screen, the notes' height and the subtask field's; and
+        /// the row that adds a subtask and its pills.
         struct Card {
-            let style: CardStyle
+            let style: @Sendable (Tile) -> CardStyle
             let check: @Sendable (Tile) -> CheckStyle
             let subtaskCheck: @Sendable (Tile) -> CheckStyle
             let subtask: @Sendable (_ isOpen: Bool) -> SubtaskRowStyle
@@ -91,6 +93,15 @@ extension TaskList {
         struct FloatingButton {
             let style: FloatingButtonStyle
             let glyphSize: Double
+        }
+
+        /// The glass buttons over the content: how they stand, the back button's numbers and glyph and "…"'s.
+        struct Glass {
+            let bar: GlassBarStyle
+            let back: GlassControlStyle
+            let backGlyphSize: Double
+            let more: GlassControlStyle
+            let moreGlyphSize: Double
         }
 
         /// The empty state: its numbers and its tile.
@@ -126,6 +137,7 @@ extension TaskList {
             case columns(Board)
         }
 
+        let glass: Glass
         let header: Header
         let tagBar: TagBar
         let empty: Empty
@@ -148,9 +160,9 @@ extension TaskList {
         /// of its end, rounded 12; "+ Add list" 44 high over the line's 1 pt rule with 4 under it, 10 under what stands
         /// above and 12 in and 6 short of the edges, its plus 18 in a 40 cell; the Done strip's capsule 36 high and 20
         /// under what stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14
-        /// short of its end, 8 on either side of its label.
+        /// short of its end, 8 on either side of its label, its rows 6 under it.
         static let phone = Metrics(
-            header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
+            glass: phoneGlass, header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .list(
                 header: .init(
                     titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
@@ -169,7 +181,7 @@ extension TaskList {
                 doneStrip: DoneStrip(
                     style: .init(
                         height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14,
-                        topMargin: 20, leadingMargin: 14, trailingMargin: 16, background: .fill
+                        topMargin: 20, leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6
                     ),
                     iconSize: 18, chevronSize: 15
                 )
@@ -199,7 +211,7 @@ extension TaskList {
         /// "+ Add list" a column 200 wide edged in a 1.5 dashed line, as rounded as a column, 52 high, padded 16, the
         /// plus 18 and 8 before its title. The table gives the dash no lengths: 5 and 4, the sidebar's dashed line.
         static let phoneColumns = Metrics(
-            header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
+            glass: phoneGlass, header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .columns(Board(
                 spacing: 10, horizontalPadding: 16, bottomPadding: 24, snaps: true,
                 column: { color in
@@ -216,11 +228,12 @@ extension TaskList {
                     foldHitSide: nil
                 ),
                 card: Row(
-                    style: { isOpen in
+                    style: { color, isOpen, lifts, isFresh in
                         .init(
                             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
-                            freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: nil, fresh: nil
+                            freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil,
+                            fresh: isFresh ? .fresh : nil
                         )
                     },
                     check: { color in
@@ -232,11 +245,14 @@ extension TaskList {
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil
                 ),
                 openCard: Card(
-                    style: .init(
-                        expandHitSide: 44, cornerRadius: 13, topMargin: 0, horizontalMargin: 0, bottomMargin: 0,
-                        bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
-                        shadow: .resting, background: .surface, animation: .cardOpens
-                    ),
+                    style: { color in
+                        .init(
+                            expandHitSide: 44, cornerRadius: 13, topMargin: 0, horizontalMargin: 0, bottomMargin: 0,
+                            bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
+                            shadow: .resting, background: .surface, animation: .cardOpens, subtasksOutdent: 12,
+                            notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color)
+                        )
+                    },
                     check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
                     titlePadding: 2, expandSize: 19, notesHeight: 22, subtaskFieldHeight: 40,
                     addSubtask: phoneAddSubtask, pill: phonePill
@@ -294,11 +310,12 @@ extension TaskList {
         /// end, rounded 12. The table gives the row no radius: 12, the add row's under it, until Task 8's hand check
         /// tunes it.
         private static let phoneRow = Row(
-            style: { isOpen in
+            style: { color, isOpen, lifts, isFresh in
                 .init(
                     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
-                    freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: nil, fresh: nil
+                    freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift(color) : nil,
+                    fresh: isFresh ? .fresh : nil
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
@@ -311,14 +328,19 @@ extension TaskList {
         /// The phone's open card (Task 8's table, Card; `Phone.dc.html`, the open card): 6 10 10 from what stands round
         /// it, rounded 18, casting the raised shadow; its check `phoneCheck`, its title field 44 high and padded 2, the
         /// canvas's 2 before and 4 after in one padding; Open full screen 19 in a 44 hit; its body 46 in and 14 short
-        /// of its end and bottom; a subtask 44 high, its field 40; the pills 6 apart and 10 under the subtasks. The
-        /// table gives the notes no height: 22, their 15 pt line at the canvas's 1.45, the least a field grows from.
+        /// of its end and bottom; the subtasks 4 under the notes and 12 outside the body's leading edge, one 44 high,
+        /// its field 40 after a ring-only circle of the subtask check's size; the pills 6 apart and 10 under the
+        /// subtasks. The table gives the notes no height: 22, their 15 pt line at the canvas's 1.45, the least a field
+        /// grows from.
         private static let phoneCard = Card(
-            style: .init(
-                expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10,
-                bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised,
-                background: .surface, animation: .cardOpens
-            ),
+            style: { color in
+                .init(
+                    expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10,
+                    bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6,
+                    shadow: .raised, background: .surface, animation: .cardOpens, subtasksOutdent: 12,
+                    notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color)
+                )
+            },
             check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
             titlePadding: 2, expandSize: 19, notesHeight: 22, subtaskFieldHeight: 40, addSubtask: phoneAddSubtask,
             pill: phonePill
@@ -345,23 +367,71 @@ extension TaskList {
             sunSize: 16, flagSize: 15, hashSize: 14
         )
 
-        /// The phone's floating "+" (Task 8's table, Floating "+"): a 48 circle, its plus 22.
-        private static let phoneFloatingButton = FloatingButton(
-            style: .init(diameter: 48, fill: .accent, shadow: .raised), glyphSize: 22
+        /// How the phone's row looks lifted (Task 8's table, Lift and slot): grown to 1.03, opaque, rounded 14 on the
+        /// surface and casting the lifted shadow; and the mark of the slot where it would land, 10 high, placed from
+        /// the rows' leading edge: the circle 8 across at 52, ringed 2 in the list's check fill and filled with the paper,
+        /// which stands in for the canvas's unfilled dot since the mark stands on the screen's paper, and the line 2
+        /// thick in the check fill, rounded 1, from 62 to 20 short of the right edge.
+        private static func phoneLift(_ color: Tile) -> TaskLiftStyle {
+            TaskLiftStyle(
+                scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
+                indicator: DropIndicatorStyle(
+                    height: 10, line: LineStyle(color: color.check.fill, width: 2, dash: []), lineOffset: 62,
+                    lineCornerRadius: 1, trailingGap: 20, circleDiameter: 8, circleOffset: 52,
+                    circleRing: LineStyle(color: color.check.fill, width: 2, dash: []), circleFill: .paper
+                )
+            )
+        }
+
+        /// How a column's card looks lifted (Task 8's table, Lift and slot): it dims to .35 where it is dragged from
+        /// and carries no mark, the column's tint marking the drop; the rest is the row's, but for its corners, the
+        /// card's own 13, which the table gives the card no other number for.
+        private static let columnLift = TaskLiftStyle(
+            scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil
         )
 
-        /// The phone's header (Task 8's table, Header): the tile 38 across, rounded 11, its glyph 23, 12 before the
-        /// title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50 in.
+        /// The phone's glass buttons (Task 8's table, Glass buttons; `Phone.dc.html`, `.glass` and the buttons' row):
+        /// 44 circles on the glass, edged with its 0.5 hairline and casting the raised shadow, 14 from the screen's
+        /// sides; the back chevron 24 across set 2 left of centre, "…" 22; under them a fade of the paper that is the
+        /// canvas's 108 less its 54 status bar, solid to 64 % of the 108, with the content 56 under the safe area's
+        /// top.
+        private static let phoneGlass = Glass(
+            bar: GlassBarStyle(
+                edgeInset: 14, fadeColor: .paper, fadeHeight: 54, fadeSolidDepth: 15.12, contentTop: 56
+            ),
+            back: GlassControlStyle(
+                iconOffset: -2, diameter: 44, surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []),
+                shadow: .raised
+            ),
+            backGlyphSize: 24,
+            more: GlassControlStyle(
+                iconOffset: 0, diameter: 44, surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []),
+                shadow: .raised
+            ),
+            moreGlyphSize: 22
+        )
+
+        /// The phone's floating "+" (Task 8's table, Floating "+"): a 48 circle, its plus 22, 16 in from the screen's
+        /// right edge and 30 above its bottom.
+        private static let phoneFloatingButton = FloatingButton(
+            style: .init(diameter: 48, fill: .accent, shadow: .raised, trailingMargin: 16, bottomMargin: 30),
+            glyphSize: 22
+        )
+
+        /// The phone's header (Task 8's table, Header): 20 in from the screen's sides, the tile 38 across, rounded 11,
+        /// its glyph 23, 12 before the title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50 in.
         private static let phoneHeader = Header(
-            style: .init(spacing: 12, titleToSubtitle: 6, subtitleLeading: 50),
+            style: .init(horizontalPadding: 20, spacing: 12, titleToSubtitle: 6, subtitleLeading: 50),
             tile: TileSize(side: 38, cornerRadius: 11, glyphSize: 23)
         )
 
-        /// The phone's tag bar (Task 8's table, Tag bar): chips 6 apart in a row padded 20, the bar 20 past the
-        /// content's sides, fading in over 16 and out over 28; a chip 30 high, a capsule, padded 10 and 12, its hash 13
-        /// and 5 before its title, in a 44 tap area.
+        /// The phone's tag bar (Task 8's table, Tag bar): 7 under the header, chips 6 apart in a row padded 20, the bar
+        /// 20 past the content's sides, fading in over 16 and out over 28; a chip 30 high, a capsule, padded 10 and
+        /// 12, its hash 13 and 5 before its title, in a 44 tap area.
         private static let phoneTagBar = TagBar(
-            style: .init(spacing: 6, padding: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20, trailingMargin: -20),
+            style: .init(
+                topMargin: 7, spacing: 6, padding: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20, trailingMargin: -20
+            ),
             chip: { color, isLit in
                 .init(
                     height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,

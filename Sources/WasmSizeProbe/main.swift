@@ -536,7 +536,8 @@ private enum WasmSizeProbe {
     private static func listLine(of screen: AppModule.ScreenModel?) -> String {
         guard case .list(let list)? = screen else { return label(screen) }
         let header = list.header.title.text + (list.header.subtitle.map { " (\($0.text))" } ?? "")
-        let chips = list.tagBar.map { "\($0.chips.count) chips, \($0.chips.filter(\.isLit).count) lit" } ?? "no tag bar"
+            + " in \(list.header.style.horizontalPadding)"
+        let chips = list.tagBar.map { "\($0.chips.count) chips, \($0.chips.filter(\.isLit).count) lit, \($0.style.topMargin) under" } ?? "no tag bar"
         let shape: String
         let rows = switch list.layout {
         case .list(let blocks): blocks.flatMap(\.rows)
@@ -554,15 +555,17 @@ private enum WasmSizeProbe {
         let first = rows.first.map { row in
             switch row {
             case .task(_, let task):
-                "\(task.check.accessibilityLabel) [\(task.meta.map { $0.text?.text ?? "glyph" }.joined(separator: " "))], \(task.swipe?.button.text ?? "no swipe"), menu \(task.menu?.sections.flatMap(\.items).map(\.title).joined(separator: "/") ?? "none")"
+                "\(task.check.accessibilityLabel) [\(task.meta.map { $0.text?.text ?? "glyph" }.joined(separator: " "))], \(task.swipe?.accessibilityLabel ?? "no swipe"), menu \(task.menu?.sections.flatMap(\.items).map(\.title).joined(separator: "/") ?? "none"), \(task.style.lift.map { "lifts to \($0.scale) at \($0.opacity), slot \($0.indicator?.height ?? 0)" } ?? "stays"), \(task.style.fresh == nil ? "settled" : "fresh")"
             case .card(_, let card):
                 "a card on \(card.title.text)"
             }
         } ?? "no row"
-        let disabled = list.showAs.menu.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)
+        let disabled = list.showAs.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)
+        let checked = list.showAs.sections.flatMap(\.items).filter(\.isChecked).map(\.title)
+        let glass = "\(list.back.accessibilityLabel) \(list.back.style.diameter) at \(list.back.style.iconOffset), \(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") \(checked), bar \(list.glassBar.edgeInset)/\(list.glassBar.fadeHeight)/\(list.glassBar.fadeSolidDepth)/\(list.glassBar.contentTop)"
         let empty = list.empty.map { "empty: \($0.title.text)" } ?? "not empty"
-        let plus = list.addTask?.accessibilityLabel ?? "no floating button"
-        return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(empty), \(plus)"
+        let plus = list.addTask.map { "\($0.accessibilityLabel) \($0.style.trailingMargin)/\($0.style.bottomMargin)" } ?? "no floating button"
+        return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(glass), \(empty), \(plus)"
     }
 
     /// The open card of a list standing in the window's stack as a line, every part a view draws, and "no card" when none
@@ -572,7 +575,8 @@ private enum WasmSizeProbe {
             guard case .card(_, let card) = row else { continue }
             let subtasks = card.subtasks.map { "\($0.check.accessibilityLabel) \($0.title.text)" }
             let pills = card.pills.map(\.text.text)
-            return "card \(card.title.text) (\(card.notes.text)), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
+            let circle = card.style.subtaskDraftCircle
+            return "card \(card.title.text) (\(card.notes.text)), \(card.style.notesToSubtasks) under, \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
         }
         return "no card"
     }
@@ -596,7 +600,7 @@ private enum WasmSizeProbe {
             case .card(_, let card): "a card on \(card.title.text)"
             }
         }
-        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") over \(rows.joined(separator: "/"))"
+        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") \(list.done?.style.capsuleToRows ?? 0) over \(rows.joined(separator: "/"))"
     }
 
     /// The first task under an open strip, which the probe checks to reopen it.

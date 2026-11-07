@@ -19,25 +19,27 @@ extension TaskList {
         guard let from = blocks.first(where: { $0.id == source }), let to = blocks.first(where: { $0.id == target }),
               let task = from.tasks.first(where: { $0.id == id })
         else { return }
-        if source == target { reorder(id, in: to, after: anchor) } else { move(task, from: from, to: to) }
+        let landed = source == target ? reorder(id, in: to, after: anchor) : move(task, from: from, to: to)
+        if landed { state.fresh = id }
     }
 
     /// Takes its place in its own block: the task and the unpinned tasks that stand above the place, in their order,
     /// are pinned in one transaction, after the last pinned task above it or first, so that it lands where it was let
     /// go and keeps it, the manual list being the view's and applied within a group (spec section 6). The order read is
     /// the page's block's, before the tag bar's filter, so that the tasks a pick hides keep their places (the
-    /// controller's ruling on #176, 2026-11-05).
-    private func reorder(_ id: TaskID, in block: PageBlock, after anchor: TaskID?) {
+    /// controller's ruling on #176, 2026-11-05). Answers whether it landed: a drop where the task already stood moves
+    /// nothing, and so lands nothing fresh.
+    private func reorder(_ id: TaskID, in block: PageBlock, after anchor: TaskID?) -> Bool {
         let order = block.tasks.map(\.id)
         let others = order.filter { $0 != id }
         let place = anchor.flatMap { others.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
-        guard order.firstIndex(of: id) != place else { return }
+        guard order.firstIndex(of: id) != place else { return false }
         // The list's own manual list for its own blocks and on a group's screen, and the list inside's for its block.
         let view = switch block.id {
         case .own: state.head.view
         case .list(let view): view
         }
-        writeAndReread { () throws(StoreError) in
+        return writeAndReread { () throws(StoreError) in
             let pinned = Set(try store.manualList(of: view))
             let above = others[..<place]
             let unpinned = above.filter { !pinned.contains($0) }
@@ -52,9 +54,9 @@ extension TaskList {
     /// own block gives nothing back, a day block's task leaving by its new day and an own block's by being claimed; a
     /// list whose rule reads as no edit gives nothing back; and what the target asks is not given back. A task two
     /// blocks draw leaves only the one it was dragged from, and the target's fold stays (the controller's ruling on
-    /// #176, 2026-11-05).
-    private func move(_ task: TodoTask, from source: PageBlock, to target: PageBlock) {
-        guard let edit = target.edit else { return }
+    /// #176, 2026-11-05). Answers whether the writes held and the page was read back.
+    private func move(_ task: TodoTask, from source: PageBlock, to target: PageBlock) -> Bool {
+        guard let edit = target.edit else { return false }
         let view = state.snapshot.page.view
         let ownDay: GroupBy? = if case .own(.day?) = target.id { view.groupBy } else { nil }
         let changes = edit.dayChanges(of: task, rule: target.rule, ownDay: ownDay, today: state.day.day)
@@ -62,7 +64,7 @@ extension TaskList {
         let leaving = edit.removeTags.union(givenBack.flatMap(\.addTags)).subtracting(edit.addTags)
         var unpinning = edit.unpinFrom.union(givenBack.compactMap(\.pinIn))
         if let list = edit.pinIn { unpinning.remove(list) }
-        writeAndReread(refusal: .couldNotMove) { () throws(StoreError) in
+        return writeAndReread(refusal: .couldNotMove) { () throws(StoreError) in
             try store.update(task: task.id, changes)
             for tag in edit.addTags.subtracting(task.tags) { try store.add(tag: tag, to: task.id) }
             for tag in leaving.intersection(task.tags) { try store.remove(tag: tag, from: task.id) }

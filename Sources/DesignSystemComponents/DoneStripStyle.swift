@@ -14,6 +14,9 @@ public struct DoneStripStyle: Equatable, Sendable {
     public let trailingMargin: Double
     public let background: DesignSystem.Color
 
+    /// How far the rows under the capsule stand below it while the strip is open.
+    public let capsuleToRows: Double
+
     public init(
         height: Double,
         cornerRadius: Double,
@@ -23,7 +26,8 @@ public struct DoneStripStyle: Equatable, Sendable {
         topMargin: Double,
         leadingMargin: Double,
         trailingMargin: Double,
-        background: DesignSystem.Color
+        background: DesignSystem.Color,
+        capsuleToRows: Double
     ) {
         self.height = height
         self.cornerRadius = cornerRadius
@@ -34,5 +38,6 @@ public struct DoneStripStyle: Equatable, Sendable {
         self.leadingMargin = leadingMargin
         self.trailingMargin = trailingMargin
         self.background = background
+        self.capsuleToRows = capsuleToRows
     }
 }

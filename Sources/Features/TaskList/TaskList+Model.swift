@@ -14,15 +14,25 @@ extension TaskList {
         /// 2).
         public let header: ScreenHeaderModel
 
+        /// The glass button that goes back, over the content at the top left; what a tap on it does is the window's
+        /// stack's, so it sends nothing (the controller's ruling on #177, 2026-11-07).
+        public let back: GlassButtonModel
+
+        /// The glass button at the top right that puts up `showAs`.
+        public let more: GlassButtonModel
+
+        /// How the glass buttons and their fade stand over the content, and where the content starts under them.
+        public let glassBar: GlassBarStyle
+
         /// The tags of the list's open tasks, the most used first, and nil when no chip would show (spec section 7).
         public let tagBar: TagBarModel<UserAction>?
 
         /// The blocks, as a list or as the board's columns.
         public let layout: Layout
 
-        /// "…" and its menu, Show as: List, and Columns, disabled with its reason where there is nothing to show as
-        /// columns (spec section 5).
-        public let showAs: MenuButtonModel<UserAction>
+        /// The menu `more` puts up, Show as: List, and Columns, disabled with its reason where there is nothing to show
+        /// as columns, the layout the list is shown as checked (spec section 5).
+        public let showAs: MenuModel<UserAction>
 
         /// What the screen shows when no block has a row, after the tag bar's filter, and the list has no lists inside,
         /// and nil otherwise (canvas, the empty state).

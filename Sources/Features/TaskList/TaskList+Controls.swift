@@ -73,12 +73,12 @@ extension TaskList {
     /// What a row's swipe and its menu both call what they do.
     private static let deleteTitle = "Delete"
 
-    /// A row's swipe to its Delete.
-    static func swipe(of id: TaskID, _ style: SwipeStyle) -> SwipeModel<UserAction> {
+    /// A row's swipe to its Delete, which reads aloud what it deletes, the title the row draws (canvas).
+    static func swipe(of id: TaskID, title: String, _ style: SwipeStyle) -> SwipeModel<UserAction> {
         SwipeModel(
             style: style,
             button: TextModel(text: deleteTitle, style: TextStyle(font: .barLabel, color: .onAccent)),
-            action: .deleteSwiped(id)
+            accessibilityLabel: "\(deleteTitle) \(title)", action: .deleteSwiped(id)
         )
     }
 

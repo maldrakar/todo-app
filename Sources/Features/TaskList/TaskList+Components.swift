@@ -16,12 +16,13 @@ import TodoCore
 /// in `TaskList+Controls.swift`.
 extension TaskList {
     /// What the rows and the headers of a model are built from beside their own tasks: the device's day, the tags'
-    /// names, the open card and the list being named.
+    /// names, the open card, the list being named and the task just dropped.
     struct RowContext {
         let today: Day
         let tags: TagNames
         let card: OpenCard?
         let naming: ListNaming?
+        let fresh: TaskID?
     }
 
     /// The screen's header (Task 8's table, Header): the list's tile, the title in the large title, and the subtitle,
@@ -172,15 +173,14 @@ extension TaskList {
 
     /// A task of a block: the open card where its row stood, or its row with its meta line, and its swipe and its menu,
     /// which a task in the Trash has neither of (spec section 6; the controller's ruling on #176, 2026-11-05). A
-    /// column's card has the menu and no swipe, its metrics having none. The row style's `lift` and `fresh` are Task
-    /// 8's.
+    /// column's card has the menu and no swipe, its metrics having none.
     private static func row(
         _ task: TodoTask, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Row, card cardMetrics: Metrics.Card
     ) -> Model.Row {
         cardRow(of: task, color, context, cardMetrics) ?? .task(task.id, taskRow(
             task, color, meta: meta(of: task, today: context.today, tags: context.tags, metrics),
-            swipe: task.trashed ? nil : metrics.swipe.map { swipe(of: task.id, $0) },
-            menu: task.trashed ? nil : deleteMenu(of: task.id), metrics
+            swipe: task.trashed ? nil : metrics.swipe.map { swipe(of: task.id, title: drawnTitle(of: task), $0) },
+            menu: task.trashed ? nil : deleteMenu(of: task.id), isFresh: context.fresh == task.id, metrics
         ))
     }
 
@@ -204,7 +204,12 @@ extension TaskList {
         }
         let rows: [Model.Row] = isOpen ? tasks.map { task in
             cardRow(of: task, color, context, cardMetrics)
-                ?? .task(task.id, taskRow(task, color, meta: [], swipe: nil, menu: nil, rowMetrics))
+                ?? .task(
+                    task.id,
+                    taskRow(
+                        task, color, meta: [], swipe: nil, menu: nil, isFresh: context.fresh == task.id, rowMetrics
+                    )
+                )
         } : []
         return (doneStrip(count: tasks.count, isOpen: isOpen, color: color, stripMetrics), rows)
     }
@@ -214,17 +219,19 @@ extension TaskList {
     /// ruling on #175, 2026-11-04); the title, struck in ink 3 over ink 2 for a task that is not open, and "New task"
     /// for a task with no title or a blank one, in the title and in what the check reads aloud (spec, "Risks"; the
     /// controller's ruling on #176, 2026-11-05); what stands under it and what it slides off and holds; and the row's
-    /// tap.
+    /// tap. It can be lifted exactly where it has a menu, a task in the Trash and a row of the Done strip having
+    /// neither (the controller's ruling on #177, 2026-11-07), and it is fresh where it is the task just dropped.
     private static func taskRow(
         _ task: TodoTask, _ color: Tile, meta: [MetaItemModel], swipe: SwipeModel<UserAction>?,
-        menu: MenuModel<UserAction>?, _ metrics: Metrics.Row
+        menu: MenuModel<UserAction>?, isFresh: Bool, _ metrics: Metrics.Row
     ) -> TaskRowModel<UserAction> {
         let isOpen = task.status == .open
         let title = drawnTitle(of: task)
         return TaskRowModel(
             check: check(title: title, isOpen: isOpen, action: .checkTapped(task.id), metrics.check(color)),
             title: TextModel(text: title, style: TextStyle(font: metrics.title, color: isOpen ? .ink : .ink2)),
-            meta: meta, style: metrics.style(isOpen), swipe: swipe, tap: .rowTapped(task.id), menu: menu
+            meta: meta, style: metrics.style(color, isOpen, menu != nil, isFresh), swipe: swipe,
+            tap: .rowTapped(task.id), menu: menu
         )
     }
 
@@ -299,28 +306,48 @@ extension TaskList {
         )
     }
 
-    /// Show as (spec section 5; canvas, section 2): "…", 22 pt semibold in ink on the platform's container, reading
-    /// "More", its menu List and Columns with their glyphs, Columns disabled with the reason the canvas gives where
-    /// there are no columns to show. The menu's "Show as" heading and the current item's check arrive with their
-    /// drawing (Task 8; the controller's ruling on #175, 2026-11-04).
-    static func showAs(canBoard: Bool) -> MenuButtonModel<UserAction> {
-        MenuButtonModel(
-            label: ButtonLabelModel(
-                icon: IconModel(icon: .ellipsis, style: IconStyle(size: 22, weight: .semibold, color: .ink)),
-                title: nil, accessibilityLabel: "More", style: ButtonLabelStyle(fill: .container)
+    /// The back button over the content (spec section 1; Task 8's table, Glass buttons): the chevron, reading "Back".
+    /// The canvas reads "Back to <title>" of the screen under this one, which the window's stack knows and this module
+    /// does not (the controller's ruling on #177, 2026-11-07).
+    static func back(_ metrics: Metrics.Glass) -> GlassButtonModel {
+        GlassButtonModel(
+            icon: IconModel(
+                icon: .chevronLeft, style: IconStyle(size: metrics.backGlyphSize, weight: .semibold, color: .ink)
             ),
-            menu: MenuModel(sections: [
+            style: metrics.back, accessibilityLabel: "Back"
+        )
+    }
+
+    /// "…" over the content (spec section 5; Task 8's table, Glass buttons), reading "More": the menu it opens is
+    /// `showAs`.
+    static func more(_ metrics: Metrics.Glass) -> GlassButtonModel {
+        GlassButtonModel(
+            icon: IconModel(
+                icon: .ellipsis, style: IconStyle(size: metrics.moreGlyphSize, weight: .semibold, color: .ink)
+            ),
+            style: metrics.more, accessibilityLabel: "More"
+        )
+    }
+
+    /// Show as (spec section 5; canvas, section 2), the menu "…" opens, headed "Show as": List and Columns with their
+    /// glyphs, the layout the list is shown as checked, Columns disabled with the reason the canvas gives where there
+    /// are no columns to show.
+    static func showAs(current: Model.Layout.Kind, canBoard: Bool) -> MenuModel<UserAction> {
+        MenuModel(
+            heading: "Show as",
+            sections: [
                 .init(items: [
                     .init(
-                        title: "List", icon: .list, isDestructive: false, shortcut: nil, action: .showAsChosen(.list)
+                        title: "List", icon: .list, isDestructive: false, isChecked: current == .list, shortcut: nil,
+                        action: .showAsChosen(.list)
                     ),
                     .init(
                         title: "Columns", subtitle: canBoard ? nil : "Group the list in its settings to get columns",
-                        icon: .columns, isDestructive: false, isDisabled: !canBoard, shortcut: nil,
-                        action: .showAsChosen(.columns)
+                        icon: .columns, isDestructive: false, isDisabled: !canBoard, isChecked: current == .columns,
+                        shortcut: nil, action: .showAsChosen(.columns)
                     ),
                 ]),
-            ])
+            ]
         )
     }
 

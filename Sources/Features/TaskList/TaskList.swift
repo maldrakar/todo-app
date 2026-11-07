@@ -165,12 +165,15 @@ public final class TaskList: Routable {
             head: route.head, title: snapshot.page.view.title, snapshot: snapshot, day: day,
             folded: isGroup ? [] : try TaskList.keptFolds(in: store, of: route.head.view),
             layout: isGroup ? .list : try TaskList.keptLayout(in: store, of: route.head.view), picks: [], card: nil,
-            isDoneOpen: false, naming: nil, destination: Destination(), problem: nil
+            isDoneOpen: false, naming: nil, fresh: nil, destination: Destination(), problem: nil
         )
         setDestination(route.tail)
     }
 
     public func send(_ event: Event) -> Output? {
+        // A drop's highlight lasts until the person does anything else, and no event of the world ends it (the
+        // controller's ruling on #177, 2026-11-07); the drop sets it again once it has landed.
+        if case .action = event { state.fresh = nil }
         switch event {
         case .action(.rowTapped(let id)): openCard(on: id)
         case .action(.checkTapped(let id)): check(id)
@@ -244,7 +247,7 @@ public final class TaskList: Routable {
             // An item is checked against the model: Columns disabled moves nothing (spec section 5). The choice is the
             // device's, kept per list (ADR-0010), and a group's screen keeps none, its one layout being the list's. The
             // sentence stays, as for a fold.
-            guard model.showAs.menu.sections.flatMap(\.items).contains(where: {
+            guard model.showAs.sections.flatMap(\.items).contains(where: {
                 $0.action == .showAsChosen(layout) && !$0.isDisabled
             }), layout != state.layout else { return nil }
             // A write that fails is not said, as a fold's is not: the layout stays on screen until the next list made
@@ -426,7 +429,8 @@ public final class TaskList: Routable {
     /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
     /// it even when the page's read fails; the snapshot of the store the blocks, the tile, the rule and the strip are
     /// read from, and the device's day it was taken by; the folds and the layout the device keeps, and what this
-    /// session keeps, the picked tags, the open card, whether the strip is open and the list being named; what it
+    /// session keeps, the picked tags, the open card, whether the strip is open, the list being named and the task a
+    /// drop just landed; what it
     /// declared over itself; and the sentence a person was last told. One value, moved field by field, and the one
     /// place any of it is kept: the model is assembled from it on every read, in `model` and nowhere else (owner's
     /// reviews of #77, #101 and #188).
@@ -444,6 +448,9 @@ public final class TaskList: Routable {
         var card: OpenCard?
         var isDoneOpen: Bool
         var naming: ListNaming?
+
+        /// The task a drop has just landed, whose rows are drawn fresh until the next action of the person's.
+        var fresh: TaskID?
         var destination: Destination<Route.Tail>
         var problem: String?
 
@@ -488,7 +495,7 @@ public final class TaskList: Routable {
             let color = TaskList.tileColor(view.color)
             let icon = TaskList.tileIcon(view.icon)
             let tags = TagNames(snapshot.tags)
-            let context = RowContext(today: today, tags: tags, card: card, naming: naming)
+            let context = RowContext(today: today, tags: tags, card: card, naming: naming, fresh: fresh)
             let hasListsInside = blocks.contains { if case .list = $0.id { true } else { false } }
             let heading = TaskList.screenHeading(
                 head: head, title: title, rule: view.filter, snapshot: snapshot, today: today
@@ -506,11 +513,14 @@ public final class TaskList: Routable {
             )
             return Model(
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
+                back: TaskList.back(metrics.glass),
+                more: TaskList.more(metrics.glass),
+                glassBar: metrics.glass.bar,
                 tagBar: TaskList.tagBar(chips, picked: picked, color: color, metrics.tagBar),
                 layout: TaskList.layout(
                     shown, title: title, folded: folded, addList: addList, context, metrics.blocks
                 ),
-                showAs: TaskList.showAs(canBoard: canBoard),
+                showAs: TaskList.showAs(current: shape, canBoard: canBoard),
                 empty: empty,
                 done: done.strip,
                 doneRows: done.rows,

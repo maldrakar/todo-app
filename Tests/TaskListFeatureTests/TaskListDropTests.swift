@@ -44,6 +44,7 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(rowIDs(of: block, in: module.model) == [ids[3], ids[0], ids[1], ids[4], ids[2]])
     module.tap(.rowDropped(ids[3], from: block, in: block, after: ids[4]))
     #expect(rowIDs(of: block, in: module.model) == [ids[0], ids[1], ids[4], ids[3], ids[2]], "a pinned task moves too")
+    module.tap(.backgroundTapped)  // the drop's highlight is the one thing a list made now does not draw
     #expect(try list(inbox, in: store).model == module.model, "and keeps it")
 }
 
@@ -465,5 +466,107 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     let id = try store.createTask(NewTask(title: "Fix the door"))
     let module = try list(parent, in: store)
     module.tap(.rowDropped(id, from: .own(nil), in: .list(house), after: nil))
+    module.tap(.backgroundTapped)  // the drop's highlight is the one thing a list made now does not draw
     #expect(module.model == (try list(parent, in: store).model))
+}
+
+// MARK: - The row just dropped
+
+/// The ids of the task rows a model draws fresh, in the list's blocks or the board's columns.
+private func freshIDs(in model: TaskList.Model) -> [TaskID] {
+    blocks(of: model).flatMap(\.rows).compactMap { row in
+        if case .task(let id, let model) = row, model.style.fresh != nil { id } else { nil }
+    }
+}
+
+/// Two days of Upcoming, each with a task, and the module on them: the first task is dragged to the second day.
+private func twoDays(_ store: Store) throws -> (list: TaskList, first: TaskID, second: TaskID, other: TaskID) {
+    let first = try store.createTask(NewTask(title: "First", when: day(1)))
+    let second = try store.createTask(NewTask(title: "Second", when: day(2)))
+    let other = try store.createTask(NewTask(title: "Other", when: day(3)))
+    return (try list(BuiltInTaskViews.upcoming, in: store), first, second, other)
+}
+
+/// A task dropped into another block lands fresh: the `fresh` colour on its row, over the `fresh` motion, and on no
+/// other row (the controller's ruling on #177, 2026-11-07, R145).
+@Test func aDropLandsFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, _) = try twoDays(store)
+    #expect(freshIDs(in: module.model).isEmpty)
+    module.tap(.rowDropped(first, from: .own(.day(day(1))), in: .own(.day(day(2))), after: second))
+    #expect(freshIDs(in: module.model) == [first])
+    let landed = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
+    #expect(landed.style.fresh == .fresh)
+    #expect(landed.style.freshAnimation == .fresh)
+}
+
+/// A reorder in the block it was dragged from lands fresh too.
+@Test func aReorderLandsFresh() throws {
+    let store = try makeStore()
+    let ids = try tasks("a", "b", "c", in: store)
+    let module = try list(inbox, in: store)
+    let block = TaskList.Model.BlockID.own(nil)
+    module.tap(.rowDropped(ids[2], from: block, in: block, after: nil))
+    #expect(freshIDs(in: module.model) == [ids[2]])
+}
+
+/// A column's card lands fresh as a row does (canvas, the dropped card).
+@Test func aDropLandsFreshOnAColumnsCard() throws {
+    let store = try makeStore()
+    let (module, first, second, _) = try twoDays(store)
+    module.tap(.showAsChosen(.columns))
+    module.tap(.rowDropped(first, from: .own(.day(day(1))), in: .own(.day(day(2))), after: second))
+    #expect(freshIDs(in: module.model) == [first])
+    let card = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
+    #expect(card.style.fresh == .fresh)
+}
+
+/// A drop that moves nothing or is refused lands nothing fresh, and takes the last drop's highlight away like any
+/// other action.
+@Test func aDropThatFailsOrRefusesLandsNothingFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, other) = try twoDays(store)
+    let one = TaskList.Model.BlockID.own(.day(day(1)))
+    let two = TaskList.Model.BlockID.own(.day(day(2)))
+    let three = TaskList.Model.BlockID.own(.day(day(3)))
+    module.tap(.rowDropped(second, from: two, in: three, after: other))
+    #expect(freshIDs(in: module.model) == [second])
+    module.tap(.rowDropped(first, from: one, in: one, after: nil))
+    #expect(freshIDs(in: module.model).isEmpty, "where it stood")
+    module.tap(.rowDropped(other, from: three, in: one, after: first))
+    #expect(freshIDs(in: module.model) == [other])
+    module.tap(.rowDropped(other, from: three, in: .list(ViewID("gone")), after: nil))
+    #expect(freshIDs(in: module.model).isEmpty, "a block that is not drawn")
+}
+
+/// Any later action of the person's clears it, the ones that change nothing too (R145).
+@Test func aLaterActionClearsFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, other) = try twoDays(store)
+    let one = TaskList.Model.BlockID.own(.day(day(1)))
+    let two = TaskList.Model.BlockID.own(.day(day(2)))
+    let three = TaskList.Model.BlockID.own(.day(day(3)))
+    module.tap(.rowDropped(first, from: one, in: two, after: second))
+    #expect(freshIDs(in: module.model) == [first])
+    module.tap(.rowTapped(other))
+    #expect(freshIDs(in: module.model).isEmpty)
+    module.tap(.backgroundTapped)
+    module.tap(.rowDropped(other, from: three, in: two, after: first))
+    #expect(freshIDs(in: module.model) == [other])
+    module.tap(.blockTitleTapped(.own(nil)))
+    #expect(freshIDs(in: module.model).isEmpty, "an action the module refuses clears it as well")
+}
+
+/// An event of the world leaves it, a change and a new day and being made alike (R145).
+@Test func aChangeDoesNotClearFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, _) = try twoDays(store)
+    module.tap(.rowDropped(first, from: .own(.day(day(1))), in: .own(.day(day(2))), after: second))
+    let renamed = try changeSet(of: store) { try store.update(task: second, [.title("Second, renamed")]) }
+    #expect(module.send(.changed(renamed)) == nil)
+    #expect(rows(of: module.model).contains { $0.title == "Second, renamed" })
+    #expect(freshIDs(in: module.model) == [first])
+    #expect(module.send(.dayChanged(testDay)) == nil)
+    #expect(module.send(.created) == nil)
+    #expect(freshIDs(in: module.model) == [first])
 }

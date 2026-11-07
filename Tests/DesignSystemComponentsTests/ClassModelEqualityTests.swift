@@ -205,7 +205,8 @@ private let swipe = SwipeModel<Action>(
         threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
         buttonCornerRadius: 12, background: .red, animation: .swipe
     ),
-    button: TextModel(text: "Delete", style: TextStyle(font: .barLabel, color: .onAccent)), action: .second
+    button: TextModel(text: "Delete", style: TextStyle(font: .barLabel, color: .onAccent)),
+    accessibilityLabel: "Delete Call the plumber", action: .second
 )
 
 private let taskRowStyle = TaskRowStyle(
@@ -268,7 +269,12 @@ private let expand = ButtonModel<Action>(
 private let cardStyle = CardStyle(
     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
     bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised, background: .surface,
-    animation: .cardOpens
+    animation: .cardOpens, subtasksOutdent: 12, notesToSubtasks: 4, subtaskDraftCircle: draftCircle
+)
+
+private let draftCircle = CheckStyle(
+    diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44, animation: .check,
+    colors: DesignSystem.Color.Components.Tile.blue.check
 )
 
 private func card(
@@ -308,7 +314,8 @@ private func card(
         "style": card(style: .init(
             expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
             bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted,
-            background: .surface, animation: .cardOpens
+            background: .surface, animation: .cardOpens, subtasksOutdent: 12, notesToSubtasks: 4,
+            subtaskDraftCircle: draftCircle
         )),
         "backgroundTapped": card(backgroundTapped: .second),
     ])
@@ -380,7 +387,7 @@ private func addRow(
 
 private let doneStripStyle = DoneStripStyle(
     height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-    leadingMargin: 14, trailingMargin: 16, background: .fill
+    leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6
 )
 
 private func doneStrip(
@@ -407,7 +414,7 @@ private func doneStrip(
         "chevron": doneStrip(rotation: 180),
         "style": doneStrip(style: .init(
             height: 30, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-            leadingMargin: 14, trailingMargin: 16, background: .fill
+            leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6
         )),
         "isOpen": doneStrip(isOpen: true),
         "action": doneStrip(action: .second),
