@@ -75,7 +75,9 @@ struct CheckCircle: View {
                     CubicKeyframe(style.pop.peakScale, duration: duration * (style.pop.peakAt - style.pop.dipAt))
                     CubicKeyframe(1, duration: duration * (1 - style.pop.peakAt))
                 } else {
-                    LinearKeyframe(1, duration: 0)
+                    // At rest for as long, not for no time: a timeline of no length left the circle at no size, so that
+                    // a check going back to open vanished (the iOS 26.3 simulator, 2026-11-07).
+                    LinearKeyframe(1, duration: style.animation.duration)
                 }
             }
         }

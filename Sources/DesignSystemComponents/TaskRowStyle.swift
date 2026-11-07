@@ -5,28 +5,6 @@ import DesignSystem
 /// colour and fade or its landing spring, and how it leaves, which a builder hands over as one value. The line goes
 /// with whether the task is open, so a done row is another instance.
 public struct TaskRowStyle: Equatable, Sendable {
-    /// How a row looks and moves as its check takes it out of its block (`Phone.dc.html`, `.tt-done` and `.row-leave`):
-    /// its title in `titleColor`, struck in `strike`, while its check fills, and then, on `animation`, which holds it
-    /// there a moment first, it fades out and sinks `offset`, the rows under it closing up on the same motion. The
-    /// module has no done task among its rows by then, so the row keeps this for its last moments on screen itself
-    /// (list screen spec, section 3).
-    public struct Leaving: Equatable, Sendable {
-        public let titleColor: DesignSystem.Color
-        public let strike: DesignSystem.Color
-        public let offset: Double
-        public let animation: DesignSystem.Animation
-
-        public init(
-            titleColor: DesignSystem.Color, strike: DesignSystem.Color, offset: Double,
-            animation: DesignSystem.Animation
-        ) {
-            self.titleColor = titleColor
-            self.strike = strike
-            self.offset = offset
-            self.animation = animation
-        }
-    }
-
     public let titleToMeta: Double
     public let metaSpacing: Double
     public let metaLineSpacing: Double
@@ -66,7 +44,7 @@ public struct TaskRowStyle: Equatable, Sendable {
     /// The motion the title changes colour on, a checked row's that stays where it is.
     public let titleAnimation: DesignSystem.Animation
 
-    public let leaving: Leaving
+    public let leaving: TaskLeavingStyle
 
     public init(
         titleToMeta: Double,
@@ -86,7 +64,7 @@ public struct TaskRowStyle: Equatable, Sendable {
         landingScale: Double?,
         landingAnimation: DesignSystem.Animation,
         titleAnimation: DesignSystem.Animation,
-        leaving: Leaving
+        leaving: TaskLeavingStyle
     ) {
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing

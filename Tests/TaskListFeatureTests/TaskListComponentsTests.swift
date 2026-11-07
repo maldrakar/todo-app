@@ -16,9 +16,9 @@ private let checkMark = CheckStyle.Mark(
     box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)]
 )
 
-/// How a row leaves as its task is completed (`Phone.dc.html`, `.tt-done` and `.row-leave`): its title in ink 2 and
-/// struck in ink 3, sinking 12 as it goes on the row's motion.
-private let rowLeaving = TaskRowStyle.Leaving(titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves)
+/// How a row or a card leaves as its task is completed (`Phone.dc.html`, `.tt-done` and `.row-leave`): its title in ink
+/// 2 and struck in ink 3, sinking 12 as it goes on the row's motion.
+private let taskLeaving = TaskLeavingStyle(titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves)
 
 /// The board a model draws in columns, nil in the list.
 private func board(of model: TaskList.Model) -> TaskList.Model.Board? {
@@ -56,7 +56,7 @@ private func phoneRow(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
             titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh,
             strike: isOpen ? nil : .ink3, lift: deletes ? lift(colors) : nil, fresh: isFresh ? .fresh : nil,
-            landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades, leaving: rowLeaving
+            landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades, leaving: taskLeaving
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
@@ -262,8 +262,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 /// The glass buttons are 44 circles on the glass edged with its 0.5 hairline and casting the raised shadow: the back
 /// chevron 24 across set 2 left of centre, reading "Back", and "…" 22 across, reading "More"; they stand 14 in from the
 /// screen's sides at the safe area's top, over a fade of the paper 54 under it, solid to 15.12 under it, with the
-/// content 56 under it (Task 8's table, Glass buttons; the controller's ruling on #177, 2026-11-07: the canvas's 108 fade
-/// less its 54 status bar, solid to 64 % of the 108).
+/// content 56 under it (Task 8's table, Glass buttons; the controller's ruling on #177, 2026-11-07: the canvas's 108
+/// fade less its 54 status bar, solid to 64 % of the 108).
 @Test func theGlassButtonsCarryThePhonesNumbers() throws {
     let store = try makeStore()
     func button(_ icon: DesignSystem.Icon, size: Double, offset: Double, _ label: String) -> GlassButtonModel {
@@ -372,17 +372,17 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
             strike: nil, lift: cardLift, fresh: nil, landingScale: nil, landingAnimation: .drop,
-            titleAnimation: .titleFades, leaving: rowLeaving
+            titleAnimation: .titleFades, leaving: taskLeaving
         ),
         swipe: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)
     )])
 }
 
-/// A task with no title is drawn as "New task" in its row, a blank title too, wherever a row is drawn: a block's, a column's
-/// card and the strip's, its title and what its check reads aloud alike, since a row with nothing to read is no row to find
-/// (spec, "Risks"; the controller's ruling on #176, 2026-11-05). The store keeps what it holds, and the open card's field
-/// shows that with its placeholder, as it does for a task just added.
+/// A task with no title is drawn as "New task" in its row, a blank title too, wherever a row is drawn: a block's, a
+/// column's card and the strip's, its title and what its check reads aloud alike, since a row with nothing to read is
+/// no row to find (spec, "Risks"; the controller's ruling on #176, 2026-11-05). The store keeps what it holds, and the
+/// open card's field shows that with its placeholder, as it does for a task just added.
 @Test func aTaskWithNoTitleIsDrawnAsNewTaskInItsRow() throws {
     let store = try makeStore()
     let empty = try store.createTask(NewTask(title: "", when: day(1)))
@@ -530,9 +530,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     #expect(rows == [phoneRow("Binned", id: id, colors: Tile.stone.check, deletes: false)])
 }
 
-/// A row or a column's card lifts exactly where it has a menu: not a row of the Done strip, not a task in the Trash (the
-/// controller's ruling on #177, 2026-11-07). Its swipe reads Delete and the title the row draws aloud, "New task" for a
-/// task with none.
+/// A row or a column's card lifts exactly where it has a menu: not a row of the Done strip, not a task in the Trash
+/// (the controller's ruling on #177, 2026-11-07). Its swipe reads Delete and the title the row draws aloud, "New task"
+/// for a task with none.
 @Test func aRowLiftsExactlyWhereItHasAMenu() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk", when: day(1)))
@@ -672,7 +672,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 entrance: EntranceStyle(
                     opacity: 0.3, scale: 0.97, offset: -4, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
                 ),
-                subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: subtaskCircle
+                subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: subtaskCircle,
+                leaving: taskLeaving
             ),
             backgroundTapped: .backgroundTapped
         )

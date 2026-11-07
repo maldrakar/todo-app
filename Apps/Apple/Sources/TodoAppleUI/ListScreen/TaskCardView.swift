@@ -9,10 +9,10 @@ import SwiftUI
 /// typed text of its three fields sends are made by `titleChanged`, `notesChanged` and `subtaskChanged`, which a model
 /// cannot hold (`TextFieldModel`).
 ///
-/// A tap on the card's own background is the card's, so that it does not reach the screen's, which closes it
-/// (`ListScreen`). The title takes the focus when the card appears with an empty title, a new task's, and the keyboard
-/// rises with it. The subtask's field takes it when it appears, and back after Return, since Return opens the next
-/// (`PlainField`).
+/// A tap on its check takes the card away as `CompletingTask` says, as a row's does. A tap on the card's own background
+/// is the card's, so that it does not reach the screen's, which closes it (`ListScreen`). The title takes the focus
+/// when the card appears with an empty title, a new task's, and the keyboard rises with it. The subtask's field takes
+/// it when it appears, and back after Return, since Return opens the next (`PlainField`).
 struct TaskCardView<Action: Equatable & Sendable>: View {
     private let model: CardModel<Action>
     private let titleChanged: (String) -> Action
@@ -36,47 +36,50 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            top
+        CompletingTask(model.check, leaving: model.style.leaving, send: send) { isCompleting, checkTapped in
             VStack(alignment: .leading, spacing: 0) {
-                PlainField(
-                    model.notes, axis: .vertical, focusesOnAppear: false, changed: notesChanged, send: send
-                )
-                .padding(.top, model.style.titleToNotes)
-                subtasks
-                    .padding(.top, model.style.notesToSubtasks)
-                WrappingRow(spacing: model.style.pillSpacing, lineSpacing: model.style.pillSpacing) {
-                    ForEach(model.pills.indices, id: \.self) { index in
-                        pill(model.pills[index])
+                top(isCompleting: isCompleting, checkTapped: checkTapped)
+                VStack(alignment: .leading, spacing: 0) {
+                    PlainField(
+                        model.notes, axis: .vertical, focusesOnAppear: false, changed: notesChanged, send: send
+                    )
+                    .padding(.top, model.style.titleToNotes)
+                    subtasks
+                        .padding(.top, model.style.notesToSubtasks)
+                    WrappingRow(spacing: model.style.pillSpacing, lineSpacing: model.style.pillSpacing) {
+                        ForEach(model.pills.indices, id: \.self) { index in
+                            pill(model.pills[index])
+                        }
                     }
+                    .padding(.top, model.style.subtasksToPills)
                 }
-                .padding(.top, model.style.subtasksToPills)
+                .padding(.leading, model.style.bodyLeading)
+                .padding(.trailing, model.style.bodyTrailing)
+                .padding(.bottom, model.style.bodyBottom)
             }
-            .padding(.leading, model.style.bodyLeading)
-            .padding(.trailing, model.style.bodyTrailing)
-            .padding(.bottom, model.style.bodyBottom)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // The shadow on the shape alone, since on the card it would be cast by each thing on it.
+            .background {
+                RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
+                    .fill(Color(model.style.background))
+                    .shadow(model.style.shadow)
+            }
+            .contentShape(.rect)
+            .onTapGesture {}
+            .modifier(Entrance(model.style.entrance))
+            .padding(.top, model.style.topMargin)
+            .padding(.horizontal, model.style.horizontalMargin)
+            .padding(.bottom, model.style.bottomMargin)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // The shadow on the shape alone, since on the card it would be cast by each thing on it.
-        .background {
-            RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
-                .fill(Color(model.style.background))
-                .shadow(model.style.shadow)
-        }
-        .contentShape(.rect)
-        .onTapGesture {}
-        .modifier(Entrance(model.style.entrance))
-        .padding(.top, model.style.topMargin)
-        .padding(.horizontal, model.style.horizontalMargin)
-        .padding(.bottom, model.style.bottomMargin)
     }
 
     /// The check, the title's field and Open full screen.
-    private var top: some View {
+    private func top(isCompleting: Bool, checkTapped: @escaping () -> Void) -> some View {
         HStack(alignment: .top, spacing: 0) {
-            CheckButton(model.check, isChecked: model.check.isChecked) { send(model.check.action) }
+            CheckButton(model.check, isChecked: model.check.isChecked || isCompleting, action: checkTapped)
             PlainField(
-                model.title, focusesOnAppear: model.title.text.isEmpty, changed: titleChanged, send: send
+                model.title, focusesOnAppear: model.title.text.isEmpty, struck: isCompleting ? model.style.leaving : nil,
+                changed: titleChanged, send: send
             )
             Button { send(model.expand.action) } label: {
                 expandFace

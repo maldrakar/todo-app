@@ -23,6 +23,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
     private let focusesOnAppear: Bool
     private let keepsFocusOnSubmit: Bool
     private let selectsAllOnFocus: Bool
+    private let struck: TaskLeavingStyle?
     private let changed: (String) -> Action
     private let send: (Action) -> Void
 
@@ -32,14 +33,15 @@ struct PlainField<Action: Equatable & Sendable>: View {
     /// The field, on one line unless `axis` says it grows down, as a card's notes do.
     init(
         _ model: TextFieldModel<Action>, axis: Axis = .horizontal, focusesOnAppear: Bool,
-        keepsFocusOnSubmit: Bool = false, selectsAllOnFocus: Bool = false, changed: @escaping (String) -> Action,
-        send: @escaping (Action) -> Void
+        keepsFocusOnSubmit: Bool = false, selectsAllOnFocus: Bool = false, struck: TaskLeavingStyle? = nil,
+        changed: @escaping (String) -> Action, send: @escaping (Action) -> Void
     ) {
         self.model = model
         self.axis = axis
         self.focusesOnAppear = focusesOnAppear
         self.keepsFocusOnSubmit = keepsFocusOnSubmit
         self.selectsAllOnFocus = selectsAllOnFocus
+        self.struck = struck
         self.changed = changed
         self.send = send
         _typed = State(initialValue: TypedText(model.text))
@@ -50,7 +52,9 @@ struct PlainField<Action: Equatable & Sendable>: View {
             // Plain, its look the model's: the Mac's default style draws a bezel of its own inside it, where iOS's
             // draws none.
             .textFieldStyle(.plain)
-            .fieldLook(model)
+            // A card's title while its check takes the card away, where the canvas's title strikes (`.tt-done`).
+            .strikethrough(struck != nil, color: struck.map { Color($0.strike) })
+            .fieldLook(model, color: struck?.titleColor)
             .focused($isFocused)
             .onSubmit {
                 send(model.submitted)
@@ -100,15 +104,16 @@ struct PlainField<Action: Equatable & Sendable>: View {
 }
 
 /// What a field shows while what it sent up comes back to it late: what is typed stands at once, and a text of the
-/// model's that this field sent is an echo of what it has moved on from, while any other is the module's own and stands,
-/// the next subtask's empty field after Return, a title the store kept trimmed or another device's change. A field bound
-/// to the model itself lost letters: a model drawn before a keystroke, handed to the field after it, wrote the text back
-/// without that letter, on an iPhone 17 one title in five at the speed a test types and however slowly a long list draws
-/// (the iOS 26.3 simulator, 2026-11-07).
+/// model's that this field sent is an echo of what it has moved on from, while any other is the module's own and
+/// stands, the next subtask's empty field after Return, a title the store kept trimmed or another device's change. A
+/// field bound to the model itself lost letters: a model drawn before a keystroke, handed to the field after it, wrote
+/// the text back without that letter, on an iPhone 17 one title in five at the speed a test types and however slowly a
+/// long list draws (the iOS 26.3 simulator, 2026-11-07).
 ///
-/// Nothing says when the module has answered but a change of the model the view can see, and a letter and Return handled
-/// with no render between them, "" to "a" and back to "", is none. So Return and a lost focus end what was waited for and
-/// put the field back on what the model last showed, and the model's next change, if it has one, settles the rest.
+/// Nothing says when the module has answered but a change of the model the view can see, and a letter and Return
+/// handled with no render between them, "" to "a" and back to "", is none. So Return and a lost focus end what was
+/// waited for and put the field back on what the model last showed, and the model's next change, if it has one, settles
+/// the rest.
 struct TypedText {
     private(set) var text: String
 
@@ -123,8 +128,8 @@ struct TypedText {
         shown = text
     }
 
-    /// Takes what the field now holds, and answers whether it goes up: a keystroke, not the text the field held, while it
-    /// has the focus. Only what goes up is waited for.
+    /// Takes what the field now holds, and answers whether it goes up: a keystroke, not the text the field held, while
+    /// it has the focus. Only what goes up is waited for.
     mutating func typed(_ new: String, goesUp: Bool) -> Bool {
         guard new != text else { return false }
         text = new
@@ -133,8 +138,8 @@ struct TypedText {
         return true
     }
 
-    /// Takes the text the model now shows. An echo answers everything sent before it too, the newest of equal texts first,
-    /// so that an old entry cannot swallow a later answer.
+    /// Takes the text the model now shows. An echo answers everything sent before it too, the newest of equal texts
+    /// first, so that an old entry cannot swallow a later answer.
     mutating func modelHolds(_ new: String) {
         shown = new
         if let index = sent.lastIndex(of: new) {

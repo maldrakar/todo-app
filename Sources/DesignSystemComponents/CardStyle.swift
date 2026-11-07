@@ -34,6 +34,9 @@ public struct CardStyle: Equatable, Sendable {
     /// the shape of a subtask's check with no task yet to mark.
     public let subtaskDraftCircle: CheckStyle
 
+    /// How the card leaves as its check completes its task, as a row does.
+    public let leaving: TaskLeavingStyle
+
     public init(
         expandHitSide: Double,
         cornerRadius: Double,
@@ -51,7 +54,8 @@ public struct CardStyle: Equatable, Sendable {
         subtasksOutdent: Double,
         titleToNotes: Double,
         notesToSubtasks: Double,
-        subtaskDraftCircle: CheckStyle
+        subtaskDraftCircle: CheckStyle,
+        leaving: TaskLeavingStyle
     ) {
         self.expandHitSide = expandHitSide
         self.cornerRadius = cornerRadius
@@ -70,5 +74,6 @@ public struct CardStyle: Equatable, Sendable {
         self.titleToNotes = titleToNotes
         self.notesToSubtasks = notesToSubtasks
         self.subtaskDraftCircle = subtaskDraftCircle
+        self.leaving = leaving
     }
 }

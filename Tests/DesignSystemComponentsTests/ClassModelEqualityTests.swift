@@ -210,13 +210,13 @@ private let swipe = SwipeModel<Action>(
     accessibilityLabel: "Delete Call the plumber", action: .second
 )
 
-private let rowLeaving = TaskRowStyle.Leaving(titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves)
+private let taskLeaving = TaskLeavingStyle(titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves)
 
 private let taskRowStyle = TaskRowStyle(
     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
     leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0, freshAnimation: .fresh,
     strike: nil, lift: nil, fresh: nil, landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades,
-    leaving: rowLeaving
+    leaving: taskLeaving
 )
 
 private func taskRow(
@@ -238,7 +238,7 @@ private func taskRow(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9, freshAnimation: .fresh,
             strike: nil, lift: nil, fresh: nil, landingScale: nil, landingAnimation: .drop,
-            titleAnimation: .titleFades, leaving: rowLeaving
+            titleAnimation: .titleFades, leaving: taskLeaving
         )),
         "swipe": taskRow(swipe: swipe),
         "tap": taskRow(tap: .second),
@@ -278,7 +278,8 @@ private let cardEntrance = EntranceStyle(
 private let cardStyle = CardStyle(
     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
     bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised, background: .surface,
-    entrance: cardEntrance, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: draftCircle
+    entrance: cardEntrance, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: draftCircle,
+    leaving: taskLeaving
 )
 
 private let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
@@ -333,7 +334,7 @@ private func card(
             expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
             bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted,
             background: .surface, entrance: cardEntrance, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4,
-            subtaskDraftCircle: draftCircle
+            subtaskDraftCircle: draftCircle, leaving: taskLeaving
         )),
         "backgroundTapped": card(backgroundTapped: .second),
     ])

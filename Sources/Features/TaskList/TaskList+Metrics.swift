@@ -243,7 +243,7 @@ extension TaskList {
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
                             freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil,
                             fresh: nil, landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop,
-                            titleAnimation: .titleFades, leaving: rowLeaving
+                            titleAnimation: .titleFades, leaving: taskLeaving
                         )
                     },
                     check: { color in
@@ -261,7 +261,8 @@ extension TaskList {
                             expandHitSide: 44, cornerRadius: 13, topMargin: 0, horizontalMargin: 0, bottomMargin: 0,
                             bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
                             shadow: .resting, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
-                            titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color)
+                            titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color),
+                            leaving: taskLeaving
                         )
                     },
                     check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
@@ -299,9 +300,10 @@ extension TaskList {
             box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)]
         )
 
-        /// How a phone's row or column's card leaves as its task is completed (`Phone.dc.html`, `.tt-done` and
-        /// `.row-leave`): its title in ink 2 and struck in ink 3, sinking 12 as it fades on the row's motion.
-        private static let rowLeaving = TaskRowStyle.Leaving(
+        /// How a phone's row, a column's card or an open card leaves as its task is completed (`Phone.dc.html`,
+        /// `.tt-done` and `.row-leave`): its title in ink 2 and struck in ink 3, sinking 12 as it fades on the row's
+        /// motion.
+        private static let taskLeaving = TaskLeavingStyle(
             titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves
         )
 
@@ -345,7 +347,7 @@ extension TaskList {
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
                     freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift(color) : nil,
                     fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .drop,
-                    titleAnimation: .titleFades, leaving: rowLeaving
+                    titleAnimation: .titleFades, leaving: taskLeaving
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
@@ -368,7 +370,8 @@ extension TaskList {
                     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10,
                     bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6,
                     shadow: .raised, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
-                    titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color)
+                    titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color),
+                    leaving: taskLeaving
                 )
             },
             check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
