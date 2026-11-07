@@ -245,9 +245,9 @@ extension TaskList {
                         .init(
                             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
-                            freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil,
-                            fresh: nil, landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop,
-                            titleAnimation: .titleFades, leaving: taskLeaving, ground: nil
+                            strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil, fresh: nil,
+                            landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop, titleAnimation: .titleFades,
+                            leaving: taskLeaving, ground: nil
                         )
                     },
                     check: { color in
@@ -348,9 +348,9 @@ extension TaskList {
                 .init(
                     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
-                    freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift : nil,
-                    fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .drop,
-                    titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper
+                    strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift : nil, fresh: isFresh ? .fresh : nil,
+                    landingScale: nil, landingAnimation: .fresh, titleAnimation: .titleFades, leaving: taskLeaving,
+                    ground: .paper
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,

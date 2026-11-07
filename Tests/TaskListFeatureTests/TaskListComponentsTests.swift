@@ -57,9 +57,9 @@ private func phoneRow(
         meta: meta,
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
-            titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh,
+            titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
             strike: isOpen ? nil : .ink3, lift: deletes ? rowLift : nil, fresh: isFresh ? .fresh : nil,
-            landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades, leaving: taskLeaving,
+            landingScale: nil, landingAnimation: .fresh, titleAnimation: .titleFades, leaving: taskLeaving,
             ground: .paper
         ),
         swipe: deletes ? SwipeModel(
@@ -374,7 +374,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         title: TextModel(text: "Buy milk", style: TextStyle(font: .nestedRowTitle, color: .ink)), meta: [],
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
-            leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
+            leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
             strike: nil, lift: cardLift, fresh: nil, landingScale: nil, landingAnimation: .drop,
             titleAnimation: .titleFades, leaving: taskLeaving, ground: nil
         ),

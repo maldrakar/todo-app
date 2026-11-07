@@ -67,10 +67,7 @@ struct TaskLanding: ViewModifier {
         guard !hasLanded else { return }
         hasLanded = true
         guard !reduceMotion, landing == nil else { return }
-        landing = Landing(
-            color: style.fresh, scale: style.landingScale,
-            animation: style.fresh == nil ? style.landingAnimation : style.freshAnimation
-        )
+        landing = Landing(color: style.fresh, scale: style.landingScale, animation: style.landingAnimation)
     }
 
     private func play(_ animation: DesignSystem.Animation) {

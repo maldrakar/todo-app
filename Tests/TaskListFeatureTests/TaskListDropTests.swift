@@ -498,7 +498,7 @@ private func twoDays(_ store: Store) throws -> (list: TaskList, first: TaskID, s
     #expect(freshIDs(in: module.model) == [first])
     let landed = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
     #expect(landed.style.fresh == .fresh)
-    #expect(landed.style.freshAnimation == .fresh)
+    #expect(landed.style.landingAnimation == .fresh)
 }
 
 /// A reorder in the block it was dragged from lands fresh too.

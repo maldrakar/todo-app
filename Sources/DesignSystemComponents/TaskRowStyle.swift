@@ -19,7 +19,6 @@ public struct TaskRowStyle: Equatable, Sendable {
 
     /// The radius of the corners of what the row draws under itself, its fresh colour and the pointer's tint.
     public let cornerRadius: Double
-    public let freshAnimation: DesignSystem.Animation
 
     /// The colour of the line through the title, the canvas's ink 3 through a done task's (`.tt-done`), and nil for a
     /// title with no line through it.
@@ -28,9 +27,8 @@ public struct TaskRowStyle: Equatable, Sendable {
     /// How the row looks while it is lifted to be moved, and nil for a row that cannot be.
     public let lift: TaskLiftStyle?
 
-    /// The colour under the row where it was just dropped, which fades out over `freshAnimation` from the moment it
-    /// lands, and nil under any other row. The motion is held while the colour is nil too, so the fade does not stop
-    /// when the colour goes.
+    /// The colour under the row where it was just dropped, which fades out over `landingAnimation` from the moment it
+    /// lands, and nil under any other row.
     public let fresh: DesignSystem.Color?
 
     /// The scale a task lands from after a drop, springing to 1 over `landingAnimation`, and nil under any other
@@ -38,7 +36,8 @@ public struct TaskRowStyle: Equatable, Sendable {
     /// `cardDrop`, a column's card; `.row-fresh`, a row). A view plays whichever of the two is not nil.
     public let landingScale: Double?
 
-    /// The motion of the landing, held while `landingScale` is nil too, so it does not stop when the scale goes.
+    /// The motion of the landing, a list's row's fade or a column's card's spring, held while `fresh` and
+    /// `landingScale` are nil too, so that it does not stop when they go.
     public let landingAnimation: DesignSystem.Animation
 
     /// The motion the title changes colour on, a checked row's that stays where it is.
@@ -61,7 +60,6 @@ public struct TaskRowStyle: Equatable, Sendable {
         trailing: Double,
         minimumHeight: Double,
         cornerRadius: Double,
-        freshAnimation: DesignSystem.Animation,
         strike: DesignSystem.Color?,
         lift: TaskLiftStyle?,
         fresh: DesignSystem.Color?,
@@ -81,7 +79,6 @@ public struct TaskRowStyle: Equatable, Sendable {
         self.trailing = trailing
         self.minimumHeight = minimumHeight
         self.cornerRadius = cornerRadius
-        self.freshAnimation = freshAnimation
         self.strike = strike
         self.lift = lift
         self.fresh = fresh
