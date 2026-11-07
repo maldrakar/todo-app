@@ -104,7 +104,7 @@ struct RowLift: Equatable {
             guard block.takesDrop else { return nil }
             let rows = block.rows.map(\.id).filter { $0 != task }
             guard block.id == source else { return Slot(block: block.id, after: rows.last) }
-            return Slot(block: block.id, after: Self.place(at: point.y, among: rows, of: block.id, frames: frames))
+            return Slot(block: block.id, after: Self.place(at: point.y, among: rows, of: block, frames: frames))
         }
         return moved
     }
@@ -124,16 +124,17 @@ struct RowLift: Equatable {
     }
 
     /// The row a task let go at the height stands after, among the rest of its own block, above a column's cards in
-    /// sight its top and below them its end.
+    /// sight its top and below them its end. A list's block is no column, though a board it was shown as left its area
+    /// in the frames.
     private static func place(
-        at y: CGFloat, among rows: [TaskID], of block: TaskList.Model.BlockID, frames: Frames
+        at y: CGFloat, among rows: [TaskID], of block: TaskList.Model.Block, frames: Frames
     ) -> TaskID? {
-        if let area = frames.columns[block] {
+        if block.column != nil, let area = frames.columns[block.id] {
             if y < area.minY { return nil }
             if y >= area.maxY { return rows.last }
         }
         return rows.prefix { row in
-            frames.rows[BlockRowID(block: block, task: row)].map { $0.midY <= y } ?? false
+            frames.rows[BlockRowID(block: block.id, task: row)].map { $0.midY <= y } ?? false
         }.last
     }
 

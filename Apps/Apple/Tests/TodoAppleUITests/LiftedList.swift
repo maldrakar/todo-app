@@ -17,6 +17,7 @@ struct LiftedList {
     private(set) var lift: RowLift?
     private(set) var drops: [TaskList.UserAction] = []
     private var scrolled: [TaskList.Model.BlockID: CGFloat] = [:]
+    private var areasLeft: [TaskList.Model.BlockID: CGRect] = [:]
     private let module: TaskList
 
     /// How high a block's header, a row, a block's "+ Add task" and the mark's gap stand in the list; how wide a column
@@ -79,6 +80,7 @@ struct LiftedList {
 
     private var listFrames: RowLift.Frames {
         var frames = RowLift.Frames()
+        frames.columns = areasLeft
         var y: CGFloat = 0
         for block in blocks {
             let top = y
@@ -114,6 +116,10 @@ struct LiftedList {
         }
         return frames
     }
+
+    /// The area a column's cards were seen through on a board this list was shown as, which stays in the frames as a
+    /// frame of anything that has left does.
+    mutating func leaveColumnArea(of id: TaskList.Model.BlockID, _ area: CGRect) { areasLeft[id] = area }
 
     /// A column's cards scrolled up by so much.
     mutating func scrollColumn(_ id: TaskList.Model.BlockID, by offset: CGFloat) { scrolled[id] = offset }

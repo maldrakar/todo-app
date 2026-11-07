@@ -146,6 +146,19 @@ import TodoCore
     #expect(list.drops == [.rowDropped(list.a, from: own, in: own, after: list.c)])
 }
 
+/// A list's block is no column, whatever a board left in the frames: back from Columns the slot goes by the rows'
+/// middles, above and below the area its column was seen through.
+@Test func aListReadsNoAreaABoardLeftInTheFrames() throws {
+    var list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    list.leaveColumnArea(of: own, CGRect(x: 0, y: 60, width: 296, height: 20))
+    list.press(.began(task: list.b, block: own, session: "first", at: list.centre(of: list.b, in: own)))
+    list.press(.changed(list.lowerHalf(of: list.c, in: own)))
+    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.c), "below the area")
+    list.press(.changed(list.lowerHalf(of: list.a, in: own)))
+    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.a), "above the area")
+}
+
 /// On the board the point picks the column under it, the nearest in a gap or a margin, whatever its height, a column
 /// that takes no drop offering none; in another column at its end, and in its own among the cards in sight: a card
 /// scrolled out of its column keeps a frame, under the column's header, and is never the one under the finger.
