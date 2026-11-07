@@ -30,6 +30,11 @@ struct PlainField<Action: Equatable & Sendable>: View {
     @FocusState private var isFocused: Bool
     @State private var typed: TypedText
 
+    #if os(iOS)
+    /// Whether the field has selected its text on taking the focus, which it does once.
+    @State private var hasSelectedAll = false
+    #endif
+
     /// The field, on one line unless `axis` says it grows down, as a card's notes do.
     init(
         _ model: TextFieldModel<Action>, axis: Axis = .horizontal, focusesOnAppear: Bool,
@@ -74,9 +79,13 @@ struct PlainField<Action: Equatable & Sendable>: View {
             // A list's new name replaces "New list" as it is typed (`Phone.dc.html`, the name field's `selectAll`).
             // SwiftUI can select a field's text from iOS 18 and the app runs on 17, so the selection is UIKit's, and on
             // the next turn, since a field beginning to edit sets its own caret after this. The Mac's field selects its
-            // text as it takes the focus.
+            // text as it takes the focus. Once: the notification names any field, and the first to begin after this one
+            // appears is this one, where `isFocused` cannot tell, being false through its own notification and true
+            // through another's, so that a card's title tapped after it lost its text to the next letter (the iOS 26.3
+            // simulator, 2026-11-07).
             .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidBeginEditingNotification)) { note in
-                guard selectsAllOnFocus, let field = note.object as? UITextField else { return }
+                guard selectsAllOnFocus, !hasSelectedAll, let field = note.object as? UITextField else { return }
+                hasSelectedAll = true
                 DispatchQueue.main.async { field.selectAll(nil) }
             }
             #endif
