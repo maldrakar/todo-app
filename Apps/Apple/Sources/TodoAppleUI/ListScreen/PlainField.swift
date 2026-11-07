@@ -38,7 +38,8 @@ struct PlainField<Action: Equatable & Sendable>: View {
     #endif
 
     /// The field, on one line unless `axis` says it grows down, as a card's notes do, in its model's colour unless
-    /// `color` gives another, and with a line through its text in `strike`, as a done task's title has on its card, and none through its prompt.
+    /// `color` gives another, and with a line through its text in `strike`, as a done task's title has on its card,
+    /// and none through its prompt.
     init(
         _ model: TextFieldModel<Action>, axis: Axis = .horizontal, focusesOnAppear: Bool,
         keepsFocusOnSubmit: Bool = false, selectsAllOnFocus: Bool = false, color: DesignSystem.Color? = nil,

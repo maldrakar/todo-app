@@ -189,7 +189,7 @@ The list screen on iPhone is the canvas's too, in a narrow window; a wide one, t
 Pro Max turned sideways, still draws the plain list until the pane of the Mac and the iPad replaces it. The glass back
 and "…" float at the top corners over the list, which scrolls under them, and under them the list's tile, its title,
 the day it shows when its rule names one, and a bar of the tags its open tasks carry: a tap lights a tag and the list
-or the board shows the tasks that carry every tag lit. The list's own tasks come first, then a block for each list
+or the board shows the tasks that carry any tag lit. The list's own tasks come first, then a block for each list
 inside it, or for each day or group its rule makes; a block's chevron folds it and a tap on its title opens it as a
 screen of its own, and each block ends with "+ Add task", which opens a new task's card in place with the keyboard up.
 "+ Add list" ends the screen and names a list in a field of its own, and the round "+" at the bottom right adds a task
@@ -239,7 +239,7 @@ cancel it, choose Open in New Window on a view — and beside it calls the publi
 through a store, read a page, search, exchange a journal, take a snapshot — because the linker keeps what a client
 calls, and a number measured on calls that were dead-stripped is a number for a binary nobody ships.
 
-The budget is 6.5625 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
+The budget is 7.3125 MiB after `gzip -9` and lives in one place, `scripts/wasm-size.sh`, which is the command
 CI runs and the command to run locally. It is the root module and the core as they stand with four percent to
 spare, rounded up to a whole 64 KiB: a guard against growing sideways, not a target to shrink towards. The
 4.5 MiB the spec first named was never measured — it is the floor measured in the toolchain spike, 3,743,306

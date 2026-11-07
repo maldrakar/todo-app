@@ -202,7 +202,7 @@ flowchart LR
     C["tokens and component models:<br/>row, card, block, column, strip,<br/>tag bar, add rows, glass buttons"]
   end
   subgraph Apple["Apps/Apple"]
-    I["iPhone: the screen, the swipe,<br/>the long-press drag, the keyboard"]
+    I["iPhone: the screen, the swipe,<br/>the system's drag and drop, the keyboard"]
     K["Mac and iPad: the pane,<br/>the pointer drag, the menus"]
     V["WindowView: reports width<br/>and the device's day"]
   end
