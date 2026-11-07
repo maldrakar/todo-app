@@ -549,10 +549,9 @@ struct ListsDragGesture: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            guard window != nil, let coordinator else { return }
-            var view = superview
-            while let candidate = view, !(candidate is UIScrollView) { view = candidate.superview }
-            guard let scrollView = view as? UIScrollView, coordinator.recognizer.view !== scrollView else { return }
+            guard window != nil, let coordinator, let scrollView = enclosingScrollView,
+                  coordinator.recognizer.view !== scrollView
+            else { return }
             scrollView.addGestureRecognizer(coordinator.recognizer)
         }
     }

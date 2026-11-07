@@ -12,12 +12,16 @@ import SwiftUI
 /// The drag, the menu, the swipe and the fresh fade wrap this view from outside (`BlockRow`).
 struct TaskRowView<Action: Equatable & Sendable>: View {
     private let model: TaskRowModel<Action>
+    private let tap: () -> Void
     private let send: (Action) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(_ model: TaskRowModel<Action>, send: @escaping (Action) -> Void) {
+    /// The row, what a tap on it beside its check does, its caller's since it may do something else first, and what its
+    /// check sends.
+    init(_ model: TaskRowModel<Action>, tap: @escaping () -> Void, send: @escaping (Action) -> Void) {
         self.model = model
+        self.tap = tap
         self.send = send
     }
 
@@ -25,7 +29,7 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
         CompletingTask(model.check, leaving: model.style.leaving, send: send) { isCompleting, checkTapped in
             HStack(alignment: .top, spacing: 0) {
                 CheckButton(model.check, isChecked: model.check.isChecked || isCompleting, action: checkTapped)
-                Button { send(model.tap) } label: { titleAndMeta(isCompleting: isCompleting) }
+                Button(action: tap) { titleAndMeta(isCompleting: isCompleting) }
                     .buttonStyle(.plain)
             }
             .padding(.leading, model.style.leading)

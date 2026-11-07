@@ -20,10 +20,6 @@ struct RowDragSource: ViewModifier {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// How wide the row stands, which the drag's copy is drawn at: alone, it would stand as wide as its title on one
-    /// line.
-    @State private var width: CGFloat = 0
-
     init(
         _ task: TaskRowModel<TaskList.UserAction>, row: BlockRowID, gestures: ScreenGestures,
         delete: @escaping (TaskList.UserAction) -> Void
@@ -45,16 +41,10 @@ struct RowDragSource: ViewModifier {
                 .contextMenu { MenuItems(menu, send: delete) }
                 #endif
                 #if os(iOS)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
                 .onDrag {
-                    gestures.space.carried = row
-                    return itemProvider(of: row.task)
+                    itemProvider(of: row.task, session: gestures.space.sessions.begin(row))
                 } preview: {
-                    TaskRowView(task) { _ in }
-                        .frame(width: width)
-                        .background(
-                            Color(lift.background), in: .rect(cornerRadius: lift.cornerRadius, style: .circular)
-                        )
+                    RowDragCopy(task: task, lift: lift, row: row, space: gestures.space)
                 }
                 #endif
                 // The opacity alone: over the whole row, a drop's own end of the lift carried the row to its place on
@@ -74,10 +64,27 @@ extension UTType {
     fileprivate static let todoTask = UTType(exportedAs: "dev.maldrakar.todo.task")
 }
 
-/// The drag's item: the task's id in the private type, seen by this process alone. The drop reads what `onDrag` said
-/// and not this; the system asks for an item with something to give.
-private func itemProvider(of task: TaskID) -> NSItemProvider {
+/// The system's copy of the row it drags, on the lift's background and corners, as wide as the row stands: alone it would
+/// stand as wide as its title on one line. A view of its own, so that the width is read when the copy is drawn, by when
+/// the row has laid out, and not when `onDrag`'s preview is asked for, with every draw of the row.
+private struct RowDragCopy: View {
+    let task: TaskRowModel<TaskList.UserAction>
+    let lift: TaskLiftStyle
+    let row: BlockRowID
+    let space: RowDragSpace
+
+    var body: some View {
+        TaskRowView(task, tap: {}, send: { _ in })
+            .frame(width: space.frames.rows[row]?.width)
+            .background(Color(lift.background), in: .rect(cornerRadius: lift.cornerRadius, style: .circular))
+    }
+}
+
+/// The drag's item: the task's id in the private type, seen by this process alone, under its session's token. The drop
+/// reads the token and not the id; the system asks for an item with something to give.
+private func itemProvider(of task: TaskID, session: String) -> NSItemProvider {
     let provider = NSItemProvider()
+    provider.suggestedName = session
     let type = UTType.todoTask.identifier
     provider.registerDataRepresentation(forTypeIdentifier: type, visibility: .ownProcess) { done in
         done(Data(task.rawValue.utf8), nil)
@@ -86,9 +93,9 @@ private func itemProvider(of task: TaskID) -> NSItemProvider {
     return provider
 }
 
-/// The drop's side of the system's drag, which stands on the screen's `ScrollView`s, hands each stage to `RowLift` in
-/// the content's space and sends what it reports. Leaving the scroll view clears the lift, and a drag that comes back
-/// lifts again (spike #174).
+/// The drop's side of the system's drag, which stands on the screen's `ScrollView`s, hands each call to the session it
+/// names (`RowDragSessions`) with its point in the content's space, and the stage that makes to `step`. Leaving the scroll
+/// view clears the lift, and a drag that comes back lifts again (spike #174).
 private struct RowDropDelegate: DropDelegate {
     let space: RowDragSpace
     let lift: () -> RowLift?
@@ -99,38 +106,36 @@ private struct RowDropDelegate: DropDelegate {
     }
 
     func dropEntered(info: DropInfo) {
-        moved(to: info.location)
+        hear(.moved(space.contentPoint(fromDrop: info.location)), info)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        moved(to: info.location)
-        // Never `.forbidden`, over a block that takes no drop either: a release under it calls nothing here, not even
-        // `dropExited`, and the lift would stay, the row dimmed (the iOS 26.3 simulator, 2026-11-07). The release
-        // reports no drop there by itself, having no slot.
+        hear(.moved(space.contentPoint(fromDrop: info.location)), info)
+        // Never `.forbidden`, over a block that takes no drop either: a release under it left the lift standing, by what
+        // the board showed (the iOS 26.3 simulator, 2026-11-07). The release reports no drop there by itself, having no
+        // slot.
         return DropProposal(operation: .move)
     }
 
     func dropExited(info: DropInfo) {
-        step(.cancelled)
+        hear(.left, info)
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        moved(to: info.location)
-        let drops = lift()?.slot != nil
-        step(.ended)
-        space.carried = nil
-        return drops
+        hear(.moved(space.contentPoint(fromDrop: info.location)), info)
+        guard let lift = lift(), lift.session == session(of: info) else { return false }
+        hear(.released, info)
+        space.sessions.forget()
+        return lift.slot != nil
     }
 
-    private func moved(to location: CGPoint) {
-        space.lastHeard = .now
-        let point = space.contentPoint(fromDrop: location)
-        guard let carried = space.carried else { return }
-        if let lift = lift(), lift.task == carried.task, lift.source == carried.block {
-            step(.changed(point))
-        } else {
-            step(.began(task: carried.task, block: carried.block, at: point))
-        }
+    private func hear(_ call: RowDragSessions.Call, _ info: DropInfo) {
+        space.wasHeard = true
+        if let phase = space.sessions.phase(for: call, session: session(of: info), lift: lift()) { step(phase) }
+    }
+
+    private func session(of info: DropInfo) -> String? {
+        info.itemProviders(for: [.todoTask]).first?.suggestedName
     }
 }
 #endif
@@ -169,10 +174,10 @@ struct RowDropTarget: ViewModifier {
             }
             .onDrop(
                 of: [.todoTask],
-                delegate: RowDropDelegate(space: gestures.space, lift: { lift }, step: step)
+                delegate: RowDropDelegate(space: gestures.space, lift: { lift }, step: { step($0) })
             )
             .task(id: lift != nil) {
-                if lift != nil { await cancelOnSilence() }
+                if lift != nil { await cleanUpOnSilence() }
             }
         #else
         content
@@ -180,28 +185,32 @@ struct RowDropTarget: ViewModifier {
     }
 
     #if os(iOS)
-    /// Ends a lift no call ends. The system calls the delegate every frame for as long as a drag stands over the
+    /// Clears a lift no call has ended. The system calls the delegate every frame for as long as a drag stands over the
     /// target, moving or not, and a drag can end with no call at all: let go at the very edge of the screen, neither
-    /// `performDrop` nor `dropExited` came, and the card stayed dimmed (the iOS 26.3 simulator, 2026-11-07). SwiftUI
-    /// has no end of a drag before iOS 26. A silence that was only a slow frame costs nothing: the next call lifts
-    /// again.
-    private func cancelOnSilence() async {
-        let silence = Duration.milliseconds(250)
-        while !Task.isCancelled {
-            try? await Task.sleep(for: silence)
-            if !Task.isCancelled, ContinuousClock.now - gestures.space.lastHeard >= silence {
-                step(.cancelled)
-                return
-            }
+    /// `performDrop` nor `dropExited` came, and the card stayed dimmed (the iOS 26.3 simulator, 2026-11-07). SwiftUI has
+    /// no end of a drag before iOS 26, and the provider `onDrag` returned is no signal, held until the next one is made
+    /// (the same). So a silence only cleans up: it clears the dim, the mark and the tint, it moves no board, since a finger
+    /// may still stand on it, and the session survives, so that a release after it lands by the point it reads. The quiet
+    /// is counted in ticks and not measured, so that a stall of the main thread counts as one.
+    private func cleanUpOnSilence() async {
+        var quietTicks = 0
+        while !Task.isCancelled, quietTicks < 5 {
+            try? await Task.sleep(for: .milliseconds(50))
+            quietTicks = gestures.space.wasHeard ? 0 : quietTicks + 1
+            gestures.space.wasHeard = false
         }
+        if !Task.isCancelled { step(.cancelled, settling: false) }
     }
 
-    private func step(_ phase: RowLift.Phase) {
+    /// A stage of the drag: the lift it leaves, the drop it reports, and, where it ended a lift, the board brought to
+    /// rest on a column.
+    private func step(_ phase: RowLift.Phase, settling: Bool = true) {
         let step = RowLift.after(phase, from: lift, among: blocks, frames: gestures.space.frames)
-        if case .began = phase { gestures.swipe.current = nil }
+        let hasEnded = lift != nil && step.lift == nil
+        if step.lift != nil { gestures.swipe.close() }
         if step.lift != lift { lift = step.lift }
         if let drop = step.drop { send(drop) }
-        if step.lift == nil, let settleInset {
+        if hasEnded, settling, let settleInset {
             gestures.space.settle(inset: settleInset, animated: !reduceMotion)
         }
     }

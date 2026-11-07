@@ -1,5 +1,6 @@
 import CoreGraphics
 import DesignSystemComponents
+import Observation
 import TaskListFeature
 import Testing
 @testable import TodoAppleUI
@@ -71,4 +72,90 @@ private let second = BlockRowID(block: .own(nil), task: TaskID())
     #expect(RowSwipe.after(.changed(-60), from: nil) == nil)
     #expect(RowSwipe.after(.ended(-60), from: nil) == nil)
     #expect(RowSwipe.after(.cancelled, from: nil) == nil)
+}
+
+/// A pan takes the row under where it started, by that block's frame, where it has a swipe: leftward, or either way
+/// where that row stands open. Over no row, on a board, whose cards have no swipe, it takes nothing, and the scroll has
+/// it.
+@Test func aPanTakesTheRowUnderItsStartWhereItHasASwipe() throws {
+    let list = try LiftedList(taskInHouseAndOffice: true)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let both = try #require(list.both)
+    func taken(_ point: CGPoint, moved: CGFloat, from swipe: RowSwipe? = nil) -> BlockRowID? {
+        RowSwipe.row(at: point, moved: moved, from: swipe, among: list.blocks, frames: list.frames)?.row
+    }
+    let inOffice = BlockRowID(block: office, task: both)
+    #expect(taken(list.centre(of: both, in: office), moved: -10) == inOffice)
+    #expect(taken(list.centre(of: both, in: house), moved: -10) == BlockRowID(block: house, task: both))
+    #expect(taken(list.centre(of: both, in: office), moved: 10) == nil, "rightward, a row at rest has nothing to close")
+    #expect(taken(CGPoint(x: 10, y: -500), moved: -10) == nil)
+
+    let style = try #require(RowSwipe.row(
+        at: list.centre(of: both, in: office), moved: -10, from: nil, among: list.blocks, frames: list.frames
+    )?.style)
+    let open = RowSwipe.after(.ended(-60), from: RowSwipe.after(.began(inOffice, style), from: nil))
+    #expect(taken(list.centre(of: both, in: office), moved: 10, from: open) == inOffice)
+    #expect(taken(list.centre(of: both, in: house), moved: 10, from: open) == nil, "the task's other row is another")
+
+    let board = try LiftedList(columns: true)
+    let own = TaskList.Model.BlockID.own(nil)
+    let card = board.centre(of: board.a, in: own)
+    #expect(RowSwipe.row(at: card, moved: -10, from: nil, among: board.blocks, frames: board.frames) == nil)
+}
+
+// MARK: - The screen's one swipe
+
+/// Whether an observation fired, which its closure, sendable, sets.
+private final class Flag: @unchecked Sendable {
+    var isSet = false
+}
+
+/// A row's swipe is held so that what every row reads, which row is taken, changes only when another is taken, and what
+/// the finger moves is read by the taken row alone: a move draws one row, not every row that can be swiped.
+@MainActor
+@Test func aMoveOfTheFingerTouchesOnlyWhatTheTakenRowReads() {
+    let swipe = ScreenSwipe()
+    swipe.step(.began(first, style))
+    let rowChanged = Flag()
+    withObservationTracking { _ = swipe.row } onChange: { rowChanged.isSet = true }
+    let xChanged = Flag()
+    withObservationTracking { _ = swipe.x } onChange: { xChanged.isSet = true }
+    swipe.step(.changed(-30))
+    #expect(!rowChanged.isSet, "every row reads this")
+    #expect(xChanged.isSet, "the taken row reads this")
+    #expect(swipe.x == -30)
+    swipe.step(.ended(-60))
+    #expect(!rowChanged.isSet, "the same row, open")
+    #expect(swipe.isOpen)
+    swipe.step(.began(second, style))
+    #expect(rowChanged.isSet, "another row taken")
+    #expect(swipe.row == second)
+}
+
+/// The row a swipe holds is let go of when it leaves the screen, a peer's change among the ways, so that the next tap on
+/// a row is not taken for closing it; another row's leaving changes nothing.
+@MainActor
+@Test func aRowThatLeavesTheScreenIsNoLongerOpen() {
+    let swipe = ScreenSwipe()
+    swipe.step(.began(first, style))
+    swipe.step(.ended(-60))
+    swipe.rowLeft(second)
+    #expect(swipe.isOpen)
+    swipe.rowLeft(first)
+    #expect(!swipe.isOpen)
+    #expect(swipe.row == nil)
+}
+
+/// Closing leaves no row taken, and answers nothing for a swipe already at rest.
+@MainActor
+@Test func closingLeavesNoRowTaken() {
+    let swipe = ScreenSwipe()
+    swipe.step(.began(first, style))
+    swipe.step(.ended(-60))
+    swipe.close()
+    #expect(!swipe.isOpen)
+    #expect(swipe.x == 0)
+    swipe.step(.changed(-60))
+    #expect(!swipe.isOpen, "with no row taken a stage moves nothing")
 }

@@ -3,14 +3,47 @@ import DesignSystemComponents
 import SwiftUI
 import TaskListFeature
 
-/// The screen's one swipe, which every row that can be swiped reads, so that a move of the finger draws those rows' few
-/// lines again and not the screen: an observed class and not the screen's state.
+/// The screen's one swipe, held so that a move of the finger draws one row and not all of them: every row that can be
+/// swiped reads which row is taken, `row`, which changes only when another is taken, and only that row reads how far it
+/// stands, `x`, and how it moves. An observed class and not the screen's state, so that the screen is not drawn again
+/// either.
 ///
 /// `ScreenSwipe` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 @MainActor @Observable
 final class ScreenSwipe {
-    var current: RowSwipe?
+    private(set) var row: BlockRowID?
+    private(set) var x: CGFloat = 0
+    private(set) var isFollowingFinger = false
+
+    /// The swipe as its steps left it, which the gestures read and nothing draws from.
+    @ObservationIgnored private(set) var current: RowSwipe?
+
+    /// Whether a row stands taken, which a tap on a row only closes.
+    var isOpen: Bool { current != nil }
+
+    func step(_ phase: RowSwipe.Phase) {
+        set(RowSwipe.after(phase, from: current))
+    }
+
+    func close() {
+        set(nil)
+    }
+
+    /// A row has left the screen, by a peer's change among the ways: it stands open no longer, and so the next tap on a
+    /// row is that row's.
+    func rowLeft(_ row: BlockRowID) {
+        if current?.row == row { close() }
+    }
+
+    private func set(_ swipe: RowSwipe?) {
+        current = swipe
+        if row != swipe?.row { row = swipe?.row }
+        let x = swipe?.x ?? 0
+        if self.x != x { self.x = x }
+        let isFollowingFinger = swipe?.isFollowingFinger ?? false
+        if self.isFollowingFinger != isFollowingFinger { self.isFollowingFinger = isFollowingFinger }
+    }
 }
 
 /// A row's swipe to its Delete as its model describes it (`SwipeModel`; `Phone.dc.html`, the row's swipe): the row
@@ -37,9 +70,9 @@ struct SwipeToDelete: ViewModifier {
 
     func body(content: Content) -> some View {
         if let model {
-            let current = swipe.current?.row == row ? swipe.current : nil
-            let x = current?.x ?? 0
-            let isAtOnce = current?.isFollowingFinger == true || reduceMotion
+            let isTaken = swipe.row == row
+            let x = isTaken ? swipe.x : 0
+            let isAtOnce = reduceMotion || isTaken && swipe.isFollowingFinger
             content
                 .animation(isAtOnce ? nil : Animation(model.style.animation)) { $0.offset(x: x) }
                 .background(alignment: .trailing) {
@@ -48,6 +81,7 @@ struct SwipeToDelete: ViewModifier {
                     }
                 }
                 .accessibilityAction(named: Text(model.accessibilityLabel)) { delete(model.action) }
+                .onDisappear { swipe.rowLeft(row) }
         } else {
             content
         }

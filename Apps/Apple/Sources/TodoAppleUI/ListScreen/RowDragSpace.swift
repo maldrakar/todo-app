@@ -29,12 +29,11 @@ final class RowDragSpace {
 
     // iOS alone: only there does a system drag stand on the screen, and these are UIKit's.
     #if os(iOS)
-    /// The row the system's drag carries, from when `onDrag` asked for its item. It is no lift yet: a press that opens
-    /// the menu asks too. A drag gone out of the scroll view and back still carries it.
-    var carried: BlockRowID?
+    /// The drags `onDrag` has begun.
+    var sessions = RowDragSessions()
 
-    /// When the drop's delegate last heard of the drag.
-    var lastHeard = ContinuousClock.now
+    /// Whether the drop's delegate has heard of the drag since this was last read (`RowDropTarget`).
+    var wasHeard = false
 
     /// Where the drop's view stands in the window, and the content and the scroll view it is drawn in.
     var dropOrigin = CGPoint.zero

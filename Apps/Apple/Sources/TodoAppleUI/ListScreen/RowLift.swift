@@ -1,5 +1,6 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowLift.swift
 import CoreGraphics
+import Foundation
 import TaskListFeature
 import TodoCore
 
@@ -26,12 +27,12 @@ struct BlockRowID: Hashable {
 /// header. In another block the module writes no place, a manual list taking the task last and any other standing it by
 /// its sort, so wherever the finger is in that block the slot stands at its end.
 struct RowLift: Equatable {
-    /// A stage of the drag, as its drop delegate reports it, with the point in the content's own coordinates where it
-    /// has one: the drag is first seen, moves, is let go once, or leaves. `onDrag` says what is carried and the first
-    /// point over the scroll view says where, since the drag has no other beginning that a press which opens the menu
-    /// instead does not also have (spike #174).
+    /// A stage of the drag, as its drop delegate reports it (`RowDragSessions`), with the point in the content's own
+    /// coordinates where it has one: the drag is first seen, moves, is let go once, or leaves. `onDrag` says what is
+    /// carried and the first point over the scroll view says where, since the drag has no other beginning that a press
+    /// which opens the menu instead does not also have (spike #174).
     enum Phase {
-        case began(task: TaskID, block: TaskList.Model.BlockID, at: CGPoint)
+        case began(task: TaskID, block: TaskList.Model.BlockID, session: String, at: CGPoint)
         case changed(CGPoint)
         case ended
         case cancelled
@@ -56,6 +57,9 @@ struct RowLift: Equatable {
     /// The block it was dragged from, which names one of the two that draw a task both select.
     let source: TaskList.Model.BlockID
 
+    /// The drag's session, which `RowDragSessions` tells apart from any other press.
+    let session: String
+
     /// Where it would land, and nil over a block that takes no drop.
     private(set) var slot: Slot?
 
@@ -67,8 +71,12 @@ struct RowLift: Equatable {
         _ phase: Phase, from lift: RowLift?, among blocks: [TaskList.Model.Block], frames: Frames
     ) -> (lift: RowLift?, drop: TaskList.UserAction?) {
         switch phase {
-        case .began(let task, let block, let point):
-            (RowLift(lifting: task, from: block, among: blocks)?.moved(to: point, among: blocks, frames: frames), nil)
+        case .began(let task, let block, let session, let point):
+            (
+                RowLift(lifting: task, from: block, session: session, among: blocks)?
+                    .moved(to: point, among: blocks, frames: frames),
+                nil
+            )
         case .changed(let point):
             (lift?.moved(to: point, among: blocks, frames: frames), nil)
         case .ended:
@@ -78,11 +86,14 @@ struct RowLift: Equatable {
         }
     }
 
-    private init?(lifting task: TaskID, from source: TaskList.Model.BlockID, among blocks: [TaskList.Model.Block]) {
+    private init?(
+        lifting task: TaskID, from source: TaskList.Model.BlockID, session: String, among blocks: [TaskList.Model.Block]
+    ) {
         let row = blocks.first { $0.id == source }?.rows.first { $0.id == task }
         guard row?.lift != nil else { return nil }
         self.task = task
         self.source = source
+        self.session = session
     }
 
     private func moved(to point: CGPoint, among blocks: [TaskList.Model.Block], frames: Frames) -> RowLift {
@@ -127,5 +138,53 @@ struct RowLift: Equatable {
     /// The drag's one report, on release, and nil over a block that takes no drop.
     private var drop: TaskList.UserAction? {
         slot.map { .rowDropped(task, from: source, in: $0.block, after: $0.after) }
+    }
+}
+
+/// The drags `onDrag` has begun on a screen, each by the token its item provider carries, which reaches the drop's
+/// delegate through `DropInfo` (`NSItemProvider.suggestedName`; the iOS 26.3 simulator, 2026-11-07), so that a lift is
+/// tied to its drag: a second finger pressing another row begins another session and takes nothing from the first, and
+/// another window's drag of the private type names a session this screen did not begin. What each call of the delegate
+/// means is one step, `phase(for:session:lift:)`, which knows no platform (`RowLiftTests`). A press that opens the menu
+/// asks `onDrag` too, so a session is no drag until the delegate hears it; they are all forgotten at a drop. A session
+/// outlives a lift that ended with no release: the drag may come back, or go quiet and be let go.
+///
+/// `RowDragSessions` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
+struct RowDragSessions {
+    /// A call of the drop's delegate: the drag at a point in the content's own coordinates, let go, or gone.
+    enum Call {
+        case moved(CGPoint)
+        case released
+        case left
+    }
+
+    private var rows: [String: BlockRowID] = [:]
+
+    /// Begins a session for what `onDrag` carries, and answers its token.
+    mutating func begin(_ row: BlockRowID) -> String {
+        let session = UUID().uuidString
+        rows[session] = row
+        return session
+    }
+
+    mutating func forget() {
+        rows = [:]
+    }
+
+    /// The stage a call of the delegate is, in the session it names, nil for one that moves nothing: a session this
+    /// screen did not begin, or any other than the one a lift stands for.
+    func phase(for call: Call, session: String?, lift: RowLift?) -> RowLift.Phase? {
+        guard let session, let row = rows[session] else { return nil }
+        let isItsLift = lift?.session == session
+        switch call {
+        case .moved(let point):
+            if lift == nil { return .began(task: row.task, block: row.block, session: session, at: point) }
+            return isItsLift ? .changed(point) : nil
+        case .released:
+            return isItsLift ? .ended : nil
+        case .left:
+            return isItsLift ? .cancelled : nil
+        }
     }
 }

@@ -69,9 +69,7 @@ struct ScrollContentFinder: UIViewRepresentable {
         override func didMoveToWindow() {
             super.didMoveToWindow()
             guard window != nil else { return }
-            var view = superview
-            while let candidate = view, !(candidate is UIScrollView) { view = candidate.superview }
-            if let scrollView = view as? UIScrollView { coordinator?.didAppear(in: scrollView) }
+            if let scrollView = enclosingScrollView { coordinator?.didAppear(in: scrollView) }
         }
     }
 
@@ -128,14 +126,14 @@ struct ScrollContentFinder: UIViewRepresentable {
             switch pan.state {
             case .began:
                 guard let taken = rowAt(start, move) else { return }
-                let began = RowSwipe.after(.began(taken.row, taken.style), from: swipe.current)
-                swipe.current = RowSwipe.after(.changed(move), from: began)
+                swipe.step(.began(taken.row, taken.style))
+                swipe.step(.changed(move))
             case .changed:
-                swipe.current = RowSwipe.after(.changed(move), from: swipe.current)
+                swipe.step(.changed(move))
             case .ended:
-                swipe.current = RowSwipe.after(.ended(move), from: swipe.current)
+                swipe.step(.ended(move))
             case .cancelled, .failed:
-                swipe.current = RowSwipe.after(.cancelled, from: swipe.current)
+                swipe.step(.cancelled)
             case .possible:
                 break
             @unknown default:
@@ -144,7 +142,7 @@ struct ScrollContentFinder: UIViewRepresentable {
         }
 
         @objc private func scrollChanged(_ pan: UIPanGestureRecognizer) {
-            if pan.state == .began { swipe?.current = nil }
+            if pan.state == .began { swipe?.close() }
         }
 
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -155,7 +153,9 @@ struct ScrollContentFinder: UIViewRepresentable {
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            if let finder { start = touch.location(in: finder) }
+            // While the pan waits for its touch only: a second finger, which it does not follow, moved the row by its
+            // distance from the first.
+            if pan.state == .possible, let finder { start = touch.location(in: finder) }
             var view = touch.view
             while let current = view {
                 if current is UITextInput { return false }

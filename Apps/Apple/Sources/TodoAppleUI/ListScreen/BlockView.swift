@@ -91,20 +91,14 @@ struct BlockRow: View {
     var body: some View {
         switch row {
         case .task(let id, let task):
-            let face = TaskRowView(task) { action in
-                if action == task.tap, gestures?.swipe.current != nil {
-                    gestures?.swipe.current = nil
-                } else {
-                    send(action)
-                }
-            }
+            let face = TaskRowView(task, tap: { tapRow(task) }, send: send)
             .modifier(ColumnCardSurface(column: column))
             .modifier(ColumnCardRing(column: column))
             .modifier(TaskLanding(task.style))
             if let block, let gestures {
                 let row = BlockRowID(block: block, task: id)
                 let delete = { (action: TaskList.UserAction) in
-                    deleted(action, row: row, leaving: task.style.leaving, gestures: gestures)
+                    sendDelete(action, row: row, leaving: task.style.leaving, gestures: gestures)
                 }
                 face
                     .background { task.style.ground.map { Color($0) } }
@@ -129,24 +123,30 @@ struct BlockRow: View {
         }
     }
 
-    /// Sends a Delete, on the motion that takes the row away as a done row leaves with no wait, the rows under it
-    /// closing up. A swiped row goes from where it stands, aside, and its swipe ends with the motion, which brings it
-    /// back where the store refused.
-    private func deleted(
+    /// A tap on a row beside its check, which only closes the row a swipe left open.
+    private func tapRow(_ task: TaskRowModel<TaskList.UserAction>) {
+        if let swipe = gestures?.swipe, swipe.isOpen {
+            swipe.close()
+        } else {
+            send(task.tap)
+        }
+    }
+
+    /// Sends a Delete, on the motion that takes the row away as a done row leaves with no wait, the rows under it closing
+    /// up. A swiped row goes from where it stands, aside, and its swipe ends with the motion, which brings it back where
+    /// the store refused.
+    private func sendDelete(
         _ action: TaskList.UserAction, row: BlockRowID, leaving: TaskLeavingStyle, gestures: ScreenGestures
     ) {
-        func endSwipe() {
-            if gestures.swipe.current?.row == row { gestures.swipe.current = nil }
-        }
         guard !reduceMotion else {
             gestures.delete(action)
-            endSwipe()
+            gestures.swipe.rowLeft(row)
             return
         }
         withAnimation(Animation(leaving.deleteAnimation), completionCriteria: .logicallyComplete) {
             gestures.delete(action)
         } completion: {
-            endSwipe()
+            gestures.swipe.rowLeft(row)
         }
     }
 
