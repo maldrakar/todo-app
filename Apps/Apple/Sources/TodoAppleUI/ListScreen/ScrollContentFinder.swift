@@ -103,24 +103,10 @@ struct ScrollContentFinder: UIViewRepresentable {
             guard self.scrollView !== scrollView else { return }
             removeRecognizers()
             self.scrollView = scrollView
-            guard swipe != nil else {
-                waitForBackSwipe(of: scrollView)
-                return
-            }
+            guard swipe != nil else { return }
             scrollView.addGestureRecognizer(pan)
             scrollView.panGestureRecognizer.require(toFail: pan)
             scrollView.panGestureRecognizer.addTarget(self, action: #selector(scrollChanged(_:)))
-        }
-
-        /// A board's scroll waits for the system's swipe back from the screen's edge to fail, which it does at once away
-        /// from the edge: a scroll view moving sideways took that swipe, on a board at its start too, and it went back
-        /// nowhere (the iOS 26.3 simulator, 2026-11-07). The list scrolls up and down, so it has no such fight.
-        private func waitForBackSwipe(of scrollView: UIScrollView) {
-            var responder = scrollView.next
-            while let current = responder, !(current is UINavigationController) { responder = current.next }
-            if let backSwipe = (responder as? UINavigationController)?.interactivePopGestureRecognizer {
-                scrollView.panGestureRecognizer.require(toFail: backSwipe)
-            }
         }
 
         /// Lets go of the scroll view and of what the closures hold, as this view goes.

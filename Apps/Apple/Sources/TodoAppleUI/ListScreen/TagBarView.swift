@@ -27,6 +27,9 @@ struct TagBarView<Action: Equatable & Sendable>: View {
             }
             .padding(.leading, model.style.padding)
             .padding(.trailing, model.style.padding + model.style.endRoom)
+            #if os(iOS)
+            .background { BackSwipeFirst() }
+            #endif
         }
         .scrollIndicators(.hidden)
         .mask {

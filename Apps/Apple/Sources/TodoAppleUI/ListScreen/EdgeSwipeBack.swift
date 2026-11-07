@@ -56,4 +56,36 @@ struct EdgeSwipeBack: UIViewControllerRepresentable {
         }
     }
 }
+
+/// A plain view placed inside a `ScrollView` that moves sideways, the board's or the tag bar's, which makes its scroll
+/// wait for the system's swipe back from the screen's edge to fail, as that swipe does at once away from the edge: such
+/// a scroll view took the swipe, at its start too, and it went back nowhere (the iOS 26.3 simulator, 2026-11-07). The
+/// list scrolls up and down, so it has no such fight. It finds the two as `ListsDragGesture` finds its scroll view.
+///
+/// `BackSwipeFirst` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
+struct BackSwipeFirst: UIViewRepresentable {
+    func makeUIView(context: Context) -> FinderView {
+        let view = FinderView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: FinderView, context: Context) {}
+
+    final class FinderView: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window != nil else { return }
+            var view = superview
+            while let candidate = view, !(candidate is UIScrollView) { view = candidate.superview }
+            var responder = view?.next
+            while let current = responder, !(current is UINavigationController) { responder = current.next }
+            guard let scrollView = view as? UIScrollView,
+                  let backSwipe = (responder as? UINavigationController)?.interactivePopGestureRecognizer
+            else { return }
+            scrollView.panGestureRecognizer.require(toFail: backSwipe)
+        }
+    }
+}
 #endif
