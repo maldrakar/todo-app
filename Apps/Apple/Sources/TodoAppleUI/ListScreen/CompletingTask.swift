@@ -7,8 +7,10 @@ import SwiftUI
 /// moments on screen are this view's own, the one animation of that write (list screen spec, section 3). It is drawn
 /// done from the tap, its check filling and its title struck, it stays a moment, and it fades and sinks as what stands
 /// under it closes up, all as its `TaskLeavingStyle` says. It leaves any other way at once, a card opening in a row's
-/// place among them, since only this tap animates. Where a person asked for less motion it goes at once too. A done
-/// task's check goes back to open at once, as the canvas's does.
+/// place among them, since only this tap animates. Where a person asked for less motion it is drawn done and stays that
+/// moment all the same, and goes with no fade or sink as what stands under it closes up at once: what they ask to lose
+/// is the motion, not the sight of the check taking (the controller's ruling on #177, 2026-11-07). A done task's check
+/// goes back to open at once, as the canvas's does.
 ///
 /// A task still here when the motion ends, a write the store refused among them, goes back to what its model says: the
 /// state ends on the motion's own end, and a motion with nothing to move, a refused write's, ends at once. A row that
@@ -49,15 +51,21 @@ struct CompletingTask<Action: Equatable & Sendable, Content: View>: View {
     }
 
     private func checkTapped() {
-        guard !check.isChecked, !reduceMotion else {
+        guard !check.isChecked else {
             send(check.action)
             return
         }
         isCompleting = true
-        withAnimation(Animation(leaving.animation), completionCriteria: .logicallyComplete) {
+        withAnimation(leavingMotion, completionCriteria: .logicallyComplete) {
             send(check.action)
         } completion: {
             isCompleting = false
         }
+    }
+
+    /// The style's motion, or where a person asked for less motion one too short to see, after the same moment: one of
+    /// no length took the task away at the tap, the moment and all (the iOS 26.3 simulator, 2026-11-07).
+    private var leavingMotion: Animation {
+        reduceMotion ? .linear(duration: 0.001).delay(leaving.animation.delay) : Animation(leaving.animation)
     }
 }
