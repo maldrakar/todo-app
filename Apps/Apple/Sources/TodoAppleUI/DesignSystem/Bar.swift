@@ -1,4 +1,5 @@
 // Apps/Apple/Sources/TodoAppleUI/DesignSystem/Bar.swift
+import DesignSystem
 import DesignSystemComponents
 import SwiftUI
 
@@ -174,9 +175,16 @@ extension View {
     /// The canvas's glass under a control of the bar, in its shape: the platform's container, with the look's raised
     /// shadow, the canvas's small one, which is the container's and no model's.
     fileprivate func glass(in shape: some Shape) -> some View {
+        glass(in: shape, edge: Color(.ink).opacity(0.08), edgeWidth: 0.5, shadow: .raised)
+    }
+
+    /// The platform's material under a control, in its shape, edged and casting a shadow: the one material the look's
+    /// glass has where a platform has no glass of its own, a view's value since a material has no token and the core no
+    /// SwiftUI (the controller's ruling on #177, 2026-11-07), under the bar's controls and the list screen's circles.
+    func glass(in shape: some Shape, edge: Color, edgeWidth: CGFloat, shadow: DesignSystem.Shadow) -> some View {
         background(.regularMaterial, in: shape)
-            .overlay { shape.stroke(Color(.ink).opacity(0.08), lineWidth: 0.5) }
-            .shadow(.raised)
+            .overlay { shape.stroke(edge, lineWidth: edgeWidth) }
+            .shadow(shadow)
     }
 
     /// A search field in its shape on what its model puts it on, every case drawn and none by `default`
