@@ -572,6 +572,7 @@ private enum WasmSizeProbe {
                     + "pops to \(task.check.style.pop.dipScale) at \(task.check.style.pop.dipAt), "
                     + "\(task.check.style.pop.peakScale) at \(task.check.style.pop.peakAt), "
                     + "ticks through \(task.check.style.mark.points.map { [$0.x, $0.y] }) in \(task.check.style.mark.box), "
+                    + "round \(task.check.style.mark.isRound), "
                     + "dims on \(task.style.lift?.dimAnimation.duration ?? 0)"
             case .card(_, let card):
                 "a card on \(card.title.text)"

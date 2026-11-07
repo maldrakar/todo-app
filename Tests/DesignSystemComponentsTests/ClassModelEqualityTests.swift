@@ -287,7 +287,7 @@ private let cardStyle = CardStyle(
 private let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
 
 private let checkMark = CheckStyle.Mark(
-    box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)]
+    box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)], isRound: true
 )
 
 private let draftCircle = CheckStyle(

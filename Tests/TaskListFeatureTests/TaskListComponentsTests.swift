@@ -11,9 +11,10 @@ private typealias Tile = DesignSystem.Color.Components.Tile
 /// How a check pops as it is checked (`Phone.dc.html`, `cbPop`): down to .8 by 35 % of its motion, up to 1.14 by 70 %.
 private let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
 
-/// The canvas's tick, `M6.5 12.5l3.5 3.5 7.5-8` in its 24-unit box (`Phone.dc.html`, `.cb`).
+/// The canvas's tick, `M6.5 12.5l3.5 3.5 7.5-8` in its 24-unit box, its ends and its corner round (`Phone.dc.html`,
+/// `.cb`).
 private let checkMark = CheckStyle.Mark(
-    box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)]
+    box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)], isRound: true
 )
 
 /// How a row or a card leaves as its task is completed (`Phone.dc.html`, `.tt-done` and `.row-leave`): its title in ink

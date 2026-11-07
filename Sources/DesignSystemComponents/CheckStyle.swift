@@ -22,7 +22,8 @@ public struct CheckStyle: Equatable, Sendable {
     }
 
     /// The tick a check draws, a line through `points` in a box `box` units on a side, which a platform scales to the
-    /// style's `markSize`: the canvas's own stroke and no glyph, so that it can draw itself in.
+    /// style's `markSize`, its ends and its corner round where `isRound` says so: the canvas's own stroke and no glyph,
+    /// so that it can draw itself in.
     public struct Mark: Equatable, Sendable {
         public struct Point: Equatable, Sendable {
             public let x: Double
@@ -36,10 +37,12 @@ public struct CheckStyle: Equatable, Sendable {
 
         public let box: Double
         public let points: [Point]
+        public let isRound: Bool
 
-        public init(box: Double, points: [Point]) {
+        public init(box: Double, points: [Point], isRound: Bool) {
             self.box = box
             self.points = points
+            self.isRound = isRound
         }
     }
 

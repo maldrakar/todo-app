@@ -298,10 +298,10 @@ extension TaskList {
         /// by 70 %.
         private static let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
 
-        /// The tick of every check of the phone, `M6.5 12.5l3.5 3.5 7.5-8` in the canvas's 24-unit box
-        /// (`Phone.dc.html`, `.cb`).
+        /// The tick of every check of the phone, `M6.5 12.5l3.5 3.5 7.5-8` in the canvas's 24-unit box, its ends and its
+        /// corner round (`Phone.dc.html`, `.cb`, its `stroke-linecap` and `stroke-linejoin`).
         private static let checkMark = CheckStyle.Mark(
-            box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)]
+            box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)], isRound: true
         )
 
         /// How a phone's row, a column's card or an open card leaves as its task is completed (`Phone.dc.html`,

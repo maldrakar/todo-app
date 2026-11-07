@@ -59,7 +59,10 @@ struct CheckCircle: View {
                 .trim(from: 0, to: isChecked ? 1 : 0)
                 .stroke(
                     Color(style.colors.mark),
-                    style: StrokeStyle(lineWidth: style.markStrokeWidth, lineCap: .round, lineJoin: .round)
+                    style: StrokeStyle(
+                        lineWidth: style.markStrokeWidth, lineCap: style.mark.isRound ? .round : .butt,
+                        lineJoin: style.mark.isRound ? .round : .miter
+                    )
                 )
                 .frame(width: style.markSize, height: style.markSize)
                 .animation(motion(style.markAnimation), value: isChecked)
