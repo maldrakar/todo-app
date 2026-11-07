@@ -200,10 +200,10 @@ row holds for a moment with its check filled and its title struck, then leaves, 
 under the blocks counts it and opens to show it. A swipe to the left on a row slides out Delete, which puts the task in
 the Trash; a press that holds still opens a menu with Delete, and a press that moves lifts the row, with a line and a
 circle marking where it would land, to another place in its block, another block, or on a board a column; a task that
-lands there is tinted for a moment. "…" opens Show as, where Columns, when the list offers them, turns the blocks into
-a board of columns that snap one at a time, and where Columns is greyed with its reason when it does not. A swipe from
-the left edge, or the back circle, goes back one screen. The screen's own "+" adds inline, so no Quick Entry button
-stands on it; quick entry stays the Lists screen's.
+lands in a list is tinted for a moment, and on a board it springs into its place. "…" opens Show as, where Columns, when
+the list offers them, turns the blocks into a board of columns that snap one at a time, and where Columns is greyed with
+its reason when it does not. A swipe from the left edge, or the back circle, goes back one screen. The screen's own "+"
+adds inline, so no Quick Entry button stands on it; quick entry stays the Lists screen's.
 
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.
