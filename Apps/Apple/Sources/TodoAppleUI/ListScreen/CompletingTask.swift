@@ -63,9 +63,8 @@ struct CompletingTask<Action: Equatable & Sendable, Content: View>: View {
         }
     }
 
-    /// The style's motion, or where a person asked for less motion one too short to see, after the same moment: one of
-    /// no length took the task away at the tap, the moment and all (the iOS 26.3 simulator, 2026-11-07).
+    /// The style's motion, or where a person asked for less motion its motion with nothing to see.
     private var leavingMotion: Animation {
-        reduceMotion ? .linear(duration: 0.001).delay(leaving.animation.delay) : Animation(leaving.animation)
+        Animation(reduceMotion ? leaving.reducedAnimation : leaving.animation)
     }
 }

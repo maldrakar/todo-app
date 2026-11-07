@@ -49,3 +49,13 @@ private typealias Animation = DesignSystem.Animation
         #expect(motion.delay == 0, "\(name)")
     }
 }
+
+/// Where a person asked for less motion a done row still waits for its check to be read, and then goes with nothing to
+/// see: on a motion of no length SwiftUI took the task away at the tap, the wait and all (the iOS 26.3 simulator,
+/// 2026-11-07), so this one has a length too short to see.
+@Test func aDoneRowWithNoMotionWaitsAsLongAndRunsTooShortToSee() {
+    let motion = DesignSystem.Animation.rowLeavesWithNoMotion
+    #expect(motion.delay == DesignSystem.Animation.rowLeaves.delay)
+    #expect(motion.duration > 0)
+    #expect(motion.duration < 0.01)
+}

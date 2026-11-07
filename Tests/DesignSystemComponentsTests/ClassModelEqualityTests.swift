@@ -211,7 +211,8 @@ private let swipe = SwipeModel<Action>(
 )
 
 private let taskLeaving = TaskLeavingStyle(
-    titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves, deleteAnimation: .rowDeleted
+    titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves,
+    reducedAnimation: .rowLeavesWithNoMotion, deleteAnimation: .rowDeleted
 )
 
 private let taskRowStyle = TaskRowStyle(

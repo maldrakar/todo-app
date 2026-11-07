@@ -29,6 +29,10 @@ extension DesignSystem {
         /// A done row leaves over 0.32 s ease-in, 0.7 s after it was checked.
         public static let rowLeaves = Animation(curve: .easeIn, duration: 0.32, delay: 0.7)
 
+        /// A done row leaving where a person asked for less motion: after the same wait, over a time too short to see.
+        /// A motion of no length took the task away at the tap, the wait and all (the iOS 26.3 simulator, 2026-11-07).
+        public static let rowLeavesWithNoMotion = Animation(curve: .easeIn, duration: 0.001, delay: 0.7)
+
         /// A deleted row leaves as a done row does and at once: the done row's wait is for its check to be read.
         public static let rowDeleted = Animation(curve: .easeIn, duration: 0.32)
 

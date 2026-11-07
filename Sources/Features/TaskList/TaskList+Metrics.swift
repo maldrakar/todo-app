@@ -307,7 +307,8 @@ extension TaskList {
         /// `.tt-done` and `.row-leave`): its title in ink 2 and struck in ink 3, sinking 12 as it fades on the row's
         /// motion, and on the same motion with no wait where it was deleted.
         private static let taskLeaving = TaskLeavingStyle(
-            titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves, deleteAnimation: .rowDeleted
+            titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves,
+            reducedAnimation: .rowLeavesWithNoMotion, deleteAnimation: .rowDeleted
         )
 
         /// A check of the phone at its own size, in a hit 44 high and as wide as it says, in the colour given, on the
