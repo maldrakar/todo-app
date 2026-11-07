@@ -52,6 +52,10 @@ struct DoneStripView<Action: Equatable & Sendable>: View {
                 Color(model.style.background), in: .rect(cornerRadius: model.style.cornerRadius, style: .circular)
             )
             .contentShape(.rect)
+            // The words take no part in a leaving row's delayed motion, so that the new count stands at the write and
+            // the bump plays on it, and the capsule fits them as they change (the controller's ruling on #177,
+            // 2026-11-07).
+            .transaction { $0.animation = nil }
         }
         .buttonStyle(.plain)
         .accessibilityHint(model.chevron.accessibilityLabel)
