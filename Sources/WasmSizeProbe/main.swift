@@ -565,9 +565,11 @@ private enum WasmSizeProbe {
                     + "\(task.style.fresh == nil ? "settled" : "fresh"), lands from \(task.style.landingScale ?? 1) "
                     + "on \(task.style.landingAnimation.duration), title on \(task.style.titleAnimation.duration), "
                     + "leaves by \(task.style.leaving.offset) on \(task.style.leaving.animation.delay), "
+                    + "\(task.style.leaving.titleColor.light.red) struck \(task.style.leaving.strike.light.red), "
                     + "check on \(task.check.style.fillAnimation.duration)/\(task.check.style.markAnimation.delay), "
-                    + "pops to \(task.check.style.pop.dipScale)/\(task.check.style.pop.peakScale), "
-                    + "ticks through \(task.check.style.mark.points.map(\.x)) in \(task.check.style.mark.box), "
+                    + "pops to \(task.check.style.pop.dipScale) at \(task.check.style.pop.dipAt), "
+                    + "\(task.check.style.pop.peakScale) at \(task.check.style.pop.peakAt), "
+                    + "ticks through \(task.check.style.mark.points.map { [$0.x, $0.y] }) in \(task.check.style.mark.box), "
                     + "dims on \(task.style.lift?.dimAnimation.duration ?? 0)"
             case .card(_, let card):
                 "a card on \(card.title.text)"
@@ -576,7 +578,7 @@ private enum WasmSizeProbe {
         let disabled = list.showAs.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)
         let checked = list.showAs.sections.flatMap(\.items).filter(\.isChecked).map(\.title)
         let bar = list.style
-        let fade = bar.fade.map { "fade \($0.height)/\($0.solidDepth)" } ?? "no fade"
+        let fade = bar.fade.map { "fade \($0.color.light.red) \($0.height)/\($0.solidDepth)" } ?? "no fade"
         let glass = "\(list.back.accessibilityLabel) \(list.back.style.diameter) at \(list.back.style.iconOffset), "
             + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "
             + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
@@ -594,7 +596,7 @@ private enum WasmSizeProbe {
             let subtasks = card.subtasks.map { "\($0.check.accessibilityLabel) \($0.title.text)" }
             let pills = card.pills.map(\.text.text)
             let circle = card.style.subtaskDraftCircle
-            return "card \(card.title.text) (\(card.notes.text), \(card.notes.style.placeholder.light.opacity)), \(card.style.titleToNotes) then \(card.style.notesToSubtasks) under, in from \(card.style.entrance.scale), sub on \(card.subtasks.first?.style.titleAnimation.duration ?? 0), \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
+            return "card \(card.title.text) (\(card.notes.text), \(card.notes.style.placeholder.light.opacity)), \(card.style.titleToNotes) then \(card.style.notesToSubtasks) under, in \(card.style.entrance.opacity)/\(card.style.entrance.scale)/\(card.style.entrance.offset) about \(card.style.entrance.anchorX),\(card.style.entrance.anchorY) on \(card.style.entrance.animation.duration), leaves by \(card.style.leaving.offset), sub on \(card.subtasks.first?.style.titleAnimation.duration ?? 0), \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
         }
         return "no card"
     }
@@ -618,7 +620,7 @@ private enum WasmSizeProbe {
             case .card(_, let card): "a card on \(card.title.text)"
             }
         }
-        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") \(list.done?.style.capsuleToRows ?? 0) in from \(list.done?.style.rowsEntrance.scale ?? 0) over \(rows.joined(separator: "/"))"
+        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") \(list.done?.style.capsuleToRows ?? 0) in \(list.done.map { let e = $0.style.rowsEntrance; return "\(e.opacity)/\(e.scale)/\(e.offset) about \(e.anchorX),\(e.anchorY) on \(e.animation.duration)" } ?? "none"), bumps to \(list.done?.style.bump.scale ?? 0) at \(list.done?.style.bump.peakAt ?? 0) on \(list.done?.style.bump.animation.duration ?? 0) over \(rows.joined(separator: "/"))"
     }
 
     /// The first task under an open strip, which the probe checks to reopen it.
