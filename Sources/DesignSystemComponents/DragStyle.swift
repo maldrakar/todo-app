@@ -1,4 +1,4 @@
-// Sources/DesignSystemComponents/DragModel.swift
+// Sources/DesignSystemComponents/DragStyle.swift
 import DesignSystem
 
 /// How the drag in a tree looks while a row is lifted: what marks the place where the row would land and the card it is
@@ -9,7 +9,7 @@ import DesignSystem
 /// A class, for the reason a list's row is one (`ListRowModel`): a screen's model holds it, every comparison of the
 /// screen's model compares it, and it is some 540 bytes on wasm32. Its `==` compares every stored property, and a test
 /// changes them one at a time.
-public final class DragModel: Equatable, Sendable {
+public final class DragStyle: Equatable, Sendable {
     /// What marks the place where the lifted row would land and the card it is carried on: the slot that opens there,
     /// with the card under the finger (`Phone.dc.html`, the drag's slot and card), or the Finder's indicator, a line
     /// and a circle, with its own card beside them (`Mac.dc.html`, the drag's slot row and card). The indicator is
@@ -17,7 +17,7 @@ public final class DragModel: Equatable, Sendable {
     /// `default` (`docs/style.md`, "Views").
     public enum Look: Equatable, Sendable {
         case slot(Slot, Card)
-        case indicator(DropIndicatorModel, IndicatorCard)
+        case indicator(DropIndicatorStyle, IndicatorCard)
     }
 
     /// The slot where the lifted row would land: `height` high, its frame drawn `verticalInset` in from its top and
@@ -32,11 +32,11 @@ public final class DragModel: Equatable, Sendable {
         public let verticalInset: Double
         public let cornerRadius: Double
         public let fill: DesignSystem.Color
-        public let stroke: StrokeModel
+        public let stroke: LineStyle
 
         public init(
             height: Double, inset: Double, trailingGap: Double, verticalInset: Double, cornerRadius: Double,
-            fill: DesignSystem.Color, stroke: StrokeModel
+            fill: DesignSystem.Color, stroke: LineStyle
         ) {
             self.height = height
             self.inset = inset
@@ -172,18 +172,18 @@ public final class DragModel: Equatable, Sendable {
 
     /// The tree's indent, which places the mark and the card at a depth, and is how far a finger or the pointer carries
     /// a lifted row sideways to change its depth by one.
-    public let indent: IndentModel
+    public let indent: IndentStyle
 
     public let animation: DesignSystem.Animation
     public let look: Look
 
-    public init(indent: IndentModel, animation: DesignSystem.Animation, look: Look) {
+    public init(indent: IndentStyle, animation: DesignSystem.Animation, look: Look) {
         self.indent = indent
         self.animation = animation
         self.look = look
     }
 
-    public static func == (lhs: DragModel, rhs: DragModel) -> Bool {
+    public static func == (lhs: DragStyle, rhs: DragStyle) -> Bool {
         if lhs === rhs { return true }
         return lhs.indent == rhs.indent
             && lhs.animation == rhs.animation

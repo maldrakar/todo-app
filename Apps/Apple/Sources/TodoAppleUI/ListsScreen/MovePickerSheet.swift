@@ -43,7 +43,7 @@ struct MovePickerSheet: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 Text(model.hint)
                     .frame(maxWidth: .infinity)
-                    .padding(.bottom, model.hintGap)
+                    .padding(.bottom, model.style.hintGap)
                     .background(Color(.paper))
             }
             .navigationTitle(model.title)
@@ -75,20 +75,22 @@ struct MovePickerSheet: View {
         let topLevel = model.topLevel
         return Button { send(topLevel.action) } label: {
             HStack(spacing: 0) {
-                HStack(spacing: topLevel.tileToTitle) {
+                HStack(spacing: topLevel.style.tileToTitle) {
                     Icon(topLevel.icon)
-                        .frame(width: topLevel.tileSide, height: topLevel.tileSide)
-                        .background(Color(topLevel.tileColor), in: .rect(cornerRadius: topLevel.tileCornerRadius))
+                        .frame(width: topLevel.style.tileSide, height: topLevel.style.tileSide)
+                        .background(
+                            Color(topLevel.style.tileColor), in: .rect(cornerRadius: topLevel.style.tileCornerRadius)
+                        )
                     Text(topLevel.title)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Accessories(
-                    topLevel.accessories, cellMinimumWidth: topLevel.cellMinimumWidth, textMinimumWidth: nil,
-                    endGap: topLevel.endGap, height: topLevel.height, send: send
+                    topLevel.accessories, cellMinimumWidth: topLevel.style.cellMinimumWidth, textMinimumWidth: nil,
+                    endGap: topLevel.style.endGap, height: topLevel.style.height, send: send
                 )
             }
-            .padding(.leading, topLevel.leading)
-            .frame(height: topLevel.height)
+            .padding(.leading, topLevel.style.leading)
+            .frame(height: topLevel.style.height)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -111,7 +113,7 @@ struct MovePickerSheet: View {
                     ListRowView(list, changed: TaskViewList.UserAction.titleFieldChanged, send: send)
                     ListRowView.End(list, send: send)
                 }
-                .background(Color(list.background))
+                .background(Color(list.style.background))
             }
         }
     }
@@ -123,12 +125,12 @@ struct MovePickerSheet: View {
     ) -> some View {
         Button { send(tap) } label: {
             row()
-                .frame(minHeight: model.minimumOptionHeight)
+                .frame(minHeight: model.style.minimumOptionHeight)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(option.isChecked ? .isSelected : [])
         .disabled(option.isDisabled)
-        .opacity(option.isDisabled ? model.disabledOpacity : 1)
+        .opacity(option.isDisabled ? model.style.disabledOpacity : 1)
     }
 }

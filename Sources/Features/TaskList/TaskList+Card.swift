@@ -29,7 +29,7 @@ extension TaskList {
         let isOpen = task.status == .open
         return CardModel(
             check: check(
-                title: drawnTitle(of: task), isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check
+                title: drawnTitle(of: task), isOpen: isOpen, action: .checkTapped(task.id), metrics.check(color)
             ),
             title: plainField(
                 card.typedTitle ?? task.title, placeholder: newTaskTitle, font: .rowTitleEmphasized,
@@ -54,16 +54,15 @@ extension TaskList {
             pills: pills(of: task, today: context.today, tags: context.tags, metrics.pill),
             expand: ButtonModel(
                 label: ButtonLabelModel(
-                    icon: IconModel(icon: .expand, size: metrics.expandSize, weight: .regular, color: .ink2),
-                    title: nil, accessibilityLabel: "Open full screen", fill: .color(.surface)
+                    icon: IconModel(
+                        icon: .expand, style: IconStyle(size: metrics.expandSize, weight: .regular, color: .ink2)
+                    ),
+                    title: nil, accessibilityLabel: "Open full screen",
+                    style: ButtonLabelStyle(fill: .color(.surface))
                 ),
                 action: .openFullScreenTapped
             ),
-            expandHitSide: metrics.expandHitSide, background: .surface, cornerRadius: metrics.cornerRadius,
-            topMargin: metrics.topMargin, horizontalMargin: metrics.horizontalMargin,
-            bottomMargin: metrics.bottomMargin, bodyLeading: metrics.bodyLeading, bodyTrailing: metrics.bodyTrailing,
-            bodyBottom: metrics.bodyBottom, subtasksToPills: metrics.subtasksToPills, pillSpacing: metrics.pillSpacing,
-            shadow: metrics.shadow, animation: .cardOpens, backgroundTapped: .backgroundTapped
+            style: metrics.style, backgroundTapped: .backgroundTapped
         )
     }
 
@@ -74,10 +73,10 @@ extension TaskList {
         let isOpen = task.status == .open
         return SubtaskRowModel(
             check: check(
-                title: task.title, isOpen: isOpen, color, action: .subtaskCheckTapped(task.id), metrics.subtaskCheck
+                title: task.title, isOpen: isOpen, action: .subtaskCheckTapped(task.id), metrics.subtaskCheck(color)
             ),
-            title: TextModel(text: task.title, font: .notes, color: isOpen ? .ink : .ink2),
-            strike: isOpen ? nil : .ink3, height: metrics.subtaskHeight
+            title: TextModel(text: task.title, style: TextStyle(font: .notes, color: isOpen ? .ink : .ink2)),
+            style: metrics.subtask(isOpen)
         )
     }
 
@@ -93,10 +92,8 @@ extension TaskList {
             font: DesignSystem.Font = .pill, color: DesignSystem.Color
         ) -> PillModel {
             PillModel(
-                icon: IconModel(icon: icon, size: size, weight: .regular, color: iconColor),
-                text: TextModel(text: text, font: font, color: color), background: .fill, height: metrics.height,
-                cornerRadius: metrics.height / 2, leadingPadding: metrics.leadingPadding,
-                trailingPadding: metrics.trailingPadding, spacing: metrics.spacing
+                icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: iconColor)),
+                text: TextModel(text: text, style: TextStyle(font: font, color: color)), style: metrics.style
             )
         }
         let when = task.when.map { whenPillText($0, today: today) }

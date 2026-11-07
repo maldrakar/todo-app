@@ -2,12 +2,11 @@
 import DesignSystem
 
 /// The round "+" that floats over the corner of the list screen on the phone (`Phone.dc.html`, the new task button):
-/// `diameter` across on `fill`, its glyph centred, casting `shadow`, in points.
+/// `diameter` across on `fill`, its glyph centred, casting `shadow`, in points. Its numbers, its `fill` and its
+/// `shadow` are the fields of its `FloatingButtonStyle`.
 public struct FloatingButtonModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
-    public let diameter: Double
-    public let fill: DesignSystem.Color
-    public let shadow: DesignSystem.Shadow
+    public let style: FloatingButtonStyle
 
     /// The words the button reads aloud, which say what a tap on it will do.
     public let accessibilityLabel: String
@@ -16,13 +15,13 @@ public struct FloatingButtonModel<Action: Equatable & Sendable>: Equatable, Send
     public let action: Action
 
     public init(
-        icon: IconModel, diameter: Double, fill: DesignSystem.Color, shadow: DesignSystem.Shadow,
-        accessibilityLabel: String, action: Action
+        icon: IconModel,
+        style: FloatingButtonStyle,
+        accessibilityLabel: String,
+        action: Action
     ) {
         self.icon = icon
-        self.diameter = diameter
-        self.fill = fill
-        self.shadow = shadow
+        self.style = style
         self.accessibilityLabel = accessibilityLabel
         self.action = action
     }

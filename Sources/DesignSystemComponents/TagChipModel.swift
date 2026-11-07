@@ -5,17 +5,11 @@ import DesignSystem
 /// of `cornerRadius`, half its height for a capsule, its glyph `leadingPadding` in from its leading edge and `spacing`
 /// before its title, and the title `trailingPadding` short of its trailing edge, in a tap area `hitHeight` high, in
 /// points. A lit chip, whose tag is picked, is drawn in the colours it is given, the list's check fill and mark, and an
-/// unlit one in the fill and the inks.
+/// unlit one in the fill and the inks. Its numbers and its `background` are the fields of its `TagChipStyle`.
 public struct TagChipModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
     public let title: TextModel
-    public let background: DesignSystem.Color
-    public let height: Double
-    public let cornerRadius: Double
-    public let leadingPadding: Double
-    public let trailingPadding: Double
-    public let spacing: Double
-    public let hitHeight: Double
+    public let style: TagChipStyle
 
     /// Whether the chip's tag is picked, which its colours already show and VoiceOver reads.
     public let isLit: Bool
@@ -26,25 +20,13 @@ public struct TagChipModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public init(
         icon: IconModel,
         title: TextModel,
-        background: DesignSystem.Color,
-        height: Double,
-        cornerRadius: Double,
-        leadingPadding: Double,
-        trailingPadding: Double,
-        spacing: Double,
-        hitHeight: Double,
+        style: TagChipStyle,
         isLit: Bool,
         action: Action
     ) {
         self.icon = icon
         self.title = title
-        self.background = background
-        self.height = height
-        self.cornerRadius = cornerRadius
-        self.leadingPadding = leadingPadding
-        self.trailingPadding = trailingPadding
-        self.spacing = spacing
-        self.hitHeight = hitHeight
+        self.style = style
         self.isLit = isLit
         self.action = action
     }

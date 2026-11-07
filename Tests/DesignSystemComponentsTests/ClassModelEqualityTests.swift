@@ -33,275 +33,254 @@ private func expectEveryPropertyCompared<Model: Equatable>(
     #expect(Set(variants.map(\.key)) == storedProperties(of: base), sourceLocation: sourceLocation)
 }
 
-private let text = TextModel(text: "Home", font: .rowTitle, color: .ink)
-private let icon = IconModel(icon: .grip, size: 18, weight: .regular, color: .ink3)
-private let stroke = StrokeModel(color: .line, width: 1, dash: [])
+private let text = TextModel(text: "Home", style: TextStyle(font: .rowTitle, color: .ink))
+private let icon = IconModel(icon: .grip, style: IconStyle(size: 18, weight: .regular, color: .ink3))
+private let stroke = LineStyle(color: .line, width: 1, dash: [])
 private let menu = MenuModel<Action>(sections: [])
 
 private func field(_ text: String) -> TextFieldModel<Action> {
     TextFieldModel(
-        text: text, placeholder: "Title", font: .rowTitle, color: .ink, background: .surface, minimumWidth: 140,
-        height: 34, padding: 10, cornerRadius: 10, ring: stroke, submitted: .first, cancelled: .first, focusLost: .first
+        text: text, placeholder: "Title",
+        style: FieldStyle(
+            font: .rowTitle, color: .ink, background: .surface, minimumWidth: 140, height: 34, padding: 10,
+            cornerRadius: 10, ring: stroke
+        ),
+        submitted: .first, cancelled: .first, focusLost: .first
     )
 }
 
+private let tileStyle = TileStyle(
+    color: .stone, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium
+)
+
+private let listRowStyle = ListRowStyle(
+    height: 46, leading: 20, tileToTitle: 12, need: 274, background: .paper, backgroundInset: 0, cornerRadius: 0,
+    guides: [], childGuides: [35], guide: stroke, fadeWidth: 10, textMinimumWidth: 20, cellMinimumWidth: 36, endGap: 4,
+    accessoriesWidth: 72
+)
+
 private func listRow(
-    height: Double = 46, leading: Double = 20,
-    tile: TileModel = TileModel(color: .stone, icon: .bullets, side: 30, cornerRadius: 8, glyphSize: 19),
-    tileToTitle: Double = 12, title: TextModel = text, field: TextFieldModel<Action>? = nil, need: Double = 274,
-    background: DesignSystem.Color = .paper, backgroundInset: Double = 0, cornerRadius: Double = 0,
-    guides: [Double] = [], childGuides: [Double] = [35], guide: StrokeModel = stroke,
-    accessories: [AccessoryModel<Action>] = [.space(20)], fadeWidth: Double = 10, textMinimumWidth: Double = 20,
-    cellMinimumWidth: Double = 36, endGap: Double = 4, accessoriesWidth: Double = 72, tap: Action = .first,
-    menu: MenuModel<Action>? = nil
+    tile: TileModel = TileModel(icon: .bullets, style: tileStyle), style: ListRowStyle = listRowStyle,
+    title: TextModel = text, field: TextFieldModel<Action>? = nil,
+    accessories: [AccessoryModel<Action>] = [.space(20)], tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> ListRowModel<Action> {
-    ListRowModel(
-        height: height, leading: leading, tile: tile, tileToTitle: tileToTitle, title: title, field: field, need: need,
-        background: background, backgroundInset: backgroundInset, cornerRadius: cornerRadius, guides: guides,
-        childGuides: childGuides, guide: guide, accessories: accessories, fadeWidth: fadeWidth,
-        textMinimumWidth: textMinimumWidth, cellMinimumWidth: cellMinimumWidth, endGap: endGap,
-        accessoriesWidth: accessoriesWidth, tap: tap, menu: menu
-    )
+    ListRowModel(tile: tile, style: style, title: title, field: field, accessories: accessories, tap: tap, menu: menu)
 }
 
 @Test func aListRowComparesEveryStoredProperty() {
     expectEveryPropertyCompared({ listRow() }, [
-        "height": listRow(height: 47),
-        "leading": listRow(leading: 42),
-        "tile": listRow(tile: TileModel(color: .teal, icon: .bullets, side: 30, cornerRadius: 8, glyphSize: 19)),
-        "tileToTitle": listRow(tileToTitle: 10),
-        "title": listRow(title: TextModel(text: "House", font: .rowTitle, color: .ink)),
+        "tile": listRow(tile: TileModel(icon: .bullets, style: TileStyle(
+            color: .teal, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium
+        ))),
+        "style": listRow(style: ListRowStyle(
+            height: 47, leading: 20, tileToTitle: 12, need: 274, background: .paper, backgroundInset: 0,
+            cornerRadius: 0, guides: [], childGuides: [35], guide: stroke, fadeWidth: 10, textMinimumWidth: 20,
+            cellMinimumWidth: 36, endGap: 4, accessoriesWidth: 72
+        )),
+        "title": listRow(title: TextModel(text: "House", style: TextStyle(font: .rowTitle, color: .ink))),
         "field": listRow(field: field("Home")),
-        "need": listRow(need: 310),
-        "background": listRow(background: .fill),
-        "backgroundInset": listRow(backgroundInset: 10),
-        "cornerRadius": listRow(cornerRadius: 7),
-        "guides": listRow(guides: [35]),
-        "childGuides": listRow(childGuides: [35, 55]),
-        "guide": listRow(guide: StrokeModel(color: .line, width: 1.5, dash: [])),
         "accessories": listRow(accessories: [.space(20), .space(36)]),
-        "fadeWidth": listRow(fadeWidth: 0),
-        "textMinimumWidth": listRow(textMinimumWidth: 22),
-        "cellMinimumWidth": listRow(cellMinimumWidth: 18),
-        "endGap": listRow(endGap: 20),
-        "accessoriesWidth": listRow(accessoriesWidth: 108),
         "tap": listRow(tap: .second),
         "menu": listRow(menu: menu),
     ])
 }
 
+private let areaLineStyle = AreaLineStyle(
+    height: 36, leading: 20, spacing: 10, line: stroke, lineToAccessories: 20, cellMinimumWidth: 22, endGap: 0
+)
+
 private func areaLine(
-    height: Double = 36, leading: Double = 20, spacing: Double = 10, label: TextModel? = text,
-    field: TextFieldModel<Action>? = nil, line: StrokeModel = stroke, lineToAccessories: Double = 20,
-    accessories: [AccessoryModel<Action>] = [], cellMinimumWidth: Double = 22, endGap: Double = 0, tap: Action = .first,
-    menu: MenuModel<Action>? = nil
+    style: AreaLineStyle = areaLineStyle, label: TextModel? = text, field: TextFieldModel<Action>? = nil,
+    accessories: [AccessoryModel<Action>] = [], tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> AreaLineModel<Action> {
-    AreaLineModel(
-        height: height, leading: leading, spacing: spacing, label: label, field: field, line: line,
-        lineToAccessories: lineToAccessories, accessories: accessories, cellMinimumWidth: cellMinimumWidth,
-        endGap: endGap, tap: tap, menu: menu
-    )
+    AreaLineModel(style: style, label: label, field: field, accessories: accessories, tap: tap, menu: menu)
 }
 
 @Test func anAreaLineComparesEveryStoredProperty() {
     expectEveryPropertyCompared({ areaLine() }, [
-        "height": areaLine(height: 17),
-        "leading": areaLine(leading: 8),
-        "spacing": areaLine(spacing: 12),
+        "style": areaLine(style: AreaLineStyle(
+            height: 17, leading: 20, spacing: 10, line: stroke, lineToAccessories: 20, cellMinimumWidth: 22, endGap: 0
+        )),
         "label": areaLine(label: nil),
         "field": areaLine(field: field("Work")),
-        "line": areaLine(line: StrokeModel(color: .line, width: 2, dash: [])),
-        "lineToAccessories": areaLine(lineToAccessories: 10),
         "accessories": areaLine(accessories: [.grip(icon)]),
-        "cellMinimumWidth": areaLine(cellMinimumWidth: 18),
-        "endGap": areaLine(endGap: 12),
         "tap": areaLine(tap: .second),
         "menu": areaLine(menu: menu),
     ])
 }
 
-private let slot = DragModel.Slot(
+private let slot = DragStyle.Slot(
     height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft, stroke: stroke
 )
 
-private let card = DragModel.Card(
+private let card = DragStyle.Card(
     raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface, grip: icon, gripCell: 40,
     minimumWidth: 120, listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14,
     lineHeight: 36, lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
 )
 
 private func drag(
-    indent: IndentModel = IndentModel(start: 20, step: 22), animation: DesignSystem.Animation = .popover,
-    look: DragModel.Look = .slot(slot, card)
-) -> DragModel {
-    DragModel(indent: indent, animation: animation, look: look)
+    indent: IndentStyle = IndentStyle(start: 20, step: 22), animation: DesignSystem.Animation = .popover,
+    look: DragStyle.Look = .slot(slot, card)
+) -> DragStyle {
+    DragStyle(indent: indent, animation: animation, look: look)
 }
 
-private let indicator = DropIndicatorModel(
-    height: 12, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
-    trailingGap: 18, circleDiameter: 10, circleOffset: -6, circleRing: StrokeModel(color: .accent, width: 2, dash: []),
+private let indicator = DropIndicatorStyle(
+    height: 12, line: LineStyle(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
+    trailingGap: 18, circleDiameter: 10, circleOffset: -6, circleRing: LineStyle(color: .accent, width: 2, dash: []),
     circleFill: .sidebar
 )
 
-private let indicatorCard = DragModel.IndicatorCard(
+private let indicatorCard = DragStyle.IndicatorCard(
     width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted, rotation: -1.2,
     opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5, glyphSize: 12, titleFont: .rowTitle
 )
 
 @Test func aDragComparesEveryStoredProperty() {
     expectEveryPropertyCompared({ drag() }, [
-        "indent": drag(indent: IndentModel(start: 20, step: 24)),
+        "indent": drag(indent: IndentStyle(start: 20, step: 24)),
         "animation": drag(animation: .check),
         "look": drag(look: .indicator(indicator, indicatorCard)),
     ])
-    #expect(drag(look: .slot(slot, card)) != drag(look: .slot(DragModel.Slot(
+    #expect(drag(look: .slot(slot, card)) != drag(look: .slot(DragStyle.Slot(
         height: 50, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft, stroke: stroke
     ), card)), "the slot is compared")
-    #expect(drag(look: .slot(slot, card)) != drag(look: .slot(slot, DragModel.Card(
+    #expect(drag(look: .slot(slot, card)) != drag(look: .slot(slot, DragStyle.Card(
         raise: 8, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface, grip: icon, gripCell: 40,
         minimumWidth: 120, listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14,
         lineHeight: 36, lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
     ))), "the card is compared")
 }
 
+private let topLevelStyle = PickerTopLevelStyle(
+    tileSide: 30, tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12, leading: 20, height: 46,
+    cellMinimumWidth: 18, endGap: 20
+)
+
 private let topLevel = PickerModel<Int, Action>.TopLevel(
-    icon: icon, tileSide: 30, tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12, title: text, leading: 20,
-    height: 46, accessories: [.space(18)], cellMinimumWidth: 18, endGap: 20, isChecked: false, action: .first
+    icon: icon, title: text, accessories: [.space(18)], isChecked: false, action: .first, style: topLevelStyle
 )
 
 private let cancel = ChoiceModel<Action>(title: "Cancel", isDestructive: false, action: .second)
+
+private let optionPickerStyle = OptionPickerStyle(hintGap: 8, minimumOptionHeight: 36, disabledOpacity: 0.35)
 
 private func picker(
     title: String = "Move “Home” to…", hint: TextModel = text, cancel: ChoiceModel<Action> = cancel,
     topLevel: PickerModel<Int, Action>.TopLevel = topLevel,
     options: [PickerModel<Int, Action>.Option] = [.init(row: 1, isDisabled: false, isChecked: true)],
-    hintGap: Double = 8, minimumOptionHeight: Double = 36, disabledOpacity: Double = 0.35
+    style: OptionPickerStyle = optionPickerStyle
 ) -> PickerModel<Int, Action> {
-    PickerModel(
-        title: title, hint: hint, cancel: cancel, topLevel: topLevel, options: options, hintGap: hintGap,
-        minimumOptionHeight: minimumOptionHeight, disabledOpacity: disabledOpacity
-    )
+    PickerModel(title: title, hint: hint, cancel: cancel, topLevel: topLevel, options: options, style: style)
 }
 
 @Test func aPickerComparesEveryStoredProperty() {
     expectEveryPropertyCompared({ picker() }, [
         "title": picker(title: "Move “Work” to…"),
-        "hint": picker(hint: TextModel(text: "Choose where it goes.", font: .hint, color: .ink2)),
+        "hint": picker(hint: TextModel(text: "Choose where it goes.", style: TextStyle(font: .hint, color: .ink2))),
         "cancel": picker(cancel: ChoiceModel(title: "Cancel", isDestructive: false, action: .first)),
         "topLevel": picker(topLevel: .init(
-            icon: icon, tileSide: 30, tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12, title: text, leading: 20,
-            height: 46, accessories: [.check(icon)], cellMinimumWidth: 18, endGap: 20, isChecked: true, action: .first
+            icon: icon, title: text, accessories: [.check(icon)], isChecked: true, action: .first,
+            style: topLevelStyle
         )),
         "options": picker(options: [.init(row: 1, isDisabled: true, isChecked: true)]),
-        "hintGap": picker(hintGap: 10),
-        "minimumOptionHeight": picker(minimumOptionHeight: 44),
-        "disabledOpacity": picker(disabledOpacity: 0.5),
+        "style": picker(style: OptionPickerStyle(hintGap: 10, minimumOptionHeight: 36, disabledOpacity: 0.35)),
     ])
 }
 
 private func check(isChecked: Bool = false) -> CheckModel<Action> {
     CheckModel(
-        diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-        colors: DesignSystem.Color.Components.Tile.blue.check, isChecked: isChecked, animation: .check,
+        style: .init(
+            diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+            animation: .check, colors: DesignSystem.Color.Components.Tile.blue.check
+        ),
+        isChecked: isChecked,
         accessibilityLabel: "Complete", action: .first
     )
 }
 
 private let swipe = SwipeModel<Action>(
-    threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
-    buttonCornerRadius: 12, button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), background: .red,
-    animation: .swipe, action: .second
+    style: .init(
+        threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
+        buttonCornerRadius: 12, background: .red, animation: .swipe
+    ),
+    button: TextModel(text: "Delete", style: TextStyle(font: .barLabel, color: .onAccent)), action: .second
 )
 
-private let lift = TaskLiftModel(
-    scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
-    indicator: DropIndicatorModel(
-        height: 10, line: StrokeModel(color: .accent, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
-        trailingGap: 20, circleDiameter: 8, circleOffset: 52,
-        circleRing: StrokeModel(color: .accent, width: 2, dash: []), circleFill: .paper
-    )
+private let taskRowStyle = TaskRowStyle(
+    titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
+    leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0, freshAnimation: .fresh,
+    strike: nil, lift: nil, fresh: nil
 )
 
 private func taskRow(
-    check: CheckModel<Action> = check(), title: TextModel = text, strike: DesignSystem.Color? = nil,
-    meta: [MetaItemModel] = [], titleToMeta: Double = 3, metaSpacing: Double = 10, metaLineSpacing: Double = 3,
-    verticalPadding: Double = 11, titleLeading: Double = 2, titleTrailing: Double = 4, leading: Double = 8,
-    trailing: Double = 12, minimumHeight: Double = 44, cornerRadius: Double = 0, swipe: SwipeModel<Action>? = nil,
-    lift: TaskLiftModel? = nil, fresh: DesignSystem.Color? = nil, freshAnimation: DesignSystem.Animation = .fresh,
+    check: CheckModel<Action> = check(), title: TextModel = text,
+    meta: [MetaItemModel] = [], style: TaskRowStyle = taskRowStyle, swipe: SwipeModel<Action>? = nil,
     tap: Action = .first, menu: MenuModel<Action>? = nil
 ) -> TaskRowModel<Action> {
     TaskRowModel(
-        check: check, title: title, strike: strike, meta: meta, titleToMeta: titleToMeta,
-        metaSpacing: metaSpacing, metaLineSpacing: metaLineSpacing, verticalPadding: verticalPadding,
-        titleLeading: titleLeading, titleTrailing: titleTrailing, leading: leading, trailing: trailing,
-        minimumHeight: minimumHeight, cornerRadius: cornerRadius, swipe: swipe, lift: lift, fresh: fresh,
-        freshAnimation: freshAnimation, tap: tap, menu: menu
+        check: check, title: title, meta: meta, style: style, swipe: swipe, tap: tap, menu: menu
     )
 }
 
 @Test func aTaskRowModelComparesEveryProperty() {
     expectEveryPropertyCompared({ taskRow() }, [
         "check": taskRow(check: check(isChecked: true)),
-        "title": taskRow(title: TextModel(text: "Call the plumber", font: .rowTitle, color: .ink)),
-        "strike": taskRow(strike: .ink3),
-        "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, spacing: 3, capsule: nil)]),
-        "titleToMeta": taskRow(titleToMeta: 2),
-        "metaSpacing": taskRow(metaSpacing: 8),
-        "metaLineSpacing": taskRow(metaLineSpacing: 2),
-        "verticalPadding": taskRow(verticalPadding: 9),
-        "titleLeading": taskRow(titleLeading: 4),
-        "titleTrailing": taskRow(titleTrailing: 0),
-        "leading": taskRow(leading: 4),
-        "trailing": taskRow(trailing: 10),
-        "minimumHeight": taskRow(minimumHeight: 36),
-        "cornerRadius": taskRow(cornerRadius: 9),
+        "title": taskRow(title: TextModel(text: "Call the plumber", style: TextStyle(font: .rowTitle, color: .ink))),
+        "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, style: MetaItemStyle(spacing: 3, capsule: nil))]),
+        "style": taskRow(style: .init(
+            titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
+            leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9, freshAnimation: .fresh,
+            strike: nil, lift: nil, fresh: nil
+        )),
         "swipe": taskRow(swipe: swipe),
-        "lift": taskRow(lift: lift),
-        "fresh": taskRow(fresh: .fresh),
-        "freshAnimation": taskRow(freshAnimation: .drop),
         "tap": taskRow(tap: .second),
         "menu": taskRow(menu: menu),
     ])
 }
 
 private let pill = PillModel(
-    icon: IconModel(icon: .flag, size: 15, weight: .medium, color: .red), text: text, background: .fill, height: 32,
-    cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6
+    icon: IconModel(icon: .flag, style: IconStyle(size: 15, weight: .medium, color: .red)), text: text,
+    style: .init(
+        height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6, background: .fill
+    )
 )
 
 private let addSubtask = AddRowModel<Action>(
-    icon: IconModel(icon: .plus, size: 17, weight: .medium, color: .ink2), iconCellWidth: 40, spacing: 0,
-    title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 44, width: nil, cornerRadius: 0,
-    topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-    trailingMargin: 0, action: .first
+    icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .medium, color: .ink2)),
+    title: TextModel(text: "Add subtask", style: TextStyle(font: .notes, color: .ink2)),
+    style: .init(
+        iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 0, topPadding: 0, leadingPadding: 0,
+        trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
+    ),
+    action: .first
 )
 
 private let expand = ButtonModel<Action>(
     label: ButtonLabelModel(
-        icon: IconModel(icon: .expand, size: 19, weight: .medium, color: .ink2), title: nil,
-        accessibilityLabel: "Open full screen", fill: .container
+        icon: IconModel(icon: .expand, style: IconStyle(size: 19, weight: .medium, color: .ink2)), title: nil,
+        accessibilityLabel: "Open full screen", style: ButtonLabelStyle(fill: .container)
     ),
     action: .first
+)
+
+private let cardStyle = CardStyle(
+    expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
+    bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised, background: .surface,
+    animation: .cardOpens
 )
 
 private func card(
     check: CheckModel<Action> = check(), title: TextFieldModel<Action> = field("Call the plumber"),
     notes: TextFieldModel<Action> = field(""), subtasks: [SubtaskRowModel<Action>] = [],
     subtaskField: TextFieldModel<Action>? = nil, addSubtask: AddRowModel<Action> = addSubtask,
-    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, expandHitSide: Double = 44,
-    background: DesignSystem.Color = .surface, cornerRadius: Double = 18, topMargin: Double = 6,
-    horizontalMargin: Double = 10, bottomMargin: Double = 10, bodyLeading: Double = 46, bodyTrailing: Double = 14,
-    bodyBottom: Double = 14, subtasksToPills: Double = 10, pillSpacing: Double = 6,
-    shadow: DesignSystem.Shadow = .raised, animation: DesignSystem.Animation = .cardOpens,
+    pills: [PillModel] = [], expand: ButtonModel<Action> = expand, style: CardStyle = cardStyle,
     backgroundTapped: Action = .first
 ) -> CardModel<Action> {
     CardModel(
         check: check, title: title, notes: notes, subtasks: subtasks, subtaskField: subtaskField,
-        addSubtask: addSubtask, pills: pills, expand: expand, expandHitSide: expandHitSide, background: background,
-        cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
-        bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing, bodyBottom: bodyBottom,
-        subtasksToPills: subtasksToPills, pillSpacing: pillSpacing, shadow: shadow, animation: animation,
-        backgroundTapped: backgroundTapped
+        addSubtask: addSubtask, pills: pills, expand: expand, style: style, backgroundTapped: backgroundTapped
     )
 }
 
@@ -310,144 +289,126 @@ private func card(
         "check": card(check: check(isChecked: true)),
         "title": card(title: field("Call the plumber today")),
         "notes": card(notes: field("Ask about the boiler")),
-        "subtasks": card(subtasks: [SubtaskRowModel(check: check(), title: text, strike: nil, height: 44)]),
+        "subtasks": card(subtasks: [
+            SubtaskRowModel(check: check(), title: text, style: .init(height: 44, strike: nil)),
+        ]),
         "subtaskField": card(subtaskField: field("")),
         "addSubtask": card(addSubtask: AddRowModel(
-            icon: IconModel(icon: .plus, size: 14, weight: .medium, color: .ink2), iconCellWidth: 30, spacing: 0,
-            title: TextModel(text: "Add subtask", font: .notes, color: .ink2), height: 30, width: nil,
-            cornerRadius: 7, topPadding: 0, leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil,
-            topMargin: 0, leadingMargin: 0, trailingMargin: 0, action: .first
+            icon: IconModel(icon: .plus, style: IconStyle(size: 14, weight: .medium, color: .ink2)),
+            title: TextModel(text: "Add subtask", style: TextStyle(font: .notes, color: .ink2)),
+            style: .init(
+                iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0,
+                leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
+                trailingMargin: 0
+            ),
+            action: .first
         )),
         "pills": card(pills: [pill]),
         "expand": card(expand: ButtonModel(label: expand.label, action: .second)),
-        "expandHitSide": card(expandHitSide: 30),
-        "background": card(background: .fill),
-        "cornerRadius": card(cornerRadius: 14),
-        "topMargin": card(topMargin: 4),
-        "horizontalMargin": card(horizontalMargin: 0),
-        "bottomMargin": card(bottomMargin: 8),
-        "bodyLeading": card(bodyLeading: 38),
-        "bodyTrailing": card(bodyTrailing: 12),
-        "bodyBottom": card(bodyBottom: 12),
-        "subtasksToPills": card(subtasksToPills: 8),
-        "pillSpacing": card(pillSpacing: 5),
-        "shadow": card(shadow: .lifted),
-        "animation": card(animation: .pushPop),
+        "style": card(style: .init(
+            expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
+            bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted,
+            background: .surface, animation: .cardOpens
+        )),
         "backgroundTapped": card(backgroundTapped: .second),
     ])
 }
 
 private let chevron = AccessoryModel<Action>.Chevron(
-    icon: IconModel(icon: .chevron, size: 18, weight: .semibold, color: .ink3), rotation: 0, animation: .fold,
-    accessibilityLabel: "Fold", action: .second
+    icon: IconModel(icon: .chevron, style: IconStyle(size: 18, weight: .semibold, color: .ink3)),
+    accessibilityLabel: "Fold", action: .second, style: ChevronStyle(rotation: 0, animation: .fold)
+)
+
+private let blockHeaderStyle = BlockHeaderStyle(
+    titleToSubtitle: 8, rule: stroke, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12,
+    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
 )
 
 private func blockHeader(
-    title: TextModel = text, subtitle: TextModel? = nil, titleToSubtitle: Double = 8,
-    field: TextFieldModel<Action>? = nil,
-    fold: BlockHeaderModel<Action>.Fold? = BlockHeaderModel.Fold(chevron: chevron, hitSide: 44),
-    rule: StrokeModel? = stroke, height: Double = 44, topMargin: Double = 6, trailingMargin: Double = 6,
-    bottomMargin: Double = 2, leadingMargin: Double = 12, topPadding: Double = 13, horizontalPadding: Double = 8,
-    bottomPadding: Double = 0, cornerRadius: Double = 0, titleTapped: Action = .first
+    title: TextModel = text, subtitle: TextModel? = nil, field: TextFieldModel<Action>? = nil,
+    fold: AccessoryModel<Action>.Chevron? = chevron,
+    style: BlockHeaderStyle = blockHeaderStyle, titleTapped: Action = .first
 ) -> BlockHeaderModel<Action> {
     BlockHeaderModel(
-        title: title, subtitle: subtitle, titleToSubtitle: titleToSubtitle, field: field, fold: fold, rule: rule,
-        height: height, topMargin: topMargin, trailingMargin: trailingMargin, bottomMargin: bottomMargin,
-        leadingMargin: leadingMargin, topPadding: topPadding, horizontalPadding: horizontalPadding,
-        bottomPadding: bottomPadding, cornerRadius: cornerRadius, titleTapped: titleTapped
+        title: title, subtitle: subtitle, field: field, fold: fold, style: style, titleTapped: titleTapped
     )
 }
 
 @Test func aBlockHeaderModelComparesEveryProperty() {
     expectEveryPropertyCompared({ blockHeader() }, [
-        "title": blockHeader(title: TextModel(text: "Work", font: .sectionTitle, color: .ink)),
-        "subtitle": blockHeader(subtitle: TextModel(text: "Tomorrow", font: .areaLabel, color: .ink2)),
-        "titleToSubtitle": blockHeader(titleToSubtitle: 6),
+        "title": blockHeader(title: TextModel(text: "Work", style: TextStyle(font: .sectionTitle, color: .ink))),
+        "subtitle": blockHeader(subtitle: TextModel(
+            text: "Tomorrow",
+            style: TextStyle(font: .areaLabel, color: .ink2)
+        )),
         "field": blockHeader(field: field("New list")),
         "fold": blockHeader(fold: nil),
-        "rule": blockHeader(rule: nil),
-        "height": blockHeader(height: 34),
-        "topMargin": blockHeader(topMargin: 14),
-        "trailingMargin": blockHeader(trailingMargin: 0),
-        "bottomMargin": blockHeader(bottomMargin: 0),
-        "leadingMargin": blockHeader(leadingMargin: 4),
-        "topPadding": blockHeader(topPadding: 9),
-        "horizontalPadding": blockHeader(horizontalPadding: 6),
-        "bottomPadding": blockHeader(bottomPadding: 9),
-        "cornerRadius": blockHeader(cornerRadius: 7),
+        "style": blockHeader(style: .init(
+            titleToSubtitle: 8, rule: nil, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2,
+            leadingMargin: 12, topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
+        )),
         "titleTapped": blockHeader(titleTapped: .second),
     ])
 }
 
-private let plus = IconModel(icon: .plus, size: 18, weight: .regular, color: .ink2)
+private let plus = IconModel(icon: .plus, style: IconStyle(size: 18, weight: .regular, color: .ink2))
+
+private let addRowStyle = AddRowStyle(
+    iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
+    trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+)
 
 private func addRow(
-    icon: IconModel = plus, iconCellWidth: Double = 44, spacing: Double = 0, title: TextModel = text,
-    height: Double = 40, width: Double? = nil, cornerRadius: Double = 12, topPadding: Double = 0,
-    leadingPadding: Double = 0, trailingPadding: Double = 12, dash: StrokeModel? = nil, rule: StrokeModel? = nil,
-    topMargin: Double = 0, leadingMargin: Double = 8, trailingMargin: Double = 12, action: Action = .first
+    icon: IconModel = plus, title: TextModel = text, style: AddRowStyle = addRowStyle,
+    action: Action = .first
 ) -> AddRowModel<Action> {
-    AddRowModel(
-        icon: icon, iconCellWidth: iconCellWidth, spacing: spacing, title: title, height: height, width: width,
-        cornerRadius: cornerRadius, topPadding: topPadding, leadingPadding: leadingPadding,
-        trailingPadding: trailingPadding, dash: dash, rule: rule, topMargin: topMargin, leadingMargin: leadingMargin,
-        trailingMargin: trailingMargin, action: action
-    )
+    AddRowModel(icon: icon, title: title, style: style, action: action)
 }
 
 @Test func anAddRowModelComparesEveryProperty() {
-    let line = StrokeModel(color: .line, width: 1, dash: [])
+    let line = LineStyle(color: .line, width: 1, dash: [])
     expectEveryPropertyCompared({ addRow() }, [
-        "icon": addRow(icon: IconModel(icon: .plus, size: 17, weight: .regular, color: .ink2)),
-        "iconCellWidth": addRow(iconCellWidth: 40),
-        "spacing": addRow(spacing: 6),
-        "title": addRow(title: TextModel(text: "Add list", font: .barLabel, color: .ink2)),
-        "height": addRow(height: 44),
-        "width": addRow(width: 200),
-        "cornerRadius": addRow(cornerRadius: 13),
-        "topPadding": addRow(topPadding: 4),
-        "leadingPadding": addRow(leadingPadding: 11),
-        "trailingPadding": addRow(trailingPadding: 16),
-        "dash": addRow(dash: line),
-        "rule": addRow(rule: line),
-        "topMargin": addRow(topMargin: 10),
-        "leadingMargin": addRow(leadingMargin: 12),
-        "trailingMargin": addRow(trailingMargin: 6),
+        "icon": addRow(icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .regular, color: .ink2))),
+        "title": addRow(title: TextModel(text: "Add list", style: TextStyle(font: .barLabel, color: .ink2))),
+        "style": addRow(style: .init(
+            iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
+            trailingPadding: 12, dash: line, rule: line, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+        )),
         "action": addRow(action: .second),
     ])
 }
 
+private let doneStripStyle = DoneStripStyle(
+    height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
+    leadingMargin: 14, trailingMargin: 16, background: .fill
+)
+
 private func doneStrip(
-    icon: IconModel = plus, label: TextModel = text, rotation: Double = 0, background: DesignSystem.Color = .fill,
-    height: Double = 36, cornerRadius: Double = 18, spacing: Double = 8, leadingPadding: Double = 10,
-    trailingPadding: Double = 14, topMargin: Double = 20, leadingMargin: Double = 14, trailingMargin: Double = 16,
-    isOpen: Bool = false, action: Action = .first
+    icon: IconModel = plus, label: TextModel = text, rotation: Double = 0,
+    style: DoneStripStyle = doneStripStyle, isOpen: Bool = false, action: Action = .first
 ) -> DoneStripModel<Action> {
     DoneStripModel(
         icon: icon, label: label,
         chevron: AccessoryModel.Chevron(
-            icon: plus, rotation: rotation, animation: .fold, accessibilityLabel: "Show done tasks", action: .first
+            icon: plus, accessibilityLabel: "Show done tasks", action: .first,
+            style: ChevronStyle(rotation: rotation, animation: .fold)
         ),
-        background: background, height: height, cornerRadius: cornerRadius, spacing: spacing,
-        leadingPadding: leadingPadding, trailingPadding: trailingPadding, topMargin: topMargin,
-        leadingMargin: leadingMargin, trailingMargin: trailingMargin, isOpen: isOpen, action: action
+        style: style, isOpen: isOpen, action: action
     )
 }
 
 @Test func aDoneStripModelComparesEveryProperty() {
     expectEveryPropertyCompared({ doneStrip() }, [
-        "icon": doneStrip(icon: IconModel(icon: .checkCircle, size: 18, weight: .regular, color: .ink2)),
-        "label": doneStrip(label: TextModel(text: "Done today · 3", font: .barLabel, color: .ink2)),
+        "icon": doneStrip(icon: IconModel(
+            icon: .checkCircle,
+            style: IconStyle(size: 18, weight: .regular, color: .ink2)
+        )),
+        "label": doneStrip(label: TextModel(text: "Done today · 3", style: TextStyle(font: .barLabel, color: .ink2))),
         "chevron": doneStrip(rotation: 180),
-        "background": doneStrip(background: .surface),
-        "height": doneStrip(height: 30),
-        "cornerRadius": doneStrip(cornerRadius: 15),
-        "spacing": doneStrip(spacing: 7),
-        "leadingPadding": doneStrip(leadingPadding: 9),
-        "trailingPadding": doneStrip(trailingPadding: 12),
-        "topMargin": doneStrip(topMargin: 22),
-        "leadingMargin": doneStrip(leadingMargin: 6),
-        "trailingMargin": doneStrip(trailingMargin: 0),
+        "style": doneStrip(style: .init(
+            height: 30, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
+            leadingMargin: 14, trailingMargin: 16, background: .fill
+        )),
         "isOpen": doneStrip(isOpen: true),
         "action": doneStrip(action: .second),
     ])

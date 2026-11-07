@@ -232,8 +232,8 @@ private struct DraggedTree {
         var frames: [ListsTreeItem.ID: CGRect] = [:]
         for item in drag?.drawn(items) ?? items {
             let height: CGFloat = switch item {
-            case .list(_, let list): list.height
-            case .area(_, let line): line.height
+            case .list(_, let list): list.style.height
+            case .area(_, let line): line.style.height
             case .slot: slotHeight
             }
             frames[item.id] = CGRect(x: 0, y: y, width: 400, height: height)

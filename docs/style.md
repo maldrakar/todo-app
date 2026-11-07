@@ -56,6 +56,14 @@ Each rule names the review that set it.
   collected into one function that both call. A write that mirrors
   another write is shaped like it, `writePairRow` like `writeEntityRow`.
   A result callers usually drop is `@discardableResult`. (PR #36)
+- **A component's look is its style.** Every visual value of a
+  component, a number, a colour, a font or a motion, is a field of its
+  style, `CheckStyle` beside `CheckModel`, a type of its own and not
+  nested in a generic model. The model keeps its content, its state and
+  its actions, and a type that holds only visual values is a style with
+  no model. A value that differs per row makes another instance of the
+  style, and a layout's table holds that entry as a function of what it
+  depends on. (PR #191)
 - **Two statements where one would do get questioned.** A repeated
   string literal becomes a constant. A value is assigned after the write
   that persists it, not before. A nested `switch` is worse than repeating
@@ -115,12 +123,13 @@ value a peer wrote is as arbitrary as one a person typed.
   width, assembles no path, and reads no route to decide what to
   draw. (Owner, 2026-10-22, #117; ADR-0006, amendment of 2026-10-22)
 - **A view may switch over three enums of its model, four of its
-  components' models, and no others.** The shape of its layout; the
-  screens of a stack, in one place per stack, to pick a view per case;
-  and the kind of a row, to pick the row to draw. Of a component's
-  model: what a control stands on, `FillModel`; what stands on a bar,
-  `BarModel.Item`; what stands at a row's right, `AccessoryModel`; and
-  how a drag marks where a row would land, `DragModel.Look`. It is
+  components' models and styles, and no others.** The shape of its
+  layout; the screens of a stack, in one place per stack, to pick a view
+  per case; and the kind of a row, to pick the row to draw. Of a
+  component: what a control stands on, `ControlFillStyle`; what stands
+  on a bar, `BarModel.Item`; what stands at a row's right,
+  `AccessoryModel`; and how a drag marks where a row would land,
+  `DragStyle.Look`. It is
   dispatch and not a condition over data: every case is drawn, with no
   `default`, so a screen added to a stack and not drawn stops the view
   compiling. (Navigation state spec, sections 4 and 6, #117; ADR-0006,

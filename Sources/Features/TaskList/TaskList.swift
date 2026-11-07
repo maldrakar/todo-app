@@ -226,7 +226,7 @@ public final class TaskList: Routable {
             // Only a block the model draws with a chevron folds, which no column has. The fold is the one thing that
             // moves: it is the device's state and no answer to anything a person was told, so the sentence stays.
             let blocks = TaskList.blocks(in: model.layout)
-            guard blocks.contains(where: { $0.header?.fold?.chevron.action == .blockChevronTapped(id) }),
+            guard blocks.contains(where: { $0.header?.fold?.action == .blockChevronTapped(id) }),
                   let key = TaskList.foldKey(of: id)
             else { return nil }
             let drawn = Set(blocks.compactMap { TaskList.foldKey(of: $0.id) })
@@ -506,7 +506,7 @@ public final class TaskList: Routable {
             )
             return Model(
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
-                tagBar: TaskList.tagBar(chips, picked: picked, colors: color.check, metrics.tagBar),
+                tagBar: TaskList.tagBar(chips, picked: picked, color: color, metrics.tagBar),
                 layout: TaskList.layout(
                     shown, title: title, folded: folded, addList: addList, context, metrics.blocks
                 ),

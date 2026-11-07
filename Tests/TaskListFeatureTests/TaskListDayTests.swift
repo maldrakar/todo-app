@@ -143,8 +143,8 @@ import TodoCore
         module.tap(.rowTapped(id))
         let pill = try #require(openCard(in: module.model)?.card.pills.first)
         #expect(pill.text.text == text)
-        #expect(pill.text.color == (offset == nil ? .ink2 : .ink))
-        #expect(pill.icon.color == (offset == nil ? .ink2 : DesignSystem.Color.Components.Tile.amber.glyph))
+        #expect(pill.text.style.color == (offset == nil ? .ink2 : .ink))
+        #expect(pill.icon.style.color == (offset == nil ? .ink2 : DesignSystem.Color.Components.Tile.amber.glyph))
     }
 }
 
@@ -163,7 +163,7 @@ import TodoCore
         module.tap(.rowTapped(id))
         let pills = try #require(openCard(in: module.model)?.card.pills)
         #expect(pills[1].text.text == text)
-        #expect(pills[1].text.color == color)
-        #expect(pills[1].icon.color == (offset == nil ? .ink2 : .red))
+        #expect(pills[1].text.style.color == color)
+        #expect(pills[1].icon.style.color == (offset == nil ? .ink2 : .red))
     }
 }

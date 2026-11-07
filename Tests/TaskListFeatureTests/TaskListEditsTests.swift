@@ -442,7 +442,7 @@ private func thisWeek(_ store: Store, tag: TagID) throws -> ViewID {
     let opened = try #require(openCard(in: module.model))
     #expect(opened.id == id)
     #expect(opened.card.check.isChecked)
-    #expect(opened.card.title.color == .ink2)
+    #expect(opened.card.title.style.color == .ink2)
     module.tap(.checkTapped(id))
     #expect(try stored(id, in: store).status == .open)
     #expect(openCard(in: module.model) == nil, "the task left the Logbook")

@@ -6,54 +6,28 @@ import DesignSystem
 /// `trailingMargin`, `bottomMargin` and `leadingMargin` from what stands round it; its title, or the field in its place
 /// while the list is being named, and `titleToSubtitle` after the title its subtitle where it has one, `topPadding`
 /// below its top, `horizontalPadding` in from either side and `bottomPadding` above its bottom; the chevron that folds
-/// and opens the block where it has one (`Fold`); its rule along its bottom where it has one; and what it draws under
-/// itself, the pointer's tint, rounded by `cornerRadius`, in points.
+/// and opens the block where it has one, centred in a square cell `foldHitSide` on a side; its rule along its bottom
+/// where it has one; and what it draws under itself, the pointer's tint, rounded by `cornerRadius`, in points. Its
+/// numbers and its `rule` are the fields of its `BlockHeaderStyle`.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block and a column each hold one, every comparison
 /// of the screen's model compares it, and inline, its field and chevron with it, it is some 770 bytes on wasm32. Its
 /// `==` compares every stored property, and a test changes them one at a time.
 public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Sendable {
-    /// The control that folds and opens the block: its chevron, centred in a square cell `hitSide` on a side, in
-    /// points. Held whole where a header has it and absent where it has none, as `SearchFieldModel.TrailingGlyph` holds
-    /// a glyph and its cell, so that a header with no chevron carries no size for one.
-    public struct Fold: Equatable, Sendable {
-        public let chevron: AccessoryModel<Action>.Chevron
-        public let hitSide: Double
-
-        public init(chevron: AccessoryModel<Action>.Chevron, hitSide: Double) {
-            self.chevron = chevron
-            self.hitSide = hitSide
-        }
-    }
-
     /// The title, in the colour of the list the block is: the open list's glyph colour for a group, its own for a list.
     public let title: TextModel
 
     /// The subtitle on the title's line after it, finished, and nil for a header with none.
     public let subtitle: TextModel?
 
-    public let titleToSubtitle: Double
-
     /// The field the title is typed into while the list is being named, in the title's place, and nil while it is not.
     public let field: TextFieldModel<Action>?
 
     /// The control that folds and opens the block, and nil for a header with none, as a column's is, since columns do
     /// not fold (list screen spec, section 5).
-    public let fold: Fold?
+    public let fold: AccessoryModel<Action>.Chevron?
 
-    /// The rule under the header, across its width, whose width is how thick it is, and nil for a header with none, as
-    /// a column's is.
-    public let rule: StrokeModel?
-
-    public let height: Double
-    public let topMargin: Double
-    public let trailingMargin: Double
-    public let bottomMargin: Double
-    public let leadingMargin: Double
-    public let topPadding: Double
-    public let horizontalPadding: Double
-    public let bottomPadding: Double
-    public let cornerRadius: Double
+    public let style: BlockHeaderStyle
 
     /// What a tap on the title sends.
     public let titleTapped: Action
@@ -61,36 +35,16 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
     public init(
         title: TextModel,
         subtitle: TextModel?,
-        titleToSubtitle: Double,
         field: TextFieldModel<Action>?,
-        fold: Fold?,
-        rule: StrokeModel?,
-        height: Double,
-        topMargin: Double,
-        trailingMargin: Double,
-        bottomMargin: Double,
-        leadingMargin: Double,
-        topPadding: Double,
-        horizontalPadding: Double,
-        bottomPadding: Double,
-        cornerRadius: Double,
+        fold: AccessoryModel<Action>.Chevron?,
+        style: BlockHeaderStyle,
         titleTapped: Action
     ) {
         self.title = title
         self.subtitle = subtitle
-        self.titleToSubtitle = titleToSubtitle
         self.field = field
         self.fold = fold
-        self.rule = rule
-        self.height = height
-        self.topMargin = topMargin
-        self.trailingMargin = trailingMargin
-        self.bottomMargin = bottomMargin
-        self.leadingMargin = leadingMargin
-        self.topPadding = topPadding
-        self.horizontalPadding = horizontalPadding
-        self.bottomPadding = bottomPadding
-        self.cornerRadius = cornerRadius
+        self.style = style
         self.titleTapped = titleTapped
     }
 
@@ -98,19 +52,9 @@ public final class BlockHeaderModel<Action: Equatable & Sendable>: Equatable, Se
         if lhs === rhs { return true }
         return lhs.title == rhs.title
             && lhs.subtitle == rhs.subtitle
-            && lhs.titleToSubtitle == rhs.titleToSubtitle
+            && lhs.style == rhs.style
             && lhs.field == rhs.field
             && lhs.fold == rhs.fold
-            && lhs.rule == rhs.rule
-            && lhs.height == rhs.height
-            && lhs.topMargin == rhs.topMargin
-            && lhs.trailingMargin == rhs.trailingMargin
-            && lhs.bottomMargin == rhs.bottomMargin
-            && lhs.leadingMargin == rhs.leadingMargin
-            && lhs.topPadding == rhs.topPadding
-            && lhs.horizontalPadding == rhs.horizontalPadding
-            && lhs.bottomPadding == rhs.bottomPadding
-            && lhs.cornerRadius == rhs.cornerRadius
             && lhs.titleTapped == rhs.titleTapped
     }
 }

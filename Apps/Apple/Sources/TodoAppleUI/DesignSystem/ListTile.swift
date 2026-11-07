@@ -16,13 +16,13 @@ struct ListTile: View {
     var body: some View {
         // Circular corners, as the canvas's `border-radius` draws them and the model's radius describes; SwiftUI's
         // default is the continuous style (Xcode 27.1's SDKs), so the circular one is named.
-        RoundedRectangle(cornerRadius: model.cornerRadius, style: .circular)
-            .fill(Color(model.color.background))
-            .frame(width: model.side, height: model.side)
+        RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
+            .fill(Color(model.style.color.background))
+            .frame(width: model.style.side, height: model.style.side)
             .overlay {
-                Image(model.glyph.icon)
-                    .font(.system(size: model.glyph.size, weight: Font.Weight(model.glyph.weight)))
-                    .foregroundStyle(Color(model.color.glyph))
+                Image(model.icon)
+                    .font(.system(size: model.style.glyphSize, weight: Font.Weight(model.style.glyphWeight)))
+                    .foregroundStyle(Color(model.style.color.glyph))
             }
     }
 }

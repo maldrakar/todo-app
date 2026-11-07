@@ -1,5 +1,4 @@
 // Sources/DesignSystemComponents/AccessoryModel.swift
-import DesignSystem
 
 /// What may stand at the right of a list's row or of an area's line, each as high as what it stands on: a text, such
 /// as a count; the chevron, which folds and unfolds the rows inside; the grip, which says the row drags; the check,
@@ -13,23 +12,19 @@ import DesignSystem
 public enum AccessoryModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// The chevron of a row with rows inside it, which folds and unfolds them: its glyph, turned by `rotation` degrees,
     /// clockwise when positive, as CSS and SwiftUI turn, moving to a new turn on `animation`, the words it reads aloud,
-    /// which say what a tap on it will do, and the action the tap sends.
+    /// which say what a tap on it will do, and the action the tap sends. Its turn and its motion are the fields of its
+    /// `ChevronStyle`.
     public struct Chevron: Equatable, Sendable {
         public let icon: IconModel
-        public let rotation: Double
-        public let animation: DesignSystem.Animation
         public let accessibilityLabel: String
         public let action: Action
+        public let style: ChevronStyle
 
-        public init(
-            icon: IconModel, rotation: Double, animation: DesignSystem.Animation, accessibilityLabel: String,
-            action: Action
-        ) {
+        public init(icon: IconModel, accessibilityLabel: String, action: Action, style: ChevronStyle) {
             self.icon = icon
-            self.rotation = rotation
-            self.animation = animation
             self.accessibilityLabel = accessibilityLabel
             self.action = action
+            self.style = style
         }
     }
 

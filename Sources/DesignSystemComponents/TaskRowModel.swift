@@ -9,10 +9,11 @@ import DesignSystem
 /// what it draws under itself rounded by `cornerRadius`, in points. The model holds every value its platform needs to
 /// draw it, so a view decides nothing but what is the platform's: the gestures, the swipe and the lift as they move,
 /// focus and Reduce Motion (ADR-0007, amendment of 2026-10-30). It holds no id of the store's: the feature module's row
-/// carries the task's id beside it.
+/// carries the task's id beside it. Its numbers, its `strike`, its `lift`, its `fresh` and its `freshAnimation` are the
+/// fields of its `TaskRowStyle`.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block holds many, every comparison of the screen's
-/// model compares them, and inline, its check, swipe and lift with it, a row is some 1,160 bytes on wasm32. Its `==`
+/// model compares them, and inline, its check, swipe and style with it, a row is some 1,160 bytes on wasm32. Its `==`
 /// compares every stored property, and a test changes them one at a time.
 public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let check: CheckModel<Action>
@@ -20,39 +21,13 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     /// The title, in its colour, the done colour where the task is done.
     public let title: TextModel
 
-    /// The colour of the line through the title, the canvas's ink 3 through a done task's (`.tt-done`), and nil for a
-    /// title with no line through it.
-    public let strike: DesignSystem.Color?
-
     /// The items of the meta line in the order they stand, and none for a row with no meta line.
     public let meta: [MetaItemModel]
 
-    public let titleToMeta: Double
-    public let metaSpacing: Double
-    public let metaLineSpacing: Double
-    public let verticalPadding: Double
-    public let titleLeading: Double
-    public let titleTrailing: Double
-    public let leading: Double
-    public let trailing: Double
-
-    /// The least the row is high: a title on more lines makes it higher.
-    public let minimumHeight: Double
-
-    /// The radius of the corners of what the row draws under itself, its fresh colour and the pointer's tint.
-    public let cornerRadius: Double
+    public let style: TaskRowStyle
 
     /// The swipe that uncovers the row's Delete, and nil for a row that is not swiped.
     public let swipe: SwipeModel<Action>?
-
-    /// How the row looks while it is lifted to be moved, and nil for a row that cannot be.
-    public let lift: TaskLiftModel?
-
-    /// The colour under the row where it was just dropped, which fades out over `freshAnimation` from the moment it
-    /// lands, and nil under any other row. The motion is held while the colour is nil too, so the fade does not stop
-    /// when the colour goes.
-    public let fresh: DesignSystem.Color?
-    public let freshAnimation: DesignSystem.Animation
 
     /// What a tap on the row, beside its check, sends.
     public let tap: Action
@@ -63,43 +38,17 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
     public init(
         check: CheckModel<Action>,
         title: TextModel,
-        strike: DesignSystem.Color?,
         meta: [MetaItemModel],
-        titleToMeta: Double,
-        metaSpacing: Double,
-        metaLineSpacing: Double,
-        verticalPadding: Double,
-        titleLeading: Double,
-        titleTrailing: Double,
-        leading: Double,
-        trailing: Double,
-        minimumHeight: Double,
-        cornerRadius: Double,
+        style: TaskRowStyle,
         swipe: SwipeModel<Action>?,
-        lift: TaskLiftModel?,
-        fresh: DesignSystem.Color?,
-        freshAnimation: DesignSystem.Animation,
         tap: Action,
         menu: MenuModel<Action>?
     ) {
         self.check = check
         self.title = title
-        self.strike = strike
         self.meta = meta
-        self.titleToMeta = titleToMeta
-        self.metaSpacing = metaSpacing
-        self.metaLineSpacing = metaLineSpacing
-        self.verticalPadding = verticalPadding
-        self.titleLeading = titleLeading
-        self.titleTrailing = titleTrailing
-        self.leading = leading
-        self.trailing = trailing
-        self.minimumHeight = minimumHeight
-        self.cornerRadius = cornerRadius
+        self.style = style
         self.swipe = swipe
-        self.lift = lift
-        self.fresh = fresh
-        self.freshAnimation = freshAnimation
         self.tap = tap
         self.menu = menu
     }
@@ -108,22 +57,9 @@ public final class TaskRowModel<Action: Equatable & Sendable>: Equatable, Sendab
         if lhs === rhs { return true }
         return lhs.check == rhs.check
             && lhs.title == rhs.title
-            && lhs.strike == rhs.strike
             && lhs.meta == rhs.meta
-            && lhs.titleToMeta == rhs.titleToMeta
-            && lhs.metaSpacing == rhs.metaSpacing
-            && lhs.metaLineSpacing == rhs.metaLineSpacing
-            && lhs.verticalPadding == rhs.verticalPadding
-            && lhs.titleLeading == rhs.titleLeading
-            && lhs.titleTrailing == rhs.titleTrailing
-            && lhs.leading == rhs.leading
-            && lhs.trailing == rhs.trailing
-            && lhs.minimumHeight == rhs.minimumHeight
-            && lhs.cornerRadius == rhs.cornerRadius
+            && lhs.style == rhs.style
             && lhs.swipe == rhs.swipe
-            && lhs.lift == rhs.lift
-            && lhs.fresh == rhs.fresh
-            && lhs.freshAnimation == rhs.freshAnimation
             && lhs.tap == rhs.tap
             && lhs.menu == rhs.menu
     }

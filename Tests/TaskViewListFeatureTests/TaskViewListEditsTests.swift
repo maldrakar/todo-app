@@ -42,13 +42,13 @@ private struct Look: Equatable {
         case .area(let line):
             title = line.label?.text
             tile = nil
-            font = line.label?.font
-            leading = line.leading
+            font = line.label?.style.font
+            leading = line.style.leading
         case .list(let list):
             title = list.title.text
             tile = list.tile
-            font = list.title.font
-            leading = list.leading
+            font = list.title.style.font
+            leading = list.style.leading
         }
     }
 }
@@ -57,7 +57,7 @@ private struct Look: Equatable {
 /// square, in every width, and an area's line, which has no background, on whatever the sheet is.
 private func standsOnTheSheet(_ option: Option) -> Bool {
     guard case .list(let list) = option.row else { return true }
-    return list.background == .paper && list.backgroundInset == 0 && list.cornerRadius == 0
+    return list.style.background == .paper && list.style.backgroundInset == 0 && list.style.cornerRadius == 0
 }
 
 /// The picker's options as a view reads them, each the id it offers and how it looks, to hold beside the screen's rows.

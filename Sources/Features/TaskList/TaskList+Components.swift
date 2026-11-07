@@ -9,9 +9,11 @@ import TodoCore
 /// points, every colour, font, icon, animation and shadow a token of the design system, every word finished, in English
 /// until the formatting service arrives, and every control's action a value (ADR-0007, amendment of 2026-10-30). The
 /// numbers are one value per layout (`Metrics`), picked once where the model is built, so that no builder branches on
-/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`). The open card is in
-/// `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete in
-/// `TaskList+Controls.swift`.
+/// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`); a component's are its style,
+/// `CheckStyle` for `CheckModel` and so on, which also holds its colours and motions, and which a builder hands over
+/// whole; what stays in `Metrics` beside the styles is a number a nested model takes, such as a glyph's size, and a
+/// font. The open card is in `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete
+/// in `TaskList+Controls.swift`.
 extension TaskList {
     /// What the rows and the headers of a model are built from beside their own tasks: the device's day, the tags'
     /// names, the open card and the list being named.
@@ -29,12 +31,15 @@ extension TaskList {
     ) -> ScreenHeaderModel {
         ScreenHeaderModel(
             tile: TileModel(
-                color: color, icon: icon, side: metrics.tileSide, cornerRadius: metrics.tileCornerRadius,
-                glyphSize: metrics.glyphSize
+                icon: icon,
+                style: TileStyle(
+                    color: color, side: metrics.tile.side, cornerRadius: metrics.tile.cornerRadius,
+                    glyphSize: metrics.tile.glyphSize, glyphWeight: .medium
+                )
             ),
-            title: TextModel(text: heading.title, font: .largeTitle, color: .ink),
-            subtitle: heading.subtitle.map { TextModel(text: $0, font: .count, color: .ink2) },
-            spacing: metrics.spacing, titleToSubtitle: metrics.titleToSubtitle, subtitleLeading: metrics.subtitleLeading
+            title: TextModel(text: heading.title, style: TextStyle(font: .largeTitle, color: .ink)),
+            subtitle: heading.subtitle.map { TextModel(text: $0, style: TextStyle(font: .count, color: .ink2)) },
+            style: metrics.style
         )
     }
 
@@ -43,25 +48,25 @@ extension TaskList {
     /// in its mark's colour, and unlit on the fill with the title in ink and the glyph in ink 2 (the controller's
     /// ruling on #175, 2026-11-04).
     static func tagBar(
-        _ chips: [Chip], picked: Set<TagID>, colors: DesignSystem.Color.Components.Check, _ metrics: Metrics.TagBar
+        _ chips: [Chip], picked: Set<TagID>, color: Tile, _ metrics: Metrics.TagBar
     ) -> TagBarModel<UserAction>? {
         guard !chips.isEmpty else { return nil }
+        let colors = color.check
         return TagBarModel(
             chips: chips.map { chip in
                 let isLit = picked.contains(chip.id)
                 return TagChipModel(
                     icon: IconModel(
-                        icon: .hash, size: metrics.hashSize, weight: .semibold, color: isLit ? colors.mark : .ink2
+                        icon: .hash,
+                        style: IconStyle(size: metrics.hashSize, weight: .semibold, color: isLit ? colors.mark : .ink2)
                     ),
-                    title: TextModel(text: chip.title, font: .pill, color: isLit ? colors.mark : .ink),
-                    background: isLit ? colors.fill : .fill, height: metrics.chipHeight,
-                    cornerRadius: metrics.chipHeight / 2, leadingPadding: metrics.chipLeadingPadding,
-                    trailingPadding: metrics.chipTrailingPadding, spacing: metrics.chipSpacing,
-                    hitHeight: metrics.chipHitHeight, isLit: isLit, action: .tagChipTapped(chip.id)
+                    title: TextModel(
+                        text: chip.title, style: TextStyle(font: .pill, color: isLit ? colors.mark : .ink)
+                    ),
+                    style: metrics.chip(color, isLit), isLit: isLit, action: .tagChipTapped(chip.id)
                 )
             },
-            spacing: metrics.spacing, padding: metrics.padding, fadeIn: metrics.fadeIn, fadeOut: metrics.fadeOut,
-            leadingMargin: metrics.margin, trailingMargin: metrics.margin
+            style: metrics.style
         )
     }
 
@@ -76,13 +81,13 @@ extension TaskList {
         _ context: RowContext, _ metrics: Metrics.Blocks
     ) -> Model.Layout {
         switch metrics {
-        case .list(let headerMetrics, let chevronMetrics, let rowMetrics, let cardMetrics, let addTaskMetrics, _):
+        case .list(let headerMetrics, let chevronSize, let rowMetrics, let cardMetrics, let addTaskMetrics, _):
             return .list(blocks.map { block in
                 let isFolded = block.heading != nil && foldKey(of: block.id).map(folded.contains) == true
                 return Model.Block(
                     id: block.id,
                     header: block.heading.map {
-                        blockHeader($0, of: block, isFolded: isFolded, context, headerMetrics, chevron: chevronMetrics)
+                        blockHeader($0, of: block, isFolded: isFolded, context, headerMetrics, chevronSize: chevronSize)
                     },
                     rows: isFolded ? [] : block.tasks.map {
                         row($0, block.color, context, rowMetrics, card: cardMetrics)
@@ -116,19 +121,15 @@ extension TaskList {
     /// on #175, 2026-11-04: the canvas keeps "Fold" and carries the state in `aria-expanded`, which the model has no
     /// field for).
     private static func blockHeader(
-        _ heading: Heading, of block: PageBlock, isFolded: Bool, _ context: RowContext, _ metrics: Metrics.BlockHeader,
-        chevron: Metrics.Chevron
+        _ heading: Heading, of block: PageBlock, isFolded: Bool, _ context: RowContext,
+        _ style: BlockHeaderStyle, chevronSize: Double
     ) -> BlockHeaderModel<UserAction> {
-        let fold = BlockHeaderModel<UserAction>.Fold(
-            chevron: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, size: chevron.size, weight: .semibold, color: .ink3),
-                rotation: isFolded ? -90 : 0, animation: .fold,
-                accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
-                action: .blockChevronTapped(block.id)
-            ),
-            hitSide: chevron.hitSide
+        let fold = AccessoryModel<UserAction>.Chevron(
+            icon: IconModel(icon: .chevron, style: IconStyle(size: chevronSize, weight: .semibold, color: .ink3)),
+            accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
+            action: .blockChevronTapped(block.id), style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .fold)
         )
-        return blockHeader(heading, of: block, fold: fold, background: .paper, context, metrics)
+        return blockHeader(heading, of: block, fold: fold, background: .paper, context, style)
     }
 
     /// A block's column (Task 8's table, Board): its header as a block's but with no rule and no chevron, since columns
@@ -140,12 +141,7 @@ extension TaskList {
     ) -> ColumnModel<UserAction> {
         ColumnModel(
             header: blockHeader(heading, of: block, fold: nil, background: .fill, context, metrics.header),
-            width: metrics.columnWidth, cornerRadius: metrics.columnCornerRadius, cardSpacing: metrics.cardSpacing,
-            padding: metrics.columnPadding, fill: .fill, dropTint: block.color.dropTint,
-            isDropTarget: block.edit != nil,
-            dropRing: StrokeModel(color: block.color.check.fill, width: metrics.dropRingWidth, dash: []),
-            cardCornerRadius: metrics.cardCornerRadius, cardBackground: .surface,
-            cardRing: StrokeModel(color: .glassLine, width: metrics.cardRingWidth, dash: []), cardShadow: .resting
+            style: metrics.column(block.color), isDropTarget: block.edit != nil
         )
     }
 
@@ -154,13 +150,13 @@ extension TaskList {
     /// its paddings, on what the header stands on (`Phone.dc.html`, the block's and the column's name field; the
     /// controller's ruling on #176, 2026-11-05: no placeholder).
     private static func blockHeader(
-        _ heading: Heading, of block: PageBlock, fold: BlockHeaderModel<UserAction>.Fold?,
-        background: DesignSystem.Color, _ context: RowContext, _ metrics: Metrics.BlockHeader
+        _ heading: Heading, of block: PageBlock, fold: AccessoryModel<UserAction>.Chevron?,
+        background: DesignSystem.Color, _ context: RowContext, _ style: BlockHeaderStyle
     ) -> BlockHeaderModel<UserAction> {
         let field: TextFieldModel<UserAction>? = if let naming = context.naming, block.id == .list(naming.id) {
             plainField(
                 naming.draft, placeholder: "", font: .sectionTitle, color: block.color.glyph, background: background,
-                height: metrics.height - metrics.topPadding - metrics.bottomPadding, padding: 0,
+                height: style.height - style.topPadding - style.bottomPadding, padding: 0,
                 submitted: .listNameFieldSubmitted, cancelled: .listNameFieldCancelled,
                 focusLost: .listNameFieldLostFocus
             )
@@ -168,20 +164,16 @@ extension TaskList {
             nil
         }
         return BlockHeaderModel(
-            title: TextModel(text: heading.title, font: .sectionTitle, color: block.color.glyph),
-            subtitle: heading.subtitle.map { TextModel(text: $0, font: .areaLabel, color: .ink2) },
-            titleToSubtitle: metrics.titleToSubtitle, field: field, fold: fold, rule: metrics.rule,
-            height: metrics.height,
-            topMargin: metrics.topMargin, trailingMargin: metrics.trailingMargin, bottomMargin: metrics.bottomMargin,
-            leadingMargin: metrics.leadingMargin, topPadding: metrics.topPadding,
-            horizontalPadding: metrics.horizontalPadding, bottomPadding: metrics.bottomPadding, cornerRadius: 0,
-            titleTapped: .blockTitleTapped(block.id)
+            title: TextModel(text: heading.title, style: TextStyle(font: .sectionTitle, color: block.color.glyph)),
+            subtitle: heading.subtitle.map { TextModel(text: $0, style: TextStyle(font: .areaLabel, color: .ink2)) },
+            field: field, fold: fold, style: style, titleTapped: .blockTitleTapped(block.id)
         )
     }
 
     /// A task of a block: the open card where its row stood, or its row with its meta line, and its swipe and its menu,
     /// which a task in the Trash has neither of (spec section 6; the controller's ruling on #176, 2026-11-05). A
-    /// column's card has the menu and no swipe, its metrics having none. The row's `lift` and `fresh` are Task 8's.
+    /// column's card has the menu and no swipe, its metrics having none. The row style's `lift` and `fresh` are Task
+    /// 8's.
     private static func row(
         _ task: TodoTask, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Row, card cardMetrics: Metrics.Card
     ) -> Model.Row {
@@ -230,26 +222,19 @@ extension TaskList {
         let isOpen = task.status == .open
         let title = drawnTitle(of: task)
         return TaskRowModel(
-            check: check(title: title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
-            title: TextModel(text: title, font: metrics.title, color: isOpen ? .ink : .ink2),
-            strike: isOpen ? nil : .ink3, meta: meta, titleToMeta: metrics.titleToMeta,
-            metaSpacing: metrics.metaSpacing, metaLineSpacing: metrics.metaLineSpacing,
-            verticalPadding: metrics.verticalPadding, titleLeading: metrics.titleLeading,
-            titleTrailing: metrics.titleTrailing, leading: metrics.leading, trailing: metrics.trailing,
-            minimumHeight: metrics.minimumHeight, cornerRadius: metrics.cornerRadius, swipe: swipe, lift: nil,
-            fresh: nil, freshAnimation: .fresh, tap: .rowTapped(task.id), menu: menu
+            check: check(title: title, isOpen: isOpen, action: .checkTapped(task.id), metrics.check(color)),
+            title: TextModel(text: title, style: TextStyle(font: metrics.title, color: isOpen ? .ink : .ink2)),
+            meta: meta, style: metrics.style(isOpen), swipe: swipe, tap: .rowTapped(task.id), menu: menu
         )
     }
 
     /// A check, a row's, a card's or a subtask's: in the colour of the block's list, filled for a task that is not
     /// open, saying what a tap will do (canvas, `cbLabel`).
     static func check(
-        title: String, isOpen: Bool, _ color: Tile, action: UserAction, _ metrics: Metrics.Check
+        title: String, isOpen: Bool, action: UserAction, _ style: CheckStyle
     ) -> CheckModel<UserAction> {
         CheckModel(
-            diameter: metrics.diameter, ringWidth: metrics.ringWidth, markSize: metrics.markSize,
-            markStrokeWidth: metrics.markStrokeWidth, hitWidth: metrics.hitWidth, hitHeight: metrics.hitHeight,
-            colors: color.check, isChecked: !isOpen, animation: .check,
+            style: style, isChecked: !isOpen,
             accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: action
         )
     }
@@ -262,8 +247,11 @@ extension TaskList {
         focusLost: UserAction
     ) -> TextFieldModel<UserAction> {
         TextFieldModel(
-            text: text, placeholder: placeholder, font: font, color: color, background: background, minimumWidth: 0,
-            height: height, padding: padding, cornerRadius: 0, ring: StrokeModel(color: background, width: 0, dash: []),
+            text: text, placeholder: placeholder,
+            style: FieldStyle(
+                font: font, color: color, background: background, minimumWidth: 0, height: height, padding: padding,
+                cornerRadius: 0, ring: LineStyle(color: background, width: 0, dash: [])
+            ),
             submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )
     }
@@ -275,9 +263,11 @@ extension TaskList {
     private static func meta(of task: TodoTask, today: Day, tags: TagNames, _ metrics: Metrics.Row) -> [MetaItemModel] {
         func item(_ icon: DesignSystem.Icon?, _ text: String?, color: DesignSystem.Color = .ink2) -> MetaItemModel {
             MetaItemModel(
-                icon: icon.map { IconModel(icon: $0, size: metrics.metaIconSize, weight: .regular, color: color) },
-                text: text.map { TextModel(text: $0, font: .meta, color: color) }, spacing: metrics.metaIconSpacing,
-                capsule: nil
+                icon: icon.map {
+                    IconModel(icon: $0, style: IconStyle(size: metrics.metaIconSize, weight: .regular, color: color))
+                },
+                text: text.map { TextModel(text: $0, style: TextStyle(font: .meta, color: color)) },
+                style: MetaItemStyle(spacing: metrics.metaIconSpacing, capsule: nil)
             )
         }
         var items: [MetaItemModel] = []
@@ -298,13 +288,14 @@ extension TaskList {
     ) -> EmptyScreenModel {
         EmptyScreenModel(
             tile: TileModel(
-                color: color, icon: icon, side: metrics.tileSide, cornerRadius: metrics.tileCornerRadius,
-                glyphSize: metrics.glyphSize
+                icon: icon,
+                style: TileStyle(
+                    color: color, side: metrics.tile.side, cornerRadius: metrics.tile.cornerRadius,
+                    glyphSize: metrics.tile.glyphSize, glyphWeight: .medium
+                )
             ),
-            title: TextModel(text: words.title, font: .emptyScreenTitle, color: .ink),
-            text: TextModel(text: words.text, font: .notes, color: .ink2), tileToTitle: metrics.tileToTitle,
-            titleToText: metrics.titleToText, topPadding: metrics.topPadding,
-            horizontalPadding: metrics.horizontalPadding, maxWidth: metrics.maxWidth
+            title: TextModel(text: words.title, style: TextStyle(font: .emptyScreenTitle, color: .ink)),
+            text: TextModel(text: words.text, style: TextStyle(font: .notes, color: .ink2)), style: metrics.style
         )
     }
 
@@ -315,8 +306,8 @@ extension TaskList {
     static func showAs(canBoard: Bool) -> MenuButtonModel<UserAction> {
         MenuButtonModel(
             label: ButtonLabelModel(
-                icon: IconModel(icon: .ellipsis, size: 22, weight: .semibold, color: .ink), title: nil,
-                accessibilityLabel: "More", fill: .container
+                icon: IconModel(icon: .ellipsis, style: IconStyle(size: 22, weight: .semibold, color: .ink)),
+                title: nil, accessibilityLabel: "More", style: ButtonLabelStyle(fill: .container)
             ),
             menu: MenuModel(sections: [
                 .init(items: [

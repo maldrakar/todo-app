@@ -57,7 +57,7 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
 private func isHighlighted(_ row: TaskViewList.Model.Row) -> Bool {
     switch row.kind {
     case .area: false
-    case .list(let list): list.background == .fill || list.background == .selection
+    case .list(let list): list.style.background == .fill || list.style.background == .selection
     }
 }
 
@@ -493,12 +493,18 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
         return row.tile
     }
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .narrow)))
-    #expect(inboxTile(app.model.taskViewList) == TileModel(color: .blue, icon: .tray, side: 30, cornerRadius: 8, glyphSize: 19))
+    #expect(inboxTile(app.model.taskViewList) == TileModel(
+        icon: .tray,
+        style: TileStyle(color: .blue, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium)
+    ))
     #expect(app.send(.widthChanged(.wide)) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .wide)))
     #expect(
         inboxTile(app.model.taskViewList)
-            == TileModel(color: .blue, icon: .tray, side: 22, cornerRadius: 6, glyphSize: 14)
+            == TileModel(
+                icon: .tray,
+                style: TileStyle(color: .blue, side: 22, cornerRadius: 6, glyphSize: 14, glyphWeight: .medium)
+            )
     )
 }
 

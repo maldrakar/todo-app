@@ -6,11 +6,12 @@ import DesignSystem
 /// then its label and its chevron, each `spacing` after what stands before it, the chevron `trailingPadding` short of
 /// its trailing edge; the capsule `topMargin` below the blocks and `leadingMargin` and `trailingMargin` in from the
 /// sides, in points. The tasks done under it, while the strip is open, are the feature module's rows, each a row or the
-/// open card, so the model holds none (list screen spec, section 3).
+/// open card, so the model holds none (list screen spec, section 3). Its numbers and its `background` are the fields of
+/// its `DoneStripStyle`.
 ///
-/// A class, for the reason a list's row is one (`ListRowModel`): the screen's model holds one, every copy and comparison of
-/// that model copies and compares it, and inline it is some 500 bytes on wasm32. Its `==` compares every stored property,
-/// and a test changes them one at a time.
+/// A class, for the reason a list's row is one (`ListRowModel`): the screen's model holds one, every copy and
+/// comparison of that model copies and compares it, and inline it is some 500 bytes on wasm32. Its `==` compares every
+/// stored property, and a test changes them one at a time.
 public final class DoneStripModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let icon: IconModel
 
@@ -20,15 +21,7 @@ public final class DoneStripModel<Action: Equatable & Sendable>: Equatable, Send
     /// The chevron, which turns as the strip opens and closes.
     public let chevron: AccessoryModel<Action>.Chevron
 
-    public let background: DesignSystem.Color
-    public let height: Double
-    public let cornerRadius: Double
-    public let spacing: Double
-    public let leadingPadding: Double
-    public let trailingPadding: Double
-    public let topMargin: Double
-    public let leadingMargin: Double
-    public let trailingMargin: Double
+    public let style: DoneStripStyle
 
     /// Whether the strip is open, which shows its rows and which VoiceOver reads.
     public let isOpen: Bool
@@ -40,30 +33,14 @@ public final class DoneStripModel<Action: Equatable & Sendable>: Equatable, Send
         icon: IconModel,
         label: TextModel,
         chevron: AccessoryModel<Action>.Chevron,
-        background: DesignSystem.Color,
-        height: Double,
-        cornerRadius: Double,
-        spacing: Double,
-        leadingPadding: Double,
-        trailingPadding: Double,
-        topMargin: Double,
-        leadingMargin: Double,
-        trailingMargin: Double,
+        style: DoneStripStyle,
         isOpen: Bool,
         action: Action
     ) {
         self.icon = icon
         self.label = label
         self.chevron = chevron
-        self.background = background
-        self.height = height
-        self.cornerRadius = cornerRadius
-        self.spacing = spacing
-        self.leadingPadding = leadingPadding
-        self.trailingPadding = trailingPadding
-        self.topMargin = topMargin
-        self.leadingMargin = leadingMargin
-        self.trailingMargin = trailingMargin
+        self.style = style
         self.isOpen = isOpen
         self.action = action
     }
@@ -73,15 +50,7 @@ public final class DoneStripModel<Action: Equatable & Sendable>: Equatable, Send
         return lhs.icon == rhs.icon
             && lhs.label == rhs.label
             && lhs.chevron == rhs.chevron
-            && lhs.background == rhs.background
-            && lhs.height == rhs.height
-            && lhs.cornerRadius == rhs.cornerRadius
-            && lhs.spacing == rhs.spacing
-            && lhs.leadingPadding == rhs.leadingPadding
-            && lhs.trailingPadding == rhs.trailingPadding
-            && lhs.topMargin == rhs.topMargin
-            && lhs.leadingMargin == rhs.leadingMargin
-            && lhs.trailingMargin == rhs.trailingMargin
+            && lhs.style == rhs.style
             && lhs.isOpen == rhs.isOpen
             && lhs.action == rhs.action
     }

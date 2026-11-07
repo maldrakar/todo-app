@@ -21,7 +21,7 @@ struct Icon: View {
 
     var body: some View {
         Image(model.icon)
-            .font(.system(size: model.size, weight: Font.Weight(model.weight)))
-            .foregroundStyle(Color(model.color))
+            .font(.system(size: model.style.size, weight: Font.Weight(model.style.weight)))
+            .foregroundStyle(Color(model.style.color))
     }
 }

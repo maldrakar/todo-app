@@ -75,7 +75,7 @@ func listRow(_ id: ViewID, in model: TaskViewList.Model) -> ListRowModel<TaskVie
 /// list's row on the fill colour: an area's line never does, since an area never opens. Not private, since the
 /// module's tests read the highlight with it too.
 func highlighted(in model: TaskViewList.Model) -> [ViewID] {
-    model.rows.filter { listRow($0)?.background == .fill }.map(\.id)
+    model.rows.filter { listRow($0)?.style.background == .fill }.map(\.id)
 }
 
 /// The count a list's row draws, read over its accessories as a view reads them, and empty where it draws none. Not
@@ -100,7 +100,7 @@ func drawnChevron(of list: ListRowModel<TaskViewList.UserAction>) -> AccessoryMo
 /// chevron, where no fold is drawn; nil when no list's row holds the view. Not private, since the edits' tests read a
 /// fold with it too.
 func isFolded(_ id: ViewID, in model: TaskViewList.Model) -> Bool? {
-    listRow(id, in: model).map { drawnChevron(of: $0)?.rotation == -90 }
+    listRow(id, in: model).map { drawnChevron(of: $0)?.style.rotation == -90 }
 }
 
 /// Whether a row is an area's line with the label, nil for the line alone.
@@ -112,7 +112,7 @@ private func isAreaLine(_ row: TaskViewList.Model.Row?, labelled label: String?)
 /// A tile's three sizes, its side, its corner radius and its glyph's size, in points, which is what the width class
 /// and the drawn depth decide of a tile.
 private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
-    listRow(row).map { [$0.tile.side, $0.tile.cornerRadius, $0.tile.glyph.size] }
+    listRow(row).map { [$0.tile.style.side, $0.tile.style.cornerRadius, $0.tile.style.glyphSize] }
 }
 
 /// Each list's row carries the tile it is drawn with, its colour and its icon read from the store's names as the
@@ -132,10 +132,16 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
         store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     ).model
     func tile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
-        TileModel(color: color, icon: icon, side: 30, cornerRadius: 8, glyphSize: 19)
+        TileModel(
+            icon: icon,
+            style: TileStyle(color: color, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium)
+        )
     }
     #expect(model.rows.map(\.id) == builtIns + [garden, reading])
-    #expect(listRow(inbox, in: model)?.tile == TileModel(color: .blue, icon: .tray, side: 30, cornerRadius: 8, glyphSize: 19))
+    #expect(listRow(inbox, in: model)?.tile == TileModel(
+        icon: .tray,
+        style: TileStyle(color: .blue, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium)
+    ))
     #expect(model.rows.map { listRow($0)?.tile } == [
         tile(.blue, .tray), tile(.amber, .sun), tile(.rose, .calendar), tile(.green, .logbook), tile(.stone, .trash),
         tile(.green, .bullets), tile(.stone, .book),
@@ -188,18 +194,18 @@ private func sizes(of row: TaskViewList.Model.Row) -> [Double]? {
     let narrow = try TaskViewList(
         store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
     ).model
-    #expect(narrow.rows.dropFirst(5).map { listRow($0)?.title.font } == [
+    #expect(narrow.rows.dropFirst(5).map { listRow($0)?.title.style.font } == [
         .rowTitleEmphasized, .nestedRowTitleEmphasized, .nestedRowTitle, .rowTitle, nil, .rowTitleEmphasized,
         .nestedRowTitle,
     ])
-    #expect(narrow.rows.prefix(5).map { listRow($0)?.title.font } == builtIns)
+    #expect(narrow.rows.prefix(5).map { listRow($0)?.title.style.font } == builtIns)
     let wide = try TaskViewList(
         store: store, route: .init(list: nil), width: .wide, day: testDay, capabilities: iPhone
     ).model
-    #expect(wide.rows.dropFirst(5).map { listRow($0)?.title.font } == [
+    #expect(wide.rows.dropFirst(5).map { listRow($0)?.title.style.font } == [
         .rowTitleEmphasized, .rowTitleEmphasized, .rowTitle, .rowTitle, nil, .rowTitleEmphasized, .rowTitle,
     ])
-    #expect(wide.rows.prefix(5).map { listRow($0)?.title.font } == [.rowTitleEmphasized] + builtIns.dropFirst())
+    #expect(wide.rows.prefix(5).map { listRow($0)?.title.style.font } == [.rowTitleEmphasized] + builtIns.dropFirst())
 }
 
 /// An area is a line across the tree, and the lists under it stand at the root's drawn depth, their own lists one
@@ -447,7 +453,10 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     #expect(isFolded(projects, in: list.model) == false)
     #expect(try store.deviceState(collapsedViewsKey, as: [String].self) == [])
     #expect(made.depth == 1)
-    #expect(listRow(made)?.tile == TileModel(color: .teal, icon: .list, side: 26, cornerRadius: 7, glyphSize: 16))
+    #expect(listRow(made)?.tile == TileModel(
+        icon: .list,
+        style: TileStyle(color: .teal, side: 26, cornerRadius: 7, glyphSize: 16, glyphWeight: .medium)
+    ))
     #expect(try stored(made.id, in: store) == ["New list", projects.rawValue, "list", "teal", "list"])
     let reference = try TaskViewList(
         store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
@@ -468,7 +477,10 @@ private func sidebar(_ store: Store, on day: DeviceDay) throws -> TaskViewList {
     let made = try rowBeingNamed(in: list.model)
     #expect(list.model.rows.map(\.id) == builtIns + [work, clients, made.id])
     #expect(made.depth == 0)
-    #expect(listRow(made)?.tile == TileModel(color: .stone, icon: .list, side: 30, cornerRadius: 8, glyphSize: 19))
+    #expect(listRow(made)?.tile == TileModel(
+        icon: .list,
+        style: TileStyle(color: .stone, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium)
+    ))
     #expect(try stored(made.id, in: store) == ["New list", work.rawValue, "list", nil, "list"])
     let reference = try TaskViewList(
         store: store, route: .init(list: nil), width: .narrow, day: testDay, capabilities: iPhone
