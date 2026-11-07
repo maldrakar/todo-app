@@ -466,7 +466,8 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     let id = try store.createTask(NewTask(title: "Fix the door"))
     let module = try list(parent, in: store)
     module.tap(.rowDropped(id, from: .own(nil), in: .list(house), after: nil))
-    module.tap(.backgroundTapped)  // the drop's highlight is the one thing a list made now does not draw
+    #expect(freshIDs(in: module.model) == [id], "the highlight is the one thing a list made now does not draw")
+    module.tap(.backgroundTapped)
     #expect(module.model == (try list(parent, in: store).model))
 }
 
@@ -475,7 +476,7 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
 /// The ids of the task rows a model draws fresh, in the list's blocks or the board's columns.
 private func freshIDs(in model: TaskList.Model) -> [TaskID] {
     blocks(of: model).flatMap(\.rows).compactMap { row in
-        if case .task(let id, let model) = row, model.style.fresh != nil { id } else { nil }
+        if case .task(let id, let model) = row, model.style.fresh != nil || model.style.landingScale != nil { id } else { nil }
     }
 }
 
@@ -510,7 +511,8 @@ private func twoDays(_ store: Store) throws -> (list: TaskList, first: TaskID, s
     #expect(freshIDs(in: module.model) == [ids[2]])
 }
 
-/// A column's card lands fresh as a row does (canvas, the dropped card).
+/// A column's card lands as the canvas lands it (R157): not a fade of the `fresh` colour but a spring from scale 1.05
+/// over the `drop` motion (`.card-drop`), and a list's row the other way about.
 @Test func aDropLandsFreshOnAColumnsCard() throws {
     let store = try makeStore()
     let (module, first, second, _) = try twoDays(store)
@@ -518,7 +520,15 @@ private func twoDays(_ store: Store) throws -> (list: TaskList, first: TaskID, s
     module.tap(.rowDropped(first, from: .own(.day(day(1))), in: .own(.day(day(2))), after: second))
     #expect(freshIDs(in: module.model) == [first])
     let card = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
-    #expect(card.style.fresh == .fresh)
+    #expect(card.style.fresh == nil)
+    #expect(card.style.landingScale == 1.05)
+    #expect(card.style.landingAnimation == .drop)
+    let settled = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == second }))
+    #expect(settled.style.landingScale == nil)
+    module.tap(.showAsChosen(.list))
+    module.tap(.rowDropped(first, from: .own(.day(day(2))), in: .own(.day(day(2))), after: second))
+    let landed = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
+    #expect(landed.style.fresh == .fresh && landed.style.landingScale == nil, "a list's row fades")
 }
 
 /// A drop that moves nothing or is refused lands nothing fresh, and takes the last drop's highlight away like any

@@ -42,7 +42,8 @@ private func phoneRow(
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
             titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh,
-            strike: isOpen ? nil : .ink3, lift: deletes ? lift(colors) : nil, fresh: isFresh ? .fresh : nil
+            strike: isOpen ? nil : .ink3, lift: deletes ? lift(colors) : nil, fresh: isFresh ? .fresh : nil,
+            landingScale: nil, landingAnimation: .drop
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
@@ -217,8 +218,11 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         ),
         title: TextModel(text: "Today", style: TextStyle(font: .largeTitle, color: .ink)),
         subtitle: TextModel(text: "Wednesday, September 10", style: TextStyle(font: .count, color: .ink2)),
-        style: .init(horizontalPadding: 20, spacing: 12, titleToSubtitle: 6, subtitleLeading: 50)
+        style: .init(horizontalPadding: 20, bottomMargin: 10, spacing: 12, titleToSubtitle: 6, subtitleLeading: 50)
     ))
+    let board = try list(BuiltInTaskViews.upcoming, in: store)
+    board.tap(.showAsChosen(.columns))
+    #expect(board.model.header.style.bottomMargin == 12, "the canvas's board stands 12 under it, the list's 10")
 }
 
 /// The empty state carries the phone's numbers: the list's tile 64 across, rounded 18, its glyph 32, the title 18
@@ -256,14 +260,15 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             accessibilityLabel: label
         )
     }
-    let bar = GlassBarStyle(edgeInset: 14, fadeColor: .paper, fadeHeight: 54, fadeSolidDepth: 15.12, contentTop: 56)
+    let fade = GlassBarStyle.Fade(color: .paper, height: 54, solidDepth: 15.12)
     for layout in [TaskList.Model.Layout.Kind.list, .columns] {
         let module = try list(BuiltInTaskViews.upcoming, in: store)
         module.tap(.showAsChosen(layout))
         let model = module.model
         #expect(model.back == button(.chevronLeft, size: 24, offset: -2, "Back"))
         #expect(model.more == button(.ellipsis, size: 22, offset: 0, "More"))
-        #expect(model.glassBar == bar)
+        let bar = GlassBarStyle(edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56)
+        #expect(model.glassBar == bar, "the fade is the list's alone; the board's circles stand in the flow")
     }
 }
 
@@ -347,7 +352,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
-            strike: nil, lift: cardLift, fresh: nil
+            strike: nil, lift: cardLift, fresh: nil, landingScale: nil, landingAnimation: .drop
         ),
         swipe: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)

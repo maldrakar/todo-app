@@ -2,8 +2,8 @@
 import DesignSystem
 
 /// The numbers a `TaskRowModel` is drawn with, in points, the line through its title, how it lifts and a fresh row's
-/// colour and fade, which a builder hands over as one value. The line goes with whether the task is open, so a done row
-/// is another instance.
+/// colour and fade or its landing spring, which a builder hands over as one value. The line goes with whether the
+/// task is open, so a done row is another instance.
 public struct TaskRowStyle: Equatable, Sendable {
     public let titleToMeta: Double
     public let metaSpacing: Double
@@ -33,6 +33,14 @@ public struct TaskRowStyle: Equatable, Sendable {
     /// when the colour goes.
     public let fresh: DesignSystem.Color?
 
+    /// The scale a task lands from after a drop, springing to 1 over `landingAnimation`, and nil under any other
+    /// task and under a list's row, which lands by fading `fresh` instead (`Phone.dc.html`, `.card-drop` and its
+    /// `cardDrop`, a column's card; `.row-fresh`, a row). A view plays whichever of the two is not nil.
+    public let landingScale: Double?
+
+    /// The motion of the landing, held while `landingScale` is nil too, so it does not stop when the scale goes.
+    public let landingAnimation: DesignSystem.Animation
+
     public init(
         titleToMeta: Double,
         metaSpacing: Double,
@@ -47,7 +55,9 @@ public struct TaskRowStyle: Equatable, Sendable {
         freshAnimation: DesignSystem.Animation,
         strike: DesignSystem.Color?,
         lift: TaskLiftStyle?,
-        fresh: DesignSystem.Color?
+        fresh: DesignSystem.Color?,
+        landingScale: Double?,
+        landingAnimation: DesignSystem.Animation
     ) {
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing
@@ -63,5 +73,7 @@ public struct TaskRowStyle: Equatable, Sendable {
         self.strike = strike
         self.lift = lift
         self.fresh = fresh
+        self.landingScale = landingScale
+        self.landingAnimation = landingAnimation
     }
 }

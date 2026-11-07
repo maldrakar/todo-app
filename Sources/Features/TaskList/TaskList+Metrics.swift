@@ -162,7 +162,8 @@ extension TaskList {
         /// under what stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14
         /// short of its end, 8 on either side of its label, its rows 6 under it.
         static let phone = Metrics(
-            glass: phoneGlass, header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
+            glass: phoneGlass(fade: phoneFade), header: phoneHeader(bottomMargin: 10), tagBar: phoneTagBar,
+            empty: phoneEmpty,
             blocks: .list(
                 header: .init(
                     titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
@@ -211,7 +212,8 @@ extension TaskList {
         /// "+ Add list" a column 200 wide edged in a 1.5 dashed line, as rounded as a column, 52 high, padded 16, the
         /// plus 18 and 8 before its title. The table gives the dash no lengths: 5 and 4, the sidebar's dashed line.
         static let phoneColumns = Metrics(
-            glass: phoneGlass, header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
+            glass: phoneGlass(fade: nil), header: phoneHeader(bottomMargin: 12), tagBar: phoneTagBar,
+            empty: phoneEmpty,
             blocks: .columns(Board(
                 spacing: 10, horizontalPadding: 16, bottomPadding: 24, snaps: true,
                 column: { color in
@@ -233,7 +235,7 @@ extension TaskList {
                             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
                             freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil,
-                            fresh: isFresh ? .fresh : nil
+                            fresh: nil, landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop
                         )
                     },
                     check: { color in
@@ -315,7 +317,7 @@ extension TaskList {
                     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
                     freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift(color) : nil,
-                    fresh: isFresh ? .fresh : nil
+                    fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .drop
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
@@ -394,22 +396,25 @@ extension TaskList {
         /// 44 circles on the glass, edged with its 0.5 hairline and casting the raised shadow, 14 from the screen's
         /// sides; the back chevron 24 across set 2 left of centre, "…" 22; under them a fade of the paper that is the
         /// canvas's 108 less its 54 status bar, solid to 64 % of the 108, with the content 56 under the safe area's
-        /// top.
-        private static let phoneGlass = Glass(
-            bar: GlassBarStyle(
-                edgeInset: 14, fadeColor: .paper, fadeHeight: 54, fadeSolidDepth: 15.12, contentTop: 56
-            ),
-            back: GlassControlStyle(
-                iconOffset: -2, diameter: 44, surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []),
-                shadow: .raised
-            ),
-            backGlyphSize: 24,
-            more: GlassControlStyle(
-                iconOffset: 0, diameter: 44, surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []),
-                shadow: .raised
-            ),
-            moreGlyphSize: 22
-        )
+        /// top; on the board the fade is `nil`, its buttons standing in the flow.
+        private static func phoneGlass(fade: GlassBarStyle.Fade?) -> Glass {
+            Glass(
+                bar: GlassBarStyle(edgeInset: 14, fade: fade, contentTop: 56),
+                back: GlassControlStyle(
+                    iconOffset: -2, diameter: 44, surface: .glass,
+                    line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+                ),
+                backGlyphSize: 24,
+                more: GlassControlStyle(
+                    iconOffset: 0, diameter: 44, surface: .glass,
+                    line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+                ),
+                moreGlyphSize: 22
+            )
+        }
+
+        /// The list's fade (see `phoneGlass`); the board has none.
+        private static let phoneFade = GlassBarStyle.Fade(color: .paper, height: 54, solidDepth: 15.12)
 
         /// The phone's floating "+" (Task 8's table, Floating "+"): a 48 circle, its plus 22, 16 in from the screen's
         /// right edge and 30 above its bottom.
@@ -419,11 +424,18 @@ extension TaskList {
         )
 
         /// The phone's header (Task 8's table, Header): 20 in from the screen's sides, the tile 38 across, rounded 11,
-        /// its glyph 23, 12 before the title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50 in.
-        private static let phoneHeader = Header(
-            style: .init(horizontalPadding: 20, spacing: 12, titleToSubtitle: 6, subtitleLeading: 50),
-            tile: TileSize(side: 38, cornerRadius: 11, glyphSize: 23)
-        )
+        /// its glyph 23, 12 before the title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50
+        /// in; what follows it and the tag bar, the list's first block or the board, 10 under them in the list and 12
+        /// in the board (`Phone.dc.html`, the list's `margin-top:10px` and `.board`'s 12).
+        private static func phoneHeader(bottomMargin: Double) -> Header {
+            Header(
+                style: .init(
+                    horizontalPadding: 20, bottomMargin: bottomMargin, spacing: 12, titleToSubtitle: 6,
+                    subtitleLeading: 50
+                ),
+                tile: TileSize(side: 38, cornerRadius: 11, glyphSize: 23)
+            )
+        }
 
         /// The phone's tag bar (Task 8's table, Tag bar): 7 under the header, chips 6 apart in a row padded 20, the bar
         /// 20 past the content's sides, fading in over 16 and out over 28; a chip 30 high, a capsule, padded 10 and

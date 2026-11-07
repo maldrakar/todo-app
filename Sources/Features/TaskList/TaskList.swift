@@ -430,10 +430,9 @@ public final class TaskList: Routable {
     /// it even when the page's read fails; the snapshot of the store the blocks, the tile, the rule and the strip are
     /// read from, and the device's day it was taken by; the folds and the layout the device keeps, and what this
     /// session keeps, the picked tags, the open card, whether the strip is open, the list being named and the task a
-    /// drop just landed; what it
-    /// declared over itself; and the sentence a person was last told. One value, moved field by field, and the one
-    /// place any of it is kept: the model is assembled from it on every read, in `model` and nowhere else (owner's
-    /// reviews of #77, #101 and #188).
+    /// drop just landed; what it declared over itself; and the sentence a person was last told. One value, moved field
+    /// by field, and the one place any of it is kept: the model is assembled from it on every read, in `model` and
+    /// nowhere else (owner's reviews of #77, #101 and #188).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
