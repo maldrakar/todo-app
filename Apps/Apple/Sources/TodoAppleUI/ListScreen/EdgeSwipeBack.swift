@@ -54,33 +54,14 @@ struct EdgeSwipeBack: UIViewControllerRepresentable {
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             (navigationController?.viewControllers.count ?? 0) > 1
         }
-    }
-}
 
-/// A plain view placed inside a `ScrollView` that moves sideways, the board's or the tag bar's, which makes its scroll
-/// wait for the system's swipe back from the screen's edge to fail, as that swipe does at once away from the edge: such
-/// a scroll view took the swipe, at its start too, and it went back nowhere (the iOS 26.3 simulator, 2026-11-07). The
-/// list scrolls up and down, so it has no such fight.
-///
-/// `BackSwipeFirst` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
-/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
-struct BackSwipeFirst: UIViewRepresentable {
-    func makeUIView(context: Context) -> FinderView {
-        let view = FinderView()
-        view.isUserInteractionEnabled = false
-        return view
-    }
-
-    func updateUIView(_ view: FinderView, context: Context) {}
-
-    final class FinderView: UIView {
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
-            guard window != nil, let scrollView = enclosingScrollView else { return }
-            var responder = scrollView.next
-            while let current = responder, !(current is UINavigationController) { responder = current.next }
-            guard let backSwipe = (responder as? UINavigationController)?.interactivePopGestureRecognizer else { return }
-            scrollView.panGestureRecognizer.require(toFail: backSwipe)
+        /// A scroll view's own pan waits for this swipe to fail, as it does at once away from the edge: a scroll view
+        /// moving sideways, the board's or the tag bar's, took the swipe, at its start too, and it went back nowhere (the
+        /// iOS 26.3 simulator, 2026-11-07). A row's swipe is another recognizer, and stands as it does.
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer
+        ) -> Bool {
+            (other.view as? UIScrollView)?.panGestureRecognizer === other
         }
     }
 }

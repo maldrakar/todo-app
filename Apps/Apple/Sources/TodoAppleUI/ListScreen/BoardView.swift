@@ -34,10 +34,6 @@ struct BoardView: View {
             .scrollTargetLayout()
             .padding(.trailing, board.endRoom)
             .modifier(rowDragContent)
-            #if os(iOS)
-            // iOS alone: the Mac and the watch have no such swipe.
-            .background { BackSwipeFirst() }
-            #endif
             // At the top of the scroll view whatever it holds, which would centre what is shorter than itself.
             .frame(maxHeight: .infinity, alignment: .top)
         }
