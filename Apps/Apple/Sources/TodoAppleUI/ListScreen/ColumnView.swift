@@ -46,7 +46,7 @@ struct ColumnView: View {
             }
             .scrollIndicators(.hidden)
             // What of its cards is in sight, since a card scrolled out of it keeps a frame under its header.
-            .reportsLiftFrame { [id = block.id] in RowLift.Frames(columns: [id: $0]) }
+            .reportsLiftFrame(\.columns, block.id, to: gestures.space)
         }
         .frame(width: column.style.width)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -64,6 +64,6 @@ struct ColumnView: View {
                 .animation(motion, value: isTinted)
                 .allowsHitTesting(false)
         }
-        .reportsLiftFrame { [id = block.id] in RowLift.Frames(blocks: [id: $0]) }
+        .reportsLiftFrame(\.blocks, block.id, to: gestures.space)
     }
 }

@@ -104,6 +104,20 @@ private let second = BlockRowID(block: .own(nil), task: TaskID())
     #expect(RowSwipe.row(at: card, moved: -10, from: nil, among: board.blocks, frames: board.frames) == nil)
 }
 
+/// Frames are kept as they are reported and a row that left keeps its frame, a peer's change among the ways: a pan takes
+/// the row drawn under its start, and no frame of a row no longer drawn stands in its way.
+@Test func aPanIsNotStoppedByTheFrameOfARowNoLongerDrawn() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let point = list.centre(of: list.a, in: own)
+    var frames = list.frames
+    for _ in 0..<50 {
+        frames.rows[BlockRowID(block: own, task: TaskID())] = CGRect(x: 0, y: point.y - 10, width: 400, height: 20)
+    }
+    let taken = RowSwipe.row(at: point, moved: -10, from: nil, among: list.blocks, frames: frames)
+    #expect(taken?.row == BlockRowID(block: own, task: list.a))
+}
+
 // MARK: - The screen's one swipe
 
 /// Whether an observation fired, which its closure, sendable, sets.

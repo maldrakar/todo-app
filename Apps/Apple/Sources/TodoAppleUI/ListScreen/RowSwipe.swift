@@ -48,19 +48,23 @@ struct RowSwipe: Equatable {
         }
     }
 
-    /// The row a pan that started at the point may take, having moved so far, with the look of its swipe: the row under
-    /// the point by the frames the last layout reported, where it has a swipe, leftward, or either way where it is the
-    /// one standing open. Otherwise nil, and the scroll has the pan.
+    /// The row a pan that started at the point may take, having moved so far, with the look of its swipe: the row drawn
+    /// under the point by the frames the rows last reported, where it has a swipe, leftward, or either way where it is
+    /// the one standing open. Otherwise nil, and the scroll has the pan. It reads the rows drawn, since a row that left
+    /// keeps its frame.
     static func row(
         at point: CGPoint, moved: CGFloat, from swipe: RowSwipe?, among blocks: [TaskList.Model.Block],
         frames: RowLift.Frames
     ) -> (row: BlockRowID, style: SwipeStyle)? {
-        guard let row = frames.rows.first(where: { $0.value.contains(point) })?.key,
-              let drawn = blocks.first(where: { $0.id == row.block })?.rows.first(where: { $0.id == row.task }),
-              let style = drawn.swipe?.style,
-              moved < 0 || swipe?.row == row
-        else { return nil }
-        return (row, style)
+        for block in blocks {
+            for drawn in block.rows {
+                let row = BlockRowID(block: block.id, task: drawn.id)
+                guard frames.rows[row]?.contains(point) == true else { continue }
+                guard let style = drawn.swipe?.style, moved < 0 || swipe?.row == row else { return nil }
+                return (row, style)
+            }
+        }
+        return nil
     }
 
     private func moved(_ move: CGFloat) -> RowSwipe {

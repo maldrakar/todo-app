@@ -17,14 +17,15 @@ struct ScreenGestures {
 }
 
 /// What a drag and a swipe read of the layout and of the drag under way, and draw nothing from. Kept in a class that
-/// nothing observes and held in the screen's state, so that a layout pass that reports frames does not draw the screen
-/// again (spike #145).
+/// nothing observes and held in the screen's state, so that a layout that reports frames does not draw the screen again
+/// (spike #145).
 ///
 /// `RowDragSpace` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 @MainActor
 final class RowDragSpace {
-    /// The frames the screen's rows, blocks and columns last reported.
+    /// The frames the screen's rows, blocks and columns last reported, each as it changed, and kept for one that has
+    /// left: what reads them reads those drawn.
     var frames = RowLift.Frames()
 
     // iOS alone: only there does a system drag stand on the screen, and these are UIKit's.
@@ -49,13 +50,13 @@ final class RowDragSpace {
 
     /// Brings the board to the nearest column's leading edge, its start or its end, where the system's scroll under a
     /// drag left it between two: that scroll knows nothing of the board's snap (spike #174).
-    func settle(inset: CGFloat, animated: Bool) {
+    func settle(among blocks: [TaskList.Model.Block], inset: CGFloat, animated: Bool) {
         guard let scrollView, let content else { return }
         let low = -scrollView.adjustedContentInset.left
         let high = max(
             low, scrollView.contentSize.width - scrollView.bounds.width + scrollView.adjustedContentInset.right
         )
-        let columns = frames.blocks.values.map { frame in
+        let columns = blocks.compactMap { frames.blocks[$0.id] }.map { frame in
             min(max(content.convert(frame, to: scrollView).minX - inset, low), high)
         }
         let current = scrollView.contentOffset.x
@@ -70,36 +71,24 @@ final class RowDragSpace {
 extension RowLift {
     /// The name of the space the frames are reported in, which is the content's of the list or of the board.
     fileprivate static let contentSpace = "RowLift.content"
-
-    /// How what a drag finds its place by reports its frame: everything laid out puts its own in the preference, and
-    /// the screen keeps the whole of what the last layout reported.
-    fileprivate struct FramesKey: PreferenceKey {
-        static let defaultValue = Frames()
-
-        static func reduce(value: inout Frames, nextValue: () -> Frames) {
-            let next = nextValue()
-            value.rows.merge(next.rows) { $1 }
-            value.blocks.merge(next.blocks) { $1 }
-            value.columns.merge(next.columns) { $1 }
-        }
-    }
 }
 
 extension View {
-    /// Reports this view's frame in the content's space, as the frames the closure makes of it.
-    func reportsLiftFrame(_ frames: @escaping @Sendable (CGRect) -> RowLift.Frames) -> some View {
-        background {
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: RowLift.FramesKey.self, value: frames(proxy.frame(in: .named(RowLift.contentSpace)))
-                )
-            }
+    /// Reports this view's frame in the content's space into a table of the screen's frames, as it changes, which reads
+    /// true while a column scrolls under its rows, by `onGeometryChange` and not a preference: measured in a release
+    /// build, the swipe's frames took half as long, with the lift and the scroll no different (fix round 1 of #177).
+    @MainActor
+    func reportsLiftFrame<Key: Hashable & Sendable>(
+        _ table: WritableKeyPath<RowLift.Frames, [Key: CGRect]> & Sendable, _ key: Key, to space: RowDragSpace
+    ) -> some View {
+        onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowLift.contentSpace)) } action: { frame in
+            space.frames[keyPath: table][key] = frame
         }
     }
 }
 
-/// The content of the list or of the board as the space a drag finds its place in: the frames reported inside it, kept
-/// in the screen's unobserved class, and on iOS what only UIKit gives it (`ScrollContentFinder`).
+/// The content of the list or of the board as the space a drag finds its place in, which its rows report their frames
+/// in, and on iOS what only UIKit gives it (`ScrollContentFinder`).
 struct RowDragContent: ViewModifier {
     private let space: RowDragSpace
     #if os(iOS)
@@ -120,9 +109,6 @@ struct RowDragContent: ViewModifier {
     func body(content: Content) -> some View {
         content
             .coordinateSpace(.named(RowLift.contentSpace))
-            .onPreferenceChange(RowLift.FramesKey.self) { [space] frames in
-                MainActor.assumeIsolated { space.frames = frames }
-            }
             #if os(iOS)
             .background { finder }
             #endif

@@ -211,7 +211,7 @@ struct RowDropTarget: ViewModifier {
         if step.lift != lift { lift = step.lift }
         if let drop = step.drop { send(drop) }
         if hasEnded, settling, let settleInset {
-            gestures.space.settle(inset: settleInset, animated: !reduceMotion)
+            gestures.space.settle(among: blocks, inset: settleInset, animated: !reduceMotion)
         }
     }
     #endif

@@ -33,7 +33,7 @@ struct BlockView: View {
                 AddRowView(addTask, send: send)
             }
         }
-        .reportsLiftFrame { [id = block.id] in RowLift.Frames(blocks: [id: $0]) }
+        .reportsLiftFrame(\.blocks, block.id, to: gestures.space)
     }
 
     /// The mark, where the lift's slot stands after this row, nil for the block's top, from the rows' leading edge. It
@@ -104,7 +104,7 @@ struct BlockRow: View {
                     .background { task.style.ground.map { Color($0) } }
                     .modifier(RowDragSource(task, row: row, gestures: gestures, delete: delete))
                     .modifier(SwipeToDelete(task.swipe, of: row, in: gestures.swipe, delete: delete))
-                    .reportsLiftFrame { RowLift.Frames(rows: [row: $0]) }
+                    .reportsLiftFrame(\.rows, row, to: gestures.space)
             } else {
                 face
             }
@@ -114,9 +114,9 @@ struct BlockRow: View {
                 subtaskChanged: { .subtaskFieldChanged($0) }, send: send
             )
             .modifier(ColumnCardRing(column: column))
-            if let block {
+            if let block, let gestures {
                 let row = BlockRowID(block: block, task: id)
-                face.reportsLiftFrame { RowLift.Frames(rows: [row: $0]) }
+                face.reportsLiftFrame(\.rows, row, to: gestures.space)
             } else {
                 face
             }
