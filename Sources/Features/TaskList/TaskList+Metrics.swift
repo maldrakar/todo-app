@@ -507,9 +507,13 @@ extension TaskList {
         )
 
         /// The phone's empty state (Task 8's table, Empty state): the tile 64 across, rounded 18, its glyph 32, the
-        /// title 18 under it and the line 6 under that, 84 from the top, 40 in, and 270 wide at most.
+        /// title 18 under it and the line 6 under that, 84 from the top, 40 in, and 270 wide at most. The table gives
+        /// no gap to a board's columns, the canvas's board having no empty state: 12, the gap the board keeps under the
+        /// header.
         private static let phoneEmpty = Empty(
-            style: .init(tileToTitle: 18, titleToText: 6, topPadding: 84, horizontalPadding: 40, maxWidth: 270),
+            style: .init(
+                tileToTitle: 18, titleToText: 6, topPadding: 84, horizontalPadding: 40, maxWidth: 270, bottomMargin: 12
+            ),
             tile: TileSize(side: 64, cornerRadius: 18, glyphSize: 32)
         )
     }

@@ -586,7 +586,7 @@ private enum WasmSizeProbe {
             + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "
             + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
             + "on \(bar.background.light.red)"
-        let empty = list.empty.map { "empty: \($0.title.text)" } ?? "not empty"
+        let empty = list.empty.map { "empty: \($0.title.text), \($0.style.bottomMargin) above what follows" } ?? "not empty"
         let plus = list.addTask.map { "\($0.accessibilityLabel) \($0.style.trailingMargin)/\($0.style.bottomMargin)" } ?? "no floating button"
         return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(glass), \(empty), \(plus)"
     }

@@ -9,17 +9,22 @@ public struct EmptyScreenStyle: Equatable, Sendable {
     public let horizontalPadding: Double
     public let maxWidth: Double
 
+    /// How far above what follows it on a board, its columns; in a list, what follows keeps its own margin.
+    public let bottomMargin: Double
+
     public init(
         tileToTitle: Double,
         titleToText: Double,
         topPadding: Double,
         horizontalPadding: Double,
-        maxWidth: Double
+        maxWidth: Double,
+        bottomMargin: Double
     ) {
         self.tileToTitle = tileToTitle
         self.titleToText = titleToText
         self.topPadding = topPadding
         self.horizontalPadding = horizontalPadding
         self.maxWidth = maxWidth
+        self.bottomMargin = bottomMargin
     }
 }

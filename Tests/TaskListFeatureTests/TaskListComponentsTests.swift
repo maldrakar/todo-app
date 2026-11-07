@@ -246,7 +246,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 }
 
 /// The empty state carries the phone's numbers: the list's tile 64 across, rounded 18, its glyph 32, the title 18
-/// under it and the line 6 under that, 84 from the top, 40 in and 270 wide at most (Task 8's table).
+/// under it and the line 6 under that, 84 from the top, 40 in and 270 wide at most (Task 8's table), and 12 above what
+/// follows it on a board.
 @Test func theEmptyStateCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     #expect(try list(BuiltInTaskViews.inbox, in: store).model.empty == EmptyScreenModel(
@@ -259,7 +260,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             text: "Tasks that match this list’s rule will show up here.",
             style: TextStyle(font: .notes, color: .ink2)
         ),
-        style: .init(tileToTitle: 18, titleToText: 6, topPadding: 84, horizontalPadding: 40, maxWidth: 270)
+        style: .init(
+            tileToTitle: 18, titleToText: 6, topPadding: 84, horizontalPadding: 40, maxWidth: 270, bottomMargin: 12
+        )
     ))
 }
 

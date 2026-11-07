@@ -143,7 +143,7 @@ struct ListScreen: View {
             header
             if let empty = model.empty {
                 EmptyScreenView(empty)
-                    .padding(.bottom, model.header.style.bottomMargin)
+                    .padding(.bottom, empty.style.bottomMargin)
             }
             BoardView(board, gestures: rowGestures.forRows(delete: send), send: sendClosingSwipe)
                 .modifier(rowGestures.dropTarget(
