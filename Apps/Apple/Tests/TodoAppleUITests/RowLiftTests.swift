@@ -16,14 +16,13 @@ import TodoCore
 // it, House (a tag) with H1 and H2, Office (a tag) with O1 and O2, Empty (a tag) with nothing, and Either (a rule of
 // alternatives) with E1, which takes no drop.
 
-/// The first stage of a drag holds what `onDrag` said it carries, with the row's look of a lift, and offers the task's
-/// own place until the finger moves.
+/// The first stage of a drag holds what `onDrag` said it carries, and offers the task's own place until the finger
+/// moves.
 @Test func aLiftHoldsTheTaskAndBlockItWasDraggedFrom() throws {
     var list = try LiftedList()
     list.press(.began(task: list.h2, block: .list(list.house), at: list.centre(of: list.h2, in: .list(list.house))))
     #expect(list.lift?.task == list.h2)
     #expect(list.lift?.source == .list(list.house))
-    #expect(list.lift?.style.indicator != nil)
     #expect(list.lift?.slot == RowLift.Slot(block: .list(list.house), after: list.h1))
 }
 
@@ -152,7 +151,6 @@ import TodoCore
     let house = TaskList.Model.BlockID.list(list.house)
     let either = TaskList.Model.BlockID.list(list.either)
     list.press(.began(task: list.b, block: own, at: list.centre(of: list.b, in: own)))
-    #expect(list.lift?.style.indicator == nil, "a column's tint marks the drop")
     list.press(.changed(list.centre(of: list.h1, in: house)))
     #expect(list.lift?.slot == RowLift.Slot(block: house, after: list.h2))
     list.press(.changed(CGPoint(x: list.columnFrame(of: house).maxX + 1, y: 5_000)))

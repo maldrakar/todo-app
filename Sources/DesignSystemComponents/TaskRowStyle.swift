@@ -46,6 +46,10 @@ public struct TaskRowStyle: Equatable, Sendable {
 
     public let leaving: TaskLeavingStyle
 
+    /// What the row stands on, which the system's menu lifts with it and which a swipe slides off what stands behind it,
+    /// and nil where it stands on something else: a column's card has its surface.
+    public let ground: DesignSystem.Color?
+
     public init(
         titleToMeta: Double,
         metaSpacing: Double,
@@ -64,7 +68,8 @@ public struct TaskRowStyle: Equatable, Sendable {
         landingScale: Double?,
         landingAnimation: DesignSystem.Animation,
         titleAnimation: DesignSystem.Animation,
-        leaving: TaskLeavingStyle
+        leaving: TaskLeavingStyle,
+        ground: DesignSystem.Color?
     ) {
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing
@@ -84,5 +89,6 @@ public struct TaskRowStyle: Equatable, Sendable {
         self.landingAnimation = landingAnimation
         self.titleAnimation = titleAnimation
         self.leaving = leaving
+        self.ground = ground
     }
 }

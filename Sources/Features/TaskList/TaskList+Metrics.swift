@@ -35,17 +35,19 @@ extension TaskList {
             let hashSize: Double
         }
 
-        /// A task's row, or a column's card: its style for the block's colour, whether the task is open, whether it can
-        /// be lifted, which it can where it has a menu, and whether it is the task just dropped; its check's for the
-        /// block's colour, the title's font, the meta line's glyph and its gap to its text, and its swipe, nil for a
-        /// column's card, which has none (canvas).
+        /// A task's row, or a column's card: its style for whether the task is open, whether it can be lifted, which it
+        /// can where it has a menu, and whether it is the task just dropped; its check's for the block's colour, the
+        /// title's font, the meta line's glyph and its gap to its text; its swipe, nil for a column's card, which has
+        /// none (canvas); and the mark of a drop's place among such rows for the block's colour, nil for a column's
+        /// card, whose column's tint marks the drop.
         struct Row {
-            let style: @Sendable (_ color: Tile, _ isOpen: Bool, _ lifts: Bool, _ isFresh: Bool) -> TaskRowStyle
+            let style: @Sendable (_ isOpen: Bool, _ lifts: Bool, _ isFresh: Bool) -> TaskRowStyle
             let check: @Sendable (Tile) -> CheckStyle
             let title: DesignSystem.Font
             let metaIconSize: Double
             let metaIconSpacing: Double
             let swipe: SwipeStyle?
+            let indicator: (@Sendable (Tile) -> DropIndicatorStyle)?
         }
 
         /// A pill of the open card: its numbers and the sizes of its glyphs, the sun's, the flag's and the hash's.
@@ -241,13 +243,13 @@ extension TaskList {
                     foldHitSide: nil
                 ),
                 card: Row(
-                    style: { color, isOpen, lifts, isFresh in
+                    style: { isOpen, lifts, isFresh in
                         .init(
                             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
                             freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil,
                             fresh: nil, landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop,
-                            titleAnimation: .titleFades, leaving: taskLeaving
+                            titleAnimation: .titleFades, leaving: taskLeaving, ground: nil
                         )
                     },
                     check: { color in
@@ -257,7 +259,7 @@ extension TaskList {
                             markAnimation: .checkMarkDraws, pop: checkPop, mark: checkMark, colors: color.check
                         )
                     },
-                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil
+                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil, indicator: nil
                 ),
                 openCard: Card(
                     style: { color, isOpen in
@@ -343,22 +345,23 @@ extension TaskList {
         /// under it, its items 10 apart and its lines 3, its glyphs 13 and 3 before their text, at least 44 high;
         /// dragged 40 leftward it stays moved 88, over a Delete 78 wide, 3 in from its top and bottom and 10 from its
         /// end, rounded 12. The table gives the row no radius: 12, the add row's under it, until Task 8's hand check
-        /// tunes it.
+        /// tunes it. It stands on the paper, the screen's ground.
         private static let phoneRow = Row(
-            style: { color, isOpen, lifts, isFresh in
+            style: { isOpen, lifts, isFresh in
                 .init(
                     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
-                    freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift(color) : nil,
+                    freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift : nil,
                     fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .drop,
-                    titleAnimation: .titleFades, leaving: taskLeaving
+                    titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
             swipe: .init(
                 threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
                 buttonCornerRadius: 12, background: .red, animation: .swipe
-            )
+            ),
+            indicator: phoneDropMark
         )
 
         /// The phone's open card (Task 8's table, Card; `Phone.dc.html`, the open card): 6 10 10 from what stands round
@@ -410,28 +413,30 @@ extension TaskList {
             sunSize: 16, flagSize: 15, hashSize: 14
         )
 
-        /// How the phone's row looks lifted (Task 8's table, Lift and slot): grown to 1.03, opaque, rounded 14 on the
-        /// surface and casting the lifted shadow; and the mark of the slot where it would land, 10 high, placed from
-        /// the rows' leading edge: the circle 8 across at 52, ringed 2 in the list's check fill and filled with the
-        /// paper, which stands in for the canvas's unfilled dot since the mark stands on the screen's paper, and the
-        /// line 2 thick in the check fill, rounded 1, from 62 to 20 short of the right edge.
-        private static func phoneLift(_ color: Tile) -> TaskLiftStyle {
-            TaskLiftStyle(
-                scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
-                indicator: DropIndicatorStyle(
-                    height: 10, line: LineStyle(color: color.check.fill, width: 2, dash: []), lineOffset: 62,
-                    lineCornerRadius: 1, trailingGap: 20, circleDiameter: 8, circleOffset: 52,
-                    circleRing: LineStyle(color: color.check.fill, width: 2, dash: []), circleFill: .paper
-                ),
-                dimAnimation: .dropHighlights
+        /// How the phone's row looks lifted (Task 8's table, Lift and slot): grown to 1.03, rounded 14 on the surface and
+        /// casting the lifted shadow, and dimmed to .35 where it is dragged from, the column's card's value, as the
+        /// system's copy of it moves (the controller's ruling on #177, 2026-11-07).
+        private static let phoneLift = TaskLiftStyle(
+            scale: 1.03, opacity: 0.35, cornerRadius: 14, background: .surface, shadow: .lifted,
+            dimAnimation: .dropHighlights
+        )
+
+        /// The mark of a drop's place among the phone's rows (Task 8's table, Lift and slot), 10 high, placed from the
+        /// rows' leading edge: the circle 8 across at 52, ringed 2 in the list's check fill and filled with the paper,
+        /// which stands in for the canvas's unfilled dot since the mark stands on the screen's paper, and the line 2
+        /// thick in the check fill, rounded 1, from 62 to 20 short of the right edge.
+        private static let phoneDropMark: @Sendable (Tile) -> DropIndicatorStyle = { color in
+            DropIndicatorStyle(
+                height: 10, line: LineStyle(color: color.check.fill, width: 2, dash: []), lineOffset: 62,
+                lineCornerRadius: 1, trailingGap: 20, circleDiameter: 8, circleOffset: 52,
+                circleRing: LineStyle(color: color.check.fill, width: 2, dash: []), circleFill: .paper
             )
         }
 
-        /// How a column's card looks lifted (Task 8's table, Lift and slot): it dims to .35 where it is dragged from
-        /// and carries no mark, the column's tint marking the drop; the rest is the row's, but for its corners, the
-        /// card's own 13, which the table gives the card no other number for.
+        /// How a column's card looks lifted (Task 8's table, Lift and slot): the row's, but for its corners, the card's
+        /// own 13, which the table gives the card no other number for. Its column's tint marks the drop.
         private static let columnLift = TaskLiftStyle(
-            scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil,
+            scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted,
             dimAnimation: .dropHighlights
         )
 

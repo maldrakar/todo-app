@@ -7,8 +7,7 @@ import TodoCore
 /// A block of the list as its model describes it (`TaskList.Model.Block`; `Phone.dc.html`, the group): its header where
 /// it has one, its rows, and "+ Add task" at its end where its rule reads as an edit. What it holds arrives finished in
 /// the model, and folding it takes its rows out of it, so this view decides nothing. While a dragged task would land in
-/// it, which only the drag knows, the mark of the place opens a gap among its rows, in the colour of its own rows' list
-/// where it has one and otherwise of the row lifted.
+/// it, which only the drag knows, the block's mark of the place opens a gap among its rows.
 struct BlockView: View {
     private let block: TaskList.Model.Block
     private let gestures: ScreenGestures
@@ -40,8 +39,7 @@ struct BlockView: View {
     /// The mark, where the lift's slot stands after this row, nil for the block's top, from the rows' leading edge. It
     /// stands in the flow, as the canvas's does (`Phone.dc.html`, `slotBefore`).
     @ViewBuilder private func mark(after row: TaskID?) -> some View {
-        if let lift = gestures.lift, lift.slot == RowLift.Slot(block: block.id, after: row),
-           let indicator = block.rows.lazy.compactMap(\.lift).first?.indicator ?? lift.style.indicator {
+        if gestures.lift?.slot == RowLift.Slot(block: block.id, after: row), let indicator = block.indicator {
             DropIndicator(indicator, from: 0, visibleRight: gestures.space.frames.blocks[block.id]?.maxX ?? 0)
                 .accessibilityHidden(true)
         }
@@ -57,9 +55,9 @@ struct BlockView: View {
 /// menu, is dragged and swiped where its model says it can be (`TaskLanding`, `RowDragSource`, `SwipeToDelete`), and an
 /// open card, which is neither lifted nor has a menu, is only a row a drag can stand after. A row of the strip has none
 /// of them. A tap on a row while a row stands swiped open only closes that one (`Phone.dc.html`, `expand`), and a
-/// Delete takes the row away on its leaving motion. A row of the list stands on the screen's ground, which the system's
-/// menu lifts with it, and which its swipe moves off the Delete behind it: with nothing under it, the menu's shadow
-/// showed through the row (the iOS 26.3 simulator, 2026-11-07). A column's card has its surface.
+/// Delete takes the row away on its leaving motion. A row stands on its style's ground, which the system's menu lifts
+/// with it, and which its swipe moves off the Delete behind it: with nothing under it, the menu's shadow showed through
+/// the row (the iOS 26.3 simulator, 2026-11-07).
 struct BlockRow: View {
     private let row: TaskList.Model.Row
     private let block: TaskList.Model.BlockID?
@@ -109,7 +107,7 @@ struct BlockRow: View {
                     deleted(action, row: row, leaving: task.style.leaving, gestures: gestures)
                 }
                 face
-                    .background { if column == nil { Color(gestures.ground) } }
+                    .background { task.style.ground.map { Color($0) } }
                     .modifier(RowDragSource(task, row: row, gestures: gestures, delete: delete))
                     .modifier(SwipeToDelete(task.swipe, of: row, in: gestures.swipe, delete: delete))
                     .reportsLiftFrame { RowLift.Frames(rows: [row: $0]) }

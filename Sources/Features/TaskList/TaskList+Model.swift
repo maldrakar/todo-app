@@ -117,6 +117,10 @@ extension TaskList {
             /// Whether the block takes a dropped task, by its rule read as an edit, as its column's `isDropTarget` says
             /// it: a view draws no slot and no tint where it does not (spec section 6).
             public let takesDrop: Bool
+
+            /// The mark of the place where a dragged task would land among its rows, in the colour of its list, and nil
+            /// in columns, where its column's tint marks the drop.
+            public let indicator: DropIndicatorStyle?
         }
 
         /// A row of a block, a view switching over its kind to pick the row to draw, every case drawn (`docs/style.md`,
@@ -130,6 +134,24 @@ extension TaskList {
             public var id: TaskID {
                 switch self {
                 case .task(let id, _), .card(let id, _): id
+                }
+            }
+
+            /// How the row looks lifted, and nil for one that cannot be: an open card, which is neither lifted nor has a
+            /// menu (the controller's ruling on #177, 2026-11-07), and a row with no menu.
+            public var lift: TaskLiftStyle? {
+                switch self {
+                case .task(_, let row): row.style.lift
+                case .card: nil
+                }
+            }
+
+            /// The row's swipe to its Delete, and nil for one that is not swiped: an open card, a row of the strip, a
+            /// task in the Trash and a column's card.
+            public var swipe: SwipeModel<UserAction>? {
+                switch self {
+                case .task(_, let row): row.swipe
+                case .card: nil
                 }
             }
         }

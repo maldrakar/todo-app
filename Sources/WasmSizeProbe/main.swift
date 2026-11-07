@@ -550,7 +550,7 @@ private enum WasmSizeProbe {
         case .list(let blocks):
             let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.fold?.accessibilityLabel ?? "")" } }
             let adds = blocks.compactMap(\.addTask).map(\.title.text).joined(separator: "/")
-            shape = "\(blocks.count) blocks, \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
+            shape = "\(blocks.count) blocks, marked \(blocks.first?.indicator?.height ?? 0), \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):
             let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, tinting on \($0.style.dropAnimation.duration), \($0.isDropTarget ? "taking" : "refusing") a drop" } }
             shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), \(board.endRoom) after, headed \(headers.joined(separator: "/")), then \(board.addList?.title.text ?? "no list to add")"
@@ -561,7 +561,8 @@ private enum WasmSizeProbe {
                 "\(task.check.accessibilityLabel) [\(task.meta.map { $0.text?.text ?? "glyph" }.joined(separator: " "))], "
                     + "\(task.swipe?.accessibilityLabel ?? "no swipe"), menu "
                     + "\(task.menu?.sections.flatMap(\.items).map(\.title).joined(separator: "/") ?? "none"), "
-                    + "\(task.style.lift.map { "lifts to \($0.scale), slot \($0.indicator?.height ?? 0)" } ?? "stays"), "
+                    + "\(row.lift.map { "lifts to \($0.scale), dims to \($0.opacity)" } ?? "stays"), swiped \(row.swipe != nil), "
+                    + "on \(task.style.ground?.light.red ?? 0), "
                     + "\(task.style.fresh == nil ? "settled" : "fresh"), lands from \(task.style.landingScale ?? 1) "
                     + "on \(task.style.landingAnimation.duration), title on \(task.style.titleAnimation.duration), "
                     + "leaves by \(task.style.leaving.offset) on \(task.style.leaving.animation.delay), "

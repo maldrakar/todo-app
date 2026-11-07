@@ -218,7 +218,7 @@ private let taskRowStyle = TaskRowStyle(
     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
     leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0, freshAnimation: .fresh,
     strike: nil, lift: nil, fresh: nil, landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades,
-    leaving: taskLeaving
+    leaving: taskLeaving, ground: nil
 )
 
 private func taskRow(
@@ -240,7 +240,7 @@ private func taskRow(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9, freshAnimation: .fresh,
             strike: nil, lift: nil, fresh: nil, landingScale: nil, landingAnimation: .drop,
-            titleAnimation: .titleFades, leaving: taskLeaving
+            titleAnimation: .titleFades, leaving: taskLeaving, ground: nil
         )),
         "swipe": taskRow(swipe: swipe),
         "tap": taskRow(tap: .second),

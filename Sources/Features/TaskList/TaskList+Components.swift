@@ -96,7 +96,8 @@ extension TaskList {
                         row($0, block.color, context, rowMetrics, card: cardMetrics)
                     },
                     isFolded: isFolded, column: nil,
-                    addTask: isFolded ? nil : addTaskRow(for: block, addTaskMetrics), takesDrop: block.edit != nil
+                    addTask: isFolded ? nil : addTaskRow(for: block, addTaskMetrics), takesDrop: block.edit != nil,
+                    indicator: rowMetrics.indicator?(block.color)
                 )
             })
         case .columns(let board):
@@ -109,7 +110,7 @@ extension TaskList {
                         column: column(
                             block.heading ?? Heading(title: title, subtitle: nil), of: block, context, board
                         ),
-                        addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edit != nil
+                        addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edit != nil, indicator: nil
                     )
                 },
                 spacing: board.spacing, horizontalPadding: board.horizontalPadding, endRoom: board.endRoom,
@@ -232,7 +233,7 @@ extension TaskList {
         return TaskRowModel(
             check: check(title: title, isOpen: isOpen, action: .checkTapped(task.id), metrics.check(color)),
             title: TextModel(text: title, style: TextStyle(font: metrics.title, color: isOpen ? .ink : .ink2)),
-            meta: meta, style: metrics.style(color, isOpen, menu != nil, isFresh), swipe: swipe,
+            meta: meta, style: metrics.style(isOpen, menu != nil, isFresh), swipe: swipe,
             tap: .rowTapped(task.id), menu: menu
         )
     }

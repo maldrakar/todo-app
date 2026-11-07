@@ -1,6 +1,5 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowLift.swift
 import CoreGraphics
-import DesignSystemComponents
 import TaskListFeature
 import TodoCore
 
@@ -14,8 +13,7 @@ struct BlockRowID: Hashable {
 }
 
 /// A task lifted out of a block by the system's drag (spike #174, y1), from its first point over the screen's scroll
-/// view to its release there: which task, the block it was dragged from, how its row looks lifted, and where it would
-/// land. It is the view's own state, which nothing else can know, and it sends nothing until the release, which reports
+/// view to its release there: which task, the block it was dragged from, and where it would land. It is the view's own state, which nothing else can know, and it sends nothing until the release, which reports
 /// `rowDropped` once; what the drop means is the module's to read. Each stage of the drag moves it through one step,
 /// `after(_:from:among:frames:)`, which knows no platform, so that the drag is tested on the host (`RowLiftTests`).
 ///
@@ -58,9 +56,6 @@ struct RowLift: Equatable {
     /// The block it was dragged from, which names one of the two that draw a task both select.
     let source: TaskList.Model.BlockID
 
-    /// How its row looks lifted, its mark of the drop's place for a block with no row of its own to give one.
-    let style: TaskLiftStyle
-
     /// Where it would land, and nil over a block that takes no drop.
     private(set) var slot: Slot?
 
@@ -85,10 +80,9 @@ struct RowLift: Equatable {
 
     private init?(lifting task: TaskID, from source: TaskList.Model.BlockID, among blocks: [TaskList.Model.Block]) {
         let row = blocks.first { $0.id == source }?.rows.first { $0.id == task }
-        guard let style = row?.lift else { return nil }
+        guard row?.lift != nil else { return nil }
         self.task = task
         self.source = source
-        self.style = style
     }
 
     private func moved(to point: CGPoint, among blocks: [TaskList.Model.Block], frames: Frames) -> RowLift {
@@ -133,16 +127,5 @@ struct RowLift: Equatable {
     /// The drag's one report, on release, and nil over a block that takes no drop.
     private var drop: TaskList.UserAction? {
         slot.map { .rowDropped(task, from: source, in: $0.block, after: $0.after) }
-    }
-}
-
-extension TaskList.Model.Row {
-    /// How the row looks lifted, and nil for one that cannot be: an open card, which is neither lifted nor has a menu,
-    /// and a row with no menu, by the module's one rule (`TaskRowStyle.lift`).
-    var lift: TaskLiftStyle? {
-        switch self {
-        case .task(_, let row): row.style.lift
-        case .card: nil
-        }
     }
 }

@@ -41,7 +41,8 @@ struct RowSwipe: Equatable {
         case .changed(let move):
             return swipe?.moved(move)
         case .ended(let move):
-            return swipe?.moved(move).resting(isOpen: swipe?.moved(move).isPastThreshold ?? false)
+            let moved = swipe?.moved(move)
+            return moved?.resting(isOpen: moved?.isPastThreshold ?? false)
         case .cancelled:
             return swipe?.resting(isOpen: swipe?.start != 0)
         }
@@ -56,7 +57,7 @@ struct RowSwipe: Equatable {
     ) -> (row: BlockRowID, style: SwipeStyle)? {
         guard let row = frames.rows.first(where: { $0.value.contains(point) })?.key,
               let drawn = blocks.first(where: { $0.id == row.block })?.rows.first(where: { $0.id == row.task }),
-              let style = drawn.swipeStyle,
+              let style = drawn.swipe?.style,
               moved < 0 || swipe?.row == row
         else { return nil }
         return (row, style)
@@ -74,16 +75,5 @@ struct RowSwipe: Equatable {
     private func resting(isOpen: Bool) -> RowSwipe? {
         guard isOpen else { return nil }
         return RowSwipe(row: row, x: style.shift, isFollowingFinger: false, style: style, start: style.shift)
-    }
-}
-
-extension TaskList.Model.Row {
-    /// The look of the row's swipe, and nil for one that is not swiped: an open card, a row of the strip, a task in the
-    /// Trash and a column's card.
-    fileprivate var swipeStyle: SwipeStyle? {
-        switch self {
-        case .task(_, let row): row.swipe?.style
-        case .card: nil
-        }
     }
 }

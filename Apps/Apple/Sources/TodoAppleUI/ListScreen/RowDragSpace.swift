@@ -1,5 +1,4 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowDragSpace.swift
-import DesignSystem
 import SwiftUI
 import TaskListFeature
 #if os(iOS)
@@ -8,13 +7,12 @@ import UIKit
 #endif
 
 /// What the screen's gestures stand at now, which its blocks and rows draw from: the lift, nil while no row is lifted,
-/// what the drag knows of the layout, the swipe, what the screen stands on, which a row of the list stands on too, and
-/// what a row's Delete sends, which leaves the swipe as it stands, since the row goes from where it stands.
+/// what the drag knows of the layout, the swipe, and what a row's Delete sends, which leaves the swipe as it stands,
+/// since the row goes from where it stands.
 struct ScreenGestures {
     let lift: RowLift?
     let space: RowDragSpace
     let swipe: ScreenSwipe
-    let ground: DesignSystem.Color
     let delete: (TaskList.UserAction) -> Void
 }
 

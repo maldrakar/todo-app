@@ -34,10 +34,10 @@ private func board(of model: TaskList.Model) -> TaskList.Model.Board? {
 /// and the 15 pt mark stroked 1.75 in a 44 pt hit, popping on the check's motion; the title in the row title, 11 above
 /// and below, 2 after the check's hit and 4 short of the end; the meta 3 under it, its items 10 apart and its lines 3;
 /// at least 44 high and rounded 12; dragged 40 leftward it stays moved 88 over its Delete, 78 wide, 3 and 10 in from
-/// its edges, rounded 12, reading "Delete" and its title aloud, and its menu holds Delete; it lifts to 1.03, opaque, on
-/// the surface rounded 14 with the lifted shadow, over a slot of the list's check fill (Task 8's table, Lift and
-/// slot), and is fresh where it is the task just dropped. A row of the strip has neither a menu nor a lift, and no meta
-/// line.
+/// its edges, rounded 12, reading "Delete" and its title aloud, and its menu holds Delete; it lifts to 1.03 on the
+/// surface rounded 14 with the lifted shadow, dimming to .35 where it is dragged from (Task 8's table, Lift and slot;
+/// the controller's ruling on #177, 2026-11-07), and is fresh where it is the task just dropped; it stands on the
+/// paper. A row of the strip has neither a menu nor a lift, and no meta line.
 private func phoneRow(
     _ title: String, id: TaskID, colors: DesignSystem.Color.Components.Check, isOpen: Bool = true,
     meta: [MetaItemModel] = [], deletes: Bool = true, isFresh: Bool = false
@@ -57,8 +57,9 @@ private func phoneRow(
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
             titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh,
-            strike: isOpen ? nil : .ink3, lift: deletes ? lift(colors) : nil, fresh: isFresh ? .fresh : nil,
-            landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades, leaving: taskLeaving
+            strike: isOpen ? nil : .ink3, lift: deletes ? rowLift : nil, fresh: isFresh ? .fresh : nil,
+            landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades, leaving: taskLeaving,
+            ground: .paper
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
@@ -74,27 +75,27 @@ private func phoneRow(
     )
 }
 
-/// A row lifted: grown to 1.03, opaque, rounded 14 on the surface with the lifted shadow, and over it the slot of the
-/// list's check fill, 10 high: the circle 8 across 52 in, ringed 2 and filled with the paper, the line 2 thick and
-/// rounded 1 from 62 in to 20 short of the right edge (Task 8's table, Lift and slot).
-private func lift(_ colors: DesignSystem.Color.Components.Check) -> TaskLiftStyle {
-    TaskLiftStyle(
-        scale: 1.03, opacity: 1, cornerRadius: 14, background: .surface, shadow: .lifted,
-        indicator: DropIndicatorStyle(
-            height: 10, line: LineStyle(color: colors.fill, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
-            trailingGap: 20, circleDiameter: 8, circleOffset: 52,
-            circleRing: LineStyle(color: colors.fill, width: 2, dash: []), circleFill: .paper
-        ),
-        dimAnimation: .dropHighlights
+/// A row lifted: grown to 1.03, rounded 14 on the surface with the lifted shadow, and dimmed to .35 where it is dragged
+/// from.
+private let rowLift = TaskLiftStyle(
+    scale: 1.03, opacity: 0.35, cornerRadius: 14, background: .surface, shadow: .lifted, dimAnimation: .dropHighlights
+)
+
+/// A column's card lifted: the row's, but rounded as the card is, 13.
+private let cardLift = TaskLiftStyle(
+    scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, dimAnimation: .dropHighlights
+)
+
+/// The mark of a drop's place among a block's rows, in the check fill of the block's list, 10 high: the circle 8 across
+/// 52 in, ringed 2 and filled with the paper, the line 2 thick and rounded 1 from 62 in to 20 short of the right edge
+/// (Task 8's table, Lift and slot).
+private func dropMark(_ colors: DesignSystem.Color.Components.Check) -> DropIndicatorStyle {
+    DropIndicatorStyle(
+        height: 10, line: LineStyle(color: colors.fill, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
+        trailingGap: 20, circleDiameter: 8, circleOffset: 52,
+        circleRing: LineStyle(color: colors.fill, width: 2, dash: []), circleFill: .paper
     )
 }
-
-/// A column's card lifted: the row's, but dimmed to .35 where it is dragged from, rounded as the card is, 13, and with
-/// no slot, the column's tint marking the drop.
-private let cardLift = TaskLiftStyle(
-    scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil,
-    dimAnimation: .dropHighlights
-)
 
 /// A row's menu: Delete with the trash's glyph, drawn as what destroys something (spec section 6).
 private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
@@ -374,7 +375,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
             strike: nil, lift: cardLift, fresh: nil, landingScale: nil, landingAnimation: .drop,
-            titleAnimation: .titleFades, leaving: taskLeaving
+            titleAnimation: .titleFades, leaving: taskLeaving, ground: nil
         ),
         swipe: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)
@@ -531,6 +532,36 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     try store.trash(task: id)
     let rows = blocks(of: try list(BuiltInTaskViews.trash, in: store).model).flatMap(\.rows).map(row)
     #expect(rows == [phoneRow("Binned", id: id, colors: Tile.stone.check, deletes: false)])
+}
+
+/// A block carries the mark of a drop's place among its rows, in the colour of its list, whichever rows it holds: one
+/// with none has it too. A column has none, its tint marking the drop.
+@Test func aBlockCarriesTheMarkOfADropInItsListsColour() throws {
+    let store = try makeStore()
+    let home = try store.createTag(title: "home")
+    let parent = try store.createView(NewTaskView(title: "Projects", color: .rose, filter: .status([.open])))
+    let house = try store.createView(NewTaskView(title: "House", parent: parent, color: .teal, filter: .hasTag(home)))
+    let module = try list(parent, in: store)
+    #expect(block(.own(nil), of: module.model)?.rows.isEmpty == true)
+    #expect(block(.own(nil), of: module.model)?.indicator == dropMark(Tile.rose.check))
+    #expect(block(.list(house), of: module.model)?.indicator == dropMark(Tile.teal.check))
+    module.tap(.showAsChosen(.columns))
+    #expect(blocks(of: module.model).allSatisfy { $0.column != nil && $0.indicator == nil })
+}
+
+/// A row answers its lift and its swipe whatever its kind: a task's row those of its model, and an open card, which is
+/// neither lifted nor swiped, none.
+@Test func aRowAnswersItsLiftAndItsSwipeWhateverItsKind() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let module = try list(BuiltInTaskViews.inbox, in: store)
+    let drawn = try #require(blocks(of: module.model).first?.rows.first)
+    #expect(drawn.lift == row(drawn).style.lift && drawn.lift != nil)
+    #expect(drawn.swipe == row(drawn).swipe && drawn.swipe != nil)
+    module.tap(.rowTapped(id))
+    let card = try #require(blocks(of: module.model).first?.rows.first)
+    #expect(card.lift == nil)
+    #expect(card.swipe == nil)
 }
 
 /// A row or a column's card lifts exactly where it has a menu: not a row of the Done strip, not a task in the Trash
