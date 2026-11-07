@@ -62,7 +62,7 @@ extension TaskList {
                 ),
                 action: .openFullScreenTapped
             ),
-            style: metrics.style(color), backgroundTapped: .backgroundTapped
+            style: metrics.style(color, isOpen), backgroundTapped: .backgroundTapped
         )
     }
 

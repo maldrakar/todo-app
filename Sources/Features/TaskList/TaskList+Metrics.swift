@@ -63,12 +63,12 @@ extension TaskList {
             let font: DesignSystem.Font
         }
 
-        /// The open card: its style, its subtask draft's circle in the block's colour; its check's and its subtasks'
-        /// for the block's colour, and a subtask row's for whether the subtask is open; its title field's height and
-        /// padding, the size of the button that opens it full screen, the notes' height and the subtask field's; and
-        /// the row that adds a subtask and its pills.
+        /// The open card: its style, its subtask draft's circle in the block's colour and its title's line where the
+        /// task is not open; its check's and its subtasks' for the block's colour, and a subtask row's for whether the
+        /// subtask is open; its title field's height and padding, the size of the button that opens it full screen, the
+        /// notes' height and the subtask field's; and the row that adds a subtask and its pills.
         struct Card {
-            let style: @Sendable (Tile) -> CardStyle
+            let style: @Sendable (_ color: Tile, _ isOpen: Bool) -> CardStyle
             let check: @Sendable (Tile) -> CheckStyle
             let subtaskCheck: @Sendable (Tile) -> CheckStyle
             let subtask: @Sendable (_ isOpen: Bool) -> SubtaskRowStyle
@@ -260,13 +260,13 @@ extension TaskList {
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil
                 ),
                 openCard: Card(
-                    style: { color in
+                    style: { color, isOpen in
                         .init(
                             expandHitSide: 44, cornerRadius: 13, topMargin: 0, horizontalMargin: 0, bottomMargin: 0,
                             bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
                             shadow: .resting, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
                             titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color),
-                            leaving: taskLeaving
+                            leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3
                         )
                     },
                     check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
@@ -369,13 +369,13 @@ extension TaskList {
         /// pills 6 apart and 10 under the subtasks. The table gives the notes no height: 22, their 15 pt line at the
         /// canvas's 1.45, the least a field grows from.
         private static let phoneCard = Card(
-            style: { color in
+            style: { color, isOpen in
                 .init(
                     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10,
                     bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6,
                     shadow: .raised, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
                     titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color),
-                    leaving: taskLeaving
+                    leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3
                 )
             },
             check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,

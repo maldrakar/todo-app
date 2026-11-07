@@ -37,6 +37,10 @@ public struct CardStyle: Equatable, Sendable {
     /// How the card leaves as its check completes its task, as a row does.
     public let leaving: TaskLeavingStyle
 
+    /// The colour of the line through the title, the canvas's ink 3 through a done task's (`.tt-done`), and nil for a
+    /// title with no line through it, so a done task's card is another instance.
+    public let titleStrike: DesignSystem.Color?
+
     public init(
         expandHitSide: Double,
         cornerRadius: Double,
@@ -55,7 +59,8 @@ public struct CardStyle: Equatable, Sendable {
         titleToNotes: Double,
         notesToSubtasks: Double,
         subtaskDraftCircle: CheckStyle,
-        leaving: TaskLeavingStyle
+        leaving: TaskLeavingStyle,
+        titleStrike: DesignSystem.Color?
     ) {
         self.expandHitSide = expandHitSide
         self.cornerRadius = cornerRadius
@@ -75,5 +80,6 @@ public struct CardStyle: Equatable, Sendable {
         self.notesToSubtasks = notesToSubtasks
         self.subtaskDraftCircle = subtaskDraftCircle
         self.leaving = leaving
+        self.titleStrike = titleStrike
     }
 }

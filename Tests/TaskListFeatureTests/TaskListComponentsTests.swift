@@ -674,7 +674,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                     opacity: 0.3, scale: 0.97, offset: -4, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
                 ),
                 subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: subtaskCircle,
-                leaving: taskLeaving
+                leaving: taskLeaving, titleStrike: nil
             ),
             backgroundTapped: .backgroundTapped
         )
@@ -694,6 +694,26 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         "A note", "Subtask", .notes, .ink, height: 40, padding: 0, submitted: .subtaskFieldSubmitted,
         cancelled: .subtaskFieldCancelled, focusLost: .subtaskFieldLostFocus
     ))
+}
+
+/// A done task's card strikes its title in ink 3 over ink 2, as a done row's title is, and an open task's has no line
+/// through it (`Phone.dc.html`, the card's `t.titleClass` and `.tt-done`; the controller's ruling on #177, 2026-11-07).
+@Test func aDoneTasksCardStrikesItsTitle() throws {
+    let store = try makeStore()
+    let done = try store.createTask(NewTask(title: "Filed"))
+    try store.update(task: done, [.status(.done)])
+    let open = try store.createTask(NewTask(title: "Open"))
+    let mine = try store.createView(NewTaskView(title: "Mine", color: .amber, filter: .trashed(false)))
+    let module = try list(mine, in: store)
+    module.tap(.rowTapped(open))
+    #expect(openCard(in: module.model)?.card.style.titleStrike == nil)
+    #expect(openCard(in: module.model)?.card.title.style.color == .ink)
+    module.tap(.backgroundTapped)
+    module.tap(.doneStripTapped)
+    module.tap(.rowTapped(done))
+    #expect(openCard(in: module.model)?.id == done)
+    #expect(openCard(in: module.model)?.card.style.titleStrike == .ink3)
+    #expect(openCard(in: module.model)?.card.title.style.color == .ink2)
 }
 
 /// A list being named has the field in its header's place, in the list's glyph colour in the section title, with no

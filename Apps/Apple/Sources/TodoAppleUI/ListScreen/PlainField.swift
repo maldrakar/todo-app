@@ -1,4 +1,5 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/PlainField.swift
+import DesignSystem
 import DesignSystemComponents
 import SwiftUI
 
@@ -23,7 +24,8 @@ struct PlainField<Action: Equatable & Sendable>: View {
     private let focusesOnAppear: Bool
     private let keepsFocusOnSubmit: Bool
     private let selectsAllOnFocus: Bool
-    private let struck: TaskLeavingStyle?
+    private let color: DesignSystem.Color?
+    private let strike: DesignSystem.Color?
     private let changed: (String) -> Action
     private let send: (Action) -> Void
 
@@ -35,18 +37,20 @@ struct PlainField<Action: Equatable & Sendable>: View {
     @State private var hasSelectedAll = false
     #endif
 
-    /// The field, on one line unless `axis` says it grows down, as a card's notes do.
+    /// The field, on one line unless `axis` says it grows down, as a card's notes do, in its model's colour unless
+    /// `color` gives another, and with a line through it in `strike`, as a done task's title has on its card.
     init(
         _ model: TextFieldModel<Action>, axis: Axis = .horizontal, focusesOnAppear: Bool,
-        keepsFocusOnSubmit: Bool = false, selectsAllOnFocus: Bool = false, struck: TaskLeavingStyle? = nil,
-        changed: @escaping (String) -> Action, send: @escaping (Action) -> Void
+        keepsFocusOnSubmit: Bool = false, selectsAllOnFocus: Bool = false, color: DesignSystem.Color? = nil,
+        strike: DesignSystem.Color? = nil, changed: @escaping (String) -> Action, send: @escaping (Action) -> Void
     ) {
         self.model = model
         self.axis = axis
         self.focusesOnAppear = focusesOnAppear
         self.keepsFocusOnSubmit = keepsFocusOnSubmit
         self.selectsAllOnFocus = selectsAllOnFocus
-        self.struck = struck
+        self.color = color
+        self.strike = strike
         self.changed = changed
         self.send = send
         _typed = State(initialValue: TypedText(model.text))
@@ -57,9 +61,8 @@ struct PlainField<Action: Equatable & Sendable>: View {
             // Plain, its look the model's: the Mac's default style draws a bezel of its own inside it, where iOS's
             // draws none.
             .textFieldStyle(.plain)
-            // A card's title while its check takes the card away, where the canvas's title strikes (`.tt-done`).
-            .strikethrough(struck != nil, color: struck.map { Color($0.strike) })
-            .fieldLook(model, color: struck?.titleColor)
+            .strikethrough(strike != nil, color: strike.map { Color($0) })
+            .fieldLook(model, color: color)
             .focused($isFocused)
             .onSubmit {
                 send(model.submitted)

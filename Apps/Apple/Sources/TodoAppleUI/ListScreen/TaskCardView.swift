@@ -79,7 +79,9 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
             CheckButton(model.check, isChecked: model.check.isChecked || isCompleting, action: checkTapped)
             PlainField(
                 model.title, focusesOnAppear: model.title.text.isEmpty,
-                struck: isCompleting ? model.style.leaving : nil, changed: titleChanged, send: send
+                color: isCompleting ? model.style.leaving.titleColor : nil,
+                strike: isCompleting ? model.style.leaving.strike : model.style.titleStrike, changed: titleChanged,
+                send: send
             )
             Button { send(model.expand.action) } label: {
                 expandFace

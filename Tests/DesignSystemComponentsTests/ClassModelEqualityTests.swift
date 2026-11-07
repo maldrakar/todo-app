@@ -279,7 +279,7 @@ private let cardStyle = CardStyle(
     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
     bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised, background: .surface,
     entrance: cardEntrance, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: draftCircle,
-    leaving: taskLeaving
+    leaving: taskLeaving, titleStrike: nil
 )
 
 private let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
@@ -334,7 +334,7 @@ private func card(
             expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
             bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted,
             background: .surface, entrance: cardEntrance, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4,
-            subtaskDraftCircle: draftCircle, leaving: taskLeaving
+            subtaskDraftCircle: draftCircle, leaving: taskLeaving, titleStrike: nil
         )),
         "backgroundTapped": card(backgroundTapped: .second),
     ])
