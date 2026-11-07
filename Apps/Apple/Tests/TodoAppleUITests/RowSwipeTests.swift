@@ -104,8 +104,8 @@ private let second = BlockRowID(block: .own(nil), task: TaskID())
     #expect(RowSwipe.row(at: card, moved: -10, from: nil, among: board.blocks, frames: board.frames) == nil)
 }
 
-/// Frames are kept as they are reported and a row that left keeps its frame, a peer's change among the ways: a pan takes
-/// the row drawn under its start, and no frame of a row no longer drawn stands in its way.
+/// Frames are kept as they are reported and a row that left keeps its frame, a peer's change among the ways: a pan
+/// takes the row drawn under its start, and no frame of a row no longer drawn stands in its way.
 @Test func aPanIsNotStoppedByTheFrameOfARowNoLongerDrawn() throws {
     let list = try LiftedList()
     let own = TaskList.Model.BlockID.own(nil)
