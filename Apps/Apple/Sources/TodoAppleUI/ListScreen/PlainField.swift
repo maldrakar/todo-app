@@ -8,7 +8,8 @@ import SwiftUI
 /// text what `changed` makes of it, which a model cannot hold (`TextFieldModel`).
 ///
 /// What is typed goes up only while the field has the focus: a field writes its text back through its binding as it
-/// goes too, and that echo, after a card has closed, names no card and would land on the one opened since. It is not
+/// goes too, and that echo, after a card has closed, names no card and would land on the one opened since. What it
+/// shows is its own (`TypedText`), since a model drawn before the last keystroke would take that letter back. It is not
 /// `TitleField`, which asks the caret back on every lost focus and cannot stand beside another field. Whether it takes
 /// the focus when it appears, and takes it back after Return, is its caller's, which is the view's own focus: a new
 /// task's title does and a stored one does not, and on the Mac a `TextField` ends editing on a Return, so that the next
@@ -26,6 +27,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
     private let send: (Action) -> Void
 
     @FocusState private var isFocused: Bool
+    @State private var typed: TypedText
 
     /// The field, on one line unless `axis` says it grows down, as a card's notes do.
     init(
@@ -40,6 +42,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
         self.selectsAllOnFocus = selectsAllOnFocus
         self.changed = changed
         self.send = send
+        _typed = State(initialValue: TypedText(model.text))
     }
 
     var body: some View {
@@ -59,6 +62,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
             .onAppear {
                 if focusesOnAppear { isFocused = true }
             }
+            .onChange(of: model.text) { _, text in typed.modelHolds(text) }
             #if os(iOS)
             // A list's new name replaces "New list" as it is typed (`Phone.dc.html`, the name field's `selectAll`).
             // SwiftUI can select a field's text from iOS 18 and the app runs on 17, so the selection is UIKit's, and on
@@ -75,8 +79,8 @@ struct PlainField<Action: Equatable & Sendable>: View {
     @ViewBuilder private var field: some View {
         let text = TextField(
             model.placeholder,
-            text: Binding(get: { model.text }, set: { text in
-                if isFocused { send(changed(text)) }
+            text: Binding(get: { typed.text }, set: { text in
+                if typed.typed(text), isFocused { send(changed(text)) }
             }),
             prompt: Text(model.placeholder).foregroundStyle(Color(model.style.placeholder)),
             axis: axis
@@ -89,5 +93,40 @@ struct PlainField<Action: Equatable & Sendable>: View {
             return .handled
         }
         #endif
+    }
+}
+
+/// What a field shows while what it sent up comes back to it late: what is typed stands at once, and a text of the
+/// model's that this field sent is an echo of what it has moved on from, while any other is the module's own and
+/// stands, the next subtask's empty field after Return, a title the store kept trimmed or another device's change. A
+/// field bound to the model itself lost letters: a model drawn before a keystroke, handed to the field after it, wrote
+/// the text back without that letter, on an iPhone 17 one title in five at the speed a test types and however slowly a
+/// long list draws (the iOS 26.3 simulator, 2026-11-07).
+struct TypedText {
+    private(set) var text: String
+
+    /// What was sent up and not yet seen back, oldest first.
+    private var sent: [String] = []
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    /// Takes what the field now holds, and answers whether it is a keystroke, which goes up, and not the text it held.
+    mutating func typed(_ new: String) -> Bool {
+        guard new != text else { return false }
+        text = new
+        sent.append(new)
+        return true
+    }
+
+    /// Takes the text the model now holds.
+    mutating func modelHolds(_ new: String) {
+        if let index = sent.firstIndex(of: new) {
+            sent.removeFirst(index + 1)
+        } else {
+            text = new
+            sent = []
+        }
     }
 }
