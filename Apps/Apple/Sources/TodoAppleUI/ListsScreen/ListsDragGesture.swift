@@ -259,31 +259,16 @@ extension ListsDrag {
                 .frame(height: slot.height)
         }
 
-        /// The line, a rule rounded at its ends, and the circle over its start, ringed inside its diameter as the
-        /// canvas's border is, each placed from the tile's leading edge at the mark's depth; and the card at the mark,
-        /// centred on the line.
+        /// The mark from the tile's leading edge at the mark's depth, and the card at it, centred on the line.
         private func indicatorMark(_ indicator: DropIndicatorStyle, _ card: DragStyle.IndicatorCard) -> some View {
             let tile = style.indent.leading(atDepth: depth)
-            let lineStart = tile + indicator.lineOffset
-            return ZStack(alignment: .leading) {
-                Rule(indicator.line, along: .horizontal)
-                    .frame(width: max(0, visibleRight - indicator.trailingGap - lineStart))
-                    .clipShape(.rect(cornerRadius: indicator.lineCornerRadius))
-                    .padding(.leading, lineStart)
-                Circle()
-                    .fill(Color(indicator.circleFill))
-                    .overlay { Circle().inset(by: indicator.circleRing.width / 2).stroke(indicator.circleRing) }
-                    .frame(width: indicator.circleDiameter, height: indicator.circleDiameter)
-                    .padding(.leading, tile + indicator.circleOffset)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .frame(height: indicator.height)
-            .overlay(alignment: .leading) {
-                if let lifted {
-                    IndicatorCard(lifted, card)
-                        .padding(.leading, tile + card.offset)
+            return DropIndicator(indicator, from: tile, visibleRight: visibleRight)
+                .overlay(alignment: .leading) {
+                    if let lifted {
+                        IndicatorCard(lifted, card)
+                            .padding(.leading, tile + card.offset)
+                    }
                 }
-            }
         }
     }
 
