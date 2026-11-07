@@ -163,7 +163,8 @@ extension TaskList {
         /// under what stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14
         /// short of its end, 8 on either side of its label, its rows 6 under it, coming in from nothing, .92 of their
         /// size about a fifth along their top and 8 above where they rest, over the popover's motion (`Phone.dc.html`,
-        /// `popIn`).
+        /// `popIn`); its words growing to 1.22 by
+        /// 40 % of the check's motion as they change (`bumpA`, on the check's own curve and .45 s).
         static let phone = Metrics(
             style: phoneStyle(fade: phoneFade), glass: phoneGlass, header: phoneHeader(bottomMargin: 10),
             tagBar: phoneTagBar,
@@ -189,7 +190,8 @@ extension TaskList {
                         topMargin: 20, leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6,
                         rowsEntrance: EntranceStyle(
                             opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
-                        )
+                        ),
+                        bump: .init(scale: 1.22, peakAt: 0.4, animation: .check)
                     ),
                     iconSize: 18, chevronSize: 15
                 )
@@ -434,8 +436,8 @@ extension TaskList {
         )
 
         /// The phone's glass buttons (Task 8's table, Glass buttons; `Phone.dc.html`, `.glass` and the buttons' row):
-        /// 44 circles on the glass, edged with its 0.5 hairline and casting the raised shadow; the back chevron 24 across
-        /// set 2 left of centre, "…" 22.
+        /// 44 circles on the glass, edged with its 0.5 hairline and casting the raised shadow; the back chevron 24
+        /// across set 2 left of centre, "…" 22.
         private static let phoneGlass = Glass(
             back: GlassControlStyle(
                 iconOffset: -2, diameter: 44, surface: .glass,
@@ -450,10 +452,10 @@ extension TaskList {
         )
 
         /// The phone's screen (Task 8's table, Glass buttons; `Phone.dc.html`, the buttons' row and the scroller): the
-        /// circles 14 from the screen's sides; under them a fade of the paper that is the canvas's 108 less its 54 status
-        /// bar, solid to 64 % of the 108, with the content 56 under the safe area's top and ending 116 above the safe
-        /// area's bottom, the canvas's 150 less the home indicator's 34; on the board the fade is `nil`, its buttons
-        /// standing in the flow; all of it on the paper.
+        /// circles 14 from the screen's sides; under them a fade of the paper that is the canvas's 108 less its 54
+        /// status bar, solid to 64 % of the 108, with the content 56 under the safe area's top and ending 116 above the
+        /// safe area's bottom, the canvas's 150 less the home indicator's 34; on the board the fade is `nil`, its
+        /// buttons standing in the flow; all of it on the paper.
         private static func phoneStyle(fade: ListScreenStyle.Fade?) -> ListScreenStyle {
             ListScreenStyle(edgeInset: 14, fade: fade, contentTop: 56, contentBottom: 116, background: .paper)
         }

@@ -506,7 +506,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6,
                 rowsEntrance: EntranceStyle(
                     opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
-                )
+                ),
+                bump: .init(scale: 1.22, peakAt: 0.4, animation: .check)
             ),
             isOpen: isOpen, action: .doneStripTapped
         )

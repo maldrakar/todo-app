@@ -408,9 +408,12 @@ private let doneRowsEntrance = EntranceStyle(
     opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
 )
 
+private let doneBump = DoneStripStyle.Bump(scale: 1.22, peakAt: 0.4, animation: .check)
+
 private let doneStripStyle = DoneStripStyle(
     height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-    leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance
+    leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance,
+    bump: doneBump
 )
 
 private func doneStrip(
@@ -437,7 +440,8 @@ private func doneStrip(
         "chevron": doneStrip(rotation: 180),
         "style": doneStrip(style: .init(
             height: 30, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-            leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance
+            leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance,
+            bump: doneBump
         )),
         "isOpen": doneStrip(isOpen: true),
         "action": doneStrip(action: .second),
