@@ -46,8 +46,8 @@ public struct TaskRowStyle: Equatable, Sendable {
 
     public let leaving: TaskLeavingStyle
 
-    /// What the row stands on, which the system's menu lifts with it and which a swipe slides off what stands behind it,
-    /// and nil where it stands on something else: a column's card has its surface.
+    /// What the row stands on, which the system's menu lifts with it and which a swipe slides off what stands behind
+    /// it, and nil where it stands on something else: a column's card has its surface.
     public let ground: DesignSystem.Color?
 
     public init(

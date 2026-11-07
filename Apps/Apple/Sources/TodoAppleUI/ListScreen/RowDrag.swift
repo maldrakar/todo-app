@@ -64,9 +64,9 @@ extension UTType {
     fileprivate static let todoTask = UTType(exportedAs: "dev.maldrakar.todo.task")
 }
 
-/// The system's copy of the row it drags, on the lift's background and corners, as wide as the row stands: alone it would
-/// stand as wide as its title on one line. A view of its own, so that the width is read when the copy is drawn, by when
-/// the row has laid out, and not when `onDrag`'s preview is asked for, with every draw of the row.
+/// The system's copy of the row it drags, on the lift's background and corners, as wide as the row stands: alone it
+/// would stand as wide as its title on one line. A view of its own, so that the width is read when the copy is drawn,
+/// by when the row has laid out, and not when `onDrag`'s preview is asked for, with every draw of the row.
 private struct RowDragCopy: View {
     let task: TaskRowModel<TaskList.UserAction>
     let lift: TaskLiftStyle
@@ -94,8 +94,8 @@ private func itemProvider(of task: TaskID, session: String) -> NSItemProvider {
 }
 
 /// The drop's side of the system's drag, which stands on the screen's `ScrollView`s, hands each call to the session it
-/// names (`RowDragSessions`) with its point in the content's space, and the stage that makes to `step`. Leaving the scroll
-/// view clears the lift, and a drag that comes back lifts again (spike #174).
+/// names (`RowDragSessions`) with its point in the content's space, and the stage that makes to `step`. Leaving the
+/// scroll view clears the lift, and a drag that comes back lifts again (spike #174).
 private struct RowDropDelegate: DropDelegate {
     let space: RowDragSpace
     let lift: () -> RowLift?
@@ -111,9 +111,9 @@ private struct RowDropDelegate: DropDelegate {
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
         hear(.moved(space.contentPoint(fromDrop: info.location)), info)
-        // Never `.forbidden`, over a block that takes no drop either: a release under it left the lift standing, by what
-        // the board showed (the iOS 26.3 simulator, 2026-11-07). The release reports no drop there by itself, having no
-        // slot.
+        // Never `.forbidden`, over a block that takes no drop either: a release under it left the lift standing, by
+        // what the board showed (the iOS 26.3 simulator, 2026-11-07). The release reports no drop there by itself,
+        // having no slot.
         return DropProposal(operation: .move)
     }
 
@@ -187,11 +187,11 @@ struct RowDropTarget: ViewModifier {
     #if os(iOS)
     /// Clears a lift no call has ended. The system calls the delegate every frame for as long as a drag stands over the
     /// target, moving or not, and a drag can end with no call at all: let go at the very edge of the screen, neither
-    /// `performDrop` nor `dropExited` came, and the card stayed dimmed (the iOS 26.3 simulator, 2026-11-07). SwiftUI has
-    /// no end of a drag before iOS 26, and the provider `onDrag` returned is no signal, held until the next one is made
-    /// (the same). So a silence only cleans up: it clears the dim, the mark and the tint, it moves no board, since a finger
-    /// may still stand on it, and the session survives, so that a release after it lands by the point it reads. The quiet
-    /// is counted in ticks and not measured, so that a stall of the main thread counts as one.
+    /// `performDrop` nor `dropExited` came, and the card stayed dimmed (the iOS 26.3 simulator, 2026-11-07). SwiftUI
+    /// has no end of a drag before iOS 26, and the provider `onDrag` returned is no signal, held until the next one is
+    /// made (the same). So a silence only cleans up: it clears the dim, the mark and the tint, it moves no board, since
+    /// a finger may still stand on it, and the session survives, so that a release after it lands by the point it
+    /// reads. The quiet is counted in ticks and not measured, so that a stall of the main thread counts as one.
     private func cleanUpOnSilence() async {
         var quietTicks = 0
         while !Task.isCancelled, quietTicks < 5 {

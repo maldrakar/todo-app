@@ -137,8 +137,8 @@ extension TaskList {
                 }
             }
 
-            /// How the row looks lifted, and nil for one that cannot be: an open card, which is neither lifted nor has a
-            /// menu (the controller's ruling on #177, 2026-11-07), and a row with no menu.
+            /// How the row looks lifted, and nil for one that cannot be: an open card, which is neither lifted nor has
+            /// a menu (the controller's ruling on #177, 2026-11-07), and a row with no menu.
             public var lift: TaskLiftStyle? {
                 switch self {
                 case .task(_, let row): row.style.lift

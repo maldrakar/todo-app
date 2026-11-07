@@ -56,8 +56,8 @@ struct EdgeSwipeBack: UIViewControllerRepresentable {
         }
 
         /// A scroll view's own pan waits for this swipe to fail, as it does at once away from the edge: a scroll view
-        /// moving sideways, the board's or the tag bar's, took the swipe, at its start too, and it went back nowhere (the
-        /// iOS 26.3 simulator, 2026-11-07). A row's swipe is another recognizer, and stands as it does.
+        /// moving sideways, the board's or the tag bar's, took the swipe, at its start too, and it went back nowhere
+        /// (the iOS 26.3 simulator, 2026-11-07). A row's swipe is another recognizer, and stands as it does.
         func gestureRecognizer(
             _ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer
         ) -> Bool {

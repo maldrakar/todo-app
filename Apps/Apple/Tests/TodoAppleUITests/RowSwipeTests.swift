@@ -133,8 +133,8 @@ private final class Flag: @unchecked Sendable {
     #expect(swipe.row == second)
 }
 
-/// The row a swipe holds is let go of when it leaves the screen, a peer's change among the ways, so that the next tap on
-/// a row is not taken for closing it; another row's leaving changes nothing.
+/// The row a swipe holds is let go of when it leaves the screen, a peer's change among the ways, so that the next tap
+/// on a row is not taken for closing it; another row's leaving changes nothing.
 @MainActor
 @Test func aRowThatLeavesTheScreenIsNoLongerOpen() {
     let swipe = ScreenSwipe()

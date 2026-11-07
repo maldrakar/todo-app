@@ -14,8 +14,9 @@ struct BlockRowID: Hashable {
 }
 
 /// A task lifted out of a block by the system's drag (spike #174, y1), from its first point over the screen's scroll
-/// view to its release there: which task, the block it was dragged from, and where it would land. It is the view's own state, which nothing else can know, and it sends nothing until the release, which reports
-/// `rowDropped` once; what the drop means is the module's to read. Each stage of the drag moves it through one step,
+/// view to its release there: which task, the block it was dragged from, and where it would land. It is the view's own
+/// state, which nothing else can know, and it sends nothing until the release, which reports `rowDropped` once; what
+/// the drop means is the module's to read. Each stage of the drag moves it through one step,
 /// `after(_:from:among:frames:)`, which knows no platform, so that the drag is tested on the host (`RowLiftTests`).
 ///
 /// The point picks the block whose frame holds it, or the nearest where none does: a list's blocks stand under one

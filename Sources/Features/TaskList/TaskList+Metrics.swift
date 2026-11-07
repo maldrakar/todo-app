@@ -413,8 +413,8 @@ extension TaskList {
             sunSize: 16, flagSize: 15, hashSize: 14
         )
 
-        /// How the phone's row looks lifted (Task 8's table, Lift and slot): grown to 1.03, rounded 14 on the surface and
-        /// casting the lifted shadow, and dimmed to .35 where it is dragged from, the column's card's value, as the
+        /// How the phone's row looks lifted (Task 8's table, Lift and slot): grown to 1.03, rounded 14 on the surface
+        /// and casting the lifted shadow, and dimmed to .35 where it is dragged from, the column's card's value, as the
         /// system's copy of it moves (the controller's ruling on #177, 2026-11-07).
         private static let phoneLift = TaskLiftStyle(
             scale: 1.03, opacity: 0.35, cornerRadius: 14, background: .surface, shadow: .lifted,

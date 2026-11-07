@@ -50,8 +50,8 @@ struct ListScreenGestures: DynamicProperty {
     }
 }
 
-/// Reads what the safe area covers at the bottom into its binding, the keyboard's region apart: a scroll view stands above
-/// the keyboard, its region not ignored.
+/// Reads what the safe area covers at the bottom into its binding, the keyboard's region apart: a scroll view stands
+/// above the keyboard, its region not ignored.
 struct BottomInsetReader: ViewModifier {
     @Binding var inset: CGFloat
 

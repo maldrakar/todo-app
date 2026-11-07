@@ -20,10 +20,12 @@ import TodoCore
 /// moves.
 @Test func aLiftHoldsTheTaskAndBlockItWasDraggedFrom() throws {
     var list = try LiftedList()
-    list.press(.began(task: list.h2, block: .list(list.house), session: "first", at: list.centre(of: list.h2, in: .list(list.house))))
+    let house = TaskList.Model.BlockID.list(list.house)
+    list.press(.began(task: list.h2, block: house, session: "first", at: list.centre(of: list.h2, in: house)))
     #expect(list.lift?.task == list.h2)
-    #expect(list.lift?.source == .list(list.house))
-    #expect(list.lift?.slot == RowLift.Slot(block: .list(list.house), after: list.h1))
+    #expect(list.lift?.source == house)
+    #expect(list.lift?.session == "first")
+    #expect(list.lift?.slot == RowLift.Slot(block: house, after: list.h1))
 }
 
 /// A row no longer drawn, gone by a peer's change between the press and the first point, lifts nothing, nor does an
@@ -208,8 +210,8 @@ import TodoCore
     #expect(list.rowIDs(of: empty) == [both])
 }
 
-/// A folded block has no rows and still takes a drop: its only place is its top, the mark standing under its header, and
-/// the fold stays.
+/// A folded block has no rows and still takes a drop: its only place is its top, the mark standing under its header,
+/// and the fold stays.
 @Test func aFoldedBlockTakesADropAtItsTop() throws {
     var list = try LiftedList()
     let house = TaskList.Model.BlockID.list(list.house)
@@ -229,8 +231,8 @@ import TodoCore
     #expect(list.rowIDs(of: office).contains(list.h1))
 }
 
-/// A block that takes no drop takes none of its own rows either, so a row lifted from it has nowhere to go in it: no slot
-/// over itself, and a release drops nothing.
+/// A block that takes no drop takes none of its own rows either, so a row lifted from it has nowhere to go in it: no
+/// slot over itself, and a release drops nothing.
 @Test func aRowLiftedFromABlockThatTakesNoDropHasNoSlotInIt() throws {
     var list = try LiftedList()
     let either = TaskList.Model.BlockID.list(list.either)

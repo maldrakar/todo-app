@@ -147,7 +147,8 @@ struct LiftedList {
         _ = module.send(.action(.rowTapped(task)))
     }
 
-    /// A call of the drop's delegate, in a session, handed on as the screen's delegate hands it, where it means a stage.
+    /// A call of the drop's delegate, in a session, handed on as the screen's delegate hands it, where it means a
+    /// stage.
     mutating func hear(_ call: RowDragSessions.Call, session: String?, in sessions: RowDragSessions) {
         if let phase = sessions.phase(for: call, session: session, lift: lift) { press(phase) }
     }
