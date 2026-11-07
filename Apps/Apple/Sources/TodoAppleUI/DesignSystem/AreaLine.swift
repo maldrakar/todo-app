@@ -34,25 +34,25 @@ struct AreaLine<Action: Equatable & Sendable>: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            HStack(spacing: model.spacing) {
+            HStack(spacing: model.style.spacing) {
                 if let field = model.field, let changed, let send {
                     TitleField(field, changed: changed, send: send)
                         .fieldLook(field)
-                        .frame(width: field.minimumWidth)
+                        .frame(width: field.style.minimumWidth)
                 } else if let label = model.label {
                     Text(label)
                         .lineLimit(1)
                         .layoutPriority(1)
                 }
-                Rule(model.line, along: .horizontal)
+                Rule(model.style.line, along: .horizontal)
             }
-            .padding(.trailing, model.lineToAccessories)
+            .padding(.trailing, model.style.lineToAccessories)
             Accessories(
-                model.accessories, cellMinimumWidth: model.cellMinimumWidth, textMinimumWidth: nil,
-                endGap: model.endGap, height: model.height, send: { send?($0) }
+                model.accessories, cellMinimumWidth: model.style.cellMinimumWidth, textMinimumWidth: nil,
+                endGap: model.style.endGap, height: model.style.height, send: { send?($0) }
             )
         }
-        .padding(.leading, model.leading)
-        .frame(height: model.height)
+        .padding(.leading, model.style.leading)
+        .frame(height: model.style.height)
     }
 }

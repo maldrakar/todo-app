@@ -26,20 +26,20 @@ struct ListRowView<Action: Equatable & Sendable>: View {
     }
 
     var body: some View {
-        HStack(spacing: model.tileToTitle) {
+        HStack(spacing: model.style.tileToTitle) {
             ListTile(model.tile)
             if let field = model.field {
                 TitleField(field, changed: changed, send: send)
                     .fieldLook(field)
-                    .frame(minWidth: field.minimumWidth)
+                    .frame(minWidth: field.style.minimumWidth)
             } else {
                 Text(model.title)
                     .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, model.leading)
-        .frame(height: model.height)
+        .padding(.leading, model.style.leading)
+        .frame(height: model.style.height)
     }
 }
 
@@ -60,23 +60,24 @@ extension ListRowView {
         }
 
         var body: some View {
-            let background = Color(model.background)
+            let background = Color(model.style.background)
             Accessories(
-                model.accessories, cellMinimumWidth: model.cellMinimumWidth,
-                textMinimumWidth: model.textMinimumWidth, endGap: model.endGap, height: model.height, send: send
+                model.accessories, cellMinimumWidth: model.style.cellMinimumWidth,
+                textMinimumWidth: model.style.textMinimumWidth, endGap: model.style.endGap,
+                height: model.style.height, send: send
             )
-            .padding(.leading, model.fadeWidth)
+            .padding(.leading, model.style.fadeWidth)
             .background {
                 HStack(spacing: 0) {
                     LinearGradient(
                         colors: [background.opacity(0), background], startPoint: .leading, endPoint: .trailing
                     )
-                    .frame(width: model.fadeWidth)
+                    .frame(width: model.style.fadeWidth)
                     // The colour in the shape and not clipped by it: a clip drew the fade beside it up to 4/255 off in
                     // the light appearance (the iOS 26.3 simulator, 2026-10-31). Circular corners, as the canvas's
                     // `border-radius` draws them (`ListTile`).
                     UnevenRoundedRectangle(
-                        bottomTrailingRadius: model.cornerRadius, topTrailingRadius: model.cornerRadius,
+                        bottomTrailingRadius: model.style.cornerRadius, topTrailingRadius: model.style.cornerRadius,
                         style: .circular
                     )
                     .fill(background)

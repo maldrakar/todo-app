@@ -19,7 +19,7 @@ import UIKit
 /// The lifted block is a list with the rows after it that are deeper than it, or an area's line with every row up to
 /// the next line, so that the slot is offered among the rows the drop would land among. A list's slot goes where the
 /// finger is and its depth follows the finger's sideways travel, a level per step of the tree's indent, which the
-/// model's look of the drag gives (`DragModel`), bounded as the spike bounded it: no shallower than the row after the
+/// model's look of the drag gives (`DragStyle`), bounded as the spike bounded it: no shallower than the row after the
 /// slot, or 0 at the end, and no deeper than one past the row before it, or 0 when there is none or it is an area's
 /// line, where a list goes into that area. An area's slot stands only where spec section 7 lets an area stand, right
 /// before another line, the first one included, or at the end of the tree, always at depth 0, and never among an
@@ -67,7 +67,7 @@ struct ListsDrag {
     /// no row, moves nothing.
     static func after(
         _ phase: Phase, from drag: ListsDrag?, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect],
-        indent: IndentModel
+        indent: IndentStyle
     ) -> (drag: ListsDrag?, drop: TaskViewList.UserAction?) {
         switch phase {
         case .began(let point):
@@ -117,7 +117,7 @@ struct ListsDrag {
     /// it in the lower; above the first row it goes to the top, and below the last to the end. The rule reads the
     /// frames the rows reported and counts no rows, so it holds in a lazy stack too (spike #145).
     private func moved(
-        to point: CGPoint, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect], indent: IndentModel
+        to point: CGPoint, among items: [ListsTreeItem], frames: [ListsTreeItem.ID: CGRect], indent: IndentStyle
     ) -> ListsDrag {
         let rest = Self.rest(of: items, without: id)
         let previous = min(slot, rest.count)
@@ -195,18 +195,18 @@ extension ListsDrag {
         }
     }
 
-    /// The mark of the place where the lifted row would land, as the drag's look describes it (`DragModel.Look`), drawn
+    /// The mark of the place where the lifted row would land, as the drag's look describes it (`DragStyle.Look`), drawn
     /// through the one switch over the look, both cases drawn and none by `default` (`docs/style.md`, "Views"), with
     /// the guides of the levels the row would stand under behind it, the list's row before it's own, as many as its
     /// depth, so that a branch's lines run on through it. It is the view's own feedback and sends nothing.
     ///
-    /// The phone's slot (`DragModel.Slot`; `Phone.dc.html`, the slot's row) is taller than a row, so that it is steady
+    /// The phone's slot (`DragStyle.Slot`; `Phone.dc.html`, the slot's row) is taller than a row, so that it is steady
     /// under the finger, its frame drawn within it from its inset before the tile of its depth to its gap short of the
-    /// right edge of the screen, filled and edged as the model says. The sidebar's indicator (`DropIndicatorModel`;
+    /// right edge of the screen, filled and edged as the style says. The sidebar's indicator (`DropIndicatorStyle`;
     /// `Mac.dc.html`, the drag's slot row) is a gap between the rows with the line and the circle centred in it, placed
     /// from the leading edge of the tile of its depth, and the lifted row's card at it (`IndicatorCard`).
     struct Slot: View {
-        private let model: DragModel
+        private let style: DragStyle
         private let depth: Int
         private let under: ListRowModel<TaskViewList.UserAction>?
         private let lifted: ListsTreeItem?
@@ -215,10 +215,10 @@ extension ListsDrag {
         /// The mark at the depth, after the list's row it stands under, and nil after an area's line or at the top, for
         /// the lifted item, which the indicator's card draws.
         init(
-            _ model: DragModel, depth: Int, under: ListRowModel<TaskViewList.UserAction>?, lifted: ListsTreeItem?,
+            _ style: DragStyle, depth: Int, under: ListRowModel<TaskViewList.UserAction>?, lifted: ListsTreeItem?,
             visibleRight: CGFloat
         ) {
-            self.model = model
+            self.style = style
             self.depth = depth
             self.under = under
             self.lifted = lifted
@@ -229,14 +229,14 @@ extension ListsDrag {
             mark
                 .background {
                     if let under {
-                        ListsTreeItem.Guides(under.childGuides.prefix(depth), in: under.guide)
+                        ListsTreeItem.Guides(under.style.childGuides.prefix(depth), in: under.style.guide)
                     }
                 }
                 .accessibilityHidden(true)
         }
 
         @ViewBuilder private var mark: some View {
-            switch model.look {
+            switch style.look {
             case .slot(let slot, _):
                 slotMark(slot)
             case .indicator(let indicator, let card):
@@ -244,8 +244,8 @@ extension ListsDrag {
             }
         }
 
-        private func slotMark(_ slot: DragModel.Slot) -> some View {
-            let leading = model.indent.leading(atDepth: depth) - slot.inset
+        private func slotMark(_ slot: DragStyle.Slot) -> some View {
+            let leading = style.indent.leading(atDepth: depth) - slot.inset
             let shape = RoundedRectangle(cornerRadius: slot.cornerRadius)
             return shape
                 .fill(Color(slot.fill))
@@ -262,8 +262,8 @@ extension ListsDrag {
         /// The line, a rule rounded at its ends, and the circle over its start, ringed inside its diameter as the
         /// canvas's border is, each placed from the tile's leading edge at the mark's depth; and the card at the mark,
         /// centred on the line.
-        private func indicatorMark(_ indicator: DropIndicatorModel, _ card: DragModel.IndicatorCard) -> some View {
-            let tile = model.indent.leading(atDepth: depth)
+        private func indicatorMark(_ indicator: DropIndicatorStyle, _ card: DragStyle.IndicatorCard) -> some View {
+            let tile = style.indent.leading(atDepth: depth)
             let lineStart = tile + indicator.lineOffset
             return ZStack(alignment: .leading) {
                 Rule(indicator.line, along: .horizontal)
@@ -287,18 +287,18 @@ extension ListsDrag {
         }
     }
 
-    /// The lifted row on the sidebar's card, as the indicator's card describes it (`DragModel.IndicatorCard`;
+    /// The lifted row on the sidebar's card, as the indicator's card describes it (`DragStyle.IndicatorCard`;
     /// `Mac.dc.html`, `.drag-ghost`): its size, on its background with its corners, casting its shadow, turned by its
     /// rotation and at its opacity, grown by nothing. A list's card holds the lifted row's tile, in its own colour and
     /// with its own icon at the card's sizes, and its title in the card's font, its padding in, its gap apart. A line's
     /// card holds the lifted line as the line draws itself, at its own leading and its own end inside the card, since
-    /// the canvas draws no line's card and the card's model carries no numbers of its own for one: its label, or the
+    /// the canvas draws no line's card and the card's style carries no numbers of its own for one: its label, or the
     /// line alone, across the card. It takes no touch.
     fileprivate struct IndicatorCard: View {
         private let item: ListsTreeItem
-        private let card: DragModel.IndicatorCard
+        private let card: DragStyle.IndicatorCard
 
-        init(_ item: ListsTreeItem, _ card: DragModel.IndicatorCard) {
+        init(_ item: ListsTreeItem, _ card: DragStyle.IndicatorCard) {
             self.item = item
             self.card = card
         }
@@ -321,11 +321,17 @@ extension ListsDrag {
                 HStack(spacing: card.tileToTitle) {
                     ListTile(
                         TileModel(
-                            color: list.tile.color, icon: list.tile.glyph.icon, side: card.tileSide,
-                            cornerRadius: card.tileCornerRadius, glyphSize: card.glyphSize
+                            icon: list.tile.icon,
+                            style: TileStyle(
+                                color: list.tile.style.color, side: card.tileSide, cornerRadius: card.tileCornerRadius,
+                                glyphSize: card.glyphSize, glyphWeight: list.tile.style.glyphWeight
+                            )
                         )
                     )
-                    Text(TextModel(text: list.title.text, font: card.titleFont, color: list.title.color))
+                    Text(TextModel(
+                        text: list.title.text,
+                        style: TextStyle(font: card.titleFont, color: list.title.style.color)
+                    ))
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -338,7 +344,7 @@ extension ListsDrag {
         }
     }
 
-    /// The lifted row, carried under the finger, as the phone's card describes it (`DragModel.Card`; `Phone.dc.html`,
+    /// The lifted row, carried under the finger, as the phone's card describes it (`DragStyle.Card`; `Phone.dc.html`,
     /// the drag's card): on its background with its shadow, grown to its scale on the drag's motion once it appears and
     /// turned by its rotation. A list's card stands at the tile of the slot's depth, the lifted row's tile and title on
     /// it with the grip at its end, out to its gap short of the right edge of the screen; an area's is the lifted line
@@ -346,8 +352,8 @@ extension ListsDrag {
     /// Motion the card is at its scale at once.
     struct Card: View {
         private let item: ListsTreeItem
-        private let card: DragModel.Card
-        private let model: DragModel
+        private let card: DragStyle.Card
+        private let style: DragStyle
         private let depth: Int
         private let visibleRight: CGFloat
 
@@ -357,10 +363,10 @@ extension ListsDrag {
         @State private var isLifted = false
 
         /// The card of the drag's look for the lifted item, placed by the drag's indent and grown on its motion.
-        init(_ item: ListsTreeItem, _ card: DragModel.Card, of model: DragModel, depth: Int, visibleRight: CGFloat) {
+        init(_ item: ListsTreeItem, _ card: DragStyle.Card, of style: DragStyle, depth: Int, visibleRight: CGFloat) {
             self.item = item
             self.card = card
-            self.model = model
+            self.style = style
             self.depth = depth
             self.visibleRight = visibleRight
         }
@@ -371,7 +377,7 @@ extension ListsDrag {
                 .rotationEffect(.degrees(card.rotation))
                 .shadow(card.shadow)
                 .onAppear {
-                    withAnimation(reduceMotion ? nil : Animation(model.animation)) { isLifted = true }
+                    withAnimation(reduceMotion ? nil : Animation(style.animation)) { isLifted = true }
                 }
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
@@ -381,8 +387,8 @@ extension ListsDrag {
         @ViewBuilder private var content: some View {
             switch item {
             case .list(_, let list):
-                let leading = model.indent.leading(atDepth: depth) - card.listInset
-                HStack(spacing: list.tileToTitle) {
+                let leading = style.indent.leading(atDepth: depth) - card.listInset
+                HStack(spacing: list.style.tileToTitle) {
                     ListTile(list.tile)
                     Text(list.title)
                         .lineLimit(1)

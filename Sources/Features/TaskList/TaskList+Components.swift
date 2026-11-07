@@ -31,11 +31,15 @@ extension TaskList {
     ) -> ScreenHeaderModel {
         ScreenHeaderModel(
             tile: TileModel(
-                color: color, icon: icon, side: metrics.tile.side, cornerRadius: metrics.tile.cornerRadius,
-                glyphSize: metrics.tile.glyphSize
+                icon: icon,
+                style: TileStyle(
+                    color: color, side: metrics.tile.side, cornerRadius: metrics.tile.cornerRadius,
+                    glyphSize: metrics.tile.glyphSize, glyphWeight: .medium
+                )
             ),
-            title: TextModel(text: heading.title, font: .largeTitle, color: .ink),
-            subtitle: heading.subtitle.map { TextModel(text: $0, font: .count, color: .ink2) }, style: metrics.style
+            title: TextModel(text: heading.title, style: TextStyle(font: .largeTitle, color: .ink)),
+            subtitle: heading.subtitle.map { TextModel(text: $0, style: TextStyle(font: .count, color: .ink2)) },
+            style: metrics.style
         )
     }
 
@@ -53,9 +57,12 @@ extension TaskList {
                 let isLit = picked.contains(chip.id)
                 return TagChipModel(
                     icon: IconModel(
-                        icon: .hash, size: metrics.hashSize, weight: .semibold, color: isLit ? colors.mark : .ink2
+                        icon: .hash,
+                        style: IconStyle(size: metrics.hashSize, weight: .semibold, color: isLit ? colors.mark : .ink2)
                     ),
-                    title: TextModel(text: chip.title, font: .pill, color: isLit ? colors.mark : .ink),
+                    title: TextModel(
+                        text: chip.title, style: TextStyle(font: .pill, color: isLit ? colors.mark : .ink)
+                    ),
                     style: metrics.chip(color, isLit), isLit: isLit, action: .tagChipTapped(chip.id)
                 )
             },
@@ -118,10 +125,9 @@ extension TaskList {
         _ style: BlockHeaderStyle, chevronSize: Double
     ) -> BlockHeaderModel<UserAction> {
         let fold = AccessoryModel<UserAction>.Chevron(
-            icon: IconModel(icon: .chevron, size: chevronSize, weight: .semibold, color: .ink3),
-            rotation: isFolded ? -90 : 0, animation: .fold,
+            icon: IconModel(icon: .chevron, style: IconStyle(size: chevronSize, weight: .semibold, color: .ink3)),
             accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
-            action: .blockChevronTapped(block.id)
+            action: .blockChevronTapped(block.id), style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .fold)
         )
         return blockHeader(heading, of: block, fold: fold, background: .paper, context, style)
     }
@@ -158,8 +164,8 @@ extension TaskList {
             nil
         }
         return BlockHeaderModel(
-            title: TextModel(text: heading.title, font: .sectionTitle, color: block.color.glyph),
-            subtitle: heading.subtitle.map { TextModel(text: $0, font: .areaLabel, color: .ink2) },
+            title: TextModel(text: heading.title, style: TextStyle(font: .sectionTitle, color: block.color.glyph)),
+            subtitle: heading.subtitle.map { TextModel(text: $0, style: TextStyle(font: .areaLabel, color: .ink2)) },
             field: field, fold: fold, style: style, titleTapped: .blockTitleTapped(block.id)
         )
     }
@@ -217,7 +223,7 @@ extension TaskList {
         let title = drawnTitle(of: task)
         return TaskRowModel(
             check: check(title: title, isOpen: isOpen, action: .checkTapped(task.id), metrics.check(color)),
-            title: TextModel(text: title, font: metrics.title, color: isOpen ? .ink : .ink2),
+            title: TextModel(text: title, style: TextStyle(font: metrics.title, color: isOpen ? .ink : .ink2)),
             meta: meta, style: metrics.style(isOpen), swipe: swipe, tap: .rowTapped(task.id), menu: menu
         )
     }
@@ -241,8 +247,11 @@ extension TaskList {
         focusLost: UserAction
     ) -> TextFieldModel<UserAction> {
         TextFieldModel(
-            text: text, placeholder: placeholder, font: font, color: color, background: background, minimumWidth: 0,
-            height: height, padding: padding, cornerRadius: 0, ring: LineStyle(color: background, width: 0, dash: []),
+            text: text, placeholder: placeholder,
+            style: FieldStyle(
+                font: font, color: color, background: background, minimumWidth: 0, height: height, padding: padding,
+                cornerRadius: 0, ring: LineStyle(color: background, width: 0, dash: [])
+            ),
             submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )
     }
@@ -254,9 +263,11 @@ extension TaskList {
     private static func meta(of task: TodoTask, today: Day, tags: TagNames, _ metrics: Metrics.Row) -> [MetaItemModel] {
         func item(_ icon: DesignSystem.Icon?, _ text: String?, color: DesignSystem.Color = .ink2) -> MetaItemModel {
             MetaItemModel(
-                icon: icon.map { IconModel(icon: $0, size: metrics.metaIconSize, weight: .regular, color: color) },
-                text: text.map { TextModel(text: $0, font: .meta, color: color) }, spacing: metrics.metaIconSpacing,
-                capsule: nil
+                icon: icon.map {
+                    IconModel(icon: $0, style: IconStyle(size: metrics.metaIconSize, weight: .regular, color: color))
+                },
+                text: text.map { TextModel(text: $0, style: TextStyle(font: .meta, color: color)) },
+                style: MetaItemStyle(spacing: metrics.metaIconSpacing, capsule: nil)
             )
         }
         var items: [MetaItemModel] = []
@@ -277,11 +288,14 @@ extension TaskList {
     ) -> EmptyScreenModel {
         EmptyScreenModel(
             tile: TileModel(
-                color: color, icon: icon, side: metrics.tile.side, cornerRadius: metrics.tile.cornerRadius,
-                glyphSize: metrics.tile.glyphSize
+                icon: icon,
+                style: TileStyle(
+                    color: color, side: metrics.tile.side, cornerRadius: metrics.tile.cornerRadius,
+                    glyphSize: metrics.tile.glyphSize, glyphWeight: .medium
+                )
             ),
-            title: TextModel(text: words.title, font: .emptyScreenTitle, color: .ink),
-            text: TextModel(text: words.text, font: .notes, color: .ink2), style: metrics.style
+            title: TextModel(text: words.title, style: TextStyle(font: .emptyScreenTitle, color: .ink)),
+            text: TextModel(text: words.text, style: TextStyle(font: .notes, color: .ink2)), style: metrics.style
         )
     }
 
@@ -292,8 +306,8 @@ extension TaskList {
     static func showAs(canBoard: Bool) -> MenuButtonModel<UserAction> {
         MenuButtonModel(
             label: ButtonLabelModel(
-                icon: IconModel(icon: .ellipsis, size: 22, weight: .semibold, color: .ink), title: nil,
-                accessibilityLabel: "More", fill: .container
+                icon: IconModel(icon: .ellipsis, style: IconStyle(size: 22, weight: .semibold, color: .ink)),
+                title: nil, accessibilityLabel: "More", style: ButtonLabelStyle(fill: .container)
             ),
             menu: MenuModel(sections: [
                 .init(items: [

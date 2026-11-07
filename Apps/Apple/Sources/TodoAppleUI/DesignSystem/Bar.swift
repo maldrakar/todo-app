@@ -9,11 +9,11 @@ import SwiftUI
 /// holds, with the keys of each item that has them (`MenuItems`), and the search field sends nothing; what follows is
 /// the module's that built the model.
 ///
-/// A control stands on what its model says (`FillModel`): on the platform's container, or on a fill of its own. The
-/// container is glass, the canvas's blurred translucent fill with a hairline and a soft shadow, which is the platform's
-/// and no model's (Lists screen plan, Task 8): drawn here as the regular material, the hairline as the ink at 8 % and
-/// the look's raised shadow for both appearances. A button alone on a fill of its own casts the model's shadow instead
-/// (`BarModel.buttonShadow`), and a search field on one casts none.
+/// A control stands on what its model says (`ControlFillStyle`): on the platform's container, or on a fill of its own.
+/// The container is glass, the canvas's blurred translucent fill with a hairline and a soft shadow, which is the
+/// platform's and no model's (Lists screen plan, Task 8): drawn here as the regular material, the hairline as the ink
+/// at 8 % and the look's raised shadow for both appearances. A button alone on a fill of its own casts the model's
+/// shadow instead (`BarStyle.buttonShadow`), and a search field on one casts none.
 ///
 /// `Bar` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and Observation for
 /// macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-10-31).
@@ -27,15 +27,15 @@ struct Bar<Action: Equatable & Sendable>: View {
     }
 
     var body: some View {
-        HStack(spacing: model.spacing) {
+        HStack(spacing: model.style.spacing) {
             ForEach(model.items.indices, id: \.self) { index in
                 item(model.items[index])
             }
         }
-        .padding(.horizontal, model.padding)
-        .frame(height: model.height)
+        .padding(.horizontal, model.style.padding)
+        .frame(height: model.style.height)
         .overlay(alignment: .top) {
-            if let rule = model.rule {
+            if let rule = model.style.rule {
                 Rule(rule, along: .horizontal)
             }
         }
@@ -83,26 +83,27 @@ struct Bar<Action: Equatable & Sendable>: View {
     /// A button or a menu button standing alone, a circle as high as the bar's controls, on what its label puts it on.
     private func alone(_ label: ButtonLabelModel) -> some View {
         buttonStanding(
-            content(of: label).frame(width: model.controlHeight, height: model.controlHeight), on: label.fill
+            content(of: label).frame(width: model.style.controlHeight, height: model.style.controlHeight),
+            on: label.style.fill
         )
     }
 
     /// A button alone on what its label puts it on: the glass of its container, or a fill of its own casting the
     /// model's shadow, where a search field on one casts none (`searchFieldStanding(on:in:)`).
-    @ViewBuilder private func buttonStanding(_ label: some View, on fill: FillModel) -> some View {
+    @ViewBuilder private func buttonStanding(_ label: some View, on fill: ControlFillStyle) -> some View {
         switch fill {
         case .container:
             label.glass(in: Circle())
         case .color(let color):
             label
                 .background(Color(color), in: Circle())
-                .shadow(model.buttonShadow)
+                .shadow(model.style.buttonShadow)
         }
     }
 
     /// What a button shows: its label's glyph, and its word after it where it has one, the group's spacing apart.
     private func content(of label: ButtonLabelModel) -> some View {
-        HStack(spacing: model.groupButtonSpacing) {
+        HStack(spacing: model.style.groupButtonSpacing) {
             Icon(label.icon)
             if let title = label.title {
                 Text(title)
@@ -115,21 +116,21 @@ struct Bar<Action: Equatable & Sendable>: View {
     /// holds no action. Its corners are SwiftUI's default style, the one its `Capsule` drew the phone's in, which a
     /// rounded rectangle of half the height draws to the same pixels (ImageRenderer on macOS 26, 2026-10-31).
     private func searchField(_ search: SearchFieldModel) -> some View {
-        HStack(spacing: search.spacing) {
+        HStack(spacing: search.style.spacing) {
             Icon(search.leadingIcon)
             Text(search.placeholder)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if let trailing = search.trailingGlyph {
-                Icon(trailing.icon)
-                    .frame(width: trailing.cell, height: trailing.cell)
+            if let trailing = search.trailingGlyph, let cell = search.style.trailingGlyphCell {
+                Icon(trailing)
+                    .frame(width: cell, height: cell)
             }
         }
-        .padding(.leading, search.leadingPadding)
-        .padding(.trailing, search.trailingPadding)
+        .padding(.leading, search.style.leadingPadding)
+        .padding(.trailing, search.style.trailingPadding)
         .frame(maxWidth: .infinity)
-        .frame(height: model.controlHeight)
-        .searchFieldStanding(on: search.fill, in: RoundedRectangle(cornerRadius: search.cornerRadius))
+        .frame(height: model.style.controlHeight)
+        .searchFieldStanding(on: search.style.fill, in: RoundedRectangle(cornerRadius: search.style.cornerRadius))
     }
 
     /// Buttons grouped on one capsule of glass, sharing its width, with the group's divider between each two of them.
@@ -137,29 +138,29 @@ struct Bar<Action: Equatable & Sendable>: View {
         HStack(spacing: 0) {
             ForEach(buttons.indices, id: \.self) { index in
                 if index > 0 {
-                    Rule(model.groupDivider, along: .vertical)
-                        .frame(height: model.groupDividerHeight)
+                    Rule(model.style.groupDivider, along: .vertical)
+                        .frame(height: model.style.groupDividerHeight)
                 }
                 pressing(buttons[index]) {
                     standingInGroup(
                         content(of: buttons[index].label)
                             .frame(maxWidth: .infinity)
-                            .frame(height: model.groupButtonHeight),
-                        on: buttons[index].label.fill
+                            .frame(height: model.style.groupButtonHeight),
+                        on: buttons[index].label.style.fill
                     )
                     .contentShape(.capsule)
                 }
             }
         }
-        .padding(.horizontal, model.groupPadding)
+        .padding(.horizontal, model.style.groupPadding)
         .frame(maxWidth: .infinity)
-        .frame(height: model.controlHeight)
+        .frame(height: model.style.controlHeight)
         .glass(in: Capsule())
     }
 
     /// A button of a group on what its label puts it on: the group's glass, which is under it already, or a fill of its
     /// own in a capsule.
-    @ViewBuilder private func standingInGroup(_ label: some View, on fill: FillModel) -> some View {
+    @ViewBuilder private func standingInGroup(_ label: some View, on fill: ControlFillStyle) -> some View {
         switch fill {
         case .container:
             label
@@ -181,7 +182,7 @@ extension View {
     /// A search field in its shape on what its model puts it on, every case drawn and none by `default`
     /// (`docs/style.md`, "Views"): the glass of its container, or a fill of its own casting no shadow, where a button
     /// alone on one casts the bar's (`Bar.buttonStanding(_:on:)`).
-    @ViewBuilder fileprivate func searchFieldStanding(on fill: FillModel, in shape: some Shape) -> some View {
+    @ViewBuilder fileprivate func searchFieldStanding(on fill: ControlFillStyle, in shape: some Shape) -> some View {
         switch fill {
         case .container:
             glass(in: shape)

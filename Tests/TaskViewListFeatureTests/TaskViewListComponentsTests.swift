@@ -74,7 +74,7 @@ private func lineMenu(_ id: ViewID) -> MenuModel<Action> {
 }
 
 /// The grip of a row and of a line in edit mode, 18 pt in ink3.
-private let grip = IconModel(icon: .grip, size: 18, weight: .regular, color: .ink3)
+private let grip = IconModel(icon: .grip, style: IconStyle(size: 18, weight: .regular, color: .ink3))
 
 /// The phone's accessories in the tree, in their order: the count in ink2, or its cell kept empty, 20 wide, where the
 /// row has none; the chevron, or its cell kept empty, 36 wide; and the grip in edit mode.
@@ -82,7 +82,7 @@ private func accessories(
     count: String?, chevron: AccessoryModel<Action>.Chevron?, isEditing: Bool = false
 ) -> [AccessoryModel<Action>] {
     [
-        count.map { .text(TextModel(text: $0, font: .count, color: .ink2)) } ?? .space(20),
+        count.map { .text(TextModel(text: $0, style: TextStyle(font: .count, color: .ink2))) } ?? .space(20),
         chevron.map { .chevron($0) } ?? .space(36),
     ] + (isEditing ? [.grip(grip)] : [])
 }
@@ -91,8 +91,9 @@ private func accessories(
 /// folded, saying what a tap will do.
 private func chevron(_ id: ViewID, folded: Bool) -> AccessoryModel<Action>.Chevron {
     .init(
-        icon: IconModel(icon: .chevron, size: 13, weight: .semibold, color: .ink2), rotation: folded ? -90 : 0,
-        animation: .popover, accessibilityLabel: folded ? "Expand" : "Collapse", action: .disclosureTapped(id)
+        icon: IconModel(icon: .chevron, style: IconStyle(size: 13, weight: .semibold, color: .ink2)),
+        accessibilityLabel: folded ? "Expand" : "Collapse", action: .disclosureTapped(id),
+        style: ChevronStyle(rotation: folded ? -90 : 0, animation: .popover)
     )
 }
 
@@ -106,10 +107,12 @@ private func field(
     cornerRadius: Double
 ) -> TextFieldModel<Action> {
     TextFieldModel(
-        text: text, placeholder: placeholder, font: font, color: .ink, background: .surface, minimumWidth: minimumWidth,
-        height: height, padding: padding, cornerRadius: cornerRadius,
-        ring: LineStyle(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
-        cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
+        text: text, placeholder: placeholder,
+        style: FieldStyle(
+            font: font, color: .ink, background: .surface, minimumWidth: minimumWidth, height: height, padding: padding,
+            cornerRadius: cornerRadius, ring: LineStyle(color: .accent, width: 2, dash: [])
+        ),
+        submitted: .titleFieldSubmitted, cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
     )
 }
 
@@ -129,12 +132,15 @@ private func phoneRow(
     guides: [Double], childGuides: [Double], count: String?, chevron: AccessoryModel<Action>.Chevron?
 ) -> ListRowModel<Action> {
     ListRowModel(
-        height: 46, leading: leading, tile: tile, tileToTitle: 12,
-        title: TextModel(text: title, font: font, color: .ink), field: nil, need: need, background: .paper,
-        backgroundInset: 0, cornerRadius: 0, guides: guides, childGuides: childGuides, guide: guide,
-        accessories: accessories(count: count, chevron: chevron), fadeWidth: 10, textMinimumWidth: 20,
-        cellMinimumWidth: 36, endGap: 4, accessoriesWidth: 72,
-        tap: .rowSelected(id), menu: listMenu(id, openInNewWindow: false)
+        tile: tile,
+        style: ListRowStyle(
+            height: 46, leading: leading, tileToTitle: 12, need: need, background: .paper, backgroundInset: 0,
+            cornerRadius: 0, guides: guides, childGuides: childGuides, guide: guide, fadeWidth: 10,
+            textMinimumWidth: 20, cellMinimumWidth: 36, endGap: 4, accessoriesWidth: 72
+        ),
+        title: TextModel(text: title, style: TextStyle(font: font, color: .ink)), field: nil,
+        accessories: accessories(count: count, chevron: chevron), tap: .rowSelected(id),
+        menu: listMenu(id, openInNewWindow: false)
     )
 }
 
@@ -152,11 +158,12 @@ private func phoneLine(
     _ id: ViewID, height: Double, label: String?, fieldText: String?, hasGrip: Bool, menu: MenuModel<Action>?
 ) -> AreaLineModel<Action> {
     AreaLineModel(
-        height: height, leading: 20, spacing: 10,
-        label: label.map { TextModel(text: $0, font: .areaLabel, color: .ink2) }, field: fieldText.map(areaField),
-        line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: hasGrip ? 10 : 20,
-        accessories: hasGrip ? [.grip(grip)] : [], cellMinimumWidth: 0, endGap: hasGrip ? 12 : 0, tap: .rowSelected(id),
-        menu: menu
+        style: AreaLineStyle(
+            height: height, leading: 20, spacing: 10, line: LineStyle(color: .line, width: 1, dash: []),
+            lineToAccessories: hasGrip ? 10 : 20, cellMinimumWidth: 0, endGap: hasGrip ? 12 : 0
+        ),
+        label: label.map { TextModel(text: $0, style: TextStyle(font: .areaLabel, color: .ink2)) },
+        field: fieldText.map(areaField), accessories: hasGrip ? [.grip(grip)] : [], tap: .rowSelected(id), menu: menu
     )
 }
 
@@ -179,12 +186,18 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
     let model = try sidebar(store).model
     #expect(listRow(projects, in: model) == phoneRow(
         projects, title: "Projects", font: .rowTitleEmphasized,
-        tile: TileModel(color: .teal, icon: .folder, side: 30, cornerRadius: 8, glyphSize: 19), leading: 20, need: 274,
+        tile: TileModel(
+            icon: .folder,
+            style: TileStyle(color: .teal, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium)
+        ), leading: 20, need: 274,
         guides: [], childGuides: [35], count: "1", chevron: chevron(projects, folded: false)
     ))
     #expect(listRow(home, in: model) == phoneRow(
         home, title: "Home", font: .nestedRowTitle,
-        tile: TileModel(color: .stone, icon: .house, side: 26, cornerRadius: 7, glyphSize: 16), leading: 42, need: 292,
+        tile: TileModel(
+            icon: .house,
+            style: TileStyle(color: .stone, side: 26, cornerRadius: 7, glyphSize: 16, glyphWeight: .medium)
+        ), leading: 42, need: 292,
         guides: [35], childGuides: [35, 55], count: "1", chevron: nil
     ))
 }
@@ -194,7 +207,7 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
 @Test func theHighlightedRowStandsOnTheFillColour() throws {
     let store = try makeStore()
     let model = try sidebar(store).model
-    #expect(model.rows.map { listRow($0)?.background } == [.fill, .paper, .paper, .paper, .paper])
+    #expect(model.rows.map { listRow($0)?.style.background } == [.fill, .paper, .paper, .paper, .paper])
 }
 
 /// The guides run under the centre of every ancestor's tile, so a row three deep stands under three; an area's line
@@ -208,7 +221,9 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
     let clients = try store.createView(NewTaskView(title: "Clients", parent: work))
     let acme = try store.createView(NewTaskView(title: "Acme", parent: clients))
     let model = try sidebar(store).model
-    let guides = [projects, home, garden, clients, acme].map { listRow($0, in: model).map { [$0.guides, $0.childGuides] } }
+    let guides = [projects, home, garden, clients, acme].map {
+        listRow($0, in: model).map { [$0.style.guides, $0.style.childGuides] }
+    }
     #expect(guides == [[[], [35]], [[35], [35, 55]], [[35, 55], [35, 55, 77]], [[], [35]], [[35], [35, 55]]])
 }
 
@@ -278,14 +293,18 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
     #expect(lists.map(\.menu) == Array(repeating: nil, count: 6))
     let gripped = accessories(count: nil, chevron: nil, isEditing: true)
     #expect(lists.map(\.accessories) == Array(repeating: gripped, count: 6), "no count, no chevron, and the grip")
-    #expect(lists.map(\.accessoriesWidth) == Array(repeating: 108, count: 6), "72 and the grip's cell of 36")
+    #expect(lists.map(\.style.accessoriesWidth) == Array(repeating: 108, count: 6), "72 and the grip's cell of 36")
     #expect(
-        lists.map(\.need) == Array(repeating: 310, count: 6), "20 + 30 + 12 + 140 + 108, the grip's cell among them"
+        lists.map(\.style.need) == Array(repeating: 310, count: 6),
+        "20 + 30 + 12 + 140 + 108, the grip's cell among them"
     )
-    #expect(lists.map(\.fadeWidth) == Array(repeating: 10, count: 6), "the fade stays in edit mode")
-    #expect(lists.map(\.textMinimumWidth) == Array(repeating: 20, count: 6), "the empty count's cell holds the column")
-    #expect(lists.map(\.cellMinimumWidth) == Array(repeating: 36, count: 6), "the grip's cell is a chevron's")
-    #expect(lists.map(\.endGap) == Array(repeating: 4, count: 6), "4 at the end, after the grip")
+    #expect(lists.map(\.style.fadeWidth) == Array(repeating: 10, count: 6), "the fade stays in edit mode")
+    #expect(
+        lists.map(\.style.textMinimumWidth) == Array(repeating: 20, count: 6),
+        "the empty count's cell holds the column"
+    )
+    #expect(lists.map(\.style.cellMinimumWidth) == Array(repeating: 36, count: 6), "the grip's cell is a chevron's")
+    #expect(lists.map(\.style.endGap) == Array(repeating: 4, count: 6), "4 at the end, after the grip")
     #expect(areaLine(work, in: editing.model)?.menu == nil)
     #expect(areaLine(work, in: editing.model)?.accessories == [.grip(grip)])
 }
@@ -310,8 +329,9 @@ private func areaField(_ text: String) -> TextFieldModel<Action> {
 private func barOutsideEditMode(microphone: Bool = true) -> BarModel<Action> {
     let more = MenuButtonModel<Action>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .ellipsis, size: 20, weight: .semibold, color: .ink), title: nil,
-            accessibilityLabel: "More", fill: .container
+            icon: IconModel(icon: .ellipsis, style: IconStyle(size: 20, weight: .semibold, color: .ink)), title: nil,
+            accessibilityLabel: "More",
+            style: ButtonLabelStyle(fill: .container)
         ),
         menu: MenuModel(sections: [
             .init(items: [
@@ -320,16 +340,20 @@ private func barOutsideEditMode(microphone: Bool = true) -> BarModel<Action> {
         ])
     )
     let search = SearchFieldModel(
-        placeholder: TextModel(text: "Search", font: .search, color: .ink2),
-        leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
+        placeholder: TextModel(text: "Search", style: TextStyle(font: .search, color: .ink2)),
+        leadingIcon: IconModel(icon: .magnifier, style: IconStyle(size: 17, weight: .regular, color: .ink2)),
         trailingGlyph: microphone
-            ? .init(icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36) : nil,
-        spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container, cornerRadius: 24
+            ? IconModel(icon: .microphone, style: IconStyle(size: 17, weight: .regular, color: .ink2)) : nil,
+        style: SearchFieldStyle(
+            spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container, cornerRadius: 24,
+            trailingGlyphCell: microphone ? 36 : nil
+        )
     )
     let add = MenuButtonModel<Action>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
-            accessibilityLabel: "Add", fill: .color(.accent)
+            icon: IconModel(icon: .plus, style: IconStyle(size: 20, weight: .semibold, color: .onAccent)), title: nil,
+            accessibilityLabel: "Add",
+            style: ButtonLabelStyle(fill: .color(.accent))
         ),
         menu: addMenu(withShortcuts: false)
     )
@@ -363,17 +387,19 @@ private func barInEditMode() -> BarModel<Action> {
     func groupButton(_ word: String, saying label: String, _ action: Action) -> ButtonModel<Action> {
         ButtonModel(
             label: ButtonLabelModel(
-                icon: IconModel(icon: .plus, size: 15, weight: .semibold, color: .accent),
-                title: TextModel(text: word, font: .barLabel, color: .accent), accessibilityLabel: label,
-                fill: .container
+                icon: IconModel(icon: .plus, style: IconStyle(size: 15, weight: .semibold, color: .accent)),
+                title: TextModel(text: word, style: TextStyle(font: .barLabel, color: .accent)),
+                accessibilityLabel: label,
+                style: ButtonLabelStyle(fill: .container)
             ),
             action: action
         )
     }
     let done = ButtonModel<Action>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .check, size: 20, weight: .bold, color: .onAccent), title: nil,
-            accessibilityLabel: "Done", fill: .color(.accent)
+            icon: IconModel(icon: .check, style: IconStyle(size: 20, weight: .bold, color: .onAccent)), title: nil,
+            accessibilityLabel: "Done",
+            style: ButtonLabelStyle(fill: .color(.accent))
         ),
         action: .doneButtonTapped
     )
@@ -390,9 +416,12 @@ private func barInEditMode() -> BarModel<Action> {
 /// glyph 6 before the word, 4 in from the group's ends, with a rule of the line colour 1 by 22 between two.
 private func phoneBar(_ items: [BarModel<Action>.Item]) -> BarModel<Action> {
     BarModel(
-        items: items, height: 48, rule: nil, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40,
-        groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
-        groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
+        items: items,
+        style: BarStyle(
+            height: 48, rule: nil, controlHeight: 48, spacing: 10, padding: 16, groupButtonHeight: 40,
+            groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
+            groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
+        )
     )
 }
 
@@ -411,9 +440,9 @@ private func phoneBar(_ items: [BarModel<Action>.Item]) -> BarModel<Action> {
 
 /// The drag's look with the phone's numbers, as the test above spells them. A line's card ends 8 short of the edge, as
 /// Task 7 drew it 8 in and 16 narrower than the tree on screen.
-private func phoneDrag() -> DragModel {
-    DragModel(
-        indent: IndentModel(start: 20, step: 22), animation: .popover,
+private func phoneDrag() -> DragStyle {
+    DragStyle(
+        indent: IndentStyle(start: 20, step: 22), animation: .popover,
         look: .slot(
             .init(
                 height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
@@ -421,7 +450,10 @@ private func phoneDrag() -> DragModel {
             ),
             .init(
                 raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
-                grip: IconModel(icon: .grip, size: 18, weight: .regular, color: .ink2), gripCell: 40, minimumWidth: 120,
+                grip: IconModel(
+                    icon: .grip,
+                    style: IconStyle(size: 18, weight: .regular, color: .ink2)
+                ), gripCell: 40, minimumWidth: 120,
                 listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6, listCornerRadius: 14, lineHeight: 36,
                 lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
             )
@@ -488,7 +520,7 @@ private func phoneDrag() -> DragModel {
 private func homesPicker(
     projects: ViewID, home: ViewID, errands: ViewID, area: ViewID, clients: ViewID
 ) -> PickerModel<TaskViewList.Model.Kind, Action> {
-    let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
+    let check = IconModel(icon: .check, style: IconStyle(size: 15, weight: .bold, color: .accent))
     let checked: [AccessoryModel<Action>] = [.check(check)]
     let unchecked: [AccessoryModel<Action>] = [.hidden(.check(check))]
     func option(
@@ -496,25 +528,34 @@ private func homesPicker(
     ) -> TaskViewList.Model.Kind {
         let leading = 20 + 22 * Double(depth)
         return .list(ListRowModel(
-            height: 46, leading: leading, tile: tile, tileToTitle: 12,
-            title: TextModel(text: title, font: font, color: .ink), field: nil,
-            need: leading + tile.side + 12 + 140 + 38, background: .paper, backgroundInset: 0, cornerRadius: 0,
-            guides: [], childGuides: [], guide: guide,
-            accessories: isChecked ? checked : unchecked, fadeWidth: 0, textMinimumWidth: 20, cellMinimumWidth: 0,
-            endGap: 20, accessoriesWidth: 38, tap: .movePickerRowTapped(id), menu: nil
+            tile: tile,
+            style: ListRowStyle(
+                height: 46, leading: leading, tileToTitle: 12, need: leading + tile.style.side + 12 + 140 + 38,
+                background: .paper, backgroundInset: 0, cornerRadius: 0, guides: [], childGuides: [], guide: guide,
+                fadeWidth: 0, textMinimumWidth: 20, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38
+            ),
+            title: TextModel(text: title, style: TextStyle(font: font, color: .ink)), field: nil,
+            accessories: isChecked ? checked : unchecked, tap: .movePickerRowTapped(id), menu: nil
         ))
     }
     let rootTile = { (color: DesignSystem.Color.Components.Tile, icon: DesignSystem.Icon) in
-        TileModel(color: color, icon: icon, side: 30, cornerRadius: 8, glyphSize: 19)
+        TileModel(
+            icon: icon,
+            style: TileStyle(color: color, side: 30, cornerRadius: 8, glyphSize: 19, glyphWeight: .medium)
+        )
     }
     return PickerModel(
-        title: "Move “Home” to…", hint: TextModel(text: "Choose where it goes.", font: .hint, color: .ink2),
+        title: "Move “Home” to…",
+        hint: TextModel(text: "Choose where it goes.", style: TextStyle(font: .hint, color: .ink2)),
         cancel: ChoiceModel(title: "Cancel", isDestructive: false, action: .movePickerCancelled),
         topLevel: .init(
-            icon: IconModel(icon: .divider, size: 15, weight: .regular, color: .ink2), tileSide: 30,
-            tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12,
-            title: TextModel(text: "Top level", font: .rowTitle, color: .ink), leading: 20, height: 46,
-            accessories: unchecked, cellMinimumWidth: 0, endGap: 20, isChecked: false, action: .movePickerRowTapped(nil)
+            icon: IconModel(icon: .divider, style: IconStyle(size: 15, weight: .regular, color: .ink2)),
+            title: TextModel(text: "Top level", style: TextStyle(font: .rowTitle, color: .ink)),
+            accessories: unchecked, isChecked: false, action: .movePickerRowTapped(nil),
+            style: PickerTopLevelStyle(
+                tileSide: 30, tileCornerRadius: 8, tileColor: .fill, tileToTitle: 12, leading: 20, height: 46,
+                cellMinimumWidth: 0, endGap: 20
+            )
         ),
         options: [
             .init(
@@ -527,7 +568,11 @@ private func homesPicker(
             .init(
                 row: option(
                     home, "Home", font: .nestedRowTitle,
-                    tile: TileModel(color: .stone, icon: .bullets, side: 26, cornerRadius: 7, glyphSize: 16), depth: 1
+                    tile: TileModel(
+                        icon: .bullets,
+                        style: TileStyle(color: .stone, side: 26, cornerRadius: 7, glyphSize: 16, glyphWeight: .medium)
+                    ),
+                    depth: 1
                 ),
                 isDisabled: true, isChecked: false
             ),
@@ -537,9 +582,11 @@ private func homesPicker(
             ),
             .init(
                 row: .area(AreaLineModel(
-                    height: 17, leading: 20, spacing: 10, label: nil, field: nil,
-                    line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: 20,
-                    accessories: unchecked, cellMinimumWidth: 0, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
+                    style: AreaLineStyle(
+                        height: 17, leading: 20, spacing: 10, line: LineStyle(color: .line, width: 1, dash: []),
+                        lineToAccessories: 20, cellMinimumWidth: 0, endGap: 20
+                    ),
+                    label: nil, field: nil, accessories: unchecked, tap: .movePickerRowTapped(area), menu: nil
                 )),
                 isDisabled: false, isChecked: false
             ),
@@ -548,7 +595,7 @@ private func homesPicker(
                 isDisabled: false, isChecked: false
             ),
         ],
-        hintGap: 8, minimumOptionHeight: 36, disabledOpacity: 0.35
+        style: OptionPickerStyle(hintGap: 8, minimumOptionHeight: 36, disabledOpacity: 0.35)
     )
 }
 
@@ -578,7 +625,7 @@ private func sidebarAccessories(
     count: String?, chevron: AccessoryModel<Action>.Chevron?, isEditing: Bool = false
 ) -> [AccessoryModel<Action>] {
     [
-        count.map { .text(TextModel(text: $0, font: .count, color: .ink2)) } ?? .space(18),
+        count.map { .text(TextModel(text: $0, style: TextStyle(font: .count, color: .ink2))) } ?? .space(18),
         chevron.map { .chevron($0) } ?? .space(20),
     ] + (isEditing ? [.grip(grip)] : [])
 }
@@ -587,8 +634,9 @@ private func sidebarAccessories(
 /// folded, saying what a tap will do.
 private func sidebarChevron(_ id: ViewID, folded: Bool) -> AccessoryModel<Action>.Chevron {
     .init(
-        icon: IconModel(icon: .chevron, size: 12, weight: .semibold, color: .ink2), rotation: folded ? -90 : 0,
-        animation: .popover, accessibilityLabel: folded ? "Expand" : "Collapse", action: .disclosureTapped(id)
+        icon: IconModel(icon: .chevron, style: IconStyle(size: 12, weight: .semibold, color: .ink2)),
+        accessibilityLabel: folded ? "Expand" : "Collapse", action: .disclosureTapped(id),
+        style: ChevronStyle(rotation: folded ? -90 : 0, animation: .popover)
     )
 }
 
@@ -607,24 +655,32 @@ private func sidebarRow(
     chevron: AccessoryModel<Action>.Chevron?, isEditing: Bool = false, menu: MenuModel<Action>?
 ) -> ListRowModel<Action> {
     ListRowModel(
-        height: 30, leading: leading, tile: tile, tileToTitle: 8,
-        title: TextModel(text: title, font: font, color: .ink), field: nil, need: need,
-        background: isHighlighted ? .selection : .sidebar, backgroundInset: 10, cornerRadius: 7, guides: guides,
-        childGuides: childGuides, guide: sidebarGuide,
-        accessories: sidebarAccessories(count: count, chevron: chevron, isEditing: isEditing), fadeWidth: 8,
-        textMinimumWidth: 18, cellMinimumWidth: 20, endGap: 4, accessoriesWidth: isEditing ? 90 : 70,
-        tap: .rowSelected(id), menu: menu
+        tile: tile,
+        style: ListRowStyle(
+            height: 30, leading: leading, tileToTitle: 8, need: need, background: isHighlighted ? .selection : .sidebar,
+            backgroundInset: 10, cornerRadius: 7, guides: guides, childGuides: childGuides, guide: sidebarGuide,
+            fadeWidth: 8, textMinimumWidth: 18, cellMinimumWidth: 20, endGap: 4, accessoriesWidth: isEditing ? 90 : 70
+        ),
+        title: TextModel(text: title, style: TextStyle(font: font, color: .ink)), field: nil,
+        accessories: sidebarAccessories(count: count, chevron: chevron, isEditing: isEditing), tap: .rowSelected(id),
+        menu: menu
     )
 }
 
 /// A tile of the sidebar's root depth, 22 across, rounded 6, its glyph 14 (`Mac.dc.html`, `tileSize`).
 private func rootTile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
-    TileModel(color: color, icon: icon, side: 22, cornerRadius: 6, glyphSize: 14)
+    TileModel(
+        icon: icon,
+        style: TileStyle(color: color, side: 22, cornerRadius: 6, glyphSize: 14, glyphWeight: .medium)
+    )
 }
 
 /// A tile of the sidebar deeper than its root, 18 across, rounded 5, its glyph 12.
 private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
-    TileModel(color: color, icon: icon, side: 18, cornerRadius: 5, glyphSize: 12)
+    TileModel(
+        icon: icon,
+        style: TileStyle(color: color, side: 18, cornerRadius: 5, glyphSize: 12, glyphWeight: .medium)
+    )
 }
 
 /// A wide window's rows carry the sidebar's numbers whole (`Mac.dc.html`, a list's row): 30 high, the tile at 18 + 16
@@ -646,8 +702,8 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
         isHighlighted: true, guides: [], childGuides: [29], count: "1", chevron: nil,
         menu: listMenu(inbox, openInNewWindow: true)
     ))
-    #expect(listRow(BuiltInTaskViews.today, in: model)?.background == .sidebar)
-    #expect(listRow(BuiltInTaskViews.today, in: model)?.title.font == .rowTitle)
+    #expect(listRow(BuiltInTaskViews.today, in: model)?.style.background == .sidebar)
+    #expect(listRow(BuiltInTaskViews.today, in: model)?.title.style.font == .rowTitle)
     #expect(listRow(projects, in: model) == sidebarRow(
         projects, title: "Projects", font: .rowTitleEmphasized, tile: rootTile(.teal, .folder), leading: 18, need: 208,
         guides: [], childGuides: [29], count: "1", chevron: sidebarChevron(projects, folded: false),
@@ -668,13 +724,13 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
     let home = try store.createView(NewTaskView(title: "Home", parent: projects))
     let list = try sidebar(store, width: .wide, capabilities: mac)
     _ = list.send(.action(.rowSelected(home)))
-    #expect(listRow(home, in: list.model)?.title.font == .rowTitleEmphasized)
-    #expect(listRow(home, in: list.model)?.background == .selection)
-    #expect(listRow(inbox, in: list.model)?.title.font == .rowTitle)
-    #expect(listRow(inbox, in: list.model)?.background == .sidebar)
+    #expect(listRow(home, in: list.model)?.title.style.font == .rowTitleEmphasized)
+    #expect(listRow(home, in: list.model)?.style.background == .selection)
+    #expect(listRow(inbox, in: list.model)?.title.style.font == .rowTitle)
+    #expect(listRow(inbox, in: list.model)?.style.background == .sidebar)
     _ = list.send(.action(.disclosureTapped(projects)))
-    #expect(listRow(projects, in: list.model)?.background == .selection)
-    #expect(listRow(projects, in: list.model)?.title.font == .rowTitleEmphasized)
+    #expect(listRow(projects, in: list.model)?.style.background == .selection)
+    #expect(listRow(projects, in: list.model)?.title.style.font == .rowTitleEmphasized)
     let folded = AccessoryModel<Action>.chevron(sidebarChevron(projects, folded: true))
     #expect(listRow(projects, in: list.model)?.accessories.contains(folded) == true, "its chevron turned while folded")
 }
@@ -694,11 +750,12 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
         isEditing: Bool = false, menu: MenuModel<Action>?
     ) -> AreaLineModel<Action> {
         AreaLineModel(
-            height: height, leading: leading, spacing: 6,
-            label: label.map { TextModel(text: $0, font: .areaCaption, color: .ink3) }, field: field,
-            line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: isEditing ? 8 : 18,
-            accessories: isEditing ? [.grip(grip)] : [], cellMinimumWidth: isEditing ? 20 : 0,
-            endGap: isEditing ? 14 : 0, tap: .rowSelected(id), menu: menu
+            style: AreaLineStyle(
+                height: height, leading: leading, spacing: 6, line: LineStyle(color: .line, width: 1, dash: []),
+                lineToAccessories: isEditing ? 8 : 18, cellMinimumWidth: isEditing ? 20 : 0, endGap: isEditing ? 14 : 0
+            ),
+            label: label.map { TextModel(text: $0, style: TextStyle(font: .areaCaption, color: .ink3)) }, field: field,
+            accessories: isEditing ? [.grip(grip)] : [], tap: .rowSelected(id), menu: menu
         )
     }
     let list = try sidebar(store, width: .wide, capabilities: mac)
@@ -735,7 +792,7 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
         "Projects", placeholder: "Title", font: .rowTitleEmphasized, minimumWidth: 90, height: 24, padding: 6,
         cornerRadius: 6
     ))
-    #expect(listRow(projects, in: list.model)?.height == 30)
+    #expect(listRow(projects, in: list.model)?.style.height == 30)
 }
 
 /// In edit mode, on the iPad's wide window, the sidebar's rows take the grip in a cell of 20 after the chevron's, the
@@ -811,21 +868,29 @@ private func nestedTile(_ color: DesignSystem.Color.Components.Tile, _ icon: Des
 /// New Area. The group's numbers, which no item of this bar uses, are the edit bar's.
 private func barWithoutEditMode() -> BarModel<Action> {
     let search = SearchFieldModel(
-        placeholder: TextModel(text: "Search", font: .search, color: .ink2),
-        leadingIcon: IconModel(icon: .magnifier, size: 15, weight: .regular, color: .ink2), trailingGlyph: nil,
-        spacing: 6, leadingPadding: 9, trailingPadding: 4, fill: .color(.fill), cornerRadius: 8
+        placeholder: TextModel(text: "Search", style: TextStyle(font: .search, color: .ink2)),
+        leadingIcon: IconModel(icon: .magnifier, style: IconStyle(size: 15, weight: .regular, color: .ink2)),
+        trailingGlyph: nil,
+        style: SearchFieldStyle(
+            spacing: 6, leadingPadding: 9, trailingPadding: 4, fill: .color(.fill), cornerRadius: 8,
+            trailingGlyphCell: nil
+        )
     )
     let add = MenuButtonModel<Action>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .plus, size: 16, weight: .bold, color: .onAccent), title: nil,
-            accessibilityLabel: "Add", fill: .color(.accent)
+            icon: IconModel(icon: .plus, style: IconStyle(size: 16, weight: .bold, color: .onAccent)), title: nil,
+            accessibilityLabel: "Add",
+            style: ButtonLabelStyle(fill: .color(.accent))
         ),
         menu: addMenu(withShortcuts: true)
     )
     return BarModel(
-        items: [.search(search), .menuButton(add)], height: 48, rule: LineStyle(color: .line, width: 1, dash: []),
-        controlHeight: 30, spacing: 8, padding: 10, groupButtonHeight: 40, groupButtonSpacing: 6, groupPadding: 4,
-        groupDividerHeight: 22, groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
+        items: [.search(search), .menuButton(add)],
+        style: BarStyle(
+            height: 48, rule: LineStyle(color: .line, width: 1, dash: []), controlHeight: 30, spacing: 8, padding: 10,
+            groupButtonHeight: 40, groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
+            groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
+        )
     )
 }
 
@@ -849,9 +914,9 @@ private func barWithoutEditMode() -> BarModel<Action> {
 /// and filled with the sidebar colour, 6 before that tile; and the card 170 by 30, 14 after that tile, rounded 7, on
 /// the surface with the lifted shadow, turned −1.2° at 95 %, a list's tile on it 18 across, rounded 5 with its glyph
 /// 12, 10 in, and its title 8 after it in the sidebar's body; all of it on the popover's motion.
-private func sidebarDrag() -> DragModel {
-    DragModel(
-        indent: IndentModel(start: 18, step: 16), animation: .popover,
+private func sidebarDrag() -> DragStyle {
+    DragStyle(
+        indent: IndentStyle(start: 18, step: 16), animation: .popover,
         look: .indicator(
             .init(
                 height: 12, line: LineStyle(color: .accent, width: 2, dash: []), lineOffset: 2, lineCornerRadius: 1,
@@ -880,52 +945,62 @@ private func sidebarDrag() -> DragModel {
     let area = try store.createView(NewTaskView(title: "Work", kind: .area))
     let list = try sidebar(store, width: .wide, capabilities: mac)
     _ = list.send(.action(.moveToMenuItemChosen(home)))
-    let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
+    let check = IconModel(icon: .check, style: IconStyle(size: 15, weight: .bold, color: .accent))
     let checked: [AccessoryModel<Action>] = [.check(check)]
     let unchecked: [AccessoryModel<Action>] = [.hidden(.check(check))]
     let picker = PickerModel<TaskViewList.Model.Kind, Action>(
-        title: "Move “Home” to…", hint: TextModel(text: "Choose where it goes.", font: .hint, color: .ink2),
+        title: "Move “Home” to…",
+        hint: TextModel(text: "Choose where it goes.", style: TextStyle(font: .hint, color: .ink2)),
         cancel: ChoiceModel(title: "Cancel", isDestructive: false, action: .movePickerCancelled),
         topLevel: .init(
-            icon: IconModel(icon: .divider, size: 11, weight: .regular, color: .ink2), tileSide: 22,
-            tileCornerRadius: 6, tileColor: .fill, tileToTitle: 8,
-            title: TextModel(text: "Top level", font: .rowTitle, color: .ink), leading: 18, height: 30,
-            accessories: unchecked, cellMinimumWidth: 0, endGap: 20, isChecked: false, action: .movePickerRowTapped(nil)
+            icon: IconModel(icon: .divider, style: IconStyle(size: 11, weight: .regular, color: .ink2)),
+            title: TextModel(text: "Top level", style: TextStyle(font: .rowTitle, color: .ink)),
+            accessories: unchecked, isChecked: false, action: .movePickerRowTapped(nil),
+            style: PickerTopLevelStyle(
+                tileSide: 22, tileCornerRadius: 6, tileColor: .fill, tileToTitle: 8, leading: 18, height: 30,
+                cellMinimumWidth: 0, endGap: 20
+            )
         ),
         options: [
             .init(
                 row: .list(ListRowModel(
-                    height: 30, leading: 18, tile: rootTile(.teal, .folder), tileToTitle: 8,
-                    title: TextModel(text: "Projects", font: .rowTitleEmphasized, color: .ink), field: nil,
-                    need: 18 + 22 + 8 + 90 + 38, background: .paper, backgroundInset: 0, cornerRadius: 0,
-                    guides: [], childGuides: [], guide: sidebarGuide, accessories: checked, fadeWidth: 0,
-                    textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38,
-                    tap: .movePickerRowTapped(projects), menu: nil
+                    tile: rootTile(.teal, .folder),
+                    style: ListRowStyle(
+                        height: 30, leading: 18, tileToTitle: 8, need: 18 + 22 + 8 + 90 + 38, background: .paper,
+                        backgroundInset: 0, cornerRadius: 0, guides: [], childGuides: [], guide: sidebarGuide,
+                        fadeWidth: 0, textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38
+                    ),
+                    title: TextModel(text: "Projects", style: TextStyle(font: .rowTitleEmphasized, color: .ink)),
+                    field: nil, accessories: checked, tap: .movePickerRowTapped(projects), menu: nil
                 )),
                 isDisabled: false, isChecked: true
             ),
             .init(
                 row: .list(ListRowModel(
-                    height: 30, leading: 34, tile: nestedTile(.stone, .bullets), tileToTitle: 8,
-                    title: TextModel(text: "Home", font: .rowTitle, color: .ink), field: nil,
-                    need: 34 + 18 + 8 + 90 + 38, background: .paper, backgroundInset: 0, cornerRadius: 0,
-                    guides: [], childGuides: [], guide: sidebarGuide, accessories: unchecked, fadeWidth: 0,
-                    textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38,
-                    tap: .movePickerRowTapped(home), menu: nil
+                    tile: nestedTile(.stone, .bullets),
+                    style: ListRowStyle(
+                        height: 30, leading: 34, tileToTitle: 8, need: 34 + 18 + 8 + 90 + 38, background: .paper,
+                        backgroundInset: 0, cornerRadius: 0, guides: [], childGuides: [], guide: sidebarGuide,
+                        fadeWidth: 0, textMinimumWidth: 18, cellMinimumWidth: 0, endGap: 20, accessoriesWidth: 38
+                    ),
+                    title: TextModel(text: "Home", style: TextStyle(font: .rowTitle, color: .ink)),
+                    field: nil, accessories: unchecked, tap: .movePickerRowTapped(home), menu: nil
                 )),
                 isDisabled: true, isChecked: false
             ),
             .init(
                 row: .area(AreaLineModel(
-                    height: 15, leading: 18, spacing: 6,
-                    label: TextModel(text: "WORK", font: .areaCaption, color: .ink3),
-                    field: nil, line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: 20,
-                    accessories: unchecked, cellMinimumWidth: 0, endGap: 20, tap: .movePickerRowTapped(area), menu: nil
+                    style: AreaLineStyle(
+                        height: 15, leading: 18, spacing: 6, line: LineStyle(color: .line, width: 1, dash: []),
+                        lineToAccessories: 20, cellMinimumWidth: 0, endGap: 20
+                    ),
+                    label: TextModel(text: "WORK", style: TextStyle(font: .areaCaption, color: .ink3)),
+                    field: nil, accessories: unchecked, tap: .movePickerRowTapped(area), menu: nil
                 )),
                 isDisabled: false, isChecked: false
             ),
         ],
-        hintGap: 8, minimumOptionHeight: 30, disabledOpacity: 0.35
+        style: OptionPickerStyle(hintGap: 8, minimumOptionHeight: 30, disabledOpacity: 0.35)
     )
     #expect(list.model.movePicker == picker)
 }

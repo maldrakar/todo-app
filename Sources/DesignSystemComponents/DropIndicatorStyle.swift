@@ -1,4 +1,4 @@
-// Sources/DesignSystemComponents/DropIndicatorModel.swift
+// Sources/DesignSystemComponents/DropIndicatorStyle.swift
 import DesignSystem
 
 /// The Finder's mark of the place where a lifted row would land, between two rows or into a parent alike: it opens a
@@ -6,10 +6,10 @@ import DesignSystem
 /// the edge the mark is placed from to `trailingGap` short of the right edge of the rows on screen, its ends rounded by
 /// `lineCornerRadius`, and a circle `circleDiameter` across, its leading edge `circleOffset` from that edge, ringed
 /// with `circleRing` and filled with `circleFill`. An offset is after the edge where it is positive and before it where
-/// it is negative, all in points. The edge is its view's: the tile of the drop's depth in a tree (`DragModel`, the
-/// sidebar's drag in `Mac.dc.html`), the rows' leading edge in a list of tasks (`TaskLiftModel`, the drop's slot in
+/// it is negative, all in points. The edge is its view's: the tile of the drop's depth in a tree (`DragStyle`, the
+/// sidebar's drag in `Mac.dc.html`), the rows' leading edge in a list of tasks (`TaskLiftStyle`, the drop's slot in
 /// `Phone.dc.html`).
-public struct DropIndicatorModel: Equatable, Sendable {
+public struct DropIndicatorStyle: Equatable, Sendable {
     public let height: Double
     public let line: LineStyle
     public let lineOffset: Double

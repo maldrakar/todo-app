@@ -51,11 +51,11 @@ extension View {
     /// either end, `height` high, on its background rounded by `cornerRadius`, with the ring along that edge. How wide
     /// it is is the row's or the line's that it stands in, by the model's minimum width.
     func fieldLook<Action>(_ field: TextFieldModel<Action>) -> some View {
-        font(Font(field.font))
-            .foregroundStyle(Color(field.color))
-            .padding(.horizontal, field.padding)
-            .frame(height: field.height)
-            .background(Color(field.background), in: .rect(cornerRadius: field.cornerRadius))
-            .overlay { RoundedRectangle(cornerRadius: field.cornerRadius).stroke(field.ring) }
+        font(Font(field.style.font))
+            .foregroundStyle(Color(field.style.color))
+            .padding(.horizontal, field.style.padding)
+            .frame(height: field.style.height)
+            .background(Color(field.style.background), in: .rect(cornerRadius: field.style.cornerRadius))
+            .overlay { RoundedRectangle(cornerRadius: field.style.cornerRadius).stroke(field.style.ring) }
     }
 }

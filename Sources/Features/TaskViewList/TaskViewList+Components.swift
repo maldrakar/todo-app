@@ -53,7 +53,7 @@ extension TaskViewList {
                     background: metrics.rowBackground(isHighlighted: row.id == highlighted), tap: .rowSelected(row.id),
                     menu: isEditing ? nil : listMenu(row.id, opensWindowsBeside: opensWindowsBeside)
                 )
-                centres = list.childGuides
+                centres = list.style.childGuides
                 return Model.Row(id: row.id, depth: row.depth, kind: .list(list))
             }
         }
@@ -111,14 +111,17 @@ extension TaskViewList {
         spacing: Double, padding: Double
     ) -> BarModel<UserAction> {
         BarModel(
-            items: items, height: height, rule: rule, controlHeight: controlHeight, spacing: spacing, padding: padding,
-            groupButtonHeight: 40, groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
-            groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
+            items: items,
+            style: BarStyle(
+                height: height, rule: rule, controlHeight: controlHeight, spacing: spacing, padding: padding,
+                groupButtonHeight: 40, groupButtonSpacing: 6, groupPadding: 4, groupDividerHeight: 22,
+                groupDivider: LineStyle(color: .line, width: 1, dash: []), buttonShadow: .raised
+            )
         )
     }
 
     /// The look of the drag in a window of the width (`Metrics.drag`), the same in and out of edit mode.
-    static func drag(in width: WindowWidth) -> DragModel {
+    static func drag(in width: WindowWidth) -> DragStyle {
         Metrics.of(width).drag
     }
 
@@ -189,19 +192,26 @@ extension TaskViewList {
         }
         return PickerModel(
             title: "Move “\(list.title)” to…",
-            hint: TextModel(text: "Choose where it goes.", font: .hint, color: .ink2),
+            hint: TextModel(text: "Choose where it goes.", style: TextStyle(font: .hint, color: .ink2)),
             cancel: ChoiceModel(title: Words.cancel, isDestructive: false, action: .movePickerCancelled),
             topLevel: PickerModel.TopLevel(
-                icon: IconModel(icon: .divider, size: metrics.topLevelGlyphSize, weight: .regular, color: .ink2),
-                tileSide: metrics.root.tileSide, tileCornerRadius: metrics.root.tileCornerRadius, tileColor: .fill,
-                tileToTitle: metrics.tileToTitle,
-                title: TextModel(text: "Top level", font: metrics.root.title, color: .ink),
-                leading: metrics.indent.start, height: metrics.rowHeight,
+                icon: IconModel(
+                    icon: .divider,
+                    style: IconStyle(size: metrics.topLevelGlyphSize, weight: .regular, color: .ink2)
+                ),
+                title: TextModel(text: "Top level", style: TextStyle(font: metrics.root.title, color: .ink)),
                 accessories: Picker.accessories(isChecked: list.parent == nil),
-                cellMinimumWidth: Picker.cellMinimumWidth, endGap: Picker.endGap,
-                isChecked: list.parent == nil, action: .movePickerRowTapped(nil)
+                isChecked: list.parent == nil, action: .movePickerRowTapped(nil),
+                style: PickerTopLevelStyle(
+                    tileSide: metrics.root.tileSide, tileCornerRadius: metrics.root.tileCornerRadius, tileColor: .fill,
+                    tileToTitle: metrics.tileToTitle, leading: metrics.indent.start, height: metrics.rowHeight,
+                    cellMinimumWidth: Picker.cellMinimumWidth, endGap: Picker.endGap
+                )
             ),
-            options: options, hintGap: 8, minimumOptionHeight: metrics.minimumOptionHeight, disabledOpacity: 0.35
+            options: options,
+            style: OptionPickerStyle(
+                hintGap: 8, minimumOptionHeight: metrics.minimumOptionHeight, disabledOpacity: 0.35
+            )
         )
     }
 
@@ -224,18 +234,21 @@ extension TaskViewList {
         let isEmphasized = row.hasChildren || isHighlighted && metrics.emphasizesHighlight
         let font = isEmphasized ? level.emphasizedTitle : level.title
         return ListRowModel(
-            height: metrics.rowHeight, leading: leading, tile: tile, tileToTitle: metrics.tileToTitle,
-            title: TextModel(text: row.title, font: font, color: .ink),
+            tile: tile,
+            style: ListRowStyle(
+                height: metrics.rowHeight, leading: leading, tileToTitle: metrics.tileToTitle,
+                need: leading + tile.style.side + metrics.tileToTitle + metrics.titleWidth + end.accessoriesWidth,
+                background: background.color, backgroundInset: background.inset,
+                cornerRadius: background.cornerRadius, guides: guides ?? [],
+                childGuides: guides.map { $0 + [leading + tile.style.side / 2] } ?? [], guide: metrics.guide,
+                fadeWidth: end.fadeWidth, textMinimumWidth: metrics.countWidth,
+                cellMinimumWidth: end.cellMinimumWidth, endGap: end.endGap, accessoriesWidth: end.accessoriesWidth
+            ),
+            title: TextModel(text: row.title, style: TextStyle(font: font, color: .ink)),
             field: draft.map {
                 titleField($0, placeholder: "Title", font: font, minimumWidth: metrics.titleWidth, metrics.rowField)
             },
-            need: leading + tile.side + metrics.tileToTitle + metrics.titleWidth + end.accessoriesWidth,
-            background: background.color, backgroundInset: background.inset, cornerRadius: background.cornerRadius,
-            guides: guides ?? [],
-            childGuides: guides.map { $0 + [leading + tile.side / 2] } ?? [], guide: metrics.guide,
-            accessories: end.accessories, fadeWidth: end.fadeWidth, textMinimumWidth: metrics.countWidth,
-            cellMinimumWidth: end.cellMinimumWidth, endGap: end.endGap, accessoriesWidth: end.accessoriesWidth,
-            tap: tap, menu: menu
+            accessories: end.accessories, tap: tap, menu: menu
         )
     }
 
@@ -269,7 +282,7 @@ extension TaskViewList {
         count: Int?, chevron: AccessoryModel<UserAction>.Chevron?, hasGrip: Bool, _ metrics: Metrics
     ) -> RowEnd {
         let counted: AccessoryModel<UserAction> = if let count {
-            .text(TextModel(text: String(count), font: .count, color: .ink2))
+            .text(TextModel(text: String(count), style: TextStyle(font: .count, color: .ink2)))
         } else {
             .space(metrics.countWidth)
         }
@@ -286,8 +299,9 @@ extension TaskViewList {
     /// the tap that folds or unfolds the branch.
     private static func chevron(_ id: ViewID, isFolded: Bool, size: Double) -> AccessoryModel<UserAction>.Chevron {
         AccessoryModel.Chevron(
-            icon: IconModel(icon: .chevron, size: size, weight: .semibold, color: .ink2), rotation: isFolded ? -90 : 0,
-            animation: .popover, accessibilityLabel: isFolded ? "Expand" : "Collapse", action: .disclosureTapped(id)
+            icon: IconModel(icon: .chevron, style: IconStyle(size: size, weight: .semibold, color: .ink2)),
+            accessibilityLabel: isFolded ? "Expand" : "Collapse", action: .disclosureTapped(id),
+            style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .popover)
         )
     }
 
@@ -315,11 +329,13 @@ extension TaskViewList {
             line.height
         }
         return AreaLineModel(
-            height: height, leading: field == nil ? line.leading : line.fieldLeading, spacing: line.spacing,
-            label: label.map { TextModel(text: $0, font: line.labelFont, color: line.labelColor) }, field: field,
-            line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: end.lineToAccessories,
-            accessories: end.accessories, cellMinimumWidth: end.cellMinimumWidth, endGap: end.endGap, tap: tap,
-            menu: menu
+            style: AreaLineStyle(
+                height: height, leading: field == nil ? line.leading : line.fieldLeading, spacing: line.spacing,
+                line: LineStyle(color: .line, width: 1, dash: []), lineToAccessories: end.lineToAccessories,
+                cellMinimumWidth: end.cellMinimumWidth, endGap: end.endGap
+            ),
+            label: label.map { TextModel(text: $0, style: TextStyle(font: line.labelFont, color: line.labelColor)) },
+            field: field, accessories: end.accessories, tap: tap, menu: menu
         )
     }
 
@@ -340,10 +356,13 @@ extension TaskViewList {
         _ draft: String, placeholder: String, font: DesignSystem.Font, minimumWidth: Double, _ size: Metrics.FieldSize
     ) -> TextFieldModel<UserAction> {
         TextFieldModel(
-            text: draft, placeholder: placeholder, font: font, color: .ink, background: .surface,
-            minimumWidth: minimumWidth, height: size.height, padding: size.padding, cornerRadius: size.cornerRadius,
-            ring: LineStyle(color: .accent, width: 2, dash: []), submitted: .titleFieldSubmitted,
-            cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
+            text: draft, placeholder: placeholder,
+            style: FieldStyle(
+                font: font, color: .ink, background: .surface, minimumWidth: minimumWidth, height: size.height,
+                padding: size.padding, cornerRadius: size.cornerRadius,
+                ring: LineStyle(color: .accent, width: 2, dash: [])
+            ),
+            submitted: .titleFieldSubmitted, cancelled: .titleFieldCancelled, focusLost: .titleFieldLostFocus
         )
     }
 
@@ -408,8 +427,8 @@ extension TaskViewList {
     /// glyph.
     private static let moreButton = MenuButtonModel<UserAction>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .ellipsis, size: 20, weight: .semibold, color: .ink), title: nil,
-            accessibilityLabel: "More", fill: .container
+            icon: IconModel(icon: .ellipsis, style: IconStyle(size: 20, weight: .semibold, color: .ink)), title: nil,
+            accessibilityLabel: "More", style: ButtonLabelStyle(fill: .container)
         ),
         menu: MenuModel(sections: [
             .init(items: [
@@ -421,12 +440,15 @@ extension TaskViewList {
     /// The search capsule, on the platform's container: its magnifier and "Search" in ink2, the glyph 17 pt, 8 apart,
     /// 15 in from its start and 6 from its end, its corners half the bar's 48, and the width's glyph at its end. It
     /// sends nothing until the search epic (the owner, 2026-10-25).
-    private static func searchCapsule(ending trailingGlyph: SearchFieldModel.TrailingGlyph?) -> SearchFieldModel {
+    private static func searchCapsule(ending trailingGlyph: Metrics.SearchGlyph?) -> SearchFieldModel {
         SearchFieldModel(
-            placeholder: TextModel(text: Words.search, font: .search, color: .ink2),
-            leadingIcon: IconModel(icon: .magnifier, size: 17, weight: .regular, color: .ink2),
-            trailingGlyph: trailingGlyph, spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container,
-            cornerRadius: 24
+            placeholder: TextModel(text: Words.search, style: TextStyle(font: .search, color: .ink2)),
+            leadingIcon: IconModel(icon: .magnifier, style: IconStyle(size: 17, weight: .regular, color: .ink2)),
+            trailingGlyph: trailingGlyph?.icon,
+            style: SearchFieldStyle(
+                spacing: 8, leadingPadding: 15, trailingPadding: 6, fill: .container, cornerRadius: 24,
+                trailingGlyphCell: trailingGlyph?.cell
+            )
         )
     }
 
@@ -435,16 +457,20 @@ extension TaskViewList {
     /// its end. It has no trailing glyph and no hint of ⌘F, since no command answers ⌘F until the search epic, and
     /// sends nothing until then.
     private static let filledSearchField = SearchFieldModel(
-        placeholder: TextModel(text: Words.search, font: .search, color: .ink2),
-        leadingIcon: IconModel(icon: .magnifier, size: 15, weight: .regular, color: .ink2), trailingGlyph: nil,
-        spacing: 6, leadingPadding: 9, trailingPadding: 4, fill: .color(.fill), cornerRadius: 8
+        placeholder: TextModel(text: Words.search, style: TextStyle(font: .search, color: .ink2)),
+        leadingIcon: IconModel(icon: .magnifier, style: IconStyle(size: 15, weight: .regular, color: .ink2)),
+        trailingGlyph: nil,
+        style: SearchFieldStyle(
+            spacing: 6, leadingPadding: 9, trailingPadding: 4, fill: .color(.fill), cornerRadius: 8,
+            trailingGlyphCell: nil
+        )
     )
 
     /// "+", on the accent, the menu that makes a task, a list or an area, its plus 20 pt semibold.
     private static let addButton = MenuButtonModel<UserAction>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .plus, size: 20, weight: .semibold, color: .onAccent), title: nil,
-            accessibilityLabel: Words.add, fill: .color(.accent)
+            icon: IconModel(icon: .plus, style: IconStyle(size: 20, weight: .semibold, color: .onAccent)), title: nil,
+            accessibilityLabel: Words.add, style: ButtonLabelStyle(fill: .color(.accent))
         ),
         menu: makeAddMenu(newTask: nil, newList: nil)
     )
@@ -453,8 +479,8 @@ extension TaskViewList {
     /// canvas's stroke of 2.4 against the icons' 1.8; New Task ⌘N and New List ⇧⌘N.
     private static let addButtonWithShortcuts = MenuButtonModel<UserAction>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .plus, size: 16, weight: .bold, color: .onAccent), title: nil,
-            accessibilityLabel: Words.add, fill: .color(.accent)
+            icon: IconModel(icon: .plus, style: IconStyle(size: 16, weight: .bold, color: .onAccent)), title: nil,
+            accessibilityLabel: Words.add, style: ButtonLabelStyle(fill: .color(.accent))
         ),
         menu: makeAddMenu(
             newTask: .init(key: "n", modifiers: [.command]), newList: .init(key: "n", modifiers: [.shift, .command])
@@ -489,8 +515,8 @@ extension TaskViewList {
     /// Done, on the accent, the check that ends edit mode.
     private static let doneButton = ButtonModel<UserAction>(
         label: ButtonLabelModel(
-            icon: IconModel(icon: .check, size: 20, weight: .bold, color: .onAccent), title: nil,
-            accessibilityLabel: "Done", fill: .color(.accent)
+            icon: IconModel(icon: .check, style: IconStyle(size: 20, weight: .bold, color: .onAccent)), title: nil,
+            accessibilityLabel: "Done", style: ButtonLabelStyle(fill: .color(.accent))
         ),
         action: .doneButtonTapped
     )
@@ -502,9 +528,9 @@ extension TaskViewList {
     ) -> ButtonModel<UserAction> {
         ButtonModel(
             label: ButtonLabelModel(
-                icon: IconModel(icon: .plus, size: 15, weight: .semibold, color: .accent),
-                title: TextModel(text: word, font: .barLabel, color: .accent), accessibilityLabel: accessibilityLabel,
-                fill: .container
+                icon: IconModel(icon: .plus, style: IconStyle(size: 15, weight: .semibold, color: .accent)),
+                title: TextModel(text: word, style: TextStyle(font: .barLabel, color: .accent)),
+                accessibilityLabel: accessibilityLabel, style: ButtonLabelStyle(fill: .container)
             ),
             action: action
         )
@@ -516,7 +542,7 @@ extension TaskViewList {
     /// The grip of a row and of a line in edit mode, which says that it drags (Lists screen spec, section 7), in ink3,
     /// the same on every width: the Mac board draws none, since the Mac has no edit mode, and the iPad's sidebar takes
     /// the phone's.
-    private static let grip = IconModel(icon: .grip, size: gripSize, weight: .regular, color: .ink3)
+    private static let grip = IconModel(icon: .grip, style: IconStyle(size: gripSize, weight: .regular, color: .ink3))
 
     /// The numbers a window of one width draws the screen's components with, in points, which more than one builder
     /// reads, picked once by the width (`of(_:)`), so that no builder branches on it (Lists screen plan, Task 9): the
@@ -535,9 +561,19 @@ extension TaskViewList {
             /// A list's tile in the colour and with the icon its row reads from the store's names, at this level.
             func tile(_ color: DesignSystem.Color.Components.Tile, _ icon: DesignSystem.Icon) -> TileModel {
                 TileModel(
-                    color: color, icon: icon, side: tileSide, cornerRadius: tileCornerRadius, glyphSize: glyphSize
+                    icon: icon,
+                    style: TileStyle(
+                        color: color, side: tileSide, cornerRadius: tileCornerRadius, glyphSize: glyphSize,
+                        glyphWeight: .medium
+                    )
                 )
             }
+        }
+
+        /// The glyph at the end of the bar's search capsule and the side of the cell it is centred in.
+        struct SearchGlyph {
+            let icon: IconModel
+            let cell: Double
         }
 
         /// A field's height, the room between its edge and its text at either end, and its corners' radius.
@@ -570,7 +606,7 @@ extension TaskViewList {
 
         /// The tree's indent, which is also how far a finger or the pointer carries a lifted row sideways to change its
         /// depth by one.
-        let indent: IndentModel
+        let indent: IndentStyle
 
         /// A list's row's height, and the picker's "Top level"'s.
         let rowHeight: Double
@@ -613,13 +649,13 @@ extension TaskViewList {
         let line: Line
 
         /// The glyph at the end of the bar's search capsule, where the bar with edit mode stands, and nil for none.
-        let searchTrailingGlyph: SearchFieldModel.TrailingGlyph?
+        let searchTrailingGlyph: SearchGlyph?
 
         /// The size of the divider glyph on "Top level"'s tile, and how high a picker's option is at least.
         let topLevelGlyphSize: Double
         let minimumOptionHeight: Double
 
-        let drag: DragModel
+        let drag: DragStyle
 
         /// The numbers of the width.
         static func of(_ width: WindowWidth) -> Metrics {
@@ -675,8 +711,8 @@ extension TaskViewList {
                 editingEnd: LineEnd(lineToAccessories: 10, accessories: [.grip(grip)], cellMinimumWidth: 0, endGap: 12),
                 fieldWidth: 160, field: FieldSize(height: 28, padding: 8, cornerRadius: 8), fieldFont: .areaLabel
             ),
-            searchTrailingGlyph: .init(
-                icon: IconModel(icon: .microphone, size: 17, weight: .regular, color: .ink2), cell: 36
+            searchTrailingGlyph: SearchGlyph(
+                icon: IconModel(icon: .microphone, style: IconStyle(size: 17, weight: .regular, color: .ink2)), cell: 36
             ),
             topLevelGlyphSize: 15, minimumOptionHeight: 36, drag: phoneDrag
         )
@@ -726,11 +762,11 @@ extension TaskViewList {
         )
 
         /// The phone's indent, a tile of the root at 20 and each level 22 further, which its rows and its drag share.
-        private static let phoneIndent = IndentModel(start: 20, step: 22)
+        private static let phoneIndent = IndentStyle(start: 20, step: 22)
 
         /// The sidebar's indent, a tile of the root at 18 from the column's edge and each level 16 further, which its
         /// rows and its drag share.
-        private static let sidebarIndent = IndentModel(start: 18, step: 16)
+        private static let sidebarIndent = IndentStyle(start: 18, step: 16)
 
         /// The phone's drag (`Phone.dc.html`, the drag's slot and card): the slot 52 high with 44 drawn, from 6 before
         /// the tile of its depth to 12 short of the right edge, rounded 13, on the accent's soft fill with a 1.5 pt
@@ -744,16 +780,17 @@ extension TaskViewList {
         /// A line's card ends 8 short of the edge because Task 7 drew it 8 in and 16 narrower than the tree on screen:
         /// each trailing gap is how far short of the right edge a shape's right end stands, the list card's 6 and the
         /// slot's 12 as much as the line card's.
-        private static let phoneDrag = DragModel(
+        private static let phoneDrag = DragStyle(
             indent: phoneIndent, animation: .popover,
             look: .slot(
-                DragModel.Slot(
+                DragStyle.Slot(
                     height: 52, inset: 6, trailingGap: 12, verticalInset: 4, cornerRadius: 13, fill: .accentSoft,
                     stroke: LineStyle(color: .accent, width: 1.5, dash: [5, 4])
                 ),
-                DragModel.Card(
+                DragStyle.Card(
                     raise: 6, scale: 1.03, rotation: -1.5, shadow: .lifted, background: .surface,
-                    grip: IconModel(icon: .grip, size: gripSize, weight: .regular, color: .ink2), gripCell: 40,
+                    grip: IconModel(icon: .grip, style: IconStyle(size: gripSize, weight: .regular, color: .ink2)),
+                    gripCell: 40,
                     minimumWidth: 120, listHeight: 50, listInset: 2, listPadding: 12, listTrailingGap: 6,
                     listCornerRadius: 14, lineHeight: 36, lineInset: 8, lineTrailingGap: 8, lineCornerRadius: 12
                 )
@@ -769,15 +806,15 @@ extension TaskViewList {
         /// surface with the lifted shadow, turned 1.2° left at 95 % and grown by nothing, a list's tile on it 18
         /// across, rounded 5, its glyph 12, 10 in, and its title 8 after it in the sidebar's body, the canvas's 13 pt
         /// 500. The motion is the phone's, since the canvas's drag is frozen.
-        private static let sidebarDrag = DragModel(
+        private static let sidebarDrag = DragStyle(
             indent: sidebarIndent, animation: .popover,
             look: .indicator(
-                DropIndicatorModel(
+                DropIndicatorStyle(
                     height: 12, line: LineStyle(color: .accent, width: 2, dash: []), lineOffset: 2,
                     lineCornerRadius: 1, trailingGap: 18, circleDiameter: 10, circleOffset: -6,
                     circleRing: LineStyle(color: .accent, width: 2, dash: []), circleFill: .sidebar
                 ),
-                DragModel.IndicatorCard(
+                DragStyle.IndicatorCard(
                     width: 170, height: 30, offset: 14, cornerRadius: 7, background: .surface, shadow: .lifted,
                     rotation: -1.2, opacity: 0.95, padding: 10, tileToTitle: 8, tileSide: 18, tileCornerRadius: 5,
                     glyphSize: 12, titleFont: .rowTitle
@@ -791,7 +828,7 @@ extension TaskViewList {
     /// at the right of every other row, so that the rows end in one column, as Task 7 drew it: "Top level", a list's
     /// row and an area's line, which ends 20 before it.
     private enum Picker {
-        static let check = IconModel(icon: .check, size: 15, weight: .bold, color: .accent)
+        static let check = IconModel(icon: .check, style: IconStyle(size: 15, weight: .bold, color: .accent))
         static let cellMinimumWidth: Double = 0
         static let endGap: Double = 20
 

@@ -35,7 +35,7 @@ private func phoneRow(
             isChecked: !isOpen,
             accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: .checkTapped(id)
         ),
-        title: TextModel(text: title, font: .rowTitle, color: isOpen ? .ink : .ink2),
+        title: TextModel(text: title, style: TextStyle(font: .rowTitle, color: isOpen ? .ink : .ink2)),
         meta: meta,
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
@@ -47,7 +47,10 @@ private func phoneRow(
                 threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
                 buttonCornerRadius: 12, background: .red, animation: .swipe
             ),
-            button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), action: .deleteSwiped(id)
+            button: TextModel(
+                text: "Delete",
+                style: TextStyle(font: .barLabel, color: .onAccent)
+            ), action: .deleteSwiped(id)
         ) : nil,
         tap: .rowTapped(id), menu: deletes ? deleteMenu(id) : nil
     )
@@ -99,12 +102,17 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let model = try list(BuiltInTaskViews.inbox, in: store).model
     let meta = [
         MetaItemModel(
-            icon: IconModel(icon: .flag, size: 13, weight: .regular, color: .red),
-            text: TextModel(text: "Due today", font: .meta, color: .red), spacing: 3, capsule: nil
+            icon: IconModel(icon: .flag, style: IconStyle(size: 13, weight: .regular, color: .red)),
+            text: TextModel(text: "Due today", style: TextStyle(font: .meta, color: .red)),
+            style: MetaItemStyle(spacing: 3, capsule: nil)
         ),
-        MetaItemModel(icon: nil, text: TextModel(text: "#errand", font: .meta, color: .ink2), spacing: 3, capsule: nil),
         MetaItemModel(
-            icon: IconModel(icon: .note, size: 13, weight: .regular, color: .ink2), text: nil, spacing: 3, capsule: nil
+            icon: nil, text: TextModel(text: "#errand", style: TextStyle(font: .meta, color: .ink2)),
+            style: MetaItemStyle(spacing: 3, capsule: nil)
+        ),
+        MetaItemModel(
+            icon: IconModel(icon: .note, style: IconStyle(size: 13, weight: .regular, color: .ink2)), text: nil,
+            style: MetaItemStyle(spacing: 3, capsule: nil)
         ),
     ]
     #expect(blocks(of: model).first?.rows.map(row) == [phoneRow("Buy milk", id: id, colors: Tile.blue.check, meta: meta)])
@@ -121,8 +129,11 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let module = try list(today, in: store)
     func chip(isLit: Bool) -> TagChipModel<Action> {
         TagChipModel(
-            icon: IconModel(icon: .hash, size: 13, weight: .semibold, color: isLit ? Tile.amber.check.mark : .ink2),
-            title: TextModel(text: "home", font: .pill, color: isLit ? Tile.amber.check.mark : .ink),
+            icon: IconModel(
+                icon: .hash,
+                style: IconStyle(size: 13, weight: .semibold, color: isLit ? Tile.amber.check.mark : .ink2)
+            ),
+            title: TextModel(text: "home", style: TextStyle(font: .pill, color: isLit ? Tile.amber.check.mark : .ink)),
             style: .init(
                 height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,
                 background: isLit ? Tile.amber.check.fill : .fill
@@ -150,12 +161,12 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let id = TaskList.Model.BlockID.own(.day(day(1)))
     func header(isFolded: Bool) -> BlockHeaderModel<Action> {
         BlockHeaderModel(
-            title: TextModel(text: "Tomorrow", font: .sectionTitle, color: Tile.rose.glyph),
-            subtitle: TextModel(text: "Thu, Sep 11", font: .areaLabel, color: .ink2), field: nil,
+            title: TextModel(text: "Tomorrow", style: TextStyle(font: .sectionTitle, color: Tile.rose.glyph)),
+            subtitle: TextModel(text: "Thu, Sep 11", style: TextStyle(font: .areaLabel, color: .ink2)), field: nil,
             fold: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, size: 18, weight: .semibold, color: .ink3),
-                rotation: isFolded ? -90 : 0, animation: .fold,
-                accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id)
+                icon: IconModel(icon: .chevron, style: IconStyle(size: 18, weight: .semibold, color: .ink3)),
+                accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id),
+                style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .fold)
             ),
             style: .init(
                 titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
@@ -176,9 +187,12 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let store = try makeStore()
     let header = try list(BuiltInTaskViews.today, in: store).model.header
     #expect(header == ScreenHeaderModel(
-        tile: TileModel(color: .amber, icon: .sun, side: 38, cornerRadius: 11, glyphSize: 23),
-        title: TextModel(text: "Today", font: .largeTitle, color: .ink),
-        subtitle: TextModel(text: "Wednesday, September 10", font: .count, color: .ink2),
+        tile: TileModel(
+            icon: .sun,
+            style: TileStyle(color: .amber, side: 38, cornerRadius: 11, glyphSize: 23, glyphWeight: .medium)
+        ),
+        title: TextModel(text: "Today", style: TextStyle(font: .largeTitle, color: .ink)),
+        subtitle: TextModel(text: "Wednesday, September 10", style: TextStyle(font: .count, color: .ink2)),
         style: .init(spacing: 12, titleToSubtitle: 6, subtitleLeading: 50)
     ))
 }
@@ -188,9 +202,15 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 @Test func theEmptyStateCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     #expect(try list(BuiltInTaskViews.inbox, in: store).model.empty == EmptyScreenModel(
-        tile: TileModel(color: .blue, icon: .tray, side: 64, cornerRadius: 18, glyphSize: 32),
-        title: TextModel(text: "Nothing here yet", font: .emptyScreenTitle, color: .ink),
-        text: TextModel(text: "Tasks that match this list’s rule will show up here.", font: .notes, color: .ink2),
+        tile: TileModel(
+            icon: .tray,
+            style: TileStyle(color: .blue, side: 64, cornerRadius: 18, glyphSize: 32, glyphWeight: .medium)
+        ),
+        title: TextModel(text: "Nothing here yet", style: TextStyle(font: .emptyScreenTitle, color: .ink)),
+        text: TextModel(
+            text: "Tasks that match this list’s rule will show up here.",
+            style: TextStyle(font: .notes, color: .ink2)
+        ),
         style: .init(tileToTitle: 18, titleToText: 6, topPadding: 84, horizontalPadding: 40, maxWidth: 270)
     ))
 }
@@ -202,8 +222,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     func showAs(canBoard: Bool) -> MenuButtonModel<Action> {
         MenuButtonModel(
             label: ButtonLabelModel(
-                icon: IconModel(icon: .ellipsis, size: 22, weight: .semibold, color: .ink), title: nil,
-                accessibilityLabel: "More", fill: .container
+                icon: IconModel(icon: .ellipsis, style: IconStyle(size: 22, weight: .semibold, color: .ink)),
+                title: nil, accessibilityLabel: "More",
+                style: ButtonLabelStyle(fill: .container)
             ),
             menu: MenuModel(sections: [
                 .init(items: [
@@ -240,8 +261,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let blockID = TaskList.Model.BlockID.own(.day(day(1)))
     #expect(block.column == ColumnModel(
         header: BlockHeaderModel(
-            title: TextModel(text: "Tomorrow", font: .sectionTitle, color: Tile.rose.glyph),
-            subtitle: TextModel(text: "Thu, Sep 11", font: .areaLabel, color: .ink2), field: nil,
+            title: TextModel(text: "Tomorrow", style: TextStyle(font: .sectionTitle, color: Tile.rose.glyph)),
+            subtitle: TextModel(text: "Thu, Sep 11", style: TextStyle(font: .areaLabel, color: .ink2)), field: nil,
             fold: nil,
             style: .init(
                 titleToSubtitle: 8, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
@@ -267,7 +288,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             isChecked: false, accessibilityLabel: "Complete: Buy milk",
             action: .checkTapped(id)
         ),
-        title: TextModel(text: "Buy milk", font: .nestedRowTitle, color: .ink), meta: [],
+        title: TextModel(text: "Buy milk", style: TextStyle(font: .nestedRowTitle, color: .ink)), meta: [],
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
@@ -328,9 +349,11 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     try store.createTask(NewTask(title: "Buy milk", when: day(1)))
     let module = try list(BuiltInTaskViews.upcoming, in: store)
     let id = TaskList.Model.BlockID.own(.day(day(1)))
-    func plus(_ size: Double) -> IconModel { IconModel(icon: .plus, size: size, weight: .regular, color: .ink2) }
+    func plus(_ size: Double) -> IconModel {
+        IconModel(icon: .plus, style: IconStyle(size: size, weight: .regular, color: .ink2))
+    }
     #expect(block(id, of: module.model)?.addTask == AddRowModel(
-        icon: plus(18), title: TextModel(text: "Add task", font: .addRow, color: .ink2),
+        icon: plus(18), title: TextModel(text: "Add task", style: TextStyle(font: .addRow, color: .ink2)),
         style: .init(
             iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
             trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
@@ -338,7 +361,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         action: .addTaskRowTapped(in: id)
     ))
     #expect(module.model.addList == AddRowModel(
-        icon: plus(18), title: TextModel(text: "Add list", font: .barLabel, color: .ink2),
+        icon: plus(18), title: TextModel(text: "Add list", style: TextStyle(font: .barLabel, color: .ink2)),
         style: .init(
             iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 4, leadingPadding: 0,
             trailingPadding: 12, dash: nil, rule: LineStyle(color: .line, width: 1, dash: []), topMargin: 10,
@@ -348,7 +371,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ))
     module.tap(.showAsChosen(.columns))
     #expect(block(id, of: module.model)?.addTask == AddRowModel(
-        icon: plus(18), title: TextModel(text: "Add task", font: .addRow, color: .ink2),
+        icon: plus(18), title: TextModel(text: "Add task", style: TextStyle(font: .addRow, color: .ink2)),
         style: .init(
             iconCellWidth: 18, spacing: 6, height: 44, width: nil, cornerRadius: 13, topPadding: 0, leadingPadding: 11,
             trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
@@ -357,7 +380,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ))
     #expect(module.model.addList == nil, "the board holds it")
     #expect(board(of: module.model)?.addList == AddRowModel(
-        icon: plus(18), title: TextModel(text: "Add list", font: .barLabel, color: .ink2),
+        icon: plus(18), title: TextModel(text: "Add list", style: TextStyle(font: .barLabel, color: .ink2)),
         style: .init(
             iconCellWidth: 18, spacing: 8, height: 52, width: 200, cornerRadius: 18, topPadding: 0, leadingPadding: 16,
             trailingPadding: 16, dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
@@ -372,7 +395,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 @Test func theFloatingPlusCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     #expect(try list(BuiltInTaskViews.inbox, in: store).model.addTask == FloatingButtonModel(
-        icon: IconModel(icon: .plus, size: 22, weight: .semibold, color: .onAccent),
+        icon: IconModel(icon: .plus, style: IconStyle(size: 22, weight: .semibold, color: .onAccent)),
         style: .init(diameter: 48, fill: .accent, shadow: .raised),
         accessibilityLabel: "New task", action: .addTaskButtonTapped
     ))
@@ -391,12 +414,12 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let module = try list(inbox, in: store)
     func strip(isOpen: Bool) -> DoneStripModel<Action> {
         DoneStripModel(
-            icon: IconModel(icon: .checkCircle, size: 18, weight: .regular, color: Tile.amber.glyph),
-            label: TextModel(text: "Done today · 1", font: .barLabel, color: .ink2),
+            icon: IconModel(icon: .checkCircle, style: IconStyle(size: 18, weight: .regular, color: Tile.amber.glyph)),
+            label: TextModel(text: "Done today · 1", style: TextStyle(font: .barLabel, color: .ink2)),
             chevron: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, size: 15, weight: .semibold, color: .ink2), rotation: isOpen ? 180 : 0,
-                animation: .fold, accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks",
-                action: .doneStripTapped
+                icon: IconModel(icon: .chevron, style: IconStyle(size: 15, weight: .semibold, color: .ink2)),
+                accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped,
+                style: ChevronStyle(rotation: isOpen ? 180 : 0, animation: .fold)
             ),
             style: .init(
                 height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
@@ -461,15 +484,18 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         padding: Double, submitted: Action, cancelled: Action, focusLost: Action
     ) -> TextFieldModel<Action> {
         TextFieldModel(
-            text: text, placeholder: placeholder, font: font, color: color, background: .surface, minimumWidth: 0,
-            height: height, padding: padding, cornerRadius: 0, ring: LineStyle(color: .surface, width: 0, dash: []),
+            text: text, placeholder: placeholder,
+            style: FieldStyle(
+                font: font, color: color, background: .surface, minimumWidth: 0, height: height, padding: padding,
+                cornerRadius: 0, ring: LineStyle(color: .surface, width: 0, dash: [])
+            ),
             submitted: submitted, cancelled: cancelled, focusLost: focusLost
         )
     }
     func pill(_ icon: DesignSystem.Icon, size: Double, iconColor: DesignSystem.Color, _ text: String, font: DesignSystem.Font = .pill) -> PillModel {
         PillModel(
-            icon: IconModel(icon: icon, size: size, weight: .regular, color: iconColor),
-            text: TextModel(text: text, font: font, color: .ink),
+            icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: iconColor)),
+            text: TextModel(text: text, style: TextStyle(font: font, color: .ink)),
             style: .init(
                 height: 32, cornerRadius: 16, leadingPadding: 10, trailingPadding: 12, spacing: 6, background: .fill
             )
@@ -492,14 +518,14 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             subtasks: [
                 SubtaskRowModel(
                     check: check("Find the coupon", .subtaskCheckTapped(sub), side: 18),
-                    title: TextModel(text: "Find the coupon", font: .notes, color: .ink),
+                    title: TextModel(text: "Find the coupon", style: TextStyle(font: .notes, color: .ink)),
                     style: .init(height: 44, strike: nil)
                 ),
             ],
             subtaskField: nil,
             addSubtask: AddRowModel(
-                icon: IconModel(icon: .plus, size: 17, weight: .regular, color: .ink2),
-                title: TextModel(text: "Add subtask", font: .notes, color: .ink2),
+                icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .regular, color: .ink2)),
+                title: TextModel(text: "Add subtask", style: TextStyle(font: .notes, color: .ink2)),
                 style: .init(
                     iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 0,
                     leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: -12,
@@ -514,8 +540,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             ],
             expand: ButtonModel(
                 label: ButtonLabelModel(
-                    icon: IconModel(icon: .expand, size: 19, weight: .regular, color: .ink2), title: nil,
-                    accessibilityLabel: "Open full screen", fill: .color(.surface)
+                    icon: IconModel(icon: .expand, style: IconStyle(size: 19, weight: .regular, color: .ink2)),
+                    title: nil, accessibilityLabel: "Open full screen",
+                    style: ButtonLabelStyle(fill: .color(.surface))
                 ),
                 action: .openFullScreenTapped
             ),
@@ -555,10 +582,12 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let made = try #require(try store.children(ofView: parent).last?.id)
     func field(background: DesignSystem.Color, height: Double) -> TextFieldModel<Action> {
         TextFieldModel(
-            text: "New list", placeholder: "", font: .sectionTitle, color: Tile.indigo.glyph, background: background,
-            minimumWidth: 0, height: height, padding: 0, cornerRadius: 0,
-            ring: LineStyle(color: background, width: 0, dash: []), submitted: .listNameFieldSubmitted,
-            cancelled: .listNameFieldCancelled, focusLost: .listNameFieldLostFocus
+            text: "New list", placeholder: "",
+            style: FieldStyle(
+                font: .sectionTitle, color: Tile.indigo.glyph, background: background, minimumWidth: 0, height: height,
+                padding: 0, cornerRadius: 0, ring: LineStyle(color: background, width: 0, dash: [])
+            ),
+            submitted: .listNameFieldSubmitted, cancelled: .listNameFieldCancelled, focusLost: .listNameFieldLostFocus
         )
     }
     #expect(block(.list(made), of: module.model)?.header?.field == field(background: .paper, height: 31))

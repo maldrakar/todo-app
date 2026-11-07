@@ -176,17 +176,21 @@ struct ListsTree: View {
         _ list: ListRowModel<TaskViewList.UserAction>, width: CGFloat, visibleRight: CGFloat
     ) -> some View {
         ListRowView(list, changed: TaskViewList.UserAction.titleFieldChanged, send: send)
-            .padding(.trailing, list.accessoriesWidth)
-            .frame(width: list.field == nil ? width : min(width, max(visibleRight, list.need)), alignment: .leading)
+            .padding(.trailing, list.style.accessoriesWidth)
+            .frame(
+                width: list.field == nil ? width : min(width, max(visibleRight, list.style.need)), alignment: .leading
+            )
             .frame(width: width, alignment: .leading)
-            .background { ListsTreeItem.Guides(list.guides, in: list.guide) }
+            .background { ListsTreeItem.Guides(list.style.guides, in: list.style.guide) }
             .overlay(alignment: .leading) {
                 ListRowView.End(list, send: send)
-                    .frame(width: visibleRight - list.backgroundInset, alignment: .trailing)
+                    .frame(width: visibleRight - list.style.backgroundInset, alignment: .trailing)
             }
             .overlay(alignment: .leading) {
                 if list.field != nil {
-                    fieldSpan(from: list.leading + list.tile.side + list.tileToTitle, to: list.need)
+                    fieldSpan(
+                        from: list.style.leading + list.tile.style.side + list.style.tileToTitle, to: list.style.need
+                    )
                 }
             }
             // The row's own frame, its inset in from either side: a background sized by the screen's right edge
@@ -194,9 +198,9 @@ struct ListsTree: View {
             // iOS 26.3 simulator, 2026-10-31). Circular corners, as the canvas's `border-radius` draws them
             // (`ListTile`).
             .background {
-                RoundedRectangle(cornerRadius: list.cornerRadius, style: .circular)
-                    .fill(Color(list.background))
-                    .padding(.horizontal, list.backgroundInset)
+                RoundedRectangle(cornerRadius: list.style.cornerRadius, style: .circular)
+                    .fill(Color(list.style.background))
+                    .padding(.horizontal, list.style.backgroundInset)
             }
             .contentShape(.rect)
             .rowTap(list.tap, hasField: list.field != nil, send: send)
@@ -220,7 +224,7 @@ struct ListsTree: View {
             .frame(width: visibleRight, alignment: .leading)
             .overlay(alignment: .leading) {
                 if let field = line.field {
-                    fieldSpan(from: 0, to: line.leading + field.minimumWidth)
+                    fieldSpan(from: 0, to: line.style.leading + field.style.minimumWidth)
                 }
             }
             .contentShape(.rect)
@@ -241,7 +245,7 @@ struct ListsTree: View {
     private func widthNeeded(by item: ListsTreeItem) -> CGFloat {
         switch item {
         case .list(_, let list):
-            list.need
+            list.style.need
         case .area, .slot:
             0
         }

@@ -79,7 +79,7 @@ extension TaskViewList {
 
         /// The look of the drag for the window's width, whose gesture, lifted block, place and depth are the platform's
         /// (the owner, 2026-10-30).
-        public let drag: DragModel
+        public let drag: DragStyle
 
         /// The confirmation of a delete while it is up, and nil when none is: a view draws it as an alert, its title
         /// and message with its two choices, which send `deleteConfirmed` and `deleteCancelled` (spec section 6). It

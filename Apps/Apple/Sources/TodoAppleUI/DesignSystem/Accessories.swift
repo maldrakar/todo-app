@@ -60,8 +60,8 @@ struct Accessories<Action: Equatable & Sendable>: View {
         case .chevron(let chevron):
             Button { send(chevron.action) } label: {
                 Icon(chevron.icon)
-                    .rotationEffect(.degrees(chevron.rotation))
-                    .animation(reduceMotion ? nil : Animation(chevron.animation), value: chevron.rotation)
+                    .rotationEffect(.degrees(chevron.style.rotation))
+                    .animation(reduceMotion ? nil : Animation(chevron.style.animation), value: chevron.style.rotation)
                     .frame(minWidth: cellMinimumWidth, minHeight: height, maxHeight: height)
                     .contentShape(.rect)
             }

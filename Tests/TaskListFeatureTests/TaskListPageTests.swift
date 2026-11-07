@@ -87,8 +87,14 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     #expect(ids(of: model) == [.own(nil), .list(house), .list(soon)])
     #expect(titles(of: model) == [["Write the plan"], ["Fix the door"], ["Pay the rent"]], "what a list inside claims is not the parent's own")
     #expect(blocks(of: model).map(heading(of:)) == [nil, ["House", nil], ["Soon", nil]])
-    #expect(blocks(of: model)[1].header?.title.color == DesignSystem.Color.Components.Tile.teal.glyph, "in the list's own colour")
-    #expect(blocks(of: model)[2].header?.title.color == DesignSystem.Color.Components.Tile.stone.glyph, "a list with no colour is stone")
+    #expect(
+        blocks(of: model)[1].header?.title.style.color == DesignSystem.Color.Components.Tile.teal.glyph,
+        "in the list's own colour"
+    )
+    #expect(
+        blocks(of: model)[2].header?.title.style.color == DesignSystem.Color.Components.Tile.stone.glyph,
+        "a list with no colour is stone"
+    )
 }
 
 /// A folder inside the list is one block of the tasks its lists select, as its count in the sidebar counts them
@@ -221,8 +227,8 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     let done = try store.createTask(NewTask(title: "Done", deadline: day(-1)))
     try store.update(task: done, [.status(.done)])
     let rows = try #require(blocks(of: try list(inbox, in: store).model).first).rows
-    #expect(rows.map { row($0).meta.first?.text?.color } == [.red, .red, .ink2])
-    #expect(rows.map { row($0).meta.first?.icon?.color } == [.red, .red, .ink2])
+    #expect(rows.map { row($0).meta.first?.text?.style.color } == [.red, .red, .ink2])
+    #expect(rows.map { row($0).meta.first?.icon?.style.color } == [.red, .red, .ink2])
     let logbook = try #require(blocks(of: try list(BuiltInTaskViews.logbook, in: store).model).first).rows
     #expect(logbook.map { row($0).title.text } == ["Done"])
     #expect(logbook.map { row($0).meta.isEmpty } == [true])
@@ -586,7 +592,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
         let header = try list(screen(group, of: upcoming), in: store).model.header
         #expect(header.title.text == title)
         #expect(header.subtitle?.text == subtitle)
-        #expect(header.tile.color == .rose, "the list's tile")
+        #expect(header.tile.style.color == .rose, "the list's tile")
     }
 }
 
@@ -705,8 +711,8 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     }
     #expect(try list(folder, in: store).model.empty == nil, "a list inside is a block to add into")
     let trash = try #require(try list(BuiltInTaskViews.trash, in: store).model.empty)
-    #expect(trash.tile.color == .stone)
-    #expect(trash.tile.glyph.icon == .trash)
+    #expect(trash.tile.style.color == .stone)
+    #expect(trash.tile.icon == .trash)
     try store.createTask(NewTask(title: "Buy milk", tags: [errand]))
     #expect(try list(inbox, in: store).model.empty == nil)
     #expect(try list(tagged, in: store).model.empty == nil)

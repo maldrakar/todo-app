@@ -1,4 +1,4 @@
-// Sources/DesignSystemComponents/FillModel.swift
+// Sources/DesignSystemComponents/ControlFillStyle.swift
 import DesignSystem
 
 /// What a control stands on: the container its platform puts it on, which is the platform's choice, the glass under a
@@ -6,7 +6,7 @@ import DesignSystem
 /// its glyph and its words stand. A button's look and a search field each say what they stand on, so that the two
 /// share one answer (Lists screen plan, Task 9). A view switches over it, every case drawn and no `default`
 /// (`docs/style.md`, "Views").
-public enum FillModel: Equatable, Sendable {
+public enum ControlFillStyle: Equatable, Sendable {
     case container
     case color(DesignSystem.Color)
 }

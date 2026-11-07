@@ -449,15 +449,17 @@ private enum WasmSizeProbe {
                 for accessory in list.accessories {
                     switch accessory {
                     case .text(let text): count = text.text
-                    case .chevron(let chevron): isFolded = chevron.rotation != 0
+                    case .chevron(let chevron): isFolded = chevron.style.rotation != 0
                     case .grip, .check, .space, .hidden: continue
                     }
                 }
                 if lists == 0 {
-                    let emphasis = list.title.font.weight == .regular ? "plain" : "emphasized"
-                    let tile = "\(list.tile.side) pt \(list.tile.color.rawValue) \(list.tile.glyph.icon.rawValue) tile"
+                    let emphasis = list.title.style.font.weight == .regular ? "plain" : "emphasized"
+                    let tileStyle = list.tile.style
+                    let tile = "\(tileStyle.side) pt \(tileStyle.color.rawValue) \(list.tile.icon.rawValue) tile"
                     let menu = list.menu?.sections.flatMap(\.items).map(\.title).joined(separator: "/") ?? "no menu"
-                    first = "\(list.title.text) \(count) on a \(tile), \(emphasis), at \(list.leading) pt needing \(list.need), \(menu)"
+                    let place = "at \(list.style.leading) pt needing \(list.style.need)"
+                    first = "\(list.title.text) \(count) on a \(tile), \(emphasis), \(place), \(menu)"
                 }
                 lists += 1
                 if isFolded { folded += 1 }
@@ -491,16 +493,16 @@ private enum WasmSizeProbe {
         let controls = bar.items.flatMap { item in
             switch item {
             case .button(let button):
-                return [(button.label.accessibilityLabel, "pressed", button.label.fill)]
+                return [(button.label.accessibilityLabel, "pressed", button.label.style.fill)]
             case .menuButton(let button):
                 let items = button.menu.sections.flatMap(\.items)
                 let shortcuts = "a menu of \(items.count) with \(items.compactMap(\.shortcut).count) shortcuts"
-                return [(button.label.accessibilityLabel, shortcuts, button.label.fill)]
+                return [(button.label.accessibilityLabel, shortcuts, button.label.style.fill)]
             case .search(let field):
-                let glyph = field.trailingGlyph.map(\.icon.icon.rawValue) ?? "nothing"
-                return [(field.placeholder.text, "ending in \(glyph)", field.fill)]
+                let glyph = field.trailingGlyph.map(\.icon.rawValue) ?? "nothing"
+                return [(field.placeholder.text, "ending in \(glyph)", field.style.fill)]
             case .group(let buttons):
-                return buttons.map { ($0.label.accessibilityLabel, "pressed", $0.label.fill) }
+                return buttons.map { ($0.label.accessibilityLabel, "pressed", $0.label.style.fill) }
             }
         }
         let labels = controls.map { name, does, fill in
@@ -510,8 +512,8 @@ private enum WasmSizeProbe {
             }
             return "\(name) \(does) \(standing)"
         }
-        let rule = bar.rule.map { "under a rule of \($0.width) pt" } ?? "with no rule"
-        return "\(labels.joined(separator: ", ")), \(bar.height) pt high \(rule)"
+        let rule = bar.style.rule.map { "under a rule of \($0.width) pt" } ?? "with no rule"
+        return "\(labels.joined(separator: ", ")), \(bar.style.height) pt high \(rule)"
     }
 
     /// The look of the sidebar's drag as a line: what marks a drop at depth 2, where it starts, and the card, through

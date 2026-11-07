@@ -1,5 +1,4 @@
 // Sources/DesignSystemComponents/BarModel.swift
-import DesignSystem
 
 /// A bar of controls as every platform draws it (`Phone.dc.html`, the bar; `Mac.dc.html`, the bottom of the column):
 /// `height` high, under its rule where it has one, its items in a row, centred in its height, `spacing` apart and
@@ -8,7 +7,8 @@ import DesignSystem
 /// take the room the buttons leave. A group is buttons on one container, `groupPadding` in from its ends, each
 /// `groupButtonHeight` high with its glyph `groupButtonSpacing` before its word, sharing the group's width, and between
 /// two of them `groupDivider`, `groupDividerHeight` high, which alone separates them. A view switches over `Item`,
-/// every case drawn and no `default` (`docs/style.md`, "Views").
+/// every case drawn and no `default` (`docs/style.md`, "Views"). Its numbers, its rules and its shadow are the fields
+/// of its `BarStyle`.
 public struct BarModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// What stands on the bar: a button, a button that puts a menu up, the search field, or buttons grouped on one
     /// container.
@@ -20,49 +20,10 @@ public struct BarModel<Action: Equatable & Sendable>: Equatable, Sendable {
     }
 
     public let items: [Item]
-    public let height: Double
+    public let style: BarStyle
 
-    /// The rule along the bar's top edge, across its width, and nil for a bar with none.
-    public let rule: LineStyle?
-
-    public let controlHeight: Double
-    public let spacing: Double
-    public let padding: Double
-    public let groupButtonHeight: Double
-    public let groupButtonSpacing: Double
-    public let groupPadding: Double
-    public let groupDividerHeight: Double
-
-    /// The divider between two buttons of a group, whose width is how thick it is.
-    public let groupDivider: LineStyle
-
-    public let buttonShadow: DesignSystem.Shadow
-
-    public init(
-        items: [Item],
-        height: Double,
-        rule: LineStyle?,
-        controlHeight: Double,
-        spacing: Double,
-        padding: Double,
-        groupButtonHeight: Double,
-        groupButtonSpacing: Double,
-        groupPadding: Double,
-        groupDividerHeight: Double,
-        groupDivider: LineStyle,
-        buttonShadow: DesignSystem.Shadow
-    ) {
+    public init(items: [Item], style: BarStyle) {
         self.items = items
-        self.height = height
-        self.rule = rule
-        self.controlHeight = controlHeight
-        self.spacing = spacing
-        self.padding = padding
-        self.groupButtonHeight = groupButtonHeight
-        self.groupButtonSpacing = groupButtonSpacing
-        self.groupPadding = groupPadding
-        self.groupDividerHeight = groupDividerHeight
-        self.groupDivider = groupDivider
-        self.buttonShadow = buttonShadow
+        self.style = style
     }
 }

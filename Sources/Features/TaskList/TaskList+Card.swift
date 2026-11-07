@@ -54,8 +54,11 @@ extension TaskList {
             pills: pills(of: task, today: context.today, tags: context.tags, metrics.pill),
             expand: ButtonModel(
                 label: ButtonLabelModel(
-                    icon: IconModel(icon: .expand, size: metrics.expandSize, weight: .regular, color: .ink2),
-                    title: nil, accessibilityLabel: "Open full screen", fill: .color(.surface)
+                    icon: IconModel(
+                        icon: .expand, style: IconStyle(size: metrics.expandSize, weight: .regular, color: .ink2)
+                    ),
+                    title: nil, accessibilityLabel: "Open full screen",
+                    style: ButtonLabelStyle(fill: .color(.surface))
                 ),
                 action: .openFullScreenTapped
             ),
@@ -72,7 +75,7 @@ extension TaskList {
             check: check(
                 title: task.title, isOpen: isOpen, action: .subtaskCheckTapped(task.id), metrics.subtaskCheck(color)
             ),
-            title: TextModel(text: task.title, font: .notes, color: isOpen ? .ink : .ink2),
+            title: TextModel(text: task.title, style: TextStyle(font: .notes, color: isOpen ? .ink : .ink2)),
             style: metrics.subtask(isOpen)
         )
     }
@@ -89,8 +92,8 @@ extension TaskList {
             font: DesignSystem.Font = .pill, color: DesignSystem.Color
         ) -> PillModel {
             PillModel(
-                icon: IconModel(icon: icon, size: size, weight: .regular, color: iconColor),
-                text: TextModel(text: text, font: font, color: color), style: metrics.style
+                icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: iconColor)),
+                text: TextModel(text: text, style: TextStyle(font: font, color: color)), style: metrics.style
             )
         }
         let when = task.when.map { whenPillText($0, today: today) }

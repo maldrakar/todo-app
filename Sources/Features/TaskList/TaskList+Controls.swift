@@ -20,8 +20,9 @@ extension TaskList {
     /// A row that adds, its plus and its title in ink 2.
     static func addRow(title: String, action: UserAction, _ metrics: Metrics.AddRow) -> AddRowModel<UserAction> {
         AddRowModel(
-            icon: IconModel(icon: .plus, size: metrics.iconSize, weight: .regular, color: .ink2),
-            title: TextModel(text: title, font: metrics.font, color: .ink2), style: metrics.style, action: action
+            icon: IconModel(icon: .plus, style: IconStyle(size: metrics.iconSize, weight: .regular, color: .ink2)),
+            title: TextModel(text: title, style: TextStyle(font: metrics.font, color: .ink2)),
+            style: metrics.style, action: action
         )
     }
 
@@ -38,9 +39,10 @@ extension TaskList {
     /// The floating "+": a white plus on the accent, casting the raised shadow.
     static func floatingButton(_ metrics: Metrics.FloatingButton) -> FloatingButtonModel<UserAction> {
         FloatingButtonModel(
-            icon: IconModel(icon: .plus, size: metrics.glyphSize, weight: .semibold, color: .onAccent),
-            style: metrics.style, accessibilityLabel: newTaskTitle,
-            action: .addTaskButtonTapped
+            icon: IconModel(
+                icon: .plus, style: IconStyle(size: metrics.glyphSize, weight: .semibold, color: .onAccent)
+            ),
+            style: metrics.style, accessibilityLabel: newTaskTitle, action: .addTaskButtonTapped
         )
     }
 
@@ -51,12 +53,18 @@ extension TaskList {
         count: Int, isOpen: Bool, color: Tile, _ metrics: Metrics.DoneStrip
     ) -> DoneStripModel<UserAction> {
         DoneStripModel(
-            icon: IconModel(icon: .checkCircle, size: metrics.iconSize, weight: .regular, color: color.glyph),
-            label: TextModel(text: "Done today · \(count)", font: .barLabel, color: .ink2),
+            icon: IconModel(
+                icon: .checkCircle,
+                style: IconStyle(size: metrics.iconSize, weight: .regular, color: color.glyph)
+            ),
+            label: TextModel(text: "Done today · \(count)", style: TextStyle(font: .barLabel, color: .ink2)),
             chevron: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, size: metrics.chevronSize, weight: .semibold, color: .ink2),
-                rotation: isOpen ? 180 : 0, animation: .fold,
-                accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped
+                icon: IconModel(
+                    icon: .chevron,
+                    style: IconStyle(size: metrics.chevronSize, weight: .semibold, color: .ink2)
+                ),
+                accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped,
+                style: ChevronStyle(rotation: isOpen ? 180 : 0, animation: .fold)
             ),
             style: metrics.style, isOpen: isOpen, action: .doneStripTapped
         )
@@ -69,7 +77,8 @@ extension TaskList {
     static func swipe(of id: TaskID, _ style: SwipeStyle) -> SwipeModel<UserAction> {
         SwipeModel(
             style: style,
-            button: TextModel(text: deleteTitle, font: .barLabel, color: .onAccent), action: .deleteSwiped(id)
+            button: TextModel(text: deleteTitle, style: TextStyle(font: .barLabel, color: .onAccent)),
+            action: .deleteSwiped(id)
         )
     }
 
