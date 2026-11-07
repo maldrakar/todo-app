@@ -1,18 +1,21 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowDragSpace.swift
 import DesignSystem
 import SwiftUI
+import TaskListFeature
 #if os(iOS)
 // A drop's point is carried into the content through the window, and a board settles by its scroll view: UIKit's alone.
 import UIKit
 #endif
 
 /// What the screen's gestures stand at now, which its blocks and rows draw from: the lift, nil while no row is lifted,
-/// what the drag knows of the layout, the swipe, and what the screen stands on, which a row of the list stands on too.
+/// what the drag knows of the layout, the swipe, what the screen stands on, which a row of the list stands on too, and
+/// what a row's Delete sends, which leaves the swipe as it stands, since the row goes from where it stands.
 struct ScreenGestures {
     let lift: RowLift?
     let space: RowDragSpace
     let swipe: ScreenSwipe
     let ground: DesignSystem.Color
+    let delete: (TaskList.UserAction) -> Void
 }
 
 /// What a drag and a swipe read of the layout and of the drag under way, and draw nothing from. Kept in a class that

@@ -29,6 +29,7 @@ struct ColumnView: View {
 
     var body: some View {
         let isTinted = isDragOver && column.isDropTarget
+        let motion = reduceMotion ? nil : Animation(column.style.dropAnimation)
         VStack(alignment: .leading, spacing: 0) {
             BlockHeaderView(column.header, send: send)
             ScrollView {
@@ -49,17 +50,20 @@ struct ColumnView: View {
         }
         .frame(width: column.style.width)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(
-            Color(isTinted ? column.style.dropTint : column.style.fill),
-            in: .rect(cornerRadius: column.style.cornerRadius, style: .circular)
-        )
+        // On the tint and the ring alone: over the whole column, a drop's own change of the tint moved its cards on that
+        // motion, and the one landing faded in as well as sprang (the iOS 26.3 simulator, 2026-11-07).
+        .background {
+            RoundedRectangle(cornerRadius: column.style.cornerRadius, style: .circular)
+                .fill(Color(isTinted ? column.style.dropTint : column.style.fill))
+                .animation(motion, value: isTinted)
+        }
         .overlay {
             RoundedRectangle(cornerRadius: column.style.cornerRadius, style: .circular)
                 .strokeBorder(Color(column.style.dropRing), lineWidth: column.style.dropRingWidth)
                 .opacity(isTinted ? 1 : 0)
+                .animation(motion, value: isTinted)
                 .allowsHitTesting(false)
         }
-        .animation(reduceMotion ? nil : Animation(column.style.dropAnimation), value: isTinted)
         .reportsLiftFrame { [id = block.id] in RowLift.Frames(blocks: [id: $0]) }
     }
 }

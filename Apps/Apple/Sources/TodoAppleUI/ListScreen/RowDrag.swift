@@ -57,8 +57,11 @@ struct RowDragSource: ViewModifier {
                         )
                 }
                 #endif
-                .opacity(isLifted ? lift.opacity : 1)
-                .animation(reduceMotion ? nil : Animation(lift.dimAnimation), value: isLifted)
+                // The opacity alone: over the whole row, a drop's own end of the lift carried the row to its place on
+                // this motion, over the rows that had already moved (the iOS 26.3 simulator, 2026-11-07).
+                .animation(reduceMotion ? nil : Animation(lift.dimAnimation)) { row in
+                    row.opacity(isLifted ? lift.opacity : 1)
+                }
         } else {
             content
         }

@@ -40,16 +40,14 @@ struct SwipeToDelete: ViewModifier {
             let current = swipe.current?.row == row ? swipe.current : nil
             let x = current?.x ?? 0
             content
-                .offset(x: x)
+                .animation(current?.isFollowingFinger == true || reduceMotion ? nil : Animation(model.style.animation)) {
+                    $0.offset(x: x)
+                }
                 .background(alignment: .trailing) {
                     if x < 0 {
                         button(model)
                     }
                 }
-                .animation(
-                    current?.isFollowingFinger == true || reduceMotion ? nil : Animation(model.style.animation),
-                    value: x
-                )
                 .accessibilityAction(named: Text(model.accessibilityLabel)) { delete(model.action) }
         } else {
             content

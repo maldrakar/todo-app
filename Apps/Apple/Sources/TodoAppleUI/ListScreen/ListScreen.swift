@@ -101,7 +101,7 @@ struct ListScreen: View {
 
     /// What the screen's gestures stand at now.
     private var gestures: ScreenGestures {
-        ScreenGestures(lift: lift, space: dragSpace, swipe: swipe, ground: model.style.background)
+        ScreenGestures(lift: lift, space: dragSpace, swipe: swipe, ground: model.style.background, delete: send)
     }
 
     /// What a control of the content sends: any of them closes the row a swipe left open.

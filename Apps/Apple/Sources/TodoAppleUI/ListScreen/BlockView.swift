@@ -105,11 +105,13 @@ struct BlockRow: View {
             .modifier(TaskLanding(task.style))
             if let block, let gestures {
                 let row = BlockRowID(block: block, task: id)
-                let deleted = { (action: TaskList.UserAction) in delete(action, leaving: task.style.leaving) }
+                let delete = { (action: TaskList.UserAction) in
+                    deleted(action, row: row, leaving: task.style.leaving, gestures: gestures)
+                }
                 face
                     .background { if column == nil { Color(gestures.ground) } }
-                    .modifier(RowDragSource(task, row: row, gestures: gestures, delete: deleted))
-                    .modifier(SwipeToDelete(task.swipe, of: row, in: gestures.swipe, delete: deleted))
+                    .modifier(RowDragSource(task, row: row, gestures: gestures, delete: delete))
+                    .modifier(SwipeToDelete(task.swipe, of: row, in: gestures.swipe, delete: delete))
                     .reportsLiftFrame { RowLift.Frames(rows: [row: $0]) }
             } else {
                 face
@@ -129,14 +131,25 @@ struct BlockRow: View {
         }
     }
 
-    /// Sends a Delete, on the motion that takes the row away, as a done row leaves with no wait, the rows under it
-    /// closing up. The row stays where it stands as it goes, a swiped one aside.
-    private func delete(_ action: TaskList.UserAction, leaving: TaskLeavingStyle) {
+    /// Sends a Delete, on the motion that takes the row away as a done row leaves with no wait, the rows under it closing
+    /// up. A swiped row goes from where it stands, aside, and its swipe ends with the motion, which brings it back where
+    /// the store refused.
+    private func deleted(
+        _ action: TaskList.UserAction, row: BlockRowID, leaving: TaskLeavingStyle, gestures: ScreenGestures
+    ) {
+        func endSwipe() {
+            if gestures.swipe.current?.row == row { gestures.swipe.current = nil }
+        }
         guard !reduceMotion else {
-            send(action)
+            gestures.delete(action)
+            endSwipe()
             return
         }
-        withAnimation(Animation(leaving.deleteAnimation)) { send(action) }
+        withAnimation(Animation(leaving.deleteAnimation), completionCriteria: .logicallyComplete) {
+            gestures.delete(action)
+        } completion: {
+            endSwipe()
+        }
     }
 
     /// What a card of a column stands on, and nothing for a row of the list.
