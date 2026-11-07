@@ -130,8 +130,10 @@ private struct RowDropDelegate: DropDelegate {
     }
 
     private func hear(_ call: RowDragSessions.Call, _ info: DropInfo) {
+        // Only a call the lift owns counts as heard, so a drag this screen did not begin cannot keep a lift alive.
+        guard let phase = space.sessions.phase(for: call, session: session(of: info), lift: lift()) else { return }
         space.wasHeard = true
-        if let phase = space.sessions.phase(for: call, session: session(of: info), lift: lift()) { step(phase) }
+        step(phase)
     }
 
     private func session(of info: DropInfo) -> String? {
