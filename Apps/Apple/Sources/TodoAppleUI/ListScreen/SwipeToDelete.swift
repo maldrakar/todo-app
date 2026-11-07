@@ -39,10 +39,9 @@ struct SwipeToDelete: ViewModifier {
         if let model {
             let current = swipe.current?.row == row ? swipe.current : nil
             let x = current?.x ?? 0
+            let isAtOnce = current?.isFollowingFinger == true || reduceMotion
             content
-                .animation(current?.isFollowingFinger == true || reduceMotion ? nil : Animation(model.style.animation)) {
-                    $0.offset(x: x)
-                }
+                .animation(isAtOnce ? nil : Animation(model.style.animation)) { $0.offset(x: x) }
                 .background(alignment: .trailing) {
                     if x < 0 {
                         button(model)

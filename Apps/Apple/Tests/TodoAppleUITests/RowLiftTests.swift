@@ -27,11 +27,17 @@ import TodoCore
     #expect(list.lift?.slot == RowLift.Slot(block: .list(list.house), after: list.h1))
 }
 
-/// A row with no lift, or one no longer drawn, gone by a peer's change between the press and the first point, lifts
-/// nothing, so that nothing dims and nothing drops.
+/// A row no longer drawn, gone by a peer's change between the press and the first point, lifts nothing, nor does an
+/// open card, which has no lift, so that nothing dims and nothing drops.
 @Test func aRowThatCannotBeLiftedLiftsNothing() throws {
     var list = try LiftedList()
-    list.press(.began(task: TaskID(), block: .own(nil), at: .zero))
+    let own = TaskList.Model.BlockID.own(nil)
+    list.press(.began(task: TaskID(), block: own, at: .zero))
+    #expect(list.lift == nil)
+    list.press(.ended)
+    #expect(list.drops.isEmpty)
+    list.openCard(on: list.a)
+    list.press(.began(task: list.a, block: own, at: list.centre(of: list.a, in: own)))
     #expect(list.lift == nil)
     list.press(.ended)
     #expect(list.drops.isEmpty)
@@ -361,6 +367,11 @@ private struct LiftedList {
     private func point(in task: TaskID, of id: TaskList.Model.BlockID, at fraction: CGFloat) -> CGPoint {
         let frame = frames.rows[BlockRowID(block: id, task: task)] ?? .zero
         return CGPoint(x: frame.midX, y: frame.minY + frame.height * fraction)
+    }
+
+    /// Opens a task's card in place of its row.
+    func openCard(on task: TaskID) {
+        _ = module.send(.action(.rowTapped(task)))
     }
 
     /// One stage of the drag, as the screen's delegate hands it on, over the frames of what is drawn now.

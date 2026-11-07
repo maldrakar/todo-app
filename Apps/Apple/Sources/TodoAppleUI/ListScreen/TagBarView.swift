@@ -28,6 +28,7 @@ struct TagBarView<Action: Equatable & Sendable>: View {
             .padding(.leading, model.style.padding)
             .padding(.trailing, model.style.padding + model.style.endRoom)
             #if os(iOS)
+            // iOS alone: the Mac and the watch have no such swipe.
             .background { BackSwipeFirst() }
             #endif
         }

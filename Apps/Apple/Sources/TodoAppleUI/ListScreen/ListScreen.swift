@@ -22,6 +22,10 @@ import TaskListFeature
 /// The bar is hidden, so the way back is the glass circle, and the swipe from the screen's edge, which a hidden bar
 /// turns off, is kept on (`EdgeSwipeBack`); the long-press menu of the system's back button goes with the button.
 ///
+/// A row's drag, menu, swipe and landing are its own (`BlockRow`); the screen keeps what they share, the drag in
+/// progress and the row swiped aside, and stands the drop on its scroll views (`RowDropTarget`). Any control of the
+/// content closes a row left swiped open.
+///
 /// A Mac window can be narrow too, so this draws there as well, each call the Mac lacks fenced and named; Task 9 gives
 /// the Mac its look.
 struct ListScreen: View {
@@ -60,10 +64,10 @@ struct ListScreen: View {
             .contentShape(.rect)
             .onTapGesture { sent(.backgroundTapped) }
             // The content goes down under the home indicator, whichever its layout, for the drop (`RowDropTarget`) and
-            // so that the board's columns end above the screen's bottom and not the safe area's (`.board`'s padding); and
-            // here, outside the shape above, which ends a hit where it ends: inside it, a drop's point left the target at
-            // the safe area's foot (the iOS 26.3 simulator, 2026-11-07). The keyboard still shortens it, its region not
-            // ignored.
+            // so that the board's columns end above the screen's bottom and not the safe area's (`.board`'s padding);
+            // and here, outside the shape above, which ends a hit where it ends: inside it, a drop's point left the
+            // target at the safe area's foot (the iOS 26.3 simulator, 2026-11-07). The keyboard still shortens it, its
+            // region not ignored.
             .ignoresSafeArea(.container, edges: .bottom)
             .background {
                 // The keyboard's region apart: the scroll view stands above the keyboard.
@@ -117,6 +121,7 @@ struct ListScreen: View {
 
     /// The list's content as the space a drag finds its place in, and what its rows' swipe reads there.
     private func rowDragContent(_ blocks: [TaskList.Model.Block]) -> RowDragContent {
+        // iOS alone: its finder is UIKit's.
         #if os(iOS)
         RowDragContent(
             space: dragSpace,
@@ -129,8 +134,8 @@ struct ListScreen: View {
         #endif
     }
 
-    /// The list: everything scrolls, under the glass bar, from under the safe area's top, and down to the screen's foot,
-    /// what it holds ending as far above what the safe area covers there as its style says.
+    /// The list: everything scrolls, under the glass bar, from under the safe area's top, and down to the screen's
+    /// foot, what it holds ending as far above what the safe area covers there as its style says.
     private func list(_ blocks: [TaskList.Model.Block]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {

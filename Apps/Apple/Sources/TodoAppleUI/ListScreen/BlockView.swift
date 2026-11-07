@@ -131,9 +131,9 @@ struct BlockRow: View {
         }
     }
 
-    /// Sends a Delete, on the motion that takes the row away as a done row leaves with no wait, the rows under it closing
-    /// up. A swiped row goes from where it stands, aside, and its swipe ends with the motion, which brings it back where
-    /// the store refused.
+    /// Sends a Delete, on the motion that takes the row away as a done row leaves with no wait, the rows under it
+    /// closing up. A swiped row goes from where it stands, aside, and its swipe ends with the motion, which brings it
+    /// back where the store refused.
     private func deleted(
         _ action: TaskList.UserAction, row: BlockRowID, leaving: TaskLeavingStyle, gestures: ScreenGestures
     ) {

@@ -35,6 +35,7 @@ struct BoardView: View {
             .padding(.trailing, board.endRoom)
             .modifier(rowDragContent)
             #if os(iOS)
+            // iOS alone: the Mac and the watch have no such swipe.
             .background { BackSwipeFirst() }
             #endif
             // At the top of the scroll view whatever it holds, which would centre what is shorter than itself.
@@ -48,6 +49,7 @@ struct BoardView: View {
 
     /// The board's content as the space a drag finds its place in.
     private var rowDragContent: RowDragContent {
+        // iOS alone: its finder is UIKit's.
         #if os(iOS)
         RowDragContent(space: gestures.space, finder: ScrollContentFinder(space: gestures.space))
         #else

@@ -29,6 +29,7 @@ final class RowDragSpace {
     /// The frames the screen's rows, blocks and columns last reported.
     var frames = RowLift.Frames()
 
+    // iOS alone: only there does a system drag stand on the screen, and these are UIKit's.
     #if os(iOS)
     /// The row the system's drag carries, from when `onDrag` asked for its item. It is no lift yet: a press that opens
     /// the menu asks too. A drag gone out of the scroll view and back still carries it.

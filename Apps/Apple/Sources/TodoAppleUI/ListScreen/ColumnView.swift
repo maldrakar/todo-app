@@ -50,8 +50,8 @@ struct ColumnView: View {
         }
         .frame(width: column.style.width)
         .frame(maxHeight: .infinity, alignment: .top)
-        // On the tint and the ring alone: over the whole column, a drop's own change of the tint moved its cards on that
-        // motion, and the one landing faded in as well as sprang (the iOS 26.3 simulator, 2026-11-07).
+        // On the tint and the ring alone: over the whole column, a drop's own change of the tint moved its cards on
+        // that motion, and the one landing faded in as well as sprang (the iOS 26.3 simulator, 2026-11-07).
         .background {
             RoundedRectangle(cornerRadius: column.style.cornerRadius, style: .circular)
                 .fill(Color(isTinted ? column.style.dropTint : column.style.fill))

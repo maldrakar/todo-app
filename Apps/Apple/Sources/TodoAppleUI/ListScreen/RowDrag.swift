@@ -105,8 +105,8 @@ private struct RowDropDelegate: DropDelegate {
     func dropUpdated(info: DropInfo) -> DropProposal? {
         moved(to: info.location)
         // Never `.forbidden`, over a block that takes no drop either: a release under it calls nothing here, not even
-        // `dropExited`, and the lift would stay, the row dimmed (the iOS 26.3 simulator, 2026-11-07). The release reports
-        // no drop there by itself, having no slot.
+        // `dropExited`, and the lift would stay, the row dimmed (the iOS 26.3 simulator, 2026-11-07). The release
+        // reports no drop there by itself, having no slot.
         return DropProposal(operation: .move)
     }
 
@@ -137,9 +137,9 @@ private struct RowDropDelegate: DropDelegate {
 
 /// A `ScrollView` of the list or the board as the target of the system's drag (spike #174, y1): on the scroll view, its
 /// margins included, and not on its content, and with the screen's content going down under the home indicator
-/// (`ListScreen`), since a release in that inset cancelled. The system scrolls the scroll views under the drag, so it has
-/// no display link. A board that snaps comes to rest on a column when the lift ends. iOS alone: the Mac's pointer drag is
-/// another task's, and the watch has neither.
+/// (`ListScreen`), since a release in that inset cancelled. The system scrolls the scroll views under the drag, so it
+/// has no display link. A board that snaps comes to rest on a column when the lift ends. iOS alone: the Mac's pointer
+/// drag is another task's, and the watch has neither.
 struct RowDropTarget: ViewModifier {
     private let blocks: [TaskList.Model.Block]
     @Binding private var lift: RowLift?
@@ -180,10 +180,11 @@ struct RowDropTarget: ViewModifier {
     }
 
     #if os(iOS)
-    /// Ends a lift no call ends. The system calls the delegate every frame for as long as a drag stands over the target,
-    /// moving or not, and a drag can end with no call at all: let go at the very edge of the screen, neither
-    /// `performDrop` nor `dropExited` came, and the card stayed dimmed (the iOS 26.3 simulator, 2026-11-07). SwiftUI has
-    /// no end of a drag before iOS 26. A silence that was only a slow frame costs nothing: the next call lifts again.
+    /// Ends a lift no call ends. The system calls the delegate every frame for as long as a drag stands over the
+    /// target, moving or not, and a drag can end with no call at all: let go at the very edge of the screen, neither
+    /// `performDrop` nor `dropExited` came, and the card stayed dimmed (the iOS 26.3 simulator, 2026-11-07). SwiftUI
+    /// has no end of a drag before iOS 26. A silence that was only a slow frame costs nothing: the next call lifts
+    /// again.
     private func cancelOnSilence() async {
         let silence = Duration.milliseconds(250)
         while !Task.isCancelled {
