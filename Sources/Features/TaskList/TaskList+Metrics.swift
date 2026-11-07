@@ -354,9 +354,9 @@ extension TaskList {
                 .init(
                     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
-                    strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 14) : nil, fresh: isFresh ? .fresh : nil,
-                    landingScale: nil, landingAnimation: .fresh, titleAnimation: .titleFades, leaving: taskLeaving,
-                    ground: .paper
+                    strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 14) : nil,
+                    fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .fresh,
+                    titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
@@ -418,8 +418,8 @@ extension TaskList {
 
         /// How the phone's row or a column's card looks lifted (Task 8's table, Lift and slot), rounded as it says, a
         /// row 14 and a card its own 13, which the table gives the card no other number for: grown to 1.03 on the
-        /// surface and casting the lifted shadow, and dimmed to .35 where it is dragged from, as the system's copy of it
-        /// moves (the controller's ruling on #177, 2026-11-07).
+        /// surface and casting the lifted shadow, and dimmed to .35 where it is dragged from, as the system's copy of
+        /// it moves (the controller's ruling on #177, 2026-11-07).
         private static func taskLift(cornerRadius: Double) -> TaskLiftStyle {
             TaskLiftStyle(
                 scale: 1.03, opacity: 0.35, cornerRadius: cornerRadius, background: .surface, shadow: .lifted,
