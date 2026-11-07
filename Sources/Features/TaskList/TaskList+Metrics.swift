@@ -165,12 +165,11 @@ extension TaskList {
         /// under what stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14
         /// short of its end, 8 on either side of its label, its rows 6 under it, coming in from nothing, .92 of their
         /// size about a fifth along their top and 8 above where they rest, over the popover's motion (`Phone.dc.html`,
-        /// `popIn`); its words growing to 1.22 by
-        /// 40 % of the check's motion as they change (`bumpA`, on the check's own curve and .45 s).
+        /// `popIn`); its words growing to 1.22 by 40 % of the check's motion as they change (`bumpA`, on the check's
+        /// own curve and .45 s).
         static let phone = Metrics(
             style: phoneStyle(fade: phoneFade), glass: phoneGlass, header: phoneHeader(bottomMargin: 10),
-            tagBar: phoneTagBar,
-            empty: phoneEmpty,
+            tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .list(
                 header: .init(
                     titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
@@ -212,21 +211,20 @@ extension TaskList {
 
         /// The phone's board (Task 8's table, Board; the controller's ruling on #175, 2026-11-04): 10 between columns,
         /// 16 in at its sides, 16 more after its last column (`Phone.dc.html`, the gap and `.board::after`) and 24 at
-        /// its bottom, snapping; a column 296 wide and rounded 18, its header padded 13 14
-        /// 9 with no rule and no chevron, its drop ring 2; a card rounded 13 with a 0.5 hairline, its check 22 across
-        /// in a 42 by 44 hit, its title callout-sized. The table gives a column's padding and cards' gap neither: the
-        /// cards are 8 apart (`task-4-canvas.md`, "column body gap 8") and 8 in; a column's header no height: a block's
-        /// 44; a card's row the row's numbers but its check, its title and its edges: 0 in, the check's hit at its
-        /// edge, 12 short of its end, rounded as the card. The card's check keeps the row's ring and mark, the canvas
-        /// resizing only its circle, and it has the menu and no swipe. Its open card fills the card, its own corners
-        /// and resting shadow, its check the row's, its body 44 in and 12 short of its end and bottom (`Phone.dc.html`,
-        /// the column's card). "+ Add task" 44 high, rounded 13, padded 11 and 12, the plus 18 and 6 before its title;
-        /// "+ Add list" a column 200 wide edged in a 1.5 dashed line, as rounded as a column, 52 high, padded 16, the
-        /// plus 18 and 8 before its title. The table gives the dash no lengths: 5 and 4, the sidebar's dashed line.
+        /// its bottom, snapping; a column 296 wide and rounded 18, its header padded 13 14 9 with no rule and no
+        /// chevron, its drop ring 2; a card rounded 13 with a 0.5 hairline, its check 22 across in a 42 by 44 hit, its
+        /// title callout-sized. The table gives a column's padding and cards' gap neither: the cards are 8 apart
+        /// (`task-4-canvas.md`, "column body gap 8") and 8 in; a column's header no height: a block's 44; a card's row
+        /// the row's numbers but its check, its title and its edges: 0 in, the check's hit at its edge, 12 short of its
+        /// end, rounded as the card. The card's check keeps the row's ring and mark, the canvas resizing only its
+        /// circle, and it has the menu and no swipe. Its open card fills the card, its own corners and resting shadow,
+        /// its check the row's, its body 44 in and 12 short of its end and bottom (`Phone.dc.html`, the column's card).
+        /// "+ Add task" 44 high, rounded 13, padded 11 and 12, the plus 18 and 6 before its title; "+ Add list" a
+        /// column 200 wide edged in a 1.5 dashed line, as rounded as a column, 52 high, padded 16, the plus 18 and 8
+        /// before its title. The table gives the dash no lengths: 5 and 4, the sidebar's dashed line.
         static let phoneColumns = Metrics(
             style: phoneStyle(fade: nil), glass: phoneGlass, header: phoneHeader(bottomMargin: 12),
-            tagBar: phoneTagBar,
-            empty: phoneEmpty,
+            tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .columns(Board(
                 spacing: 10, horizontalPadding: 16, endRoom: 16, bottomPadding: 24, snaps: true,
                 column: { color in
@@ -324,8 +322,7 @@ extension TaskList {
         }
 
         /// A subtask's check in the open card: 18 across with a 1.5 ring and the 12 pt mark in a 40 by 44 hit (Task 8's
-        /// table, Card), the canvas's 2.8 in its 24-unit box stroked 1.4 at that size
-        /// (`CheckStyle.markStrokeWidth`).
+        /// table, Card), the canvas's 2.8 in its 24-unit box stroked 1.4 at that size (`CheckStyle.markStrokeWidth`).
         private static func phoneSubtaskCheck(_ color: Tile) -> CheckStyle {
             CheckStyle(
                 diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
@@ -476,9 +473,9 @@ extension TaskList {
         )
 
         /// The phone's header (Task 8's table, Header): 20 in from the screen's sides, the tile 38 across, rounded 11,
-        /// its glyph 23, 12 before the title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50
-        /// in; what follows it and the tag bar, the list's first block or the board, 10 under them in the list and 12
-        /// in the board (`Phone.dc.html`, the list's `margin-top:10px` and `.board`'s 12).
+        /// its glyph 23, 12 before the title (`task-4-canvas.md`, "gap 12"), the subtitle 6 under it and 50 in; what
+        /// follows it and the tag bar, the list's first block or the board, 10 under them in the list and 12 in the
+        /// board (`Phone.dc.html`, the list's `margin-top:10px` and `.board`'s 12).
         private static func phoneHeader(bottomMargin: Double) -> Header {
             Header(
                 style: .init(
@@ -490,9 +487,9 @@ extension TaskList {
         }
 
         /// The phone's tag bar (Task 8's table, Tag bar): 7 under the header, chips 6 apart in a row padded 20 with 20
-        /// more after the last (`Phone.dc.html`, the gap and `.tagbar::after`), the bar
-        /// 20 past the content's sides, fading in over 16 and out over 28; a chip 30 high, a capsule, padded 10 and
-        /// 12, its hash 13 and 5 before its title, in a 44 tap area.
+        /// more after the last (`Phone.dc.html`, the gap and `.tagbar::after`), the bar 20 past the content's sides,
+        /// fading in over 16 and out over 28; a chip 30 high, a capsule, padded 10 and 12, its hash 13 and 5 before its
+        /// title, in a 44 tap area.
         private static let phoneTagBar = TagBar(
             style: .init(
                 topMargin: 7, spacing: 6, padding: 20, endRoom: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20,
