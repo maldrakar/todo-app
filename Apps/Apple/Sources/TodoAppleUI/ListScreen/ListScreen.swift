@@ -47,9 +47,9 @@ struct ListScreen: View {
             .contentShape(.rect)
             .onTapGesture { send(.backgroundTapped) }
             .safeAreaInset(edge: .bottom, spacing: 0) { sentence }
-            .overlay(alignment: .top) { glassBar }
+            .overlay(alignment: .top) { glassButtons }
             .overlay { floatingButton }
-            .background(Color(model.glassBar.background))
+            .background(Color(model.style.background))
             // The screen's title is the header's, which names the list in the back button's menu over what stands on it
             // (#126), though its own bar is hidden.
             .navigationTitle(model.header.title.text)
@@ -101,8 +101,8 @@ struct ListScreen: View {
                     }
                 }
             }
-            .padding(.top, model.glassBar.contentTop)
-            .padding(.bottom, model.glassBar.contentBottom)
+            .padding(.top, model.style.contentTop)
+            .padding(.bottom, model.style.contentBottom)
         }
         .scrollIndicators(.hidden)
     }
@@ -118,7 +118,7 @@ struct ListScreen: View {
             }
             BoardView(board, send: send)
         }
-        .padding(.top, model.glassBar.contentTop)
+        .padding(.top, model.style.contentTop)
         // The whole screen whatever the board holds: a sideways scroll view is as high as its content, and with no
         // column to stretch it the screen stood in the middle of the window (the iOS 26.3 simulator, 2026-11-07).
         .frame(maxHeight: .infinity, alignment: .top)
@@ -149,9 +149,9 @@ struct ListScreen: View {
     }
 
     /// The circles at the safe area's top, over the fade where the layout has one.
-    private var glassBar: some View {
+    private var glassButtons: some View {
         ZStack(alignment: .top) {
-            if let fade = model.glassBar.fade {
+            if let fade = model.style.fade {
                 fadeUnderTheButtons(fade)
             }
             HStack(spacing: 0) {
@@ -159,14 +159,14 @@ struct ListScreen: View {
                 Spacer(minLength: 0)
                 showAs
             }
-            .padding(.horizontal, model.glassBar.edgeInset)
+            .padding(.horizontal, model.style.edgeInset)
         }
     }
 
     /// What scrolls under the circles leaves by this, the paper down to its solid depth under the safe area's top and
     /// the same colour clear at its end. Two parts, so that the solid one reaches up under the status bar whatever the
     /// device's inset; it takes no touch, so that a row behind it is still tapped.
-    private func fadeUnderTheButtons(_ fade: GlassBarStyle.Fade) -> some View {
+    private func fadeUnderTheButtons(_ fade: ListScreenStyle.Fade) -> some View {
         let color = Color(fade.color)
         return VStack(spacing: 0) {
             color
@@ -213,7 +213,7 @@ struct ListScreen: View {
     @ViewBuilder private var sentence: some View {
         if let problem = model.problem {
             Text(problem)
-                .listsSentence(on: model.glassBar.background)
+                .listsSentence(on: model.style.background)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { sentenceHeight = $0 }
                 .onDisappear { sentenceHeight = 0 }
         }

@@ -575,7 +575,7 @@ private enum WasmSizeProbe {
         } ?? "no row"
         let disabled = list.showAs.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)
         let checked = list.showAs.sections.flatMap(\.items).filter(\.isChecked).map(\.title)
-        let bar = list.glassBar
+        let bar = list.style
         let fade = bar.fade.map { "fade \($0.height)/\($0.solidDepth)" } ?? "no fade"
         let glass = "\(list.back.accessibilityLabel) \(list.back.style.diameter) at \(list.back.style.iconOffset), "
             + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "

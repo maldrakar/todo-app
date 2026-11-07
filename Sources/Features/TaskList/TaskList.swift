@@ -514,7 +514,7 @@ public final class TaskList: Routable {
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
                 back: TaskList.back(metrics.glass),
                 more: TaskList.more(metrics.glass),
-                glassBar: metrics.glass.bar,
+                style: metrics.style,
                 tagBar: TaskList.tagBar(chips, picked: picked, color: color, metrics.tagBar),
                 layout: TaskList.layout(
                     shown, title: title, folded: folded, addList: addList, context, metrics.blocks

@@ -276,17 +276,17 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             accessibilityLabel: label
         )
     }
-    let fade = GlassBarStyle.Fade(color: .paper, height: 54, solidDepth: 15.12)
+    let fade = ListScreenStyle.Fade(color: .paper, height: 54, solidDepth: 15.12)
     for layout in [TaskList.Model.Layout.Kind.list, .columns] {
         let module = try list(BuiltInTaskViews.upcoming, in: store)
         module.tap(.showAsChosen(layout))
         let model = module.model
         #expect(model.back == button(.chevronLeft, size: 24, offset: -2, "Back"))
         #expect(model.more == button(.ellipsis, size: 22, offset: 0, "More"))
-        let bar = GlassBarStyle(
+        let style = ListScreenStyle(
             edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56, contentBottom: 116, background: .paper
         )
-        #expect(model.glassBar == bar, "the fade is the list's alone; the board's circles stand in the flow")
+        #expect(model.style == style, "the fade is the list's alone; the board's circles stand in the flow")
     }
 }
 

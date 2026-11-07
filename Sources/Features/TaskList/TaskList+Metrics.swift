@@ -95,9 +95,8 @@ extension TaskList {
             let glyphSize: Double
         }
 
-        /// The glass buttons over the content: how they stand, the back button's numbers and glyph and "…"'s.
+        /// The glass buttons over the content: the back button's numbers and glyph and "…"'s.
         struct Glass {
-            let bar: GlassBarStyle
             let back: GlassControlStyle
             let backGlyphSize: Double
             let more: GlassControlStyle
@@ -138,6 +137,7 @@ extension TaskList {
             case columns(Board)
         }
 
+        let style: ListScreenStyle
         let glass: Glass
         let header: Header
         let tagBar: TagBar
@@ -165,7 +165,8 @@ extension TaskList {
         /// size about a fifth along their top and 8 above where they rest, over the popover's motion (`Phone.dc.html`,
         /// `popIn`).
         static let phone = Metrics(
-            glass: phoneGlass(fade: phoneFade), header: phoneHeader(bottomMargin: 10), tagBar: phoneTagBar,
+            style: phoneStyle(fade: phoneFade), glass: phoneGlass, header: phoneHeader(bottomMargin: 10),
+            tagBar: phoneTagBar,
             empty: phoneEmpty,
             blocks: .list(
                 header: .init(
@@ -219,7 +220,8 @@ extension TaskList {
         /// "+ Add list" a column 200 wide edged in a 1.5 dashed line, as rounded as a column, 52 high, padded 16, the
         /// plus 18 and 8 before its title. The table gives the dash no lengths: 5 and 4, the sidebar's dashed line.
         static let phoneColumns = Metrics(
-            glass: phoneGlass(fade: nil), header: phoneHeader(bottomMargin: 12), tagBar: phoneTagBar,
+            style: phoneStyle(fade: nil), glass: phoneGlass, header: phoneHeader(bottomMargin: 12),
+            tagBar: phoneTagBar,
             empty: phoneEmpty,
             blocks: .columns(Board(
                 spacing: 10, horizontalPadding: 16, endRoom: 16, bottomPadding: 24, snaps: true,
@@ -432,31 +434,32 @@ extension TaskList {
         )
 
         /// The phone's glass buttons (Task 8's table, Glass buttons; `Phone.dc.html`, `.glass` and the buttons' row):
-        /// 44 circles on the glass, edged with its 0.5 hairline and casting the raised shadow, 14 from the screen's
-        /// sides; the back chevron 24 across set 2 left of centre, "…" 22; under them a fade of the paper that is the
-        /// canvas's 108 less its 54 status bar, solid to 64 % of the 108, with the content 56 under the safe area's
-        /// top and ending 116 above the safe area's bottom, the canvas's 150 less the home indicator's 34; on the board
-        /// the fade is `nil`, its buttons standing in the flow; all of it on the paper.
-        private static func phoneGlass(fade: GlassBarStyle.Fade?) -> Glass {
-            Glass(
-                bar: GlassBarStyle(
-                    edgeInset: 14, fade: fade, contentTop: 56, contentBottom: 116, background: .paper
-                ),
-                back: GlassControlStyle(
-                    iconOffset: -2, diameter: 44, surface: .glass,
-                    line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
-                ),
-                backGlyphSize: 24,
-                more: GlassControlStyle(
-                    iconOffset: 0, diameter: 44, surface: .glass,
-                    line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
-                ),
-                moreGlyphSize: 22
-            )
+        /// 44 circles on the glass, edged with its 0.5 hairline and casting the raised shadow; the back chevron 24 across
+        /// set 2 left of centre, "…" 22.
+        private static let phoneGlass = Glass(
+            back: GlassControlStyle(
+                iconOffset: -2, diameter: 44, surface: .glass,
+                line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+            ),
+            backGlyphSize: 24,
+            more: GlassControlStyle(
+                iconOffset: 0, diameter: 44, surface: .glass,
+                line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+            ),
+            moreGlyphSize: 22
+        )
+
+        /// The phone's screen (Task 8's table, Glass buttons; `Phone.dc.html`, the buttons' row and the scroller): the
+        /// circles 14 from the screen's sides; under them a fade of the paper that is the canvas's 108 less its 54 status
+        /// bar, solid to 64 % of the 108, with the content 56 under the safe area's top and ending 116 above the safe
+        /// area's bottom, the canvas's 150 less the home indicator's 34; on the board the fade is `nil`, its buttons
+        /// standing in the flow; all of it on the paper.
+        private static func phoneStyle(fade: ListScreenStyle.Fade?) -> ListScreenStyle {
+            ListScreenStyle(edgeInset: 14, fade: fade, contentTop: 56, contentBottom: 116, background: .paper)
         }
 
-        /// The list's fade (see `phoneGlass`); the board has none.
-        private static let phoneFade = GlassBarStyle.Fade(color: .paper, height: 54, solidDepth: 15.12)
+        /// The list's fade (see `phoneStyle`); the board has none.
+        private static let phoneFade = ListScreenStyle.Fade(color: .paper, height: 54, solidDepth: 15.12)
 
         /// The phone's floating "+" (Task 8's table, Floating "+"): a 48 circle, its plus 22, 16 in from the screen's
         /// right edge and 30 above its bottom.
