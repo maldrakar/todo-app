@@ -185,6 +185,26 @@ or Pro Max turned sideways, draws the same tree as the Mac's sidebar with the ph
 row's menu, the bar at the bottom of the column holds "…", the search capsule and "+", and in edit mode a long press
 lifts a row, a line with a circle marking where it lands.
 
+The list screen on iPhone is the canvas's too, in a narrow window; a wide one, the iPad's or that of an iPhone Plus or
+Pro Max turned sideways, still draws the plain list until the pane of the Mac and the iPad replaces it. The glass back
+and "…" float at the top corners over the list, which scrolls under them, and under them the list's tile, its title,
+the day it shows when its rule names one, and a bar of the tags its open tasks carry: a tap lights a tag and the list
+or the board shows the tasks that carry every tag lit. The list's own tasks come first, then a block for each list
+inside it, or for each day or group its rule makes; a block's chevron folds it and a tap on its title opens it as a
+screen of its own, and each block ends with "+ Add task", which opens a new task's card in place with the keyboard up.
+"+ Add list" ends the screen and names a list in a field of its own, and the round "+" at the bottom right adds a task
+at the top of the first block. A tap on a task opens its card where its row stood, with its title, notes, subtasks, the
+pills for its day, deadline and tags, and an arrow for its full screen; Return in a subtask's field writes the subtask
+and opens the next, and a tap on the screen's background closes the card. A tap on a task's circle completes it: the
+row holds for a moment with its check filled and its title struck, then leaves, and the strip "Done today"
+under the blocks counts it and opens to show it. A swipe to the left on a row slides out Delete, which puts the task in
+the Trash; a press that holds still opens a menu with Delete, and a press that moves lifts the row, with a line and a
+circle marking where it would land, to another place in its block, another block, or on a board a column; a task that
+lands there is tinted for a moment. "…" opens Show as, where Columns, when the list offers them, turns the blocks into
+a board of columns that snap one at a time, and where Columns is greyed with its reason when it does not. A swipe from
+the left edge, or the back circle, goes back one screen. The screen's own "+" adds inline, so no Quick Entry button
+stands on it; quick entry stays the Lists screen's.
+
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.
 
