@@ -46,5 +46,8 @@ struct AddRowView<Action: Equatable & Sendable>: View {
         .padding(.top, model.style.topMargin)
         .padding(.leading, model.style.leadingMargin)
         .padding(.trailing, model.style.trailingMargin)
+        // One geometry, so that its plus and its words move as one as the rows above close up, as a row's do
+        // (`CompletingTask`): they drifted apart on that motion (the iOS 26.3 simulator, 2026-11-07).
+        .geometryGroup()
     }
 }

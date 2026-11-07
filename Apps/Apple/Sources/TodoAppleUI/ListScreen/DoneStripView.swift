@@ -58,5 +58,7 @@ struct DoneStripView<Action: Equatable & Sendable>: View {
         .padding(.top, model.style.topMargin)
         .padding(.leading, model.style.leadingMargin)
         .padding(.trailing, model.style.trailingMargin)
+        // One geometry, as a row that adds has (`AddRowView`).
+        .geometryGroup()
     }
 }

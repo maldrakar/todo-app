@@ -36,6 +36,8 @@ struct BlockHeaderView: View {
         .padding(.trailing, model.style.trailingMargin)
         .padding(.bottom, model.style.bottomMargin)
         .padding(.leading, model.style.leadingMargin)
+        // One geometry, as a row that adds has (`AddRowView`).
+        .geometryGroup()
     }
 
     /// The title's control, padded in the header's height, on the header's whole width beside the chevron.
