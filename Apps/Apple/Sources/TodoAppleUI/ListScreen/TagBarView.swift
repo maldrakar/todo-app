@@ -55,7 +55,9 @@ struct TagBarView<Action: Equatable & Sendable>: View {
             .padding(.leading, chip.style.leadingPadding)
             .padding(.trailing, chip.style.trailingPadding)
             .frame(height: chip.style.height)
-            .background(Color(chip.style.background), in: .rect(cornerRadius: chip.style.cornerRadius, style: .circular))
+            .background(
+                Color(chip.style.background), in: .rect(cornerRadius: chip.style.cornerRadius, style: .circular)
+            )
             .animation(reduceMotion ? nil : Animation(chip.style.animation), value: chip.isLit)
             .frame(height: chip.style.hitHeight)
             .contentShape(.rect)

@@ -21,8 +21,8 @@ extension TaskList {
         /// The glass button at the top right that puts up `showAs`.
         public let more: GlassButtonModel
 
-        /// How the screen itself stands: what it stands on, how the glass buttons and their fade stand over the content,
-        /// and where the content starts and ends under them.
+        /// How the screen itself stands: what it stands on, how the glass buttons and their fade stand over the
+        /// content, and where the content starts and ends under them.
         public let style: ListScreenStyle
 
         /// The tags of the list's open tasks, the most used first, and nil when no chip would show (spec section 7).

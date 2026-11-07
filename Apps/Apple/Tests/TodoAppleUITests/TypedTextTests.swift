@@ -17,8 +17,8 @@ import Testing
     #expect(field.text == "Buy")
 }
 
-/// A text written while the field has no focus stands in it and sends nothing, so it waits for no answer: the model's own
-/// text of the same words later on is the module's and stands, and the one before it is no echo.
+/// A text written while the field has no focus stands in it and sends nothing, so it waits for no answer: the model's
+/// own text of the same words later on is the module's and stands, and the one before it is no echo.
 @Test func aTextNeverSentWaitsForNoAnswer() {
     var field = TypedText("")
     let goesUp = field.typed("a", goesUp: false)
@@ -81,8 +81,8 @@ import Testing
 }
 
 /// From an empty subtask's field, a letter and Return handled with no render between them take the model from "" to "a"
-/// and back to "" (`TaskList.writeSubtask`): no change the view can see, so Return itself puts the field back on what the
-/// model last showed.
+/// and back to "" (`TaskList.writeSubtask`): no change the view can see, so Return itself puts the field back on what
+/// the model last showed.
 @Test func aReturnWithNoRenderFallsBackOnTheModel() {
     var field = TypedText("")
     _ = field.typed("a", goesUp: true)
@@ -94,8 +94,8 @@ import Testing
     #expect(field.text == "b")
 }
 
-/// Return or a lost focus with the model behind: the field falls back on what it last showed, and the model's change that
-/// follows, the letter it had not drawn or the store's trimmed text, settles it.
+/// Return or a lost focus with the model behind: the field falls back on what it last showed, and the model's change
+/// that follows, the letter it had not drawn or the store's trimmed text, settles it.
 @Test func aSettledFieldTakesTheModelsNextChange() {
     var field = TypedText("Buy mil")
     _ = field.typed("Buy milk", goesUp: true)
