@@ -46,7 +46,7 @@ struct EdgeSwipeBack: UIViewControllerRepresentable {
             giveRecognizerBack()
         }
 
-        func giveRecognizerBack() {
+        fileprivate func giveRecognizerBack() {
             guard let recognizer, recognizer.delegate === self else { return }
             recognizer.delegate = answeredBefore
         }

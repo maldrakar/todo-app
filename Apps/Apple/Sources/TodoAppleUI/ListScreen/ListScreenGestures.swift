@@ -13,14 +13,14 @@ struct ListScreenGestures: DynamicProperty {
     @State private var lift: RowLift?
 
     /// What the drag and the swipe read of the layout, which nothing observes.
-    @State private var space = RowDragSpace()
+    @State private var dragState = RowDragState()
 
     /// The row a swipe has moved aside.
     @State private var swipe = ScreenSwipe()
 
     /// What they stand at now, for the rows to draw from, with what a row's Delete sends.
-    func forRows(delete: @escaping (TaskList.UserAction) -> Void) -> ScreenGestures {
-        ScreenGestures(lift: lift, space: space, swipe: swipe, delete: delete)
+    func forRows(delete: @escaping (TaskList.UserAction) -> Void) -> RowGestures {
+        RowGestures(lift: lift, dragState: dragState, swipe: swipe, delete: delete)
     }
 
     func closeSwipe() {
@@ -39,27 +39,13 @@ struct ListScreenGestures: DynamicProperty {
         // iOS alone: its finder is UIKit's.
         #if os(iOS)
         RowDragContent(
-            space: space,
-            finder: ScrollContentFinder(space: space, swipe: swipe) { [space, swipe] point, moved in
-                RowSwipe.row(at: point, moved: moved, from: swipe.current, among: blocks, frames: space.frames)
+            dragState: dragState,
+            finder: ScrollContentFinder(dragState: dragState, swipe: swipe) { [dragState, swipe] point, moved in
+                RowSwipe.row(at: point, moved: moved, from: swipe.current, among: blocks, frames: dragState.frames)
             }
         )
         #else
-        RowDragContent(space: space)
+        RowDragContent(dragState: dragState)
         #endif
-    }
-}
-
-/// Reads what the safe area covers at the bottom into its binding, the keyboard's region apart: a scroll view stands
-/// above the keyboard, its region not ignored.
-struct BottomInsetReader: ViewModifier {
-    @Binding var inset: CGFloat
-
-    func body(content: Content) -> some View {
-        content.background {
-            Color.clear
-                .ignoresSafeArea(.keyboard)
-                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { inset = $0 }
-        }
     }
 }

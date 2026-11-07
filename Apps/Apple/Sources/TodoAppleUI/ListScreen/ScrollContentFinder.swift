@@ -20,23 +20,23 @@ import UIKit
 ///
 /// What it holds goes with it: the recognizers leaked per switch of Show as in the spike until they did.
 struct ScrollContentFinder: UIViewRepresentable {
-    private let space: RowDragSpace
+    private let dragState: RowDragState
     private let swipe: ScreenSwipe?
     private let rowAt: (_ point: CGPoint, _ moved: CGFloat) -> (row: BlockRowID, style: SwipeStyle)?
 
     /// The finder of the board, whose cards have no swipe.
-    init(space: RowDragSpace) {
-        self.space = space
+    init(dragState: RowDragState) {
+        self.dragState = dragState
         swipe = nil
         rowAt = { _, _ in nil }
     }
 
     /// The finder of the list, whose rows are swiped, each found by `rowAt`.
     init(
-        space: RowDragSpace, swipe: ScreenSwipe,
+        dragState: RowDragState, swipe: ScreenSwipe,
         rowAt: @escaping (_ point: CGPoint, _ moved: CGFloat) -> (row: BlockRowID, style: SwipeStyle)?
     ) {
-        self.space = space
+        self.dragState = dragState
         self.swipe = swipe
         self.rowAt = rowAt
     }
@@ -54,7 +54,7 @@ struct ScrollContentFinder: UIViewRepresentable {
     }
 
     func updateUIView(_ view: FinderView, context: Context) {
-        context.coordinator.space = space
+        context.coordinator.dragState = dragState
         context.coordinator.swipe = swipe
         context.coordinator.rowAt = rowAt
     }
@@ -64,7 +64,7 @@ struct ScrollContentFinder: UIViewRepresentable {
     }
 
     final class FinderView: UIView {
-        weak var coordinator: Coordinator?
+        fileprivate weak var coordinator: Coordinator?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -75,10 +75,10 @@ struct ScrollContentFinder: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        weak var finder: UIView?
-        var space: RowDragSpace?
-        var swipe: ScreenSwipe?
-        var rowAt: (CGPoint, CGFloat) -> (row: BlockRowID, style: SwipeStyle)? = { _, _ in nil }
+        fileprivate weak var finder: UIView?
+        fileprivate var dragState: RowDragState?
+        fileprivate var swipe: ScreenSwipe?
+        fileprivate var rowAt: (CGPoint, CGFloat) -> (row: BlockRowID, style: SwipeStyle)? = { _, _ in nil }
         private weak var scrollView: UIScrollView?
 
         /// Where the pan's finger came down, in the content's own coordinates.
@@ -92,12 +92,12 @@ struct ScrollContentFinder: UIViewRepresentable {
         }()
 
         /// This view has come into a window in the scroll view, which makes it the one a drag reads: the list's and the
-        /// board's share the screen's space, and what leaves does so with no word of it, after what comes has made its
-        /// view, so that a write from anything but this moment left the space with a view gone and a board's drop
+        /// board's share the screen's state, and what leaves does so with no word of it, after what comes has made its
+        /// view, so that a write from anything but this moment left the state with a view gone and a board's drop
         /// unconverted (the iOS 26.3 simulator, 2026-11-07).
-        func didAppear(in scrollView: UIScrollView) {
-            space?.content = finder
-            space?.scrollView = scrollView
+        fileprivate func didAppear(in scrollView: UIScrollView) {
+            dragState?.content = finder
+            dragState?.scrollView = scrollView
             guard self.scrollView !== scrollView else { return }
             removeRecognizers()
             self.scrollView = scrollView
@@ -108,7 +108,7 @@ struct ScrollContentFinder: UIViewRepresentable {
         }
 
         /// Lets go of the scroll view and of what the closures hold, as this view goes.
-        func uninstall() {
+        fileprivate func uninstall() {
             removeRecognizers()
             swipe = nil
             rowAt = { _, _ in nil }

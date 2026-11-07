@@ -10,10 +10,10 @@ import TodoCore
 /// it, which only the drag knows, the block's mark of the place opens a gap among its rows.
 struct BlockView: View {
     private let block: TaskList.Model.Block
-    private let gestures: ScreenGestures
+    private let gestures: RowGestures
     private let send: (TaskList.UserAction) -> Void
 
-    init(_ block: TaskList.Model.Block, gestures: ScreenGestures, send: @escaping (TaskList.UserAction) -> Void) {
+    init(_ block: TaskList.Model.Block, gestures: RowGestures, send: @escaping (TaskList.UserAction) -> Void) {
         self.block = block
         self.gestures = gestures
         self.send = send
@@ -33,14 +33,14 @@ struct BlockView: View {
                 AddRowView(addTask, send: send)
             }
         }
-        .reportsLiftFrame(\.blocks, block.id, to: gestures.space)
+        .reportsLiftFrame(\.blocks, block.id, to: gestures.dragState)
     }
 
     /// The mark, where the lift's slot stands after this row, nil for the block's top, from the rows' leading edge. It
     /// stands in the flow, as the canvas's does (`Phone.dc.html`, `slotBefore`).
     @ViewBuilder private func mark(after row: TaskID?) -> some View {
         if gestures.lift?.slot == RowLift.Slot(block: block.id, after: row), let indicator = block.indicator {
-            DropIndicator(indicator, from: 0, visibleRight: gestures.space.frames.blocks[block.id]?.maxX ?? 0)
+            DropIndicator(indicator, from: 0, visibleRight: gestures.dragState.frames.blocks[block.id]?.maxX ?? 0)
                 .accessibilityHidden(true)
         }
     }
@@ -62,7 +62,7 @@ struct BlockRow: View {
     private let row: TaskList.Model.Row
     private let block: TaskList.Model.BlockID?
     private let column: ColumnStyle?
-    private let gestures: ScreenGestures?
+    private let gestures: RowGestures?
     private let send: (TaskList.UserAction) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -70,7 +70,7 @@ struct BlockRow: View {
     /// A row of a block or of a column, whose style it is given.
     init(
         _ row: TaskList.Model.Row, in block: TaskList.Model.BlockID, column: ColumnStyle? = nil,
-        gestures: ScreenGestures, send: @escaping (TaskList.UserAction) -> Void
+        gestures: RowGestures, send: @escaping (TaskList.UserAction) -> Void
     ) {
         self.row = row
         self.block = block
@@ -104,7 +104,7 @@ struct BlockRow: View {
                     .background { task.style.ground.map { Color($0) } }
                     .modifier(RowDragSource(task, row: row, gestures: gestures, delete: delete))
                     .modifier(SwipeToDelete(task.swipe, of: row, in: gestures.swipe, delete: delete))
-                    .reportsLiftFrame(\.rows, row, to: gestures.space)
+                    .reportsLiftFrame(\.rows, row, to: gestures.dragState)
             } else {
                 face
             }
@@ -116,7 +116,7 @@ struct BlockRow: View {
             .modifier(ColumnCardRing(column: column))
             if let block, let gestures {
                 let row = BlockRowID(block: block, task: id)
-                face.reportsLiftFrame(\.rows, row, to: gestures.space)
+                face.reportsLiftFrame(\.rows, row, to: gestures.dragState)
             } else {
                 face
             }
@@ -136,7 +136,7 @@ struct BlockRow: View {
     /// closing up. A swiped row goes from where it stands, aside, and its swipe ends with the motion, which brings it
     /// back where the store refused.
     private func sendDelete(
-        _ action: TaskList.UserAction, row: BlockRowID, leaving: TaskLeavingStyle, gestures: ScreenGestures
+        _ action: TaskList.UserAction, row: BlockRowID, leaving: TaskLeavingStyle, gestures: RowGestures
     ) {
         guard !reduceMotion else {
             gestures.delete(action)

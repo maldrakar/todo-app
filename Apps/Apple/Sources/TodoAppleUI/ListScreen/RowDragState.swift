@@ -1,4 +1,4 @@
-// Apps/Apple/Sources/TodoAppleUI/ListScreen/RowDragSpace.swift
+// Apps/Apple/Sources/TodoAppleUI/ListScreen/RowDragState.swift
 import SwiftUI
 import TaskListFeature
 #if os(iOS)
@@ -9,9 +9,12 @@ import UIKit
 /// What the screen's gestures stand at now, which its blocks and rows draw from: the lift, nil while no row is lifted,
 /// what the drag knows of the layout, the swipe, and what a row's Delete sends, which leaves the swipe as it stands,
 /// since the row goes from where it stands.
-struct ScreenGestures {
+///
+/// `RowGestures` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
+struct RowGestures {
     let lift: RowLift?
-    let space: RowDragSpace
+    let dragState: RowDragState
     let swipe: ScreenSwipe
     let delete: (TaskList.UserAction) -> Void
 }
@@ -20,10 +23,10 @@ struct ScreenGestures {
 /// nothing observes and held in the screen's state, so that a layout that reports frames does not draw the screen again
 /// (spike #145).
 ///
-/// `RowDragSpace` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// `RowDragState` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 @MainActor
-final class RowDragSpace {
+final class RowDragState {
     /// The frames the screen's rows, blocks and columns last reported, each as it changed, and kept for one that has
     /// left: what reads them reads those drawn.
     var frames = RowLift.Frames()
@@ -79,10 +82,10 @@ extension View {
     /// build, the swipe's frames took half as long, with the lift and the scroll no different (fix round 1 of #177).
     @MainActor
     func reportsLiftFrame<Key: Hashable & Sendable>(
-        _ table: WritableKeyPath<RowLift.Frames, [Key: CGRect]> & Sendable, _ key: Key, to space: RowDragSpace
+        _ table: WritableKeyPath<RowLift.Frames, [Key: CGRect]> & Sendable, _ key: Key, to dragState: RowDragState
     ) -> some View {
         onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowLift.contentSpace)) } action: { frame in
-            space.frames[keyPath: table][key] = frame
+            dragState.frames[keyPath: table][key] = frame
         }
     }
 }
@@ -90,19 +93,19 @@ extension View {
 /// The content of the list or of the board as the space a drag finds its place in, which its rows report their frames
 /// in, and on iOS what only UIKit gives it (`ScrollContentFinder`).
 struct RowDragContent: ViewModifier {
-    private let space: RowDragSpace
+    private let dragState: RowDragState
     #if os(iOS)
     private let finder: ScrollContentFinder
     #endif
 
     #if os(iOS)
-    init(space: RowDragSpace, finder: ScrollContentFinder) {
-        self.space = space
+    init(dragState: RowDragState, finder: ScrollContentFinder) {
+        self.dragState = dragState
         self.finder = finder
     }
     #else
-    init(space: RowDragSpace) {
-        self.space = space
+    init(dragState: RowDragState) {
+        self.dragState = dragState
     }
     #endif
 

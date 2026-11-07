@@ -11,14 +11,14 @@ struct ColumnView: View {
     private let block: TaskList.Model.Block
     private let column: ColumnModel<TaskList.UserAction>
     private let isDragOver: Bool
-    private let gestures: ScreenGestures
+    private let gestures: RowGestures
     private let send: (TaskList.UserAction) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         _ block: TaskList.Model.Block, column: ColumnModel<TaskList.UserAction>, isDragOver: Bool,
-        gestures: ScreenGestures, send: @escaping (TaskList.UserAction) -> Void
+        gestures: RowGestures, send: @escaping (TaskList.UserAction) -> Void
     ) {
         self.block = block
         self.column = column
@@ -46,7 +46,7 @@ struct ColumnView: View {
             }
             .scrollIndicators(.hidden)
             // What of its cards is in sight, since a card scrolled out of it keeps a frame under its header.
-            .reportsLiftFrame(\.columns, block.id, to: gestures.space)
+            .reportsLiftFrame(\.columns, block.id, to: gestures.dragState)
         }
         .frame(width: column.style.width)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -64,6 +64,6 @@ struct ColumnView: View {
                 .animation(motion, value: isTinted)
                 .allowsHitTesting(false)
         }
-        .reportsLiftFrame(\.blocks, block.id, to: gestures.space)
+        .reportsLiftFrame(\.blocks, block.id, to: gestures.dragState)
     }
 }

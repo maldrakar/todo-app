@@ -15,13 +15,13 @@ import UniformTypeIdentifiers
 struct RowDragSource: ViewModifier {
     private let task: TaskRowModel<TaskList.UserAction>
     private let row: BlockRowID
-    private let gestures: ScreenGestures
+    private let gestures: RowGestures
     private let delete: (TaskList.UserAction) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
-        _ task: TaskRowModel<TaskList.UserAction>, row: BlockRowID, gestures: ScreenGestures,
+        _ task: TaskRowModel<TaskList.UserAction>, row: BlockRowID, gestures: RowGestures,
         delete: @escaping (TaskList.UserAction) -> Void
     ) {
         self.task = task
@@ -42,9 +42,9 @@ struct RowDragSource: ViewModifier {
                 #endif
                 #if os(iOS)
                 .onDrag {
-                    itemProvider(of: row.task, session: gestures.space.sessions.begin(row))
+                    itemProvider(of: row.task, session: gestures.dragState.sessions.begin(row))
                 } preview: {
-                    RowDragCopy(task: task, lift: lift, row: row, space: gestures.space)
+                    RowDragCopy(task: task, lift: lift, row: row, dragState: gestures.dragState)
                 }
                 #endif
                 // The opacity alone: over the whole row, a drop's own end of the lift carried the row to its place on
@@ -71,11 +71,11 @@ private struct RowDragCopy: View {
     let task: TaskRowModel<TaskList.UserAction>
     let lift: TaskLiftStyle
     let row: BlockRowID
-    let space: RowDragSpace
+    let dragState: RowDragState
 
     var body: some View {
         TaskRowView(task, tap: {}, send: { _ in })
-            .frame(width: space.frames.rows[row]?.width)
+            .frame(width: dragState.frames.rows[row]?.width)
             .background(Color(lift.background), in: .rect(cornerRadius: lift.cornerRadius, style: .circular))
     }
 }
@@ -97,7 +97,7 @@ private func itemProvider(of task: TaskID, session: String) -> NSItemProvider {
 /// names (`RowDragSessions`) with its point in the content's space, and the stage that makes to `step`. Leaving the
 /// scroll view clears the lift, and a drag that comes back lifts again (spike #174).
 private struct RowDropDelegate: DropDelegate {
-    let space: RowDragSpace
+    let dragState: RowDragState
     let lift: () -> RowLift?
     let step: (RowLift.Phase) -> Void
 
@@ -106,11 +106,11 @@ private struct RowDropDelegate: DropDelegate {
     }
 
     func dropEntered(info: DropInfo) {
-        hear(.moved(space.contentPoint(fromDrop: info.location)), info)
+        hear(.moved(dragState.contentPoint(fromDrop: info.location)), info)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        hear(.moved(space.contentPoint(fromDrop: info.location)), info)
+        hear(.moved(dragState.contentPoint(fromDrop: info.location)), info)
         // Never `.forbidden`, over a block that takes no drop either: a release under it left the lift standing, by
         // what the board showed (the iOS 26.3 simulator, 2026-11-07). The release reports no drop there by itself,
         // having no slot.
@@ -122,17 +122,17 @@ private struct RowDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        hear(.moved(space.contentPoint(fromDrop: info.location)), info)
+        hear(.moved(dragState.contentPoint(fromDrop: info.location)), info)
         guard let lift = lift(), lift.session == session(of: info) else { return false }
         hear(.released, info)
-        space.sessions.forget()
+        dragState.sessions.forget()
         return lift.slot != nil
     }
 
     private func hear(_ call: RowDragSessions.Call, _ info: DropInfo) {
         // Only a call the lift owns counts as heard, so a drag this screen did not begin cannot keep a lift alive.
-        guard let phase = space.sessions.phase(for: call, session: session(of: info), lift: lift()) else { return }
-        space.wasHeard = true
+        guard let phase = dragState.sessions.phase(for: call, session: session(of: info), lift: lift()) else { return }
+        dragState.wasHeard = true
         step(phase)
     }
 
@@ -150,7 +150,7 @@ private struct RowDropDelegate: DropDelegate {
 struct RowDropTarget: ViewModifier {
     private let blocks: [TaskList.Model.Block]
     @Binding private var lift: RowLift?
-    private let gestures: ScreenGestures
+    private let gestures: RowGestures
     private let settleInset: CGFloat?
     private let send: (TaskList.UserAction) -> Void
 
@@ -158,7 +158,7 @@ struct RowDropTarget: ViewModifier {
 
     /// The target among the blocks drawn, with the board's inset to settle by where it snaps, and what a drop sends.
     init(
-        _ blocks: [TaskList.Model.Block], lift: Binding<RowLift?>, gestures: ScreenGestures, settleInset: CGFloat?,
+        _ blocks: [TaskList.Model.Block], lift: Binding<RowLift?>, gestures: RowGestures, settleInset: CGFloat?,
         send: @escaping (TaskList.UserAction) -> Void
     ) {
         self.blocks = blocks
@@ -171,12 +171,14 @@ struct RowDropTarget: ViewModifier {
     func body(content: Content) -> some View {
         #if os(iOS)
         content
-            .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { [space = gestures.space] in
-                space.dropOrigin = $0
+            .onGeometryChange(for: CGPoint.self) {
+                $0.frame(in: .global).origin
+            } action: { [dragState = gestures.dragState] in
+                dragState.dropOrigin = $0
             }
             .onDrop(
                 of: [.todoTask],
-                delegate: RowDropDelegate(space: gestures.space, lift: { lift }, step: { step($0) })
+                delegate: RowDropDelegate(dragState: gestures.dragState, lift: { lift }, step: { step($0) })
             )
             .task(id: lift != nil) {
                 if lift != nil { await cleanUpOnSilence() }
@@ -198,8 +200,8 @@ struct RowDropTarget: ViewModifier {
         var quietTicks = 0
         while !Task.isCancelled, quietTicks < 5 {
             try? await Task.sleep(for: .milliseconds(50))
-            quietTicks = gestures.space.wasHeard ? 0 : quietTicks + 1
-            gestures.space.wasHeard = false
+            quietTicks = gestures.dragState.wasHeard ? 0 : quietTicks + 1
+            gestures.dragState.wasHeard = false
         }
         if !Task.isCancelled { step(.cancelled, settling: false) }
     }
@@ -207,13 +209,13 @@ struct RowDropTarget: ViewModifier {
     /// A stage of the drag: the lift it leaves, the drop it reports, and, where it ended a lift, the board brought to
     /// rest on a column.
     private func step(_ phase: RowLift.Phase, settling: Bool = true) {
-        let step = RowLift.after(phase, from: lift, among: blocks, frames: gestures.space.frames)
+        let step = RowLift.after(phase, from: lift, among: blocks, frames: gestures.dragState.frames)
         let hasEnded = lift != nil && step.lift == nil
         if step.lift != nil { gestures.swipe.close() }
         if step.lift != lift { lift = step.lift }
         if let drop = step.drop { send(drop) }
         if hasEnded, settling, let settleInset {
-            gestures.space.settle(among: blocks, inset: settleInset, animated: !reduceMotion)
+            gestures.dragState.settle(among: blocks, inset: settleInset, animated: !reduceMotion)
         }
     }
     #endif

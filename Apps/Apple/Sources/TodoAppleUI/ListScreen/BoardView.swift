@@ -7,10 +7,10 @@ import TaskListFeature
 /// and after them the dashed "+ Add list" at the height of its own button (`.bcol`'s `align-self`).
 struct BoardView: View {
     private let board: TaskList.Model.Board
-    private let gestures: ScreenGestures
+    private let gestures: RowGestures
     private let send: (TaskList.UserAction) -> Void
 
-    init(_ board: TaskList.Model.Board, gestures: ScreenGestures, send: @escaping (TaskList.UserAction) -> Void) {
+    init(_ board: TaskList.Model.Board, gestures: RowGestures, send: @escaping (TaskList.UserAction) -> Void) {
         self.board = board
         self.gestures = gestures
         self.send = send
@@ -47,9 +47,9 @@ struct BoardView: View {
     private var rowDragContent: RowDragContent {
         // iOS alone: its finder is UIKit's.
         #if os(iOS)
-        RowDragContent(space: gestures.space, finder: ScrollContentFinder(space: gestures.space))
+        RowDragContent(dragState: gestures.dragState, finder: ScrollContentFinder(dragState: gestures.dragState))
         #else
-        RowDragContent(space: gestures.space)
+        RowDragContent(dragState: gestures.dragState)
         #endif
     }
 
