@@ -542,7 +542,7 @@ private enum WasmSizeProbe {
         }
         switch list.layout {
         case .list(let blocks):
-            let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.fold?.chevron.accessibilityLabel ?? "")" } }
+            let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.fold?.accessibilityLabel ?? "")" } }
             let adds = blocks.compactMap(\.addTask).map(\.title.text).joined(separator: "/")
             shape = "\(blocks.count) blocks, \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):

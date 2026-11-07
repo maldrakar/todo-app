@@ -30,16 +30,17 @@ private func phoneRow(
         check: CheckModel(
             style: .init(
                 diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-                animation: .check
+                animation: .check, colors: colors
             ),
-            colors: colors, isChecked: !isOpen,
+            isChecked: !isOpen,
             accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: .checkTapped(id)
         ),
-        title: TextModel(text: title, font: .rowTitle, color: isOpen ? .ink : .ink2), strike: isOpen ? nil : .ink3,
+        title: TextModel(text: title, font: .rowTitle, color: isOpen ? .ink : .ink2),
         meta: meta,
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
-            titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh
+            titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh,
+            strike: isOpen ? nil : .ink3, lift: nil, fresh: nil
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
@@ -48,7 +49,7 @@ private func phoneRow(
             ),
             button: TextModel(text: "Delete", font: .barLabel, color: .onAccent), action: .deleteSwiped(id)
         ) : nil,
-        lift: nil, fresh: nil, tap: .rowTapped(id), menu: deletes ? deleteMenu(id) : nil
+        tap: .rowTapped(id), menu: deletes ? deleteMenu(id) : nil
     )
 }
 
@@ -71,7 +72,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     try store.createTask(NewTask(title: "Write the plan"))
     try store.createTask(NewTask(title: "Fix the door", tags: [home]))
     let model = try list(projects, in: store).model
-    #expect(blocks(of: model).map { $0.rows.map { row($0).check.colors } } == [[Tile.indigo.check], [Tile.teal.check]])
+    let colors = blocks(of: model).map { $0.rows.map { row($0).check.style.colors } }
+    #expect(colors == [[Tile.indigo.check], [Tile.teal.check]])
 }
 
 /// A task that is not open has its check filled and its title struck in ink 3 over ink 2, and its check says it marks
@@ -121,9 +123,9 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         TagChipModel(
             icon: IconModel(icon: .hash, size: 13, weight: .semibold, color: isLit ? Tile.amber.check.mark : .ink2),
             title: TextModel(text: "home", font: .pill, color: isLit ? Tile.amber.check.mark : .ink),
-            background: isLit ? Tile.amber.check.fill : .fill,
             style: .init(
-                height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44
+                height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,
+                background: isLit ? Tile.amber.check.fill : .fill
             ),
             isLit: isLit, action: .tagChipTapped(home)
         )
@@ -150,18 +152,15 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         BlockHeaderModel(
             title: TextModel(text: "Tomorrow", font: .sectionTitle, color: Tile.rose.glyph),
             subtitle: TextModel(text: "Thu, Sep 11", font: .areaLabel, color: .ink2), field: nil,
-            fold: BlockHeaderModel.Fold(
-                chevron: AccessoryModel.Chevron(
-                    icon: IconModel(icon: .chevron, size: 18, weight: .semibold, color: .ink3),
-                    rotation: isFolded ? -90 : 0, animation: .fold,
-                    accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id)
-                ),
-                hitSide: 44
+            fold: AccessoryModel.Chevron(
+                icon: IconModel(icon: .chevron, size: 18, weight: .semibold, color: .ink3),
+                rotation: isFolded ? -90 : 0, animation: .fold,
+                accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id)
             ),
             style: .init(
                 titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
                 trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
-                bottomPadding: 0, cornerRadius: 0
+                bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
             ),
             titleTapped: .blockTitleTapped(id)
         )
@@ -246,33 +245,35 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             fold: nil,
             style: .init(
                 titleToSubtitle: 8, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
-                leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0
+                leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0,
+                foldHitSide: nil
             ),
             titleTapped: .blockTitleTapped(blockID)
         ),
         style: .init(
             width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
             cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill, cardBackground: .surface,
-            cardShadow: .resting, dropRingWidth: 2
+            cardShadow: .resting, dropRingWidth: 2, dropTint: Tile.rose.dropTint,
+            dropRing: Tile.rose.check.fill
         ),
-        dropTint: Tile.rose.dropTint, isDropTarget: true,
-        dropRing: Tile.rose.check.fill
+        isDropTarget: true
     ))
     #expect(block.rows.map(row) == [TaskRowModel(
         check: CheckModel(
             style: .init(
                 diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42, hitHeight: 44,
-                animation: .check
+                animation: .check, colors: Tile.rose.check
             ),
-            colors: Tile.rose.check, isChecked: false, accessibilityLabel: "Complete: Buy milk",
+            isChecked: false, accessibilityLabel: "Complete: Buy milk",
             action: .checkTapped(id)
         ),
-        title: TextModel(text: "Buy milk", font: .nestedRowTitle, color: .ink), strike: nil, meta: [],
+        title: TextModel(text: "Buy milk", font: .nestedRowTitle, color: .ink), meta: [],
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
-            leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh
+            leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
+            strike: nil, lift: nil, fresh: nil
         ),
-        swipe: nil, lift: nil, fresh: nil,
+        swipe: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)
     )])
 }
@@ -441,17 +442,17 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             ? CheckModel(
                 style: .init(
                     diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-                    animation: .check
+                    animation: .check, colors: colors
                 ),
-                colors: colors, isChecked: false, accessibilityLabel: "Complete: \(title)",
+                isChecked: false, accessibilityLabel: "Complete: \(title)",
                 action: action
             )
             : CheckModel(
                 style: .init(
                     diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
-                    animation: .check
+                    animation: .check, colors: colors
                 ),
-                colors: colors, isChecked: false, accessibilityLabel: "Complete: \(title)",
+                isChecked: false, accessibilityLabel: "Complete: \(title)",
                 action: action
             )
     }
@@ -491,8 +492,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             subtasks: [
                 SubtaskRowModel(
                     check: check("Find the coupon", .subtaskCheckTapped(sub), side: 18),
-                    title: TextModel(text: "Find the coupon", font: .notes, color: .ink), strike: nil,
-                    style: .init(height: 44)
+                    title: TextModel(text: "Find the coupon", font: .notes, color: .ink),
+                    style: .init(height: 44, strike: nil)
                 ),
             ],
             subtaskField: nil,

@@ -2,7 +2,8 @@
 import DesignSystem
 
 /// The numbers a `ColumnModel` is drawn with, in points, its fill, the background, hairline and shadow of its cards and
-/// the thickness of its drop ring, which the layout knows whole and a builder hands over as one value.
+/// its drop tint and ring, which a builder hands over as one value. The tint and the ring's colour are the block's, so
+/// a column in another list's colour is another instance.
 public struct ColumnStyle: Equatable, Sendable {
     public let width: Double
     public let cornerRadius: Double
@@ -19,6 +20,12 @@ public struct ColumnStyle: Equatable, Sendable {
     /// How thick the ring is inside the column's edge while a card is dragged over it.
     public let dropRingWidth: Double
 
+    /// The tint of the column while a card is dragged over it.
+    public let dropTint: DesignSystem.Color
+
+    /// The colour of the ring inside the column's edge while a card is dragged over it.
+    public let dropRing: DesignSystem.Color
+
     public init(
         width: Double,
         cornerRadius: Double,
@@ -29,7 +36,9 @@ public struct ColumnStyle: Equatable, Sendable {
         fill: DesignSystem.Color,
         cardBackground: DesignSystem.Color,
         cardShadow: DesignSystem.Shadow,
-        dropRingWidth: Double
+        dropRingWidth: Double,
+        dropTint: DesignSystem.Color,
+        dropRing: DesignSystem.Color
     ) {
         self.width = width
         self.cornerRadius = cornerRadius
@@ -41,5 +50,7 @@ public struct ColumnStyle: Equatable, Sendable {
         self.cardBackground = cardBackground
         self.cardShadow = cardShadow
         self.dropRingWidth = dropRingWidth
+        self.dropTint = dropTint
+        self.dropRing = dropRing
     }
 }

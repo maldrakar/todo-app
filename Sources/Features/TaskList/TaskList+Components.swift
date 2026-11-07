@@ -10,10 +10,10 @@ import TodoCore
 /// until the formatting service arrives, and every control's action a value (ADR-0007, amendment of 2026-10-30). The
 /// numbers are one value per layout (`Metrics`), picked once where the model is built, so that no builder branches on
 /// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`); a component's are its style,
-/// `CheckStyle` for `CheckModel` and so on, which also holds the colours and motions the component draws alike in every
-/// row, and which a builder hands over whole; what stays in `Metrics` beside the styles is a number a nested model
-/// takes, such as a glyph's size, and a font. The open card is in `TaskList+Card.swift`, and the rows that add, the
-/// floating "+", the Done strip and Delete in `TaskList+Controls.swift`.
+/// `CheckStyle` for `CheckModel` and so on, which also holds its colours and motions, and which a builder hands over
+/// whole; what stays in `Metrics` beside the styles is a number a nested model takes, such as a glyph's size, and a
+/// font. The open card is in `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete
+/// in `TaskList+Controls.swift`.
 extension TaskList {
     /// What the rows and the headers of a model are built from beside their own tasks: the device's day, the tags'
     /// names, the open card and the list being named.
@@ -44,9 +44,10 @@ extension TaskList {
     /// in its mark's colour, and unlit on the fill with the title in ink and the glyph in ink 2 (the controller's
     /// ruling on #175, 2026-11-04).
     static func tagBar(
-        _ chips: [Chip], picked: Set<TagID>, colors: DesignSystem.Color.Components.Check, _ metrics: Metrics.TagBar
+        _ chips: [Chip], picked: Set<TagID>, color: Tile, _ metrics: Metrics.TagBar
     ) -> TagBarModel<UserAction>? {
         guard !chips.isEmpty else { return nil }
+        let colors = color.check
         return TagBarModel(
             chips: chips.map { chip in
                 let isLit = picked.contains(chip.id)
@@ -55,8 +56,7 @@ extension TaskList {
                         icon: .hash, size: metrics.hashSize, weight: .semibold, color: isLit ? colors.mark : .ink2
                     ),
                     title: TextModel(text: chip.title, font: .pill, color: isLit ? colors.mark : .ink),
-                    background: isLit ? colors.fill : .fill, style: metrics.chip, isLit: isLit,
-                    action: .tagChipTapped(chip.id)
+                    style: metrics.chip(color, isLit), isLit: isLit, action: .tagChipTapped(chip.id)
                 )
             },
             style: metrics.style
@@ -74,13 +74,13 @@ extension TaskList {
         _ context: RowContext, _ metrics: Metrics.Blocks
     ) -> Model.Layout {
         switch metrics {
-        case .list(let headerMetrics, let chevronMetrics, let rowMetrics, let cardMetrics, let addTaskMetrics, _):
+        case .list(let headerMetrics, let chevronSize, let rowMetrics, let cardMetrics, let addTaskMetrics, _):
             return .list(blocks.map { block in
                 let isFolded = block.heading != nil && foldKey(of: block.id).map(folded.contains) == true
                 return Model.Block(
                     id: block.id,
                     header: block.heading.map {
-                        blockHeader($0, of: block, isFolded: isFolded, context, headerMetrics, chevron: chevronMetrics)
+                        blockHeader($0, of: block, isFolded: isFolded, context, headerMetrics, chevronSize: chevronSize)
                     },
                     rows: isFolded ? [] : block.tasks.map {
                         row($0, block.color, context, rowMetrics, card: cardMetrics)
@@ -115,16 +115,13 @@ extension TaskList {
     /// field for).
     private static func blockHeader(
         _ heading: Heading, of block: PageBlock, isFolded: Bool, _ context: RowContext,
-        _ style: BlockHeaderStyle, chevron: Metrics.Chevron
+        _ style: BlockHeaderStyle, chevronSize: Double
     ) -> BlockHeaderModel<UserAction> {
-        let fold = BlockHeaderModel<UserAction>.Fold(
-            chevron: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, size: chevron.size, weight: .semibold, color: .ink3),
-                rotation: isFolded ? -90 : 0, animation: .fold,
-                accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
-                action: .blockChevronTapped(block.id)
-            ),
-            hitSide: chevron.hitSide
+        let fold = AccessoryModel<UserAction>.Chevron(
+            icon: IconModel(icon: .chevron, size: chevronSize, weight: .semibold, color: .ink3),
+            rotation: isFolded ? -90 : 0, animation: .fold,
+            accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
+            action: .blockChevronTapped(block.id)
         )
         return blockHeader(heading, of: block, fold: fold, background: .paper, context, style)
     }
@@ -138,8 +135,7 @@ extension TaskList {
     ) -> ColumnModel<UserAction> {
         ColumnModel(
             header: blockHeader(heading, of: block, fold: nil, background: .fill, context, metrics.header),
-            style: metrics.column, dropTint: block.color.dropTint, isDropTarget: block.edit != nil,
-            dropRing: block.color.check.fill
+            style: metrics.column(block.color), isDropTarget: block.edit != nil
         )
     }
 
@@ -148,7 +144,7 @@ extension TaskList {
     /// its paddings, on what the header stands on (`Phone.dc.html`, the block's and the column's name field; the
     /// controller's ruling on #176, 2026-11-05: no placeholder).
     private static func blockHeader(
-        _ heading: Heading, of block: PageBlock, fold: BlockHeaderModel<UserAction>.Fold?,
+        _ heading: Heading, of block: PageBlock, fold: AccessoryModel<UserAction>.Chevron?,
         background: DesignSystem.Color, _ context: RowContext, _ style: BlockHeaderStyle
     ) -> BlockHeaderModel<UserAction> {
         let field: TextFieldModel<UserAction>? = if let naming = context.naming, block.id == .list(naming.id) {
@@ -170,7 +166,8 @@ extension TaskList {
 
     /// A task of a block: the open card where its row stood, or its row with its meta line, and its swipe and its menu,
     /// which a task in the Trash has neither of (spec section 6; the controller's ruling on #176, 2026-11-05). A
-    /// column's card has the menu and no swipe, its metrics having none. The row's `lift` and `fresh` are Task 8's.
+    /// column's card has the menu and no swipe, its metrics having none. The row style's `lift` and `fresh` are Task
+    /// 8's.
     private static func row(
         _ task: TodoTask, _ color: Tile, _ context: RowContext, _ metrics: Metrics.Row, card cardMetrics: Metrics.Card
     ) -> Model.Row {
@@ -219,20 +216,19 @@ extension TaskList {
         let isOpen = task.status == .open
         let title = drawnTitle(of: task)
         return TaskRowModel(
-            check: check(title: title, isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check),
+            check: check(title: title, isOpen: isOpen, action: .checkTapped(task.id), metrics.check(color)),
             title: TextModel(text: title, font: metrics.title, color: isOpen ? .ink : .ink2),
-            strike: isOpen ? nil : .ink3, meta: meta, style: metrics.style, swipe: swipe, lift: nil, fresh: nil,
-            tap: .rowTapped(task.id), menu: menu
+            meta: meta, style: metrics.style(isOpen), swipe: swipe, tap: .rowTapped(task.id), menu: menu
         )
     }
 
     /// A check, a row's, a card's or a subtask's: in the colour of the block's list, filled for a task that is not
     /// open, saying what a tap will do (canvas, `cbLabel`).
     static func check(
-        title: String, isOpen: Bool, _ color: Tile, action: UserAction, _ style: CheckStyle
+        title: String, isOpen: Bool, action: UserAction, _ style: CheckStyle
     ) -> CheckModel<UserAction> {
         CheckModel(
-            style: style, colors: color.check, isChecked: !isOpen,
+            style: style, isChecked: !isOpen,
             accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: action
         )
     }

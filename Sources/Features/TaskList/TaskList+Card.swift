@@ -29,7 +29,7 @@ extension TaskList {
         let isOpen = task.status == .open
         return CardModel(
             check: check(
-                title: drawnTitle(of: task), isOpen: isOpen, color, action: .checkTapped(task.id), metrics.check
+                title: drawnTitle(of: task), isOpen: isOpen, action: .checkTapped(task.id), metrics.check(color)
             ),
             title: plainField(
                 card.typedTitle ?? task.title, placeholder: newTaskTitle, font: .rowTitleEmphasized,
@@ -70,10 +70,10 @@ extension TaskList {
         let isOpen = task.status == .open
         return SubtaskRowModel(
             check: check(
-                title: task.title, isOpen: isOpen, color, action: .subtaskCheckTapped(task.id), metrics.subtaskCheck
+                title: task.title, isOpen: isOpen, action: .subtaskCheckTapped(task.id), metrics.subtaskCheck(color)
             ),
             title: TextModel(text: task.title, font: .notes, color: isOpen ? .ink : .ink2),
-            strike: isOpen ? nil : .ink3, style: metrics.subtask
+            style: metrics.subtask(isOpen)
         )
     }
 

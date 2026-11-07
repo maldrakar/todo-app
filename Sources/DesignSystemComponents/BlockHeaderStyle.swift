@@ -19,6 +19,10 @@ public struct BlockHeaderStyle: Equatable, Sendable {
     public let bottomPadding: Double
     public let cornerRadius: Double
 
+    /// The side of the square cell the chevron that folds the block is centred in, and nil for a header with none, as a
+    /// column's is.
+    public let foldHitSide: Double?
+
     public init(
         titleToSubtitle: Double,
         rule: LineStyle?,
@@ -30,7 +34,8 @@ public struct BlockHeaderStyle: Equatable, Sendable {
         topPadding: Double,
         horizontalPadding: Double,
         bottomPadding: Double,
-        cornerRadius: Double
+        cornerRadius: Double,
+        foldHitSide: Double?
     ) {
         self.titleToSubtitle = titleToSubtitle
         self.rule = rule
@@ -43,5 +48,6 @@ public struct BlockHeaderStyle: Equatable, Sendable {
         self.horizontalPadding = horizontalPadding
         self.bottomPadding = bottomPadding
         self.cornerRadius = cornerRadius
+        self.foldHitSide = foldHitSide
     }
 }

@@ -8,8 +8,10 @@ extension TaskList {
     /// and the phone's board (`phoneColumns`), which share the header, the tag bar, the empty state and the floating
     /// "+" and differ in their blocks, their "+ Add list" and the Done strip, which only the list has. A component's
     /// values are its style, `CheckStyle` for `CheckModel` and so on (`DesignSystemComponents`), declared here once per
-    /// layout and handed to its model whole; a struct of this type's own stays only for a number that feeds a model
-    /// nested in a component, such as a glyph's size, which the component's style cannot hand over.
+    /// layout and handed to its model whole; an entry that depends on the row is a function of what it depends on, the
+    /// list's colour or whether the task is open, which a builder calls for that row's instance; a struct of this
+    /// type's own stays only for a number that feeds a model nested in a component, such as a glyph's size, which the
+    /// component's style cannot hand over.
     struct Metrics {
         /// A tile's side, its corners and the size of its glyph: the tile's own numbers, beside which its colour and
         /// which glyph it draws are the list's.
@@ -25,25 +27,20 @@ extension TaskList {
             let tile: TileSize
         }
 
-        /// The tag bar and its chips: the bar's numbers, a chip's and the size of the chip's hash.
+        /// The tag bar and its chips: the bar's style, a chip's for the list's colour and whether it is lit, and the
+        /// size of the chip's hash.
         struct TagBar {
             let style: TagBarStyle
-            let chip: TagChipStyle
+            let chip: @Sendable (Tile, _ isLit: Bool) -> TagChipStyle
             let hashSize: Double
         }
 
-        /// The chevron that folds a block in the list: its glyph's size and its square hit's side. A column's header
-        /// has none, so the board carries none.
-        struct Chevron {
-            let size: Double
-            let hitSide: Double
-        }
-
-        /// A task's row, or a column's card: its numbers, its check, the title's font, the meta line's glyph and its
-        /// gap to its text, and its swipe, nil for a column's card, which has none (canvas).
+        /// A task's row, or a column's card: its style for whether the task is open, its check's for the block's
+        /// colour, the title's font, the meta line's glyph and its gap to its text, and its swipe, nil for a column's
+        /// card, which has none (canvas).
         struct Row {
-            let style: TaskRowStyle
-            let check: CheckStyle
+            let style: @Sendable (_ isOpen: Bool) -> TaskRowStyle
+            let check: @Sendable (Tile) -> CheckStyle
             let title: DesignSystem.Font
             let metaIconSize: Double
             let metaIconSpacing: Double
@@ -65,14 +62,14 @@ extension TaskList {
             let font: DesignSystem.Font
         }
 
-        /// The open card: its numbers; its check and its subtasks' and a subtask's row; its title field's height and
-        /// padding, the size of the button that opens it full screen, the notes' height and the subtask field's; and
-        /// the row that adds a subtask and its pills.
+        /// The open card: its style; its check's and its subtasks' for the block's colour, and a subtask row's for
+        /// whether the subtask is open; its title field's height and padding, the size of the button that opens it full
+        /// screen, the notes' height and the subtask field's; and the row that adds a subtask and its pills.
         struct Card {
             let style: CardStyle
-            let check: CheckStyle
-            let subtaskCheck: CheckStyle
-            let subtask: SubtaskRowStyle
+            let check: @Sendable (Tile) -> CheckStyle
+            let subtaskCheck: @Sendable (Tile) -> CheckStyle
+            let subtask: @Sendable (_ isOpen: Bool) -> SubtaskRowStyle
             let titleHeight: Double
             let titlePadding: Double
             let expandSize: Double
@@ -103,26 +100,28 @@ extension TaskList {
         }
 
         /// The board: the gap between columns, its paddings, and whether it snaps, which `Model.Board` holds as they
-        /// are, the board being no component; a column's style; a column's header; a card's row, and the card it opens
-        /// into; and "+ Add task".
+        /// are, the board being no component; a column's style for the block's colour; a column's header; a card's row,
+        /// and the card it opens into; and "+ Add task".
         struct Board {
             let spacing: Double
             let horizontalPadding: Double
             let bottomPadding: Double
             let snaps: Bool
-            let column: ColumnStyle
+            let column: @Sendable (Tile) -> ColumnStyle
             let header: BlockHeaderStyle
             let card: Row
             let openCard: Card
             let addTask: AddRow
         }
 
-        /// The blocks' values in the layout: the list's header, its chevron, its row, its open card, its "+ Add task"
-        /// and its Done strip, or the board's, which has no strip (canvas). Indirect, as the layout's whole values are
-        /// some 1,900 to 2,100 bytes on wasm32, which a debug build would put on the stack at every copy of `Metrics`.
+        /// The blocks' values in the layout: the list's header, its chevron's size, its row, its open card, its "+ Add
+        /// task" and its Done strip, or the board's, which has no strip (canvas). Indirect, as the layout's whole
+        /// values are some 1,400 to 1,500 bytes on wasm32, which a debug build would put on the stack at every copy of
+        /// `Metrics`.
         indirect enum Blocks {
             case list(
-                header: BlockHeaderStyle, chevron: Chevron, row: Row, card: Card, addTask: AddRow, doneStrip: DoneStrip
+                header: BlockHeaderStyle, chevronSize: Double, row: Row, card: Card, addTask: AddRow,
+                doneStrip: DoneStrip
             )
             case columns(Board)
         }
@@ -156,9 +155,9 @@ extension TaskList {
                 header: .init(
                     titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
                     trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
-                    bottomPadding: 0, cornerRadius: 0
+                    bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
                 ),
-                chevron: Chevron(size: 18, hitSide: 44), row: phoneRow, card: phoneCard,
+                chevronSize: 18, row: phoneRow, card: phoneCard,
                 addTask: AddRow(
                     style: .init(
                         iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0,
@@ -203,25 +202,33 @@ extension TaskList {
             header: phoneHeader, tagBar: phoneTagBar, empty: phoneEmpty,
             blocks: .columns(Board(
                 spacing: 10, horizontalPadding: 16, bottomPadding: 24, snaps: true,
-                column: .init(
-                    width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
-                    cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill,
-                    cardBackground: .surface, cardShadow: .resting, dropRingWidth: 2
-                ),
+                column: { color in
+                    .init(
+                        width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
+                        cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill,
+                        cardBackground: .surface, cardShadow: .resting, dropRingWidth: 2, dropTint: color.dropTint,
+                        dropRing: color.check.fill
+                    )
+                },
                 header: .init(
                     titleToSubtitle: 8, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
-                    leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0
+                    leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0,
+                    foldHitSide: nil
                 ),
                 card: Row(
-                    style: .init(
-                        titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
-                        titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
-                        freshAnimation: .fresh
-                    ),
-                    check: .init(
-                        diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42, hitHeight: 44,
-                        animation: .check
-                    ),
+                    style: { isOpen in
+                        .init(
+                            titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
+                            titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
+                            freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: nil, fresh: nil
+                        )
+                    },
+                    check: { color in
+                        .init(
+                            diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42,
+                            hitHeight: 44, animation: .check, colors: color.check
+                        )
+                    },
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil
                 ),
                 openCard: Card(
@@ -230,7 +237,7 @@ extension TaskList {
                         bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
                         shadow: .resting, background: .surface, animation: .cardOpens
                     ),
-                    check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: .init(height: 44), titleHeight: 44,
+                    check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
                     titlePadding: 2, expandSize: 19, notesHeight: 22, subtaskFieldHeight: 40,
                     addSubtask: phoneAddSubtask, pill: phonePill
                 ),
@@ -257,18 +264,28 @@ extension TaskList {
 
         /// A check of the phone's row and of its open card: 24 across with a 1.75 ring and the 15 pt mark stroked 1.75
         /// in a 44 hit (Task 8's table, Row).
-        private static let phoneCheck = CheckStyle(
-            diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-            animation: .check
-        )
+        private static func phoneCheck(_ color: Tile) -> CheckStyle {
+            CheckStyle(
+                diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+                animation: .check, colors: color.check
+            )
+        }
 
         /// A subtask's check in the open card: 18 across with a 1.5 ring and the 12 pt mark in a 40 by 44 hit (Task 8's
         /// table, Card), the canvas's 2.8 in its 24-unit box stroked 1.4 at that size
         /// (`CheckStyle.markStrokeWidth`).
-        private static let phoneSubtaskCheck = CheckStyle(
-            diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
-            animation: .check
-        )
+        private static func phoneSubtaskCheck(_ color: Tile) -> CheckStyle {
+            CheckStyle(
+                diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
+                animation: .check, colors: color.check
+            )
+        }
+
+        /// A subtask in the phone's open card, 44 high and struck in ink 3 where it is no longer open (Task 8's table,
+        /// Card; canvas).
+        private static func phoneSubtask(isOpen: Bool) -> SubtaskRowStyle {
+            SubtaskRowStyle(height: 44, strike: isOpen ? nil : .ink3)
+        }
 
         /// The phone's row (Task 8's table, Row and Swipe): 8 in and 12 short of the edges, its check `phoneCheck`, its
         /// title the row title padded 11 above and below, 2 after the check's hit and 4 short of the end, the meta 3
@@ -277,10 +294,13 @@ extension TaskList {
         /// end, rounded 12. The table gives the row no radius: 12, the add row's under it, until Task 8's hand check
         /// tunes it.
         private static let phoneRow = Row(
-            style: .init(
-                titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
-                titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh
-            ),
+            style: { isOpen in
+                .init(
+                    titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
+                    titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
+                    freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: nil, fresh: nil
+                )
+            },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
             swipe: .init(
                 threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
@@ -299,7 +319,7 @@ extension TaskList {
                 bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised,
                 background: .surface, animation: .cardOpens
             ),
-            check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: .init(height: 44), titleHeight: 44,
+            check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
             titlePadding: 2, expandSize: 19, notesHeight: 22, subtaskFieldHeight: 40, addSubtask: phoneAddSubtask,
             pill: phonePill
         )
@@ -342,9 +362,12 @@ extension TaskList {
         /// and 5 before its title, in a 44 tap area.
         private static let phoneTagBar = TagBar(
             style: .init(spacing: 6, padding: 20, fadeIn: 16, fadeOut: 28, leadingMargin: -20, trailingMargin: -20),
-            chip: .init(
-                height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44
-            ),
+            chip: { color, isLit in
+                .init(
+                    height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,
+                    background: isLit ? color.check.fill : .fill
+                )
+            },
             hashSize: 13
         )
 

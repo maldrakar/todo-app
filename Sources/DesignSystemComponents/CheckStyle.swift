@@ -1,8 +1,8 @@
 // Sources/DesignSystemComponents/CheckStyle.swift
 import DesignSystem
 
-/// The numbers a `CheckModel` is drawn with, in points, and its animation, which a layout holds whole and a builder
-/// hands over as one value.
+/// The numbers a `CheckModel` is drawn with, in points, its colours and its animation, which a builder hands over as
+/// one value. The colours are the list's, so a check in another list's colour is another instance.
 public struct CheckStyle: Equatable, Sendable {
     public let diameter: Double
     public let ringWidth: Double
@@ -16,6 +16,9 @@ public struct CheckStyle: Equatable, Sendable {
     public let hitHeight: Double
     public let animation: DesignSystem.Animation
 
+    /// The ring, the fill and the mark in the colour of the list the task is drawn in.
+    public let colors: DesignSystem.Color.Components.Check
+
     public init(
         diameter: Double,
         ringWidth: Double,
@@ -23,7 +26,8 @@ public struct CheckStyle: Equatable, Sendable {
         markStrokeWidth: Double,
         hitWidth: Double,
         hitHeight: Double,
-        animation: DesignSystem.Animation
+        animation: DesignSystem.Animation,
+        colors: DesignSystem.Color.Components.Check
     ) {
         self.diameter = diameter
         self.ringWidth = ringWidth
@@ -32,5 +36,6 @@ public struct CheckStyle: Equatable, Sendable {
         self.hitWidth = hitWidth
         self.hitHeight = hitHeight
         self.animation = animation
+        self.colors = colors
     }
 }
