@@ -26,6 +26,9 @@ public struct ColumnStyle: Equatable, Sendable {
     /// The colour of the ring inside the column's edge while a card is dragged over it.
     public let dropRing: DesignSystem.Color
 
+    /// The motion the tint and the ring come and go on.
+    public let dropAnimation: DesignSystem.Animation
+
     public init(
         width: Double,
         cornerRadius: Double,
@@ -38,7 +41,8 @@ public struct ColumnStyle: Equatable, Sendable {
         cardShadow: DesignSystem.Shadow,
         dropRingWidth: Double,
         dropTint: DesignSystem.Color,
-        dropRing: DesignSystem.Color
+        dropRing: DesignSystem.Color,
+        dropAnimation: DesignSystem.Animation
     ) {
         self.width = width
         self.cornerRadius = cornerRadius
@@ -52,5 +56,6 @@ public struct ColumnStyle: Equatable, Sendable {
         self.dropRingWidth = dropRingWidth
         self.dropTint = dropTint
         self.dropRing = dropRing
+        self.dropAnimation = dropAnimation
     }
 }

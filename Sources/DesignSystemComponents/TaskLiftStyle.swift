@@ -21,13 +21,17 @@ public struct TaskLiftStyle: Equatable, Sendable {
     /// the drop is marked otherwise: a column's card is dropped into a column that its tint marks (`ColumnModel`).
     public let indicator: DropIndicatorStyle?
 
+    /// The motion `opacity` comes and goes on where the task is dragged from.
+    public let dimAnimation: DesignSystem.Animation
+
     public init(
         scale: Double,
         opacity: Double,
         cornerRadius: Double,
         background: DesignSystem.Color,
         shadow: DesignSystem.Shadow,
-        indicator: DropIndicatorStyle?
+        indicator: DropIndicatorStyle?,
+        dimAnimation: DesignSystem.Animation
     ) {
         self.scale = scale
         self.opacity = opacity
@@ -35,5 +39,6 @@ public struct TaskLiftStyle: Equatable, Sendable {
         self.background = background
         self.shadow = shadow
         self.indicator = indicator
+        self.dimAnimation = dimAnimation
     }
 }

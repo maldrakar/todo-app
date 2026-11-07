@@ -539,7 +539,7 @@ private enum WasmSizeProbe {
             + " in \(list.header.style.horizontalPadding), then \(list.header.style.bottomMargin)"
         let chips = list.tagBar.map {
             "\($0.chips.count) chips, \($0.chips.filter(\.isLit).count) lit, \($0.style.topMargin) under, "
-                + "\($0.style.endRoom) after"
+                + "\($0.style.endRoom) after, lit on \($0.chips.first?.style.animation.duration ?? 0)"
         } ?? "no tag bar"
         let shape: String
         let rows = switch list.layout {
@@ -552,7 +552,7 @@ private enum WasmSizeProbe {
             let adds = blocks.compactMap(\.addTask).map(\.title.text).joined(separator: "/")
             shape = "\(blocks.count) blocks, \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):
-            let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, \($0.isDropTarget ? "taking" : "refusing") a drop" } }
+            let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, tinting on \($0.style.dropAnimation.duration), \($0.isDropTarget ? "taking" : "refusing") a drop" } }
             shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), \(board.endRoom) after, headed \(headers.joined(separator: "/")), then \(board.addList?.title.text ?? "no list to add")"
         }
         let first = rows.first.map { row in
@@ -563,7 +563,12 @@ private enum WasmSizeProbe {
                     + "\(task.menu?.sections.flatMap(\.items).map(\.title).joined(separator: "/") ?? "none"), "
                     + "\(task.style.lift.map { "lifts to \($0.scale), slot \($0.indicator?.height ?? 0)" } ?? "stays"), "
                     + "\(task.style.fresh == nil ? "settled" : "fresh"), lands from \(task.style.landingScale ?? 1) "
-                    + "on \(task.style.landingAnimation.duration)"
+                    + "on \(task.style.landingAnimation.duration), title on \(task.style.titleAnimation.duration), "
+                    + "leaves by \(task.style.leaving.offset) on \(task.style.leaving.animation.delay), "
+                    + "check on \(task.check.style.fillAnimation.duration)/\(task.check.style.markAnimation.delay), "
+                    + "pops to \(task.check.style.pop.dipScale)/\(task.check.style.pop.peakScale), "
+                    + "ticks through \(task.check.style.mark.points.map(\.x)) in \(task.check.style.mark.box), "
+                    + "dims on \(task.style.lift?.dimAnimation.duration ?? 0)"
             case .card(_, let card):
                 "a card on \(card.title.text)"
             }
@@ -589,7 +594,7 @@ private enum WasmSizeProbe {
             let subtasks = card.subtasks.map { "\($0.check.accessibilityLabel) \($0.title.text)" }
             let pills = card.pills.map(\.text.text)
             let circle = card.style.subtaskDraftCircle
-            return "card \(card.title.text) (\(card.notes.text), \(card.notes.style.placeholder.light.opacity)), \(card.style.titleToNotes) then \(card.style.notesToSubtasks) under, \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
+            return "card \(card.title.text) (\(card.notes.text), \(card.notes.style.placeholder.light.opacity)), \(card.style.titleToNotes) then \(card.style.notesToSubtasks) under, in from \(card.style.entrance.scale), sub on \(card.subtasks.first?.style.titleAnimation.duration ?? 0), \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
         }
         return "no card"
     }
@@ -613,7 +618,7 @@ private enum WasmSizeProbe {
             case .card(_, let card): "a card on \(card.title.text)"
             }
         }
-        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") \(list.done?.style.capsuleToRows ?? 0) over \(rows.joined(separator: "/"))"
+        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") \(list.done?.style.capsuleToRows ?? 0) in from \(list.done?.style.rowsEntrance.scale ?? 0) over \(rows.joined(separator: "/"))"
     }
 
     /// The first task under an open strip, which the probe checks to reopen it.

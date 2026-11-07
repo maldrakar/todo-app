@@ -2,9 +2,31 @@
 import DesignSystem
 
 /// The numbers a `TaskRowModel` is drawn with, in points, the line through its title, how it lifts and a fresh row's
-/// colour and fade or its landing spring, which a builder hands over as one value. The line goes with whether the
-/// task is open, so a done row is another instance.
+/// colour and fade or its landing spring, and how it leaves, which a builder hands over as one value. The line goes
+/// with whether the task is open, so a done row is another instance.
 public struct TaskRowStyle: Equatable, Sendable {
+    /// How a row looks and moves as its check takes it out of its block (`Phone.dc.html`, `.tt-done` and `.row-leave`):
+    /// its title in `titleColor`, struck in `strike`, while its check fills, and then, on `animation`, which holds it
+    /// there a moment first, it fades out and sinks `offset`, the rows under it closing up on the same motion. The
+    /// module has no done task among its rows by then, so the row keeps this for its last moments on screen itself
+    /// (list screen spec, section 3).
+    public struct Leaving: Equatable, Sendable {
+        public let titleColor: DesignSystem.Color
+        public let strike: DesignSystem.Color
+        public let offset: Double
+        public let animation: DesignSystem.Animation
+
+        public init(
+            titleColor: DesignSystem.Color, strike: DesignSystem.Color, offset: Double,
+            animation: DesignSystem.Animation
+        ) {
+            self.titleColor = titleColor
+            self.strike = strike
+            self.offset = offset
+            self.animation = animation
+        }
+    }
+
     public let titleToMeta: Double
     public let metaSpacing: Double
     public let metaLineSpacing: Double
@@ -41,6 +63,11 @@ public struct TaskRowStyle: Equatable, Sendable {
     /// The motion of the landing, held while `landingScale` is nil too, so it does not stop when the scale goes.
     public let landingAnimation: DesignSystem.Animation
 
+    /// The motion the title changes colour on, a checked row's that stays where it is.
+    public let titleAnimation: DesignSystem.Animation
+
+    public let leaving: Leaving
+
     public init(
         titleToMeta: Double,
         metaSpacing: Double,
@@ -57,7 +84,9 @@ public struct TaskRowStyle: Equatable, Sendable {
         lift: TaskLiftStyle?,
         fresh: DesignSystem.Color?,
         landingScale: Double?,
-        landingAnimation: DesignSystem.Animation
+        landingAnimation: DesignSystem.Animation,
+        titleAnimation: DesignSystem.Animation,
+        leaving: Leaving
     ) {
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing
@@ -75,5 +104,7 @@ public struct TaskRowStyle: Equatable, Sendable {
         self.fresh = fresh
         self.landingScale = landingScale
         self.landingAnimation = landingAnimation
+        self.titleAnimation = titleAnimation
+        self.leaving = leaving
     }
 }

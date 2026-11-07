@@ -4,11 +4,14 @@ import SwiftUI
 
 /// The tag bar as its model describes it (`TagBarModel`; `Phone.dc.html`, `.tagbar`): its chips in a row that scrolls
 /// sideways, running past the content's sides to the screen's edges where its margins say so, and fading out at both
-/// ends. A tap on a chip sends the action its model holds, and which tasks that leaves is the module's. The chip's room
-/// after the last is its style's, so that the row scrolled to its end leaves that chip clear of the fade.
+/// ends. A tap on a chip sends the action its model holds, and which tasks that leaves is the module's. The room after
+/// the last chip is its style's, so that the row scrolled to its end leaves that chip clear of the fade.
 struct TagBarView<Action: Equatable & Sendable>: View {
     private let model: TagBarModel<Action>
     private let send: (Action) -> Void
+
+    /// Whether a person asked for less motion: a chip then lights at once.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(_ model: TagBarModel<Action>, send: @escaping (Action) -> Void) {
         self.model = model
@@ -53,6 +56,7 @@ struct TagBarView<Action: Equatable & Sendable>: View {
             .padding(.trailing, chip.style.trailingPadding)
             .frame(height: chip.style.height)
             .background(Color(chip.style.background), in: .rect(cornerRadius: chip.style.cornerRadius, style: .circular))
+            .animation(reduceMotion ? nil : Animation(chip.style.animation), value: chip.isLit)
             .frame(height: chip.style.hitHeight)
             .contentShape(.rect)
         }

@@ -161,7 +161,9 @@ extension TaskList {
         /// of its end, rounded 12; "+ Add list" 44 high over the line's 1 pt rule with 4 under it, 10 under what stands
         /// above and 12 in and 6 short of the edges, its plus 18 in a 40 cell; the Done strip's capsule 36 high and 20
         /// under what stands above, 14 in and 16 short of the edges, its glyph 18 and 10 in, its chevron 15 and 14
-        /// short of its end, 8 on either side of its label, its rows 6 under it.
+        /// short of its end, 8 on either side of its label, its rows 6 under it, coming in from nothing, .92 of their
+        /// size about a fifth along their top and 8 above where they rest, over the popover's motion (`Phone.dc.html`,
+        /// `popIn`).
         static let phone = Metrics(
             glass: phoneGlass(fade: phoneFade), header: phoneHeader(bottomMargin: 10), tagBar: phoneTagBar,
             empty: phoneEmpty,
@@ -183,7 +185,10 @@ extension TaskList {
                 doneStrip: DoneStrip(
                     style: .init(
                         height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14,
-                        topMargin: 20, leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6
+                        topMargin: 20, leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6,
+                        rowsEntrance: EntranceStyle(
+                            opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
+                        )
                     ),
                     iconSize: 18, chevronSize: 15
                 )
@@ -223,7 +228,7 @@ extension TaskList {
                         width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
                         cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill,
                         cardBackground: .surface, cardShadow: .resting, dropRingWidth: 2, dropTint: color.dropTint,
-                        dropRing: color.check.fill
+                        dropRing: color.check.fill, dropAnimation: .dropHighlights
                     )
                 },
                 header: .init(
@@ -237,13 +242,15 @@ extension TaskList {
                             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
                             freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil,
-                            fresh: nil, landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop
+                            fresh: nil, landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop,
+                            titleAnimation: .titleFades, leaving: rowLeaving
                         )
                     },
                     check: { color in
                         .init(
                             diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42,
-                            hitHeight: 44, animation: .check, colors: color.check
+                            hitHeight: 44, animation: .check, fillAnimation: .checkFills,
+                            markAnimation: .checkMarkDraws, pop: checkPop, mark: checkMark, colors: color.check
                         )
                     },
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil
@@ -253,7 +260,7 @@ extension TaskList {
                         .init(
                             expandHitSide: 44, cornerRadius: 13, topMargin: 0, horizontalMargin: 0, bottomMargin: 0,
                             bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
-                            shadow: .resting, background: .surface, animation: .cardOpens, subtasksOutdent: 12,
+                            shadow: .resting, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
                             titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color)
                         )
                     },
@@ -282,12 +289,29 @@ extension TaskList {
             floatingButton: phoneFloatingButton
         )
 
+        /// How every check of the phone pops (`Phone.dc.html`, `cbPop`): down to .8 by 35 % of its motion, up to 1.14
+        /// by 70 %.
+        private static let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
+
+        /// The tick of every check of the phone, `M6.5 12.5l3.5 3.5 7.5-8` in the canvas's 24-unit box
+        /// (`Phone.dc.html`, `.cb`).
+        private static let checkMark = CheckStyle.Mark(
+            box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)]
+        )
+
+        /// How a phone's row or column's card leaves as its task is completed (`Phone.dc.html`, `.tt-done` and
+        /// `.row-leave`): its title in ink 2 and struck in ink 3, sinking 12 as it fades on the row's motion.
+        private static let rowLeaving = TaskRowStyle.Leaving(
+            titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves
+        )
+
         /// A check of the phone's row and of its open card: 24 across with a 1.75 ring and the 15 pt mark stroked 1.75
         /// in a 44 hit (Task 8's table, Row).
         private static func phoneCheck(_ color: Tile) -> CheckStyle {
             CheckStyle(
                 diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-                animation: .check, colors: color.check
+                animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+                mark: checkMark, colors: color.check
             )
         }
 
@@ -297,14 +321,15 @@ extension TaskList {
         private static func phoneSubtaskCheck(_ color: Tile) -> CheckStyle {
             CheckStyle(
                 diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
-                animation: .check, colors: color.check
+                animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+                mark: checkMark, colors: color.check
             )
         }
 
         /// A subtask in the phone's open card, 44 high and struck in ink 3 where it is no longer open (Task 8's table,
         /// Card; canvas).
         private static func phoneSubtask(isOpen: Bool) -> SubtaskRowStyle {
-            SubtaskRowStyle(height: 44, strike: isOpen ? nil : .ink3)
+            SubtaskRowStyle(height: 44, strike: isOpen ? nil : .ink3, titleAnimation: .titleFades)
         }
 
         /// The phone's row (Task 8's table, Row and Swipe): 8 in and 12 short of the edges, its check `phoneCheck`, its
@@ -319,7 +344,8 @@ extension TaskList {
                     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
                     freshAnimation: .fresh, strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift(color) : nil,
-                    fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .drop
+                    fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .drop,
+                    titleAnimation: .titleFades, leaving: rowLeaving
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
@@ -341,13 +367,19 @@ extension TaskList {
                 .init(
                     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10,
                     bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6,
-                    shadow: .raised, background: .surface, animation: .cardOpens, subtasksOutdent: 12,
+                    shadow: .raised, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
                     titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color)
                 )
             },
             check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
             titlePadding: 2, expandSize: 19, notesHeight: 22, subtaskFieldHeight: 40, addSubtask: phoneAddSubtask,
             pill: phonePill
+        )
+
+        /// How an open card comes in (`Phone.dc.html`, `xIn`): from .3 opaque, .97 of its size and 4 above where it
+        /// rests, over the card's motion.
+        private static let cardEntrance = EntranceStyle(
+            opacity: 0.3, scale: 0.97, offset: -4, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
         )
 
         /// "Add subtask" in the phone's card (`Phone.dc.html`, the open card): 44 high, its plus 17 in a 40 cell under
@@ -383,7 +415,8 @@ extension TaskList {
                     height: 10, line: LineStyle(color: color.check.fill, width: 2, dash: []), lineOffset: 62,
                     lineCornerRadius: 1, trailingGap: 20, circleDiameter: 8, circleOffset: 52,
                     circleRing: LineStyle(color: color.check.fill, width: 2, dash: []), circleFill: .paper
-                )
+                ),
+                dimAnimation: .dropHighlights
             )
         }
 
@@ -391,7 +424,8 @@ extension TaskList {
         /// and carries no mark, the column's tint marking the drop; the rest is the row's, but for its corners, the
         /// card's own 13, which the table gives the card no other number for.
         private static let columnLift = TaskLiftStyle(
-            scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil
+            scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil,
+            dimAnimation: .dropHighlights
         )
 
         /// The phone's glass buttons (Task 8's table, Glass buttons; `Phone.dc.html`, `.glass` and the buttons' row):
@@ -454,7 +488,7 @@ extension TaskList {
             chip: { color, isLit in
                 .init(
                     height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,
-                    background: isLit ? color.check.fill : .fill
+                    background: isLit ? color.check.fill : .fill, animation: .chipToggles
                 )
             },
             hashSize: 13

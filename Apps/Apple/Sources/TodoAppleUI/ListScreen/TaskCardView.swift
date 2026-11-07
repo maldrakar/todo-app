@@ -20,6 +20,9 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
     private let subtaskChanged: (String) -> Action
     private let send: (Action) -> Void
 
+    /// Whether a person asked for less motion: a subtask's title then changes colour at once.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     init(
         _ model: CardModel<Action>, titleChanged: @escaping (String) -> Action,
         notesChanged: @escaping (String) -> Action, subtaskChanged: @escaping (String) -> Action,
@@ -62,6 +65,7 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
         }
         .contentShape(.rect)
         .onTapGesture {}
+        .modifier(Entrance(model.style.entrance))
         .padding(.top, model.style.topMargin)
         .padding(.horizontal, model.style.horizontalMargin)
         .padding(.bottom, model.style.bottomMargin)
@@ -119,9 +123,14 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
     private func subtask(_ subtask: SubtaskRowModel<Action>) -> some View {
         HStack(spacing: 0) {
             CheckButton(subtask.check, isChecked: subtask.check.isChecked) { send(subtask.check.action) }
-            Text(subtask.title)
+            Text(subtask.title.text)
+                .font(Font(subtask.title.style.font))
                 .strikethrough(subtask.style.strike != nil, color: subtask.style.strike.map { Color($0) })
                 .multilineTextAlignment(.leading)
+                // The colour alone, as a row's (`TaskRowView`).
+                .animation(reduceMotion ? nil : Animation(subtask.style.titleAnimation)) { text in
+                    text.foregroundStyle(Color(subtask.title.style.color))
+                }
         }
         .frame(minHeight: subtask.style.height)
     }

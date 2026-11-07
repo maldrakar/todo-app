@@ -9,8 +9,8 @@ import DesignSystem
 /// what it draws under itself rounded by `cornerRadius`, in points. The model holds every value its platform needs to
 /// draw it, so a view decides nothing but what is the platform's: the gestures, the swipe and the lift as they move,
 /// focus and Reduce Motion (ADR-0007, amendment of 2026-10-30). It holds no id of the store's: the feature module's row
-/// carries the task's id beside it. Its numbers, its `strike`, its `lift`, its `fresh` and its `freshAnimation` are the
-/// fields of its `TaskRowStyle`.
+/// carries the task's id beside it. Its numbers, its `strike`, its `lift`, its `fresh`, its motions and how it leaves
+/// are the fields of its `TaskRowStyle`.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): a block holds many, every comparison of the screen's
 /// model compares them, and inline, its check, swipe and style with it, a row is some 1,160 bytes on wasm32. Its `==`

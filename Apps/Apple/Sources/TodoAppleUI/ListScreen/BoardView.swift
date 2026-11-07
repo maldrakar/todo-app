@@ -19,7 +19,9 @@ struct BoardView: View {
             HStack(alignment: .top, spacing: board.spacing) {
                 ForEach(board.columns) { block in
                     if let column = block.column {
-                        ColumnView(block, column: column, send: send)
+                        // Nothing is dragged yet: the drag arrives with the screen's gestures (list screen plan, Task
+                        // 8).
+                        ColumnView(block, column: column, isDragOver: false, send: send)
                     }
                 }
                 if let addList = board.addList {
@@ -28,6 +30,8 @@ struct BoardView: View {
             }
             .scrollTargetLayout()
             .padding(.trailing, board.endRoom)
+            // At the top of the scroll view whatever it holds, which would centre what is shorter than itself.
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .contentMargins(.horizontal, board.horizontalPadding, for: .scrollContent)
         .contentMargins(.bottom, board.bottomPadding, for: .scrollContent)

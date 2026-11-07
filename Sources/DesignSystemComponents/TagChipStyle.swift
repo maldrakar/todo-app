@@ -12,6 +12,9 @@ public struct TagChipStyle: Equatable, Sendable {
     public let hitHeight: Double
     public let background: DesignSystem.Color
 
+    /// The motion the chip's colours change on as it lights and goes out.
+    public let animation: DesignSystem.Animation
+
     public init(
         height: Double,
         cornerRadius: Double,
@@ -19,7 +22,8 @@ public struct TagChipStyle: Equatable, Sendable {
         trailingPadding: Double,
         spacing: Double,
         hitHeight: Double,
-        background: DesignSystem.Color
+        background: DesignSystem.Color,
+        animation: DesignSystem.Animation
     ) {
         self.height = height
         self.cornerRadius = cornerRadius
@@ -28,5 +32,6 @@ public struct TagChipStyle: Equatable, Sendable {
         self.spacing = spacing
         self.hitHeight = hitHeight
         self.background = background
+        self.animation = animation
     }
 }

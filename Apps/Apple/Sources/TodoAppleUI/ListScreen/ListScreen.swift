@@ -19,7 +19,11 @@ import TaskListFeature
 /// the content takes every tap no control of it took, the header's words and the room under the rows among them, and a
 /// card takes its own (`TaskCardView`).
 ///
-/// A Mac window can be narrow too, so this draws there as well; Task 9 gives the Mac its look.
+/// The bar is hidden, so the way back is the glass circle, and the swipe from the screen's edge, which a hidden bar
+/// turns off, is kept on (`EdgeSwipeBack`); the long-press menu of the system's back button goes with the button.
+///
+/// A Mac window can be narrow too, so this draws there as well, each call the Mac lacks fenced and named; Task 9 gives
+/// the Mac its look.
 struct ListScreen: View {
     private let model: TaskList.Model
     private let send: (TaskList.UserAction) -> Void
@@ -53,6 +57,9 @@ struct ListScreen: View {
             // The canvas has no bar over the content; the screens pushed over it keep theirs. The placement is
             // unavailable on macOS.
             .toolbar(.hidden, for: .navigationBar)
+            #endif
+            #if os(iOS)
+            .background { EdgeSwipeBack() }
             #endif
     }
 
@@ -88,6 +95,7 @@ struct ListScreen: View {
                                 BlockRow(row, send: send)
                             }
                         }
+                        .modifier(Entrance(done.style.rowsEntrance))
                         .padding(.top, done.style.capsuleToRows)
                     }
                 }
@@ -105,10 +113,14 @@ struct ListScreen: View {
             header
             if let empty = model.empty {
                 EmptyScreenView(empty)
+                    .padding(.bottom, model.header.style.bottomMargin)
             }
             BoardView(board, send: send)
         }
         .padding(.top, model.glassBar.contentTop)
+        // The whole screen whatever the board holds: a sideways scroll view is as high as its content, and with no
+        // column to stretch it the screen stood in the middle of the window (the iOS 26.3 simulator, 2026-11-07).
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     /// The screen's header and the tag bar under it, and the gap to what follows. Its words take no touch, so that a

@@ -1,7 +1,7 @@
 // Sources/DesignSystemComponents/CardStyle.swift
 import DesignSystem
 
-/// The numbers a `CardModel` is drawn with, in points, and the card's background, shadow and animation, which the
+/// The numbers a `CardModel` is drawn with, in points, and the card's background, shadow and entrance, which the
 /// layout knows whole and a builder hands over as one value.
 public struct CardStyle: Equatable, Sendable {
     public let expandHitSide: Double
@@ -16,7 +16,9 @@ public struct CardStyle: Equatable, Sendable {
     public let pillSpacing: Double
     public let shadow: DesignSystem.Shadow
     public let background: DesignSystem.Color
-    public let animation: DesignSystem.Animation
+
+    /// How the card comes in as it opens in its row's place.
+    public let entrance: EntranceStyle
 
     /// How far the subtasks, the row that adds one and the field of the one being typed stand outside the body's
     /// leading edge, so that their checks stand under the card's own.
@@ -45,7 +47,7 @@ public struct CardStyle: Equatable, Sendable {
         pillSpacing: Double,
         shadow: DesignSystem.Shadow,
         background: DesignSystem.Color,
-        animation: DesignSystem.Animation,
+        entrance: EntranceStyle,
         subtasksOutdent: Double,
         titleToNotes: Double,
         notesToSubtasks: Double,
@@ -63,7 +65,7 @@ public struct CardStyle: Equatable, Sendable {
         self.pillSpacing = pillSpacing
         self.shadow = shadow
         self.background = background
-        self.animation = animation
+        self.entrance = entrance
         self.subtasksOutdent = subtasksOutdent
         self.titleToNotes = titleToNotes
         self.notesToSubtasks = notesToSubtasks

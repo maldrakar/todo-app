@@ -8,6 +8,18 @@ import TodoCore
 private typealias Action = TaskList.UserAction
 private typealias Tile = DesignSystem.Color.Components.Tile
 
+/// How a check pops as it is checked (`Phone.dc.html`, `cbPop`): down to .8 by 35 % of its motion, up to 1.14 by 70 %.
+private let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
+
+/// The canvas's tick, `M6.5 12.5l3.5 3.5 7.5-8` in its 24-unit box (`Phone.dc.html`, `.cb`).
+private let checkMark = CheckStyle.Mark(
+    box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)]
+)
+
+/// How a row leaves as its task is completed (`Phone.dc.html`, `.tt-done` and `.row-leave`): its title in ink 2 and
+/// struck in ink 3, sinking 12 as it goes on the row's motion.
+private let rowLeaving = TaskRowStyle.Leaving(titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves)
+
 /// The board a model draws in columns, nil in the list.
 private func board(of model: TaskList.Model) -> TaskList.Model.Board? {
     switch model.layout {
@@ -32,7 +44,8 @@ private func phoneRow(
         check: CheckModel(
             style: .init(
                 diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-                animation: .check, colors: colors
+                animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+                mark: checkMark, colors: colors
             ),
             isChecked: !isOpen,
             accessibilityLabel: (isOpen ? "Complete: " : "Mark as not done: ") + title, action: .checkTapped(id)
@@ -43,7 +56,7 @@ private func phoneRow(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
             titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12, freshAnimation: .fresh,
             strike: isOpen ? nil : .ink3, lift: deletes ? lift(colors) : nil, fresh: isFresh ? .fresh : nil,
-            landingScale: nil, landingAnimation: .drop
+            landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades, leaving: rowLeaving
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
@@ -69,14 +82,16 @@ private func lift(_ colors: DesignSystem.Color.Components.Check) -> TaskLiftStyl
             height: 10, line: LineStyle(color: colors.fill, width: 2, dash: []), lineOffset: 62, lineCornerRadius: 1,
             trailingGap: 20, circleDiameter: 8, circleOffset: 52,
             circleRing: LineStyle(color: colors.fill, width: 2, dash: []), circleFill: .paper
-        )
+        ),
+        dimAnimation: .dropHighlights
     )
 }
 
 /// A column's card lifted: the row's, but dimmed to .35 where it is dragged from, rounded as the card is, 13, and with
 /// no slot, the column's tint marking the drop.
 private let cardLift = TaskLiftStyle(
-    scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil
+    scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, indicator: nil,
+    dimAnimation: .dropHighlights
 )
 
 /// A row's menu: Delete with the trash's glyph, drawn as what destroys something (spec section 6).
@@ -154,12 +169,12 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         TagChipModel(
             icon: IconModel(
                 icon: .hash,
-                style: IconStyle(size: 13, weight: .semibold, color: isLit ? Tile.amber.check.mark : .ink2)
+                style: IconStyle(size: 13, weight: .regular, color: isLit ? Tile.amber.check.mark : .ink2)
             ),
             title: TextModel(text: "home", style: TextStyle(font: .pill, color: isLit ? Tile.amber.check.mark : .ink)),
             style: .init(
                 height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,
-                background: isLit ? Tile.amber.check.fill : .fill
+                background: isLit ? Tile.amber.check.fill : .fill, animation: .chipToggles
             ),
             isLit: isLit, action: .tagChipTapped(home)
         )
@@ -190,7 +205,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             title: TextModel(text: "Tomorrow", style: TextStyle(font: .sectionTitle, color: Tile.rose.glyph)),
             subtitle: TextModel(text: "Thu, Sep 11", style: TextStyle(font: .areaLabel, color: .ink2)), field: nil,
             fold: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, style: IconStyle(size: 18, weight: .semibold, color: .ink2)),
+                icon: IconModel(icon: .chevron, style: IconStyle(size: 18, weight: .regular, color: .ink2)),
                 accessibilityLabel: isFolded ? "Unfold Tomorrow" : "Fold Tomorrow", action: .blockChevronTapped(id),
                 style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .fold)
             ),
@@ -253,7 +268,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     let store = try makeStore()
     func button(_ icon: DesignSystem.Icon, size: Double, offset: Double, _ label: String) -> GlassButtonModel {
         GlassButtonModel(
-            icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .semibold, color: .ink)),
+            icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: .ink)),
             style: GlassControlStyle(
                 iconOffset: offset, diameter: 44, surface: .glass,
                 line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
@@ -338,7 +353,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
             cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill, cardBackground: .surface,
             cardShadow: .resting, dropRingWidth: 2, dropTint: Tile.rose.dropTint,
-            dropRing: Tile.rose.check.fill
+            dropRing: Tile.rose.check.fill, dropAnimation: .dropHighlights
         ),
         isDropTarget: true
     ))
@@ -346,7 +361,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         check: CheckModel(
             style: .init(
                 diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42, hitHeight: 44,
-                animation: .check, colors: Tile.rose.check
+                animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+                mark: checkMark, colors: Tile.rose.check
             ),
             isChecked: false, accessibilityLabel: "Complete: Buy milk",
             action: .checkTapped(id)
@@ -355,7 +371,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13, freshAnimation: .fresh,
-            strike: nil, lift: cardLift, fresh: nil, landingScale: nil, landingAnimation: .drop
+            strike: nil, lift: cardLift, fresh: nil, landingScale: nil, landingAnimation: .drop,
+            titleAnimation: .titleFades, leaving: rowLeaving
         ),
         swipe: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)
@@ -458,7 +475,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 @Test func theFloatingPlusCarriesThePhonesNumbers() throws {
     let store = try makeStore()
     #expect(try list(BuiltInTaskViews.inbox, in: store).model.addTask == FloatingButtonModel(
-        icon: IconModel(icon: .plus, style: IconStyle(size: 22, weight: .semibold, color: .onAccent)),
+        icon: IconModel(icon: .plus, style: IconStyle(size: 22, weight: .medium, color: .onAccent)),
         style: .init(diameter: 48, fill: .accent, shadow: .raised, trailingMargin: 16, bottomMargin: 30),
         accessibilityLabel: "New task", action: .addTaskButtonTapped
     ))
@@ -480,13 +497,16 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             icon: IconModel(icon: .checkCircle, style: IconStyle(size: 18, weight: .regular, color: Tile.amber.glyph)),
             label: TextModel(text: "Done today · 1", style: TextStyle(font: .barLabel, color: .ink2)),
             chevron: AccessoryModel.Chevron(
-                icon: IconModel(icon: .chevron, style: IconStyle(size: 15, weight: .semibold, color: .ink2)),
+                icon: IconModel(icon: .chevron, style: IconStyle(size: 15, weight: .regular, color: .ink2)),
                 accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped,
                 style: ChevronStyle(rotation: isOpen ? 180 : 0, animation: .fold)
             ),
             style: .init(
                 height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-                leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6
+                leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6,
+                rowsEntrance: EntranceStyle(
+                    opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
+                )
             ),
             isOpen: isOpen, action: .doneStripTapped
         )
@@ -557,7 +577,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             ? CheckModel(
                 style: .init(
                     diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-                    animation: .check, colors: colors
+                    animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+                    mark: checkMark, colors: colors
                 ),
                 isChecked: false, accessibilityLabel: "Complete: \(title)",
                 action: action
@@ -565,7 +586,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             : CheckModel(
                 style: .init(
                     diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
-                    animation: .check, colors: colors
+                    animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+                    mark: checkMark, colors: colors
                 ),
                 isChecked: false, accessibilityLabel: "Complete: \(title)",
                 action: action
@@ -599,7 +621,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     ) -> CardModel<Action> {
         let subtaskCircle = CheckStyle(
             diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
-            animation: .check, colors: colors
+            animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+            mark: checkMark, colors: colors
         )
         return CardModel(
             check: check("Buy milk", .checkTapped(id)),
@@ -615,7 +638,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 SubtaskRowModel(
                     check: check("Find the coupon", .subtaskCheckTapped(sub), side: 18),
                     title: TextModel(text: "Find the coupon", style: TextStyle(font: .notes, color: .ink)),
-                    style: .init(height: 44, strike: nil)
+                    style: .init(height: 44, strike: nil, titleAnimation: .titleFades)
                 ),
             ],
             subtaskField: nil,
@@ -646,8 +669,10 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 expandHitSide: 44, cornerRadius: cornerRadius, topMargin: topMargin, horizontalMargin: horizontalMargin,
                 bottomMargin: bottomMargin, bodyLeading: bodyLeading, bodyTrailing: bodyTrailing,
                 bodyBottom: bodyBottom, subtasksToPills: 10, pillSpacing: 6, shadow: shadow, background: .surface,
-                animation: .cardOpens, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4,
-                subtaskDraftCircle: subtaskCircle
+                entrance: EntranceStyle(
+                    opacity: 0.3, scale: 0.97, offset: -4, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
+                ),
+                subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: subtaskCircle
             ),
             backgroundTapped: .backgroundTapped
         )

@@ -12,8 +12,10 @@ import TodoCore
 /// the layout, as the sidebar's are one value per width (`TaskViewList+Components.swift`); a component's are its style,
 /// `CheckStyle` for `CheckModel` and so on, which also holds its colours and motions, and which a builder hands over
 /// whole; what stays in `Metrics` beside the styles is a number a nested model takes, such as a glyph's size, and a
-/// font. The open card is in `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete
-/// in `TaskList+Controls.swift`.
+/// font. A glyph's weight is the one nearest the canvas's stroke, its 1.8 and the back chevron's 2.2 at the regular
+/// weight and the floating plus's 2.4 at the medium, by measure in the iOS 26.3 simulator (2026-11-07). The open card
+/// is in `TaskList+Card.swift`, and the rows that add, the floating "+", the Done strip and Delete in
+/// `TaskList+Controls.swift`.
 extension TaskList {
     /// What the rows and the headers of a model are built from beside their own tasks: the device's day, the tags'
     /// names, the open card, the list being named and the task just dropped.
@@ -59,7 +61,7 @@ extension TaskList {
                 return TagChipModel(
                     icon: IconModel(
                         icon: .hash,
-                        style: IconStyle(size: metrics.hashSize, weight: .semibold, color: isLit ? colors.mark : .ink2)
+                        style: IconStyle(size: metrics.hashSize, weight: .regular, color: isLit ? colors.mark : .ink2)
                     ),
                     title: TextModel(
                         text: chip.title, style: TextStyle(font: .pill, color: isLit ? colors.mark : .ink)
@@ -126,7 +128,7 @@ extension TaskList {
         _ style: BlockHeaderStyle, chevronSize: Double
     ) -> BlockHeaderModel<UserAction> {
         let fold = AccessoryModel<UserAction>.Chevron(
-            icon: IconModel(icon: .chevron, style: IconStyle(size: chevronSize, weight: .semibold, color: .ink2)),
+            icon: IconModel(icon: .chevron, style: IconStyle(size: chevronSize, weight: .regular, color: .ink2)),
             accessibilityLabel: (isFolded ? "Unfold " : "Fold ") + heading.title,
             action: .blockChevronTapped(block.id), style: ChevronStyle(rotation: isFolded ? -90 : 0, animation: .fold)
         )
@@ -313,7 +315,7 @@ extension TaskList {
     static func back(_ metrics: Metrics.Glass) -> GlassButtonModel {
         GlassButtonModel(
             icon: IconModel(
-                icon: .chevronLeft, style: IconStyle(size: metrics.backGlyphSize, weight: .semibold, color: .ink)
+                icon: .chevronLeft, style: IconStyle(size: metrics.backGlyphSize, weight: .regular, color: .ink)
             ),
             style: metrics.back, accessibilityLabel: "Back"
         )
@@ -324,7 +326,7 @@ extension TaskList {
     static func more(_ metrics: Metrics.Glass) -> GlassButtonModel {
         GlassButtonModel(
             icon: IconModel(
-                icon: .ellipsis, style: IconStyle(size: metrics.moreGlyphSize, weight: .semibold, color: .ink)
+                icon: .ellipsis, style: IconStyle(size: metrics.moreGlyphSize, weight: .regular, color: .ink)
             ),
             style: metrics.more, accessibilityLabel: "More"
         )

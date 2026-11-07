@@ -132,7 +132,10 @@ struct BlockHeaderView: View {
     /// The title's control, padded in the header's height, on the header's whole width beside the chevron.
     @ViewBuilder private var title: some View {
         if let field = model.field {
-            PlainField(field, focusesOnAppear: true, changed: { .listNameFieldChanged($0) }, send: send)
+            PlainField(
+                field, focusesOnAppear: true, selectsAllOnFocus: true, changed: { .listNameFieldChanged($0) },
+                send: send
+            )
                 .padding(.top, model.style.topPadding)
                 .padding(.horizontal, model.style.horizontalPadding)
                 .padding(.bottom, model.style.bottomPadding)

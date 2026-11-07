@@ -6,8 +6,8 @@ import DesignSystem
 /// then its label and its chevron, each `spacing` after what stands before it, the chevron `trailingPadding` short of
 /// its trailing edge; the capsule `topMargin` below the blocks and `leadingMargin` and `trailingMargin` in from the
 /// sides, in points. The tasks done under it, while the strip is open, are the feature module's rows, each a row or the
-/// open card, so the model holds none (list screen spec, section 3). Its numbers and its `background` are the fields of
-/// its `DoneStripStyle`.
+/// open card, so the model holds none (list screen spec, section 3); they come in by `rowsEntrance`. Its numbers, its
+/// `background` and that entrance are the fields of its `DoneStripStyle`.
 ///
 /// A class, for the reason a list's row is one (`ListRowModel`): the screen's model holds one, every copy and
 /// comparison of that model copies and compares it, and inline it is some 500 bytes on wasm32. Its `==` compares every

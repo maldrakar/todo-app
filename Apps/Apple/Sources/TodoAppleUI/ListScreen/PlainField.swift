@@ -21,6 +21,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
     private let axis: Axis
     private let focusesOnAppear: Bool
     private let keepsFocusOnSubmit: Bool
+    private let selectsAllOnFocus: Bool
     private let changed: (String) -> Action
     private let send: (Action) -> Void
 
@@ -29,13 +30,14 @@ struct PlainField<Action: Equatable & Sendable>: View {
     /// The field, on one line unless `axis` says it grows down, as a card's notes do.
     init(
         _ model: TextFieldModel<Action>, axis: Axis = .horizontal, focusesOnAppear: Bool,
-        keepsFocusOnSubmit: Bool = false, changed: @escaping (String) -> Action,
+        keepsFocusOnSubmit: Bool = false, selectsAllOnFocus: Bool = false, changed: @escaping (String) -> Action,
         send: @escaping (Action) -> Void
     ) {
         self.model = model
         self.axis = axis
         self.focusesOnAppear = focusesOnAppear
         self.keepsFocusOnSubmit = keepsFocusOnSubmit
+        self.selectsAllOnFocus = selectsAllOnFocus
         self.changed = changed
         self.send = send
     }
@@ -57,6 +59,16 @@ struct PlainField<Action: Equatable & Sendable>: View {
             .onAppear {
                 if focusesOnAppear { isFocused = true }
             }
+            #if os(iOS)
+            // A list's new name replaces "New list" as it is typed (`Phone.dc.html`, the name field's `selectAll`).
+            // SwiftUI can select a field's text from iOS 18 and the app runs on 17, so the selection is UIKit's, and on
+            // the next turn, since a field beginning to edit sets its own caret after this. The Mac's field selects its
+            // text as it takes the focus.
+            .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidBeginEditingNotification)) { note in
+                guard selectsAllOnFocus, let field = note.object as? UITextField else { return }
+                DispatchQueue.main.async { field.selectAll(nil) }
+            }
+            #endif
     }
 
     /// The field, which reads Esc where a keyboard has one: `onKeyPress` has no watchOS.
