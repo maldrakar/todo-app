@@ -29,6 +29,9 @@ extension DesignSystem {
         /// A done row leaves over 0.32 s ease-in, 0.7 s after it was checked.
         public static let rowLeaves = Animation(curve: .easeIn, duration: 0.32, delay: 0.7)
 
+        /// A deleted row leaves as a done row does and at once: the done row's wait is for its check to be read.
+        public static let rowDeleted = Animation(curve: .easeIn, duration: 0.32)
+
         /// Push and pop, on the curve (.2, .8, .2, 1).
         public static let pushPop = Animation(curve: settle, duration: 0.32)
         public static let popover = Animation(curve: .spring, duration: 0.2)

@@ -210,7 +210,9 @@ private let swipe = SwipeModel<Action>(
     accessibilityLabel: "Delete Call the plumber", action: .second
 )
 
-private let taskLeaving = TaskLeavingStyle(titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves)
+private let taskLeaving = TaskLeavingStyle(
+    titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves, deleteAnimation: .rowDeleted
+)
 
 private let taskRowStyle = TaskRowStyle(
     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,

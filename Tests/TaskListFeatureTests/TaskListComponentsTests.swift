@@ -18,7 +18,9 @@ private let checkMark = CheckStyle.Mark(
 
 /// How a row or a card leaves as its task is completed (`Phone.dc.html`, `.tt-done` and `.row-leave`): its title in ink
 /// 2 and struck in ink 3, sinking 12 as it goes on the row's motion.
-private let taskLeaving = TaskLeavingStyle(titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves)
+private let taskLeaving = TaskLeavingStyle(
+    titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves, deleteAnimation: .rowDeleted
+)
 
 /// The board a model draws in columns, nil in the list.
 private func board(of model: TaskList.Model) -> TaskList.Model.Board? {

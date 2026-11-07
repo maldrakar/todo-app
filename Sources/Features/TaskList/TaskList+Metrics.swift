@@ -306,9 +306,9 @@ extension TaskList {
 
         /// How a phone's row, a column's card or an open card leaves as its task is completed (`Phone.dc.html`,
         /// `.tt-done` and `.row-leave`): its title in ink 2 and struck in ink 3, sinking 12 as it fades on the row's
-        /// motion.
+        /// motion, and on the same motion with no wait where it was deleted.
         private static let taskLeaving = TaskLeavingStyle(
-            titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves
+            titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves, deleteAnimation: .rowDeleted
         )
 
         /// A check of the phone's row and of its open card: 24 across with a 1.75 ring and the 15 pt mark stroked 1.75

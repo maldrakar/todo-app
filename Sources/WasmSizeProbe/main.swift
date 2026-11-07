@@ -565,6 +565,7 @@ private enum WasmSizeProbe {
                     + "\(task.style.fresh == nil ? "settled" : "fresh"), lands from \(task.style.landingScale ?? 1) "
                     + "on \(task.style.landingAnimation.duration), title on \(task.style.titleAnimation.duration), "
                     + "leaves by \(task.style.leaving.offset) on \(task.style.leaving.animation.delay), "
+                    + "deleted on \(task.style.leaving.deleteAnimation.delay), "
                     + "\(task.style.leaving.titleColor.light.red) struck \(task.style.leaving.strike.light.red), "
                     + "check on \(task.check.style.fillAnimation.duration)/\(task.check.style.markAnimation.delay), "
                     + "pops to \(task.check.style.pop.dipScale) at \(task.check.style.pop.dipAt), "

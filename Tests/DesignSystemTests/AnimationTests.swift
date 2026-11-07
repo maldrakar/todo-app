@@ -9,6 +9,15 @@ private typealias Animation = DesignSystem.Animation
     #expect(DesignSystem.Animation.rowLeaves.delay == 0.7)
 }
 
+/// A deleted row leaves on a done row's curve and in its time, at once: the wait is for a check to be read, and a delete
+/// has none.
+@Test func aDeletedRowLeavesAsADoneRowDoesWithNoWait() {
+    let motion = DesignSystem.Animation.rowDeleted
+    #expect(motion.curve == DesignSystem.Animation.rowLeaves.curve)
+    #expect(motion.duration == DesignSystem.Animation.rowLeaves.duration)
+    #expect(motion.delay == 0)
+}
+
 /// A check's mark draws itself over 0.26 s on `ease`, starting 0.08 s after its colours do (`Phone.dc.html`, `.cb path`).
 @Test func aChecksMarkDrawsItselfAfterItsColoursHaveStarted() {
     let motion = DesignSystem.Animation.checkMarkDraws
