@@ -245,16 +245,15 @@ extension TaskList {
                         .init(
                             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
-                            strike: isOpen ? nil : .ink3, lift: lifts ? columnLift : nil, fresh: nil,
+                            strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 13) : nil, fresh: nil,
                             landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop, titleAnimation: .titleFades,
                             leaving: taskLeaving, ground: nil
                         )
                     },
                     check: { color in
-                        .init(
+                        checkStyle(
                             diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42,
-                            hitHeight: 44, animation: .check, fillAnimation: .checkFills,
-                            markAnimation: .checkMarkDraws, pop: checkPop, mark: checkMark, colors: color.check
+                            color: color
                         )
                     },
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil, indicator: nil
@@ -298,8 +297,8 @@ extension TaskList {
         /// by 70 %.
         private static let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
 
-        /// The tick of every check of the phone, `M6.5 12.5l3.5 3.5 7.5-8` in the canvas's 24-unit box, its ends and its
-        /// corner round (`Phone.dc.html`, `.cb`, its `stroke-linecap` and `stroke-linejoin`).
+        /// The tick of every check of the phone, `M6.5 12.5l3.5 3.5 7.5-8` in the canvas's 24-unit box, its ends and
+        /// its corner round (`Phone.dc.html`, `.cb`, its `stroke-linecap` and `stroke-linejoin`).
         private static let checkMark = CheckStyle.Mark(
             box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)], isRound: true
         )
@@ -311,24 +310,31 @@ extension TaskList {
             titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves, deleteAnimation: .rowDeleted
         )
 
+        /// A check of the phone at its own size, in a hit 44 high and as wide as it says, in the colour given, on the
+        /// motions, the pop and the tick every check has.
+        private static func checkStyle(
+            diameter: Double, ringWidth: Double, markSize: Double, markStrokeWidth: Double, hitWidth: Double,
+            color: Tile
+        ) -> CheckStyle {
+            CheckStyle(
+                diameter: diameter, ringWidth: ringWidth, markSize: markSize, markStrokeWidth: markStrokeWidth,
+                hitWidth: hitWidth, hitHeight: 44, animation: .check, fillAnimation: .checkFills,
+                markAnimation: .checkMarkDraws, pop: checkPop, mark: checkMark, colors: color.check
+            )
+        }
+
         /// A check of the phone's row and of its open card: 24 across with a 1.75 ring and the 15 pt mark stroked 1.75
         /// in a 44 hit (Task 8's table, Row).
         private static func phoneCheck(_ color: Tile) -> CheckStyle {
-            CheckStyle(
-                diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-                animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
-                mark: checkMark, colors: color.check
+            checkStyle(
+                diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, color: color
             )
         }
 
         /// A subtask's check in the open card: 18 across with a 1.5 ring and the 12 pt mark in a 40 by 44 hit (Task 8's
         /// table, Card), the canvas's 2.8 in its 24-unit box stroked 1.4 at that size (`CheckStyle.markStrokeWidth`).
         private static func phoneSubtaskCheck(_ color: Tile) -> CheckStyle {
-            CheckStyle(
-                diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
-                animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
-                mark: checkMark, colors: color.check
-            )
+            checkStyle(diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, color: color)
         }
 
         /// A subtask in the phone's open card, 44 high and struck in ink 3 where it is no longer open (Task 8's table,
@@ -348,7 +354,7 @@ extension TaskList {
                 .init(
                     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2,
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
-                    strike: isOpen ? nil : .ink3, lift: lifts ? phoneLift : nil, fresh: isFresh ? .fresh : nil,
+                    strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 14) : nil, fresh: isFresh ? .fresh : nil,
                     landingScale: nil, landingAnimation: .fresh, titleAnimation: .titleFades, leaving: taskLeaving,
                     ground: .paper
                 )
@@ -410,13 +416,16 @@ extension TaskList {
             sunSize: 16, flagSize: 15, hashSize: 14
         )
 
-        /// How the phone's row looks lifted (Task 8's table, Lift and slot): grown to 1.03, rounded 14 on the surface
-        /// and casting the lifted shadow, and dimmed to .35 where it is dragged from, the column's card's value, as the
-        /// system's copy of it moves (the controller's ruling on #177, 2026-11-07).
-        private static let phoneLift = TaskLiftStyle(
-            scale: 1.03, opacity: 0.35, cornerRadius: 14, background: .surface, shadow: .lifted,
-            dimAnimation: .dropHighlights
-        )
+        /// How the phone's row or a column's card looks lifted (Task 8's table, Lift and slot), rounded as it says, a
+        /// row 14 and a card its own 13, which the table gives the card no other number for: grown to 1.03 on the
+        /// surface and casting the lifted shadow, and dimmed to .35 where it is dragged from, as the system's copy of it
+        /// moves (the controller's ruling on #177, 2026-11-07).
+        private static func taskLift(cornerRadius: Double) -> TaskLiftStyle {
+            TaskLiftStyle(
+                scale: 1.03, opacity: 0.35, cornerRadius: cornerRadius, background: .surface, shadow: .lifted,
+                dimAnimation: .dropHighlights
+            )
+        }
 
         /// The mark of a drop's place among the phone's rows (Task 8's table, Lift and slot), 10 high, placed from the
         /// rows' leading edge: the circle 8 across at 52, ringed 2 in the list's check fill and filled with the paper,
@@ -429,13 +438,6 @@ extension TaskList {
                 circleRing: LineStyle(color: color.check.fill, width: 2, dash: []), circleFill: .paper
             )
         }
-
-        /// How a column's card looks lifted (Task 8's table, Lift and slot): the row's, but for its corners, the card's
-        /// own 13, which the table gives the card no other number for. Its column's tint marks the drop.
-        private static let columnLift = TaskLiftStyle(
-            scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted,
-            dimAnimation: .dropHighlights
-        )
 
         /// The phone's glass buttons (Task 8's table, Glass buttons; `Phone.dc.html`, `.glass` and the buttons' row):
         /// 44 circles on the glass, edged with its 0.5 hairline and casting the raised shadow; the back chevron 24
