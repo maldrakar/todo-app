@@ -59,6 +59,7 @@ struct ListScreen: View {
             .toolbar(.hidden, for: .navigationBar)
             #endif
             #if os(iOS)
+            // iOS alone: the Mac and the watch have no `interactivePopGestureRecognizer`.
             .background { EdgeSwipeBack() }
             #endif
     }

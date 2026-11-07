@@ -1,4 +1,5 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/EdgeSwipeBack.swift
+// iOS alone: `interactivePopGestureRecognizer` is `UINavigationController`'s, which the Mac and the watch do not have.
 #if os(iOS)
 import SwiftUI
 import UIKit
@@ -6,30 +7,48 @@ import UIKit
 /// Keeps the swipe from the screen's left edge going back on a screen that hides its navigation bar, where UIKit turns
 /// it off: on an iPhone 17 (the iOS 26.3 simulator, 2026-11-07) that swipe went back from the task screen, whose bar
 /// shows, and did nothing on the list screen, whose own glass circle goes back instead. SwiftUI has no way to say so,
-/// so while the screen stands on top its view controller answers for the navigation controller's recognizer, and gives
-/// it back to what answered before when the screen goes, since a recognizer that answers yes on a stack's root screen
-/// hangs the stack. The pop it starts is the system's, which writes the shorter path the root view sends as any pop.
+/// so while the screen stands on top its view controller answers for the navigation controller's recognizer. The pop it
+/// starts is the system's, which writes the shorter path the root view sends as any pop.
+///
+/// It gives the recognizer back to what answered before, since one that answers yes on a stack's root screen hangs the
+/// stack, and it does so only if it took it: a list opened under a task by a link gets `viewWillDisappear` from a swipe
+/// cancelled on the task with no `viewDidAppear` before it. The recognizer is held here and not asked of the navigation
+/// controller at the end, since a glass Back drops the element and tears this controller down while the pop plays, by
+/// when it may have lost its parent; so the end has two ways in, the appearance callback and the explicit dismantling.
 struct EdgeSwipeBack: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> Controller { Controller() }
 
     func updateUIViewController(_ controller: Controller, context: Context) {}
 
+    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) {
+        controller.giveRecognizerBack()
+    }
+
     final class Controller: UIViewController, UIGestureRecognizerDelegate {
-        /// What answered for the recognizer before this screen came up, which the recognizer holds only weakly.
+        /// The recognizer this screen answers for while it stands on top, and nil before it first has.
+        private weak var recognizer: UIGestureRecognizer?
+
+        /// What answered for it before this screen came up, which the recognizer holds only weakly.
         private weak var answeredBefore: (any UIGestureRecognizerDelegate)?
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            guard let recognizer = navigationController?.interactivePopGestureRecognizer else { return }
-            if recognizer.delegate !== self {
-                answeredBefore = recognizer.delegate
-            }
+            guard let recognizer = navigationController?.interactivePopGestureRecognizer,
+                  recognizer.delegate !== self
+            else { return }
+            answeredBefore = recognizer.delegate
             recognizer.delegate = self
+            self.recognizer = recognizer
         }
 
         override func viewWillDisappear(_ animated: Bool) {
             super.viewWillDisappear(animated)
-            navigationController?.interactivePopGestureRecognizer?.delegate = answeredBefore
+            giveRecognizerBack()
+        }
+
+        func giveRecognizerBack() {
+            guard let recognizer, recognizer.delegate === self else { return }
+            recognizer.delegate = answeredBefore
         }
 
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
