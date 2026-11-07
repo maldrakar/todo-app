@@ -45,9 +45,10 @@ struct RowLift: Equatable {
         let after: TaskID?
     }
 
-    /// What the last layout reported, in the content's own coordinates, which a drag finds its place by: each row's
-    /// frame, each block's or column's, and the part of each column its cards are seen through.
-    struct Frames: Equatable {
+    /// What the screen's rows, blocks and columns last reported, in the content's own coordinates, which a drag finds
+    /// its place by: each row's frame, each block's or column's, and the part of each column its cards are seen
+    /// through.
+    struct Frames {
         var rows: [BlockRowID: CGRect] = [:]
         var blocks: [TaskList.Model.BlockID: CGRect] = [:]
         var columns: [TaskList.Model.BlockID: CGRect] = [:]
@@ -64,7 +65,7 @@ struct RowLift: Equatable {
     /// Where it would land, and nil over a block that takes no drop.
     private(set) var slot: Slot?
 
-    /// The drag after a stage, among the blocks drawn and the frames their last layout reported, and the drop that
+    /// The drag after a stage, among the blocks drawn and the frames they last reported, and the drop that
     /// stage reports: the first point lifts the row `onDrag` named, where it is still drawn and lifts; a move moves the
     /// slot; the release reports the drop once, where there is a slot, and puts the task down; and a cancel puts it
     /// down and reports nothing. A stage with no task lifted moves nothing.
