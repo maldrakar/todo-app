@@ -104,7 +104,7 @@ struct PlainField<Action: Equatable & Sendable>: View {
             text: Binding(get: { typed.text }, set: { text in
                 if typed.typed(text, goesUp: isFocused) { send(changed(text)) }
             }),
-            prompt: model.prompt,
+            prompt: prompt,
             axis: axis
         )
         #if os(watchOS)
@@ -115,6 +115,11 @@ struct PlainField<Action: Equatable & Sendable>: View {
             return .handled
         }
         #endif
+    }
+
+    /// What the field shows with nothing typed, in its model's colour.
+    private var prompt: Text {
+        Text(model.placeholder).foregroundStyle(Color(model.style.placeholder))
     }
 }
 

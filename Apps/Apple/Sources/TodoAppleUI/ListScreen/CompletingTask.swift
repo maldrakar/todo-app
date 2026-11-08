@@ -17,13 +17,18 @@ import SwiftUI
 /// comes in during that motion, the strip's for this task, comes in on it, so that it does not stand over the rows that
 /// have not moved yet.
 ///
+/// It hands what it wraps whether the task is completing, the check as it is drawn, its model checked from the tap
+/// while the task leaves, and what the check sends through, which holds that moment.
+///
 /// One geometry, so that the task moves whole as those above it close up: a row's glyphs and words, each placed on its
 /// own, drifted apart on that motion (the iOS 26.3 simulator, 2026-11-07).
 struct CompletingTask<Action: Equatable & Sendable, Content: View>: View {
     private let check: CheckModel<Action>
     private let leaving: TaskLeavingStyle
     private let send: (Action) -> Void
-    private let content: (_ isCompleting: Bool, _ checkTapped: @escaping () -> Void) -> Content
+    private let content: (
+        _ isCompleting: Bool, _ check: CheckModel<Action>, _ sendCheck: @escaping (Action) -> Void
+    ) -> Content
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -32,7 +37,9 @@ struct CompletingTask<Action: Equatable & Sendable, Content: View>: View {
 
     init(
         _ check: CheckModel<Action>, leaving: TaskLeavingStyle, send: @escaping (Action) -> Void,
-        @ViewBuilder content: @escaping (_ isCompleting: Bool, _ checkTapped: @escaping () -> Void) -> Content
+        @ViewBuilder content: @escaping (
+            _ isCompleting: Bool, _ check: CheckModel<Action>, _ sendCheck: @escaping (Action) -> Void
+        ) -> Content
     ) {
         self.check = check
         self.leaving = leaving
@@ -41,7 +48,7 @@ struct CompletingTask<Action: Equatable & Sendable, Content: View>: View {
     }
 
     var body: some View {
-        content(isCompleting, checkTapped)
+        content(isCompleting, drawnCheck, sendCheck)
             .geometryGroup()
             // One layer as it fades: a card's fields, each on its own surface, showed through it one by one.
             .compositingGroup()
@@ -50,14 +57,24 @@ struct CompletingTask<Action: Equatable & Sendable, Content: View>: View {
             )
     }
 
-    private func checkTapped() {
+    /// The check as it is drawn: checked from the tap until the task has left, which its model, written done at once,
+    /// does not stay on screen to say.
+    private var drawnCheck: CheckModel<Action> {
+        guard isCompleting else { return check }
+        return CheckModel(
+            style: check.style, isChecked: true, accessibilityLabel: check.accessibilityLabel, action: check.action
+        )
+    }
+
+    /// What the check sends: an open check's action on the leaving motion, and a done one's at once.
+    private func sendCheck(_ action: Action) {
         guard !check.isChecked else {
-            send(check.action)
+            send(action)
             return
         }
         isCompleting = true
         withAnimation(leavingMotion, completionCriteria: .logicallyComplete) {
-            send(check.action)
+            send(action)
         } completion: {
             isCompleting = false
         }

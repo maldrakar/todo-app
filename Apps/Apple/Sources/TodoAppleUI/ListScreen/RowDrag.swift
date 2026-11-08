@@ -74,7 +74,7 @@ private struct RowDragCopy: View {
     let dragState: RowDragState
 
     var body: some View {
-        TaskRowView(task, tap: {}, send: { _ in })
+        TaskRowView(task, send: { _ in })
             .frame(width: dragState.frames.rows[row]?.width)
             .background(Color(lift.background), in: .rect(cornerRadius: lift.cornerRadius, style: .circular))
     }

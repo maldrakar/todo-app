@@ -36,9 +36,9 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
     }
 
     var body: some View {
-        CompletingTask(model.check, leaving: model.style.leaving, send: send) { isCompleting, checkTapped in
+        CompletingTask(model.check, leaving: model.style.leaving, send: send) { isCompleting, check, sendCheck in
             VStack(alignment: .leading, spacing: 0) {
-                top(isCompleting: isCompleting, checkTapped: checkTapped)
+                top(isCompleting: isCompleting, check: check, sendCheck: sendCheck)
                 VStack(alignment: .leading, spacing: 0) {
                     PlainField(
                         model.notes, axis: .vertical, focusesOnAppear: false, changed: notesChanged, send: send
@@ -73,10 +73,12 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
         }
     }
 
-    /// The check, the title's field and Open full screen.
-    private func top(isCompleting: Bool, checkTapped: @escaping () -> Void) -> some View {
+    /// The check as `CompletingTask` draws it, the title's field and Open full screen.
+    private func top(
+        isCompleting: Bool, check: CheckModel<Action>, sendCheck: @escaping (Action) -> Void
+    ) -> some View {
         HStack(alignment: .top, spacing: 0) {
-            CheckButton(model.check, isChecked: model.check.isChecked || isCompleting, action: checkTapped)
+            CheckButton(check, send: sendCheck)
             PlainField(
                 model.title, focusesOnAppear: model.title.text.isEmpty,
                 color: isCompleting ? model.style.leaving.titleColor : nil,
@@ -127,7 +129,7 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
     /// A subtask's row: its check, and beside it its title, struck where it is done.
     private func subtask(_ subtask: SubtaskRowModel<Action>) -> some View {
         HStack(spacing: 0) {
-            CheckButton(subtask.check, isChecked: subtask.check.isChecked) { send(subtask.check.action) }
+            CheckButton(subtask.check, send: send)
             Text(subtask.title.text)
                 .font(Font(subtask.title.style.font))
                 .strikethrough(subtask.style.strike != nil, color: subtask.style.strike.map { Color($0) })

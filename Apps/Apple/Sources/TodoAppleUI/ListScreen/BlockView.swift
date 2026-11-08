@@ -91,7 +91,7 @@ struct BlockRow: View {
     var body: some View {
         switch row {
         case .task(let id, let task):
-            let face = TaskRowView(task, tap: { tapRow(task) }, send: send)
+            let face = TaskRowView(task, send: sendFromRow(task))
             .modifier(ColumnCardSurface(column: column))
             .modifier(ColumnCardRing(column: column))
             .modifier(TaskLanding(task.style))
@@ -123,12 +123,15 @@ struct BlockRow: View {
         }
     }
 
-    /// A tap on a row beside its check, which only closes the row a swipe left open.
-    private func tapRow(_ task: TaskRowModel<TaskList.UserAction>) {
-        if let swipe = gestures?.swipe, swipe.isOpen {
-            swipe.close()
-        } else {
-            send(task.tap)
+    /// What a task's row sends: a tap on it beside its check, its model's `tap`, only closes the row a swipe left open,
+    /// and the rest closes it and acts, as every control of the screen does (`Phone.dc.html`, `expand` and `complete`).
+    private func sendFromRow(_ task: TaskRowModel<TaskList.UserAction>) -> (TaskList.UserAction) -> Void {
+        { action in
+            if action == task.tap, let swipe = gestures?.swipe, swipe.isOpen {
+                swipe.close()
+            } else {
+                send(action)
+            }
         }
     }
 

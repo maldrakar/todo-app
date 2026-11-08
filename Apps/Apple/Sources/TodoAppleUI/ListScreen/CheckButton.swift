@@ -4,23 +4,21 @@ import DesignSystemComponents
 import SwiftUI
 
 /// A check as its model describes it (`CheckModel`; `Phone.dc.html`, `.cb` in its `.cbh`), a row's, a card's or a
-/// subtask's: the circle centred in its tap area, sending what `action` does, which reads aloud what a tap will do.
-/// Whether it is drawn checked is its caller's, since a row's check fills on the tap and its model's answer may not
-/// come while the row is on screen (`TaskRowView`).
+/// subtask's: the circle centred in its tap area, checked where its model is, sending its model's action, which reads
+/// aloud what a tap will do. A row's and a card's check are handed their model as `CompletingTask` draws it, checked
+/// from the tap while the task leaves.
 struct CheckButton<Action: Equatable & Sendable>: View {
     private let model: CheckModel<Action>
-    private let isChecked: Bool
-    private let action: () -> Void
+    private let send: (Action) -> Void
 
-    init(_ model: CheckModel<Action>, isChecked: Bool, action: @escaping () -> Void) {
+    init(_ model: CheckModel<Action>, send: @escaping (Action) -> Void) {
         self.model = model
-        self.isChecked = isChecked
-        self.action = action
+        self.send = send
     }
 
     var body: some View {
-        Button(action: action) {
-            CheckCircle(model.style, isChecked: isChecked)
+        Button { send(model.action) } label: {
+            CheckCircle(model.style, isChecked: model.isChecked)
                 .frame(width: model.style.hitWidth, height: model.style.hitHeight)
                 .contentShape(.rect)
         }

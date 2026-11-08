@@ -5,31 +5,27 @@ import SwiftUI
 /// A task's row as its model describes it (`TaskRowModel`; `Phone.dc.html`, the list screen's row), and a card of a
 /// column, which the column stands on its card's look (`BlockRow`): its check, and beside it its title and meta line as
 /// the button that opens it, every size, colour, font and word the model's. Each sends the action its model holds, and
-/// what follows is the module's.
+/// what follows is the module's: a tap beside the check sends its `tap`.
 ///
 /// A tap on an open row's check takes the row away as `CompletingTask` says.
 ///
 /// The drag, the menu, the swipe and the fresh fade wrap this view from outside (`BlockRow`).
 struct TaskRowView<Action: Equatable & Sendable>: View {
     private let model: TaskRowModel<Action>
-    private let tap: () -> Void
     private let send: (Action) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// The row, what a tap on it beside its check does, its caller's since it may do something else first, and what its
-    /// check sends.
-    init(_ model: TaskRowModel<Action>, tap: @escaping () -> Void, send: @escaping (Action) -> Void) {
+    init(_ model: TaskRowModel<Action>, send: @escaping (Action) -> Void) {
         self.model = model
-        self.tap = tap
         self.send = send
     }
 
     var body: some View {
-        CompletingTask(model.check, leaving: model.style.leaving, send: send) { isCompleting, checkTapped in
+        CompletingTask(model.check, leaving: model.style.leaving, send: send) { isCompleting, check, sendCheck in
             HStack(alignment: .top, spacing: 0) {
-                CheckButton(model.check, isChecked: model.check.isChecked || isCompleting, action: checkTapped)
-                Button(action: tap) { titleAndMeta(isCompleting: isCompleting) }
+                CheckButton(check, send: sendCheck)
+                Button { send(model.tap) } label: { titleAndMeta(isCompleting: isCompleting) }
                     .buttonStyle(.plain)
             }
             .padding(.leading, model.style.leading)
