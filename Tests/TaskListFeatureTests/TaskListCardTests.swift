@@ -150,6 +150,26 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     #expect(module.destination.pushed == .task(TaskScreen.Route(head: id)))
 }
 
+/// The back button asks the list's opener to close it, and an open card closes first by the rule of every close, since
+/// nothing after the tap reaches the list: a title typed is written, and a new task with nothing put in it is deleted
+/// (the owner's review of #177, 2026-11-08).
+@Test func theBackButtonClosesTheCardAndAsksTheOpenerToCloseTheList() throws {
+    let store = try makeStore()
+    let (module, id) = try cardOnATask(store)
+    module.tap(.titleFieldChanged("Buy oat milk"))
+    #expect(module.send(.action(.backButtonTapped)) == .closeRequested)
+    #expect(try stored(id, in: store).title == "Buy oat milk")
+    #expect(openCard(in: module.model) == nil)
+    let new = try list(inbox, in: store)
+    new.tap(.addTaskButtonTapped)
+    let empty = try #require(openCard(in: new.model)?.id)
+    #expect(new.send(.action(.backButtonTapped)) == .closeRequested)
+    #expect(try store.task(empty) == nil, "it never had anything in it")
+    let bare = try list(inbox, in: store)
+    #expect(bare.send(.action(.backButtonTapped)) == .closeRequested, "with no card open it only asks")
+    #expect(bare.model == (try list(inbox, in: store).model))
+}
+
 @Test func aCardClosingWithNoTitleDeletesTheTask() throws {
     let store = try makeStore()
     let module = try list(inbox, in: store)

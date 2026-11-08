@@ -25,8 +25,10 @@ struct BlockRowID: Hashable {
 /// block the task takes the place the point names, the upper half of a row being before it and the lower half after it,
 /// read by the rows' middles alone, so that the gap the mark opens, which moves the rows under a still finger, does not
 /// move the slot; on a column only among the cards in sight, since a card scrolled out of it keeps a frame under its
-/// header. In another block the module writes no place, a manual list taking the task last and any other standing it by
-/// its sort, so wherever the finger is in that block the slot stands at its end.
+/// header. A block that keeps no dropped place, a list inside that groups its tasks, offers none, since the task would
+/// keep to its own group wherever it was let go. In another block the module writes no place, a manual list taking the
+/// task last and any other standing it by its order, so the slot is that block, which its tint marks, and no place in
+/// it (the owner's review of #177, 2026-11-08).
 struct RowLift: Equatable {
     /// A stage of the drag, as its drop delegate reports it (`RowDragSessions`), with the point in the content's own
     /// coordinates where it has one: the drag is first seen, moves, is let go once, or leaves. `onDrag` says what is
@@ -39,10 +41,17 @@ struct RowLift: Equatable {
         case cancelled
     }
 
-    /// Where the task would land: in a block, after a row there, nil for the top.
-    struct Slot: Equatable {
-        let block: TaskList.Model.BlockID
-        let after: TaskID?
+    /// Where the task would land: at a place in the block it was dragged from, after a row there or at its top where
+    /// `after` is nil, or in another block, wherever that block's rule and order stand it.
+    enum Slot: Equatable {
+        case place(TaskList.Model.BlockID, after: TaskID?)
+        case into(TaskList.Model.BlockID)
+
+        var block: TaskList.Model.BlockID {
+            switch self {
+            case .place(let block, _), .into(let block): block
+            }
+        }
     }
 
     /// What the screen's rows, blocks and columns last reported, in the content's own coordinates, which a drag finds
@@ -62,7 +71,7 @@ struct RowLift: Equatable {
     /// The drag's session, which `RowDragSessions` tells apart from any other press.
     let session: String
 
-    /// Where it would land, and nil over a block that takes no drop.
+    /// Where it would land, and nil over a block that takes no drop and over its own where it keeps no dropped place.
     private(set) var slot: Slot?
 
     /// The drag after a stage, among the blocks drawn and the frames they last reported, and the drop that
@@ -102,9 +111,10 @@ struct RowLift: Equatable {
         var moved = self
         moved.slot = Self.block(at: point, among: blocks, frames: frames).flatMap { block in
             guard block.takesDrop else { return nil }
+            guard block.id == source else { return .into(block.id) }
+            guard block.keepsDroppedPlace else { return nil }
             let rows = block.rows.map(\.id).filter { $0 != task }
-            guard block.id == source else { return Slot(block: block.id, after: rows.last) }
-            return Slot(block: block.id, after: Self.place(at: point.y, among: rows, of: block, frames: frames))
+            return .place(block.id, after: Self.place(at: point.y, among: rows, of: block, frames: frames))
         }
         return moved
     }
@@ -138,9 +148,13 @@ struct RowLift: Equatable {
         }.last
     }
 
-    /// The drag's one report, on release, and nil over a block that takes no drop.
+    /// The drag's one report, on release, and nil where there is no slot.
     private var drop: TaskList.UserAction? {
-        slot.map { .rowDropped(task, from: source, in: $0.block, after: $0.after) }
+        switch slot {
+        case .place(let block, let after)?: .rowDropped(task, from: source, in: block, after: after)
+        case .into(let block)?: .rowDropped(task, from: source, in: block, after: nil)
+        case nil: nil
+        }
     }
 }
 

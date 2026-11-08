@@ -326,6 +326,11 @@ private enum WasmSizeProbe {
             tap(.list(.listNameFieldLostFocus))
             edits = "\(card); \(strip); \(listLine(of: model()))"
             tap(.list(.showAsChosen(.list)))
+            // Back with a card open, which writes its title as it closes, then the list.
+            tap(.list(.addTaskButtonTapped))
+            tap(.list(.titleFieldChanged("Return the book")))
+            tap(.list(.backButtonTapped))
+            edits += "; back to \(app.route.path)"
         }
         let window: String
         switch perform(.action(.taskViewList(.openInNewWindowMenuItemChosen(BuiltInTaskViews.today)))) {
@@ -550,7 +555,9 @@ private enum WasmSizeProbe {
         case .list(let blocks):
             let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.fold?.accessibilityLabel ?? "")" } }
             let adds = blocks.compactMap(\.addTask).map(\.title.text).joined(separator: "/")
-            shape = "\(blocks.count) blocks, marked \(blocks.first?.indicator?.height ?? 0), \(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
+            shape = "\(blocks.count) blocks, marked \(blocks.first?.indicator?.height ?? 0), tinted "
+                + "\(blocks.first?.dropTint?.cornerRadius ?? 0), \(blocks.filter(\.keepsDroppedPlace).count) keeping a place, "
+                + "\(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):
             let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, tinting on \($0.style.dropAnimation.duration), \($0.isDropTarget ? "taking" : "refusing") a drop" } }
             shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), \(board.endRoom) after, headed \(headers.joined(separator: "/")), then \(board.addList?.title.text ?? "no list to add")"
@@ -583,7 +590,8 @@ private enum WasmSizeProbe {
         let checked = list.showAs.sections.flatMap(\.items).filter(\.isChecked).map(\.title)
         let bar = list.style
         let fade = bar.fade.map { "fade \($0.color.light.red) \($0.height)/\($0.solidDepth)" } ?? "no fade"
-        let glass = "\(list.back.accessibilityLabel) \(list.back.style.diameter) at \(list.back.style.iconOffset), "
+        let glass = "\(list.back.label.accessibilityLabel) \(list.back.label.style.diameter) at "
+            + "\(list.back.label.style.iconOffset), "
             + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "
             + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
             + "on \(bar.background.light.red)"

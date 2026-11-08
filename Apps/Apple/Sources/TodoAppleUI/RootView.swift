@@ -127,11 +127,7 @@ struct RootView: View {
             ListsScreen(model: host.model.taskViewList) { host.send(.taskViewList($0)) }
                 .navigationDestination(for: StackElementID.self) { id in
                     screen(id) { list in
-                        // The way back is the root's (ADR-0009, amendment of 2026-10-22, point 4): the stack's path
-                        // with this element dropped, sent as a pop is, with what stands over it dropped too.
-                        ListScreen(model: list) { host.send(.screen(id, .list($0))) } back: {
-                            host.send(.wentBack(to: Array(path.prefix { $0 != id })))
-                        }
+                        ListScreen(model: list) { host.send(.screen(id, .list($0))) }
                     }
                     // The sidebar's sentence on every screen pushed over the Lists screen, which draws it above its
                     // bar when it is on top, so it shows once on whichever screen is on top, a task's included

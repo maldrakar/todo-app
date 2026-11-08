@@ -14,12 +14,11 @@ extension TaskList {
         /// 2).
         public let header: ScreenHeaderModel
 
-        /// The glass button that goes back, over the content at the top left; what a tap on it does is the window's
-        /// stack's, so it sends nothing (the controller's ruling on #177, 2026-11-07).
-        public let back: GlassButtonModel
+        /// The glass button that goes back, over the content at the top left.
+        public let back: GlassButtonModel<UserAction>
 
-        /// The glass button at the top right that puts up `showAs`.
-        public let more: GlassButtonModel
+        /// The glass button at the top right, the label of `showAs`, which it puts up.
+        public let more: GlassButtonLabelModel
 
         /// How the screen itself stands: what it stands on, how the glass buttons and their fade stand over the
         /// content, and where the content starts and ends under them.
@@ -118,9 +117,20 @@ extension TaskList {
             /// it: a view draws no slot and no tint where it does not (spec section 6).
             public let takesDrop: Bool
 
-            /// The mark of the place where a dragged task would land among its rows, in the colour of its list, and nil
-            /// in columns, where its column's tint marks the drop.
+            /// Whether a task dragged within the block lands where it is let go, its rows being one manual order: each
+            /// of the list's own blocks, and a list inside with one group of rows. A list inside that groups its tasks
+            /// orders each group apart, so a task dragged in it keeps to its group wherever it is let go, and a view
+            /// marks no place there and takes no drop (the owner's review of #177, 2026-11-08).
+            public let keepsDroppedPlace: Bool
+
+            /// The mark of the place where a task dragged within the block would land among its rows, in the colour of
+            /// its list, and nil in columns, where its column's tint marks the drop.
             public let indicator: DropIndicatorStyle?
+
+            /// The block's look while a task dragged from another block would land in it, in the colour of its list,
+            /// where the block takes it last or by its order and no line could say where; nil in columns, where its
+            /// column's tint marks the drop (the owner's review of #177, 2026-11-08).
+            public let dropTint: BlockDropStyle?
         }
 
         /// A row of a block, a view switching over its kind to pick the row to draw, every case drawn (`docs/style.md`,

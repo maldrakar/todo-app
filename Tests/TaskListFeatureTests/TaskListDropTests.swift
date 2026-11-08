@@ -71,6 +71,31 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(try store.manualList(of: week) == [b, a, c], "a group's reorder pins in the list")
 }
 
+/// A block keeps a dropped task's place where its rows are one manual order: each of the list's own blocks, and a list
+/// inside with one group of rows. A list inside that groups its tasks orders each group apart, so a task dragged in it
+/// keeps to its own group wherever it is let go, and the model says so for the view, which marks no place there; in
+/// columns alike (the owner's review of #177, 2026-11-08).
+@Test func aListInsideWithItsTasksInGroupsKeepsNoDroppedPlace() throws {
+    let store = try makeStore()
+    let home = try store.createTag(title: "home")
+    let parent = try projects(store)
+    let house = try store.createView(NewTaskView(title: "House", parent: parent, filter: .hasTag(home)))
+    let week = try store.createView(
+        NewTaskView(title: "Week", parent: parent, filter: .hasTag(home), groupBy: .whenDay)
+    )
+    try store.createTask(NewTask(title: "a", when: day(1), tags: [home]))
+    let module = try list(parent, in: store)
+    #expect(block(.own(nil), of: module.model)?.keepsDroppedPlace == true)
+    #expect(block(.list(house), of: module.model)?.keepsDroppedPlace == true)
+    #expect(block(.list(week), of: module.model)?.keepsDroppedPlace == true, "one day, one group")
+    try store.createTask(NewTask(title: "b", when: day(2), tags: [home]))
+    let twoDays = try list(parent, in: store)
+    #expect(block(.list(week), of: twoDays.model)?.keepsDroppedPlace == false)
+    #expect(block(.list(house), of: twoDays.model)?.keepsDroppedPlace == true)
+    twoDays.tap(.showAsChosen(.columns))
+    #expect(block(.list(week), of: twoDays.model)?.keepsDroppedPlace == false)
+}
+
 /// A list inside keeps its order in its own manual list, not its parent's (spec section 6).
 @Test func aReorderInAListInsidePinsInThatList() throws {
     let store = try makeStore()

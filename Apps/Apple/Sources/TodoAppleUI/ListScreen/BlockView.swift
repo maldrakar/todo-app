@@ -7,7 +7,8 @@ import TodoCore
 /// A block of the list as its model describes it (`TaskList.Model.Block`; `Phone.dc.html`, the group): its header where
 /// it has one, its rows, and "+ Add task" at its end where its rule reads as an edit. What it holds arrives finished in
 /// the model, and folding it takes its rows out of it, so this view decides nothing. While a dragged task would land in
-/// it, which only the drag knows, the block's mark of the place opens a gap among its rows.
+/// it, which only the drag knows, the block's mark of the place opens a gap among its rows where the task was dragged
+/// from it, and where it was dragged from another block the block is tinted, as a column is, with no place marked.
 struct BlockView: View {
     private let block: TaskList.Model.Block
     private let gestures: RowGestures
@@ -33,16 +34,50 @@ struct BlockView: View {
                 AddRowView(addTask, send: send)
             }
         }
+        .overlay {
+            if let tint = block.dropTint {
+                BlockDropTint(tint, isOn: gestures.lift?.slot == .into(block.id))
+            }
+        }
         .reportsLiftFrame(\.blocks, block.id, to: gestures.dragState)
     }
 
     /// The mark, where the lift's slot stands after this row, nil for the block's top, from the rows' leading edge. It
     /// stands in the flow, as the canvas's does (`Phone.dc.html`, `slotBefore`).
     @ViewBuilder private func mark(after row: TaskID?) -> some View {
-        if gestures.lift?.slot == RowLift.Slot(block: block.id, after: row), let indicator = block.indicator {
+        if gestures.lift?.slot == .place(block.id, after: row), let indicator = block.indicator {
             DropIndicator(indicator, from: 0, visibleRight: gestures.dragState.frames.blocks[block.id]?.maxX ?? 0)
                 .accessibilityHidden(true)
         }
+    }
+}
+
+/// The tint of a block a task dragged from another block would land in, and the ring inside its edge, as a column's
+/// (`ColumnView`), in from the screen's sides as its style says. Over the block and not under it, since its rows stand
+/// on the paper, which would hide it, and the tint lets them show through; it takes no touch. On its motion, or at once
+/// where a person asked for less motion.
+private struct BlockDropTint: View {
+    private let style: BlockDropStyle
+    private let isOn: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(_ style: BlockDropStyle, isOn: Bool) {
+        self.style = style
+        self.isOn = isOn
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .circular)
+        ZStack {
+            shape.fill(Color(style.tint))
+            shape.strokeBorder(Color(style.ring), lineWidth: style.ringWidth)
+        }
+        .padding(.horizontal, style.inset)
+        .opacity(isOn ? 1 : 0)
+        .animation(reduceMotion ? nil : Animation(style.animation), value: isOn)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

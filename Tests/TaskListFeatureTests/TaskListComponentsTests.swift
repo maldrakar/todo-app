@@ -274,8 +274,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
 /// fade less its 54 status bar, solid to 64 % of the 108).
 @Test func theGlassButtonsCarryThePhonesNumbers() throws {
     let store = try makeStore()
-    func button(_ icon: DesignSystem.Icon, size: Double, offset: Double, _ label: String) -> GlassButtonModel {
-        GlassButtonModel(
+    func button(_ icon: DesignSystem.Icon, size: Double, offset: Double, _ label: String) -> GlassButtonLabelModel {
+        GlassButtonLabelModel(
             icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: .ink)),
             style: GlassControlStyle(
                 iconOffset: offset, diameter: 44, surface: .glass,
@@ -289,7 +289,10 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         let module = try list(BuiltInTaskViews.upcoming, in: store)
         module.tap(.showAsChosen(layout))
         let model = module.model
-        #expect(model.back == button(.chevronLeft, size: 24, offset: -2, "Back"))
+        #expect(
+            model.back
+                == GlassButtonModel(label: button(.chevronLeft, size: 24, offset: -2, "Back"), action: .backButtonTapped)
+        )
         #expect(model.more == button(.ellipsis, size: 22, offset: 0, "More"))
         let style = ListScreenStyle(
             edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56, contentBottom: 116, background: .paper
@@ -552,6 +555,28 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     #expect(block(.list(house), of: module.model)?.indicator == dropMark(Tile.teal.check))
     module.tap(.showAsChosen(.columns))
     #expect(blocks(of: module.model).allSatisfy { $0.column != nil && $0.indicator == nil })
+}
+
+/// A block a task dragged from another block would land in is tinted and ringed inside its edge as a column is, in the
+/// colour of its list, rounded 18 as a column and standing 6 in from the screen's sides, on the drop's motion, since
+/// no line there could say where the task lands (the owner's review of #177, 2026-11-08). A column has no such tint,
+/// its own look tinting it.
+@Test func aBlockCarriesTheTintOfADropFromAnotherBlockInItsListsColour() throws {
+    let store = try makeStore()
+    let home = try store.createTag(title: "home")
+    let parent = try store.createView(NewTaskView(title: "Projects", color: .rose, filter: .status([.open])))
+    let house = try store.createView(NewTaskView(title: "House", parent: parent, color: .teal, filter: .hasTag(home)))
+    func tint(_ color: Tile) -> BlockDropStyle {
+        BlockDropStyle(
+            tint: color.dropTint, ring: color.check.fill, ringWidth: 2, cornerRadius: 18, inset: 6,
+            animation: .dropHighlights
+        )
+    }
+    let module = try list(parent, in: store)
+    #expect(block(.own(nil), of: module.model)?.dropTint == tint(.rose))
+    #expect(block(.list(house), of: module.model)?.dropTint == tint(.teal))
+    module.tap(.showAsChosen(.columns))
+    #expect(blocks(of: module.model).allSatisfy { $0.column != nil && $0.dropTint == nil })
 }
 
 /// A row answers its lift and its swipe whatever its kind: a task's row those of its model, and an open card, which is

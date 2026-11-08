@@ -97,7 +97,8 @@ extension TaskList {
                     },
                     isFolded: isFolded, column: nil,
                     addTask: isFolded ? nil : addTaskRow(for: block, addTaskMetrics), takesDrop: block.edit != nil,
-                    indicator: rowMetrics.indicator?(block.color)
+                    keepsDroppedPlace: block.keepsDroppedPlace, indicator: rowMetrics.indicator?(block.color),
+                    dropTint: rowMetrics.dropTint?(block.color)
                 )
             })
         case .columns(let board):
@@ -110,7 +111,8 @@ extension TaskList {
                         column: column(
                             block.heading ?? Heading(title: title, subtitle: nil), of: block, context, board
                         ),
-                        addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edit != nil, indicator: nil
+                        addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edit != nil,
+                        keepsDroppedPlace: block.keepsDroppedPlace, indicator: nil, dropTint: nil
                     )
                 },
                 spacing: board.spacing, horizontalPadding: board.horizontalPadding, endRoom: board.endRoom,
@@ -313,19 +315,22 @@ extension TaskList {
     /// The back button over the content (spec section 1; Task 8's table, Glass buttons): the chevron, reading "Back".
     /// The canvas reads "Back to <title>" of the screen under this one, which the window's stack knows and this module
     /// does not (the controller's ruling on #177, 2026-11-07).
-    static func back(_ metrics: Metrics.Glass) -> GlassButtonModel {
+    static func back(_ metrics: Metrics.Glass) -> GlassButtonModel<UserAction> {
         GlassButtonModel(
-            icon: IconModel(
-                icon: .chevronLeft, style: IconStyle(size: metrics.backGlyphSize, weight: .regular, color: .ink)
+            label: GlassButtonLabelModel(
+                icon: IconModel(
+                    icon: .chevronLeft, style: IconStyle(size: metrics.backGlyphSize, weight: .regular, color: .ink)
+                ),
+                style: metrics.back, accessibilityLabel: "Back"
             ),
-            style: metrics.back, accessibilityLabel: "Back"
+            action: .backButtonTapped
         )
     }
 
     /// "…" over the content (spec section 5; Task 8's table, Glass buttons), reading "More": the menu it opens is
     /// `showAs`.
-    static func more(_ metrics: Metrics.Glass) -> GlassButtonModel {
-        GlassButtonModel(
+    static func more(_ metrics: Metrics.Glass) -> GlassButtonLabelModel {
+        GlassButtonLabelModel(
             icon: IconModel(
                 icon: .ellipsis, style: IconStyle(size: metrics.moreGlyphSize, weight: .regular, color: .ink)
             ),

@@ -26,7 +26,10 @@ struct LiftedList {
     private static let columnWidth: CGFloat = 296, columnGap: CGFloat = 10, columnHeader: CGFloat = 44
     private static let columnArea: CGFloat = 300, card: CGFloat = 60, cardGap: CGFloat = 8
 
-    init(columns: Bool = false, taskInHouseAndOffice: Bool = false) throws {
+    /// The list, on the board where `columns` says so, with a task House and Office both draw where
+    /// `taskInHouseAndOffice` does, and Office grouping its tasks by day, O1 on the test's day and O2 on the next, where
+    /// `officeByDay` does.
+    init(columns: Bool = false, taskInHouseAndOffice: Bool = false, officeByDay: Bool = false) throws {
         let store = try Store.openInMemory(device: "row-lift-tests", now: Store.systemNow)
         let home = try store.createTag(title: "home")
         let work = try store.createTag(title: "work")
@@ -37,7 +40,9 @@ struct LiftedList {
             NewTaskView(title: "Projects", filter: .status([.open]), sort: [SortKey(.rank)])
         )
         house = try store.createView(NewTaskView(title: "House", parent: parent, filter: .hasTag(home)))
-        office = try store.createView(NewTaskView(title: "Office", parent: parent, filter: .hasTag(work)))
+        office = try store.createView(
+            NewTaskView(title: "Office", parent: parent, filter: .hasTag(work), groupBy: officeByDay ? .whenDay : nil)
+        )
         empty = try store.createView(NewTaskView(title: "Empty", parent: parent, filter: .hasTag(spare)))
         either = try store.createView(
             NewTaskView(title: "Either", parent: parent, filter: .or([.hasTag(x), .hasTag(y)]))
@@ -48,8 +53,8 @@ struct LiftedList {
         d = try store.createTask(NewTask(title: "D"))
         h1 = try store.createTask(NewTask(title: "H1", tags: [home]))
         h2 = try store.createTask(NewTask(title: "H2", tags: [home]))
-        o1 = try store.createTask(NewTask(title: "O1", tags: [work]))
-        o2 = try store.createTask(NewTask(title: "O2", tags: [work]))
+        o1 = try store.createTask(NewTask(title: "O1", when: officeByDay ? testDay.day : nil, tags: [work]))
+        o2 = try store.createTask(NewTask(title: "O2", when: officeByDay ? testDay.day.advanced(by: 1) : nil, tags: [work]))
         e1 = try store.createTask(NewTask(title: "E1", tags: [x]))
         both = taskInHouseAndOffice ? try store.createTask(NewTask(title: "Both", tags: [home, work])) : nil
         module = try TaskList(store: store, route: TaskList.Route(head: .init(view: parent)), day: testDay)
@@ -85,12 +90,12 @@ struct LiftedList {
         for block in blocks {
             let top = y
             if block.header != nil { y += Self.header }
-            if lift?.slot == RowLift.Slot(block: block.id, after: nil) { y += Self.gap }
+            if lift?.slot == .place(block.id, after: nil) { y += Self.gap }
             for row in block.rows {
                 let id = BlockRowID(block: block.id, task: row.id)
                 frames.rows[id] = CGRect(x: 0, y: y, width: 400, height: Self.row)
                 y += Self.row
-                if lift?.slot == RowLift.Slot(block: block.id, after: row.id) { y += Self.gap }
+                if lift?.slot == .place(block.id, after: row.id) { y += Self.gap }
             }
             if block.addTask != nil { y += Self.addRow }
             frames.blocks[block.id] = CGRect(x: 0, y: top, width: 400, height: y - top)

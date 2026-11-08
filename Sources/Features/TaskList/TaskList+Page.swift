@@ -46,10 +46,14 @@ extension TaskList {
         let edit: TaskEdit?
         let listRules: [Filter]
 
+        /// Whether a task dragged within it lands where it is let go, its tasks being one group of the page.
+        let keepsDroppedPlace: Bool
+
         /// The block with the tasks a filter leaves.
         func keeping(_ tasks: [TodoTask]) -> PageBlock {
             PageBlock(
-                id: id, tasks: tasks, heading: heading, color: color, rule: rule, edit: edit, listRules: listRules
+                id: id, tasks: tasks, heading: heading, color: color, rule: rule, edit: edit, listRules: listRules,
+                keepsDroppedPlace: keepsDroppedPlace
             )
         }
     }
@@ -173,7 +177,8 @@ extension TaskList {
         func ownBlock(_ key: GroupKey?, _ tasks: [TodoTask], heading: Heading?) -> PageBlock {
             PageBlock(
                 id: .own(key), tasks: rows(of: tasks, by: view.filter), heading: heading, color: color,
-                rule: view.filter, edit: ownEdit(of: view, key: key, today: today), listRules: []
+                rule: view.filter, edit: ownEdit(of: view, key: key, today: today), listRules: [],
+                keepsDroppedPlace: true
             )
         }
         if let group = head.group {
@@ -197,11 +202,14 @@ extension TaskList {
             guard let child = section.view else { continue }
             let folder = snapshot.folderRules[child.id]
             let rule = child.needsNewerApp == nil ? child.filter ?? folder?.first : nil
+            // The groups that hold a row: the manual list orders each apart, so a block of more than one keeps no
+            // dropped place.
+            let groups = section.groups.map { rows(of: $0.tasks, by: child.filter) }.filter { !$0.isEmpty }
             blocks.append(PageBlock(
-                id: .list(child.id), tasks: rows(of: section.groups.flatMap(\.tasks), by: child.filter),
+                id: .list(child.id), tasks: groups.flatMap { $0 },
                 heading: Heading(title: child.title, subtitle: nil), color: tileColor(child.color), rule: rule,
                 edit: rule.flatMap { TaskEdit.of($0, today: today, day: nil) },
-                listRules: child.filter.map { [$0] } ?? folder?.all ?? []
+                listRules: child.filter.map { [$0] } ?? folder?.all ?? [], keepsDroppedPlace: groups.count <= 1
             ))
         }
         return blocks

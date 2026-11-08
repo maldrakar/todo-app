@@ -25,7 +25,7 @@ import TodoCore
     #expect(list.lift?.task == list.h2)
     #expect(list.lift?.source == house)
     #expect(list.lift?.session == "first")
-    #expect(list.lift?.slot == RowLift.Slot(block: house, after: list.h1))
+    #expect(list.lift?.slot == .place(house, after: list.h1))
 }
 
 /// A row no longer drawn, gone by a peer's change between the press and the first point, lifts nothing, nor does an
@@ -52,19 +52,19 @@ import TodoCore
     let own = TaskList.Model.BlockID.own(nil)
     list.press(.began(task: list.b, block: own, session: "first", at: list.centre(of: list.b, in: own)))
     list.press(.changed(list.upperHalf(of: list.d, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.c))
+    #expect(list.lift?.slot == .place(own, after: list.c))
     list.press(.changed(list.upperHalf(of: list.d, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.c), "the gap above D moved D down, not the slot")
+    #expect(list.lift?.slot == .place(own, after: list.c), "the gap above D moved D down, not the slot")
     list.press(.changed(list.lowerHalf(of: list.d, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.d))
+    #expect(list.lift?.slot == .place(own, after: list.d))
     list.press(.changed(list.lowerHalf(of: list.d, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.d), "the gap below D moved D up, not the slot")
+    #expect(list.lift?.slot == .place(own, after: list.d), "the gap below D moved D up, not the slot")
     list.press(.changed(list.centre(of: list.b, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.a), "over itself, its own place")
+    #expect(list.lift?.slot == .place(own, after: list.a), "over itself, its own place")
     list.press(.changed(list.upperHalf(of: list.a, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: nil))
+    #expect(list.lift?.slot == .place(own, after: nil))
     list.press(.changed(CGPoint(x: 10, y: -500)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: nil), "above the blocks, the first block's top")
+    #expect(list.lift?.slot == .place(own, after: nil), "above the blocks, the first block's top")
     list.press(.changed(list.lowerHalf(of: list.c, in: own)))
     list.press(.ended)
     #expect(list.drops == [.rowDropped(list.b, from: own, in: own, after: list.c)])
@@ -74,22 +74,23 @@ import TodoCore
 }
 
 /// In another block the module writes no place, a manual list taking the task last and any other standing it by its
-/// sort, so wherever the finger is in that block the slot stands at its end.
-@Test func aMoveIntoAnotherBlockPicksItsEnd() throws {
+/// order, so wherever the finger is in that block the slot is the block, which its tint marks, and the drop names no
+/// row (the owner's review of #177, 2026-11-08).
+@Test func aMoveIntoAnotherBlockPicksTheBlock() throws {
     var list = try LiftedList()
     let house = TaskList.Model.BlockID.list(list.house)
     let office = TaskList.Model.BlockID.list(list.office)
     let empty = TaskList.Model.BlockID.list(list.empty)
     list.press(.began(task: list.h1, block: house, session: "first", at: list.centre(of: list.h1, in: house)))
     list.press(.changed(list.upperHalf(of: list.o1, in: office)))
-    #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o2))
+    #expect(list.lift?.slot == .into(office))
     list.press(.changed(list.top(of: office)))
-    #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o2), "over its header")
+    #expect(list.lift?.slot == .into(office), "over its header")
     list.press(.changed(list.top(of: empty)))
-    #expect(list.lift?.slot == RowLift.Slot(block: empty, after: nil), "a block with no rows has only its top")
+    #expect(list.lift?.slot == .into(empty), "and a block with no rows")
     list.press(.changed(list.lowerHalf(of: list.o2, in: office)))
     list.press(.ended)
-    #expect(list.drops == [.rowDropped(list.h1, from: house, in: office, after: list.o2)])
+    #expect(list.drops == [.rowDropped(list.h1, from: house, in: office, after: nil)])
     list.sendDrops()
     #expect(list.problem == nil)
     #expect(Set(list.rowIDs(of: office)) == [list.o1, list.o2, list.h1])
@@ -141,7 +142,7 @@ import TodoCore
     #expect(list.lift == nil)
     #expect(list.drops.isEmpty)
     list.press(.began(task: list.a, block: own, session: "first", at: list.lowerHalf(of: list.c, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.c))
+    #expect(list.lift?.slot == .place(own, after: list.c))
     list.press(.ended)
     #expect(list.drops == [.rowDropped(list.a, from: own, in: own, after: list.c)])
 }
@@ -154,13 +155,13 @@ import TodoCore
     list.leaveColumnArea(of: own, CGRect(x: 0, y: 60, width: 296, height: 20))
     list.press(.began(task: list.b, block: own, session: "first", at: list.centre(of: list.b, in: own)))
     list.press(.changed(list.lowerHalf(of: list.c, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.c), "below the area")
+    #expect(list.lift?.slot == .place(own, after: list.c), "below the area")
     list.press(.changed(list.lowerHalf(of: list.a, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.a), "above the area")
+    #expect(list.lift?.slot == .place(own, after: list.a), "above the area")
 }
 
 /// On the board the point picks the column under it, the nearest in a gap or a margin, whatever its height, a column
-/// that takes no drop offering none; in another column at its end, and in its own among the cards in sight: a card
+/// that takes no drop offering none; another column itself, and in its own a place among the cards in sight: a card
 /// scrolled out of its column keeps a frame, under the column's header, and is never the one under the finger.
 @Test func aMoveOverAColumnPicksTheColumn() throws {
     var list = try LiftedList(columns: true)
@@ -169,9 +170,9 @@ import TodoCore
     let either = TaskList.Model.BlockID.list(list.either)
     list.press(.began(task: list.b, block: own, session: "first", at: list.centre(of: list.b, in: own)))
     list.press(.changed(list.centre(of: list.h1, in: house)))
-    #expect(list.lift?.slot == RowLift.Slot(block: house, after: list.h2))
+    #expect(list.lift?.slot == .into(house))
     list.press(.changed(CGPoint(x: list.columnFrame(of: house).maxX + 1, y: 5_000)))
-    #expect(list.lift?.slot == RowLift.Slot(block: house, after: list.h2), "in the gap after it and below its end")
+    #expect(list.lift?.slot == .into(house), "in the gap after it and below its end")
     list.press(.changed(list.centre(of: list.e1, in: either)))
     #expect(list.lift?.slot == nil)
 
@@ -180,11 +181,11 @@ import TodoCore
     let area = list.visibleArea(of: own)
     #expect(hidden.y < area.minY, "C's frame lies under the header")
     list.press(.changed(hidden))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: nil), "over the header, the top")
+    #expect(list.lift?.slot == .place(own, after: nil), "over the header, the top")
     list.press(.changed(CGPoint(x: area.midX, y: area.maxY + 1)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.d), "under the cards in sight, the end")
+    #expect(list.lift?.slot == .place(own, after: list.d), "under the cards in sight, the end")
     list.press(.changed(list.upperHalf(of: list.d, in: own)))
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.c))
+    #expect(list.lift?.slot == .place(own, after: list.c))
     list.press(.ended)
     #expect(list.drops == [.rowDropped(list.b, from: own, in: own, after: list.c)])
     list.sendDrops()
@@ -205,14 +206,14 @@ import TodoCore
     #expect(rows[BlockRowID(block: house, task: both)] != rows[BlockRowID(block: office, task: both)])
 
     list.press(.began(task: both, block: office, session: "first", at: list.centre(of: both, in: office)))
-    #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o2), "its place in the block it was lifted from")
+    #expect(list.lift?.slot == .place(office, after: list.o2), "its place in the block it was lifted from")
     list.press(.changed(list.upperHalf(of: list.o2, in: office)))
-    #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o1))
+    #expect(list.lift?.slot == .place(office, after: list.o1))
     list.press(.cancelled)
 
     list.press(.began(task: both, block: house, session: "first", at: list.centre(of: both, in: house)))
     list.press(.changed(list.top(of: office)))
-    #expect(list.lift?.slot == RowLift.Slot(block: office, after: list.o2), "not after its own row there")
+    #expect(list.lift?.slot == .into(office), "another block, though it draws the task too")
     list.press(.changed(list.top(of: empty)))
     list.press(.ended)
     #expect(list.drops == [.rowDropped(both, from: house, in: empty, after: nil)])
@@ -223,9 +224,8 @@ import TodoCore
     #expect(list.rowIDs(of: empty) == [both])
 }
 
-/// A folded block has no rows and still takes a drop: its only place is its top, the mark standing under its header,
-/// and the fold stays.
-@Test func aFoldedBlockTakesADropAtItsTop() throws {
+/// A folded block has no rows and still takes a drop, as another block does, and the fold stays.
+@Test func aFoldedBlockTakesADrop() throws {
     var list = try LiftedList()
     let house = TaskList.Model.BlockID.list(list.house)
     let office = TaskList.Model.BlockID.list(list.office)
@@ -233,7 +233,7 @@ import TodoCore
     #expect(list.rowIDs(of: office).isEmpty)
     list.press(.began(task: list.h1, block: house, session: "first", at: list.centre(of: list.h1, in: house)))
     list.press(.changed(list.top(of: office)))
-    #expect(list.lift?.slot == RowLift.Slot(block: office, after: nil))
+    #expect(list.lift?.slot == .into(office))
     list.press(.ended)
     #expect(list.drops == [.rowDropped(list.h1, from: house, in: office, after: nil)])
     list.sendDrops()
@@ -242,6 +242,33 @@ import TodoCore
     #expect(list.rowIDs(of: office).isEmpty, "the fold stays")
     list.toggleFold(of: office)
     #expect(list.rowIDs(of: office).contains(list.h1))
+}
+
+/// A block that keeps no dropped place, a list inside whose tasks are in groups, offers no place to a task dragged
+/// within it, since the task would keep to its own group wherever it was let go: no slot there, and a release drops
+/// nothing. Another block still takes it, and a block with one group of rows keeps the place (the owner's review of
+/// #177, 2026-11-08).
+@Test func aBlockThatKeepsNoDroppedPlaceOffersNoPlaceInIt() throws {
+    var list = try LiftedList(officeByDay: true)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let house = TaskList.Model.BlockID.list(list.house)
+    #expect(list.block(office)?.keepsDroppedPlace == false)
+    #expect(list.block(house)?.keepsDroppedPlace == true)
+    list.press(.began(task: list.o1, block: office, session: "first", at: list.centre(of: list.o1, in: office)))
+    #expect(list.lift?.task == list.o1)
+    #expect(list.lift?.slot == nil)
+    list.press(.changed(list.lowerHalf(of: list.o2, in: office)))
+    #expect(list.lift?.slot == nil)
+    list.press(.changed(list.top(of: house)))
+    #expect(list.lift?.slot == .into(house), "another block takes it")
+    list.press(.changed(list.lowerHalf(of: list.o2, in: office)))
+    list.press(.ended)
+    #expect(list.drops.isEmpty)
+    list.press(.began(task: list.h1, block: house, session: "first", at: list.centre(of: list.h1, in: house)))
+    list.press(.changed(list.lowerHalf(of: list.h2, in: house)))
+    #expect(list.lift?.slot == .place(house, after: list.h2))
+    list.press(.changed(list.centre(of: list.o1, in: office)))
+    #expect(list.lift?.slot == .into(office), "and it takes a task from elsewhere")
 }
 
 /// A block that takes no drop takes none of its own rows either, so a row lifted from it has nowhere to go in it: no
@@ -276,7 +303,7 @@ import TodoCore
     let second = sessions.begin(BlockRowID(block: own, task: list.d))
     list.hear(.moved(list.lowerHalf(of: list.b, in: own)), session: first, in: sessions)
     #expect(list.lift?.task == list.a)
-    #expect(list.lift?.slot == RowLift.Slot(block: own, after: list.b))
+    #expect(list.lift?.slot == .place(own, after: list.b))
     list.hear(.moved(list.upperHalf(of: list.c, in: own)), session: second, in: sessions)
     #expect(list.lift?.task == list.a, "the other session's call moves nothing")
     list.hear(.released, session: second, in: sessions)

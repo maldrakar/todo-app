@@ -19,8 +19,9 @@ import TaskListFeature
 /// the content takes every tap no control of it took, the header's words and the room under the rows among them, and a
 /// card takes its own (`TaskCardView`).
 ///
-/// The bar is hidden, so the way back is the glass circle, and the swipe from the screen's edge, which a hidden bar
-/// turns off, is kept on (`EdgeSwipeBack`); the long-press menu of the system's back button goes with the button.
+/// The bar is hidden, so the way back is the glass circle, which sends the list's action as every control does, and the
+/// swipe from the screen's edge, which a hidden bar turns off, is kept on (`EdgeSwipeBack`) and is the stack's pop, as
+/// the system's back button's; the long-press menu of that button goes with it.
 ///
 /// A row's drag, menu, swipe and landing are its own (`BlockRow`); the screen keeps what they share, the drag in
 /// progress and the row swiped aside, and stands the drop on its scroll views (`RowDropTarget`). Any control of the
@@ -31,7 +32,6 @@ import TaskListFeature
 struct ListScreen: View {
     private let model: TaskList.Model
     private let send: (TaskList.UserAction) -> Void
-    private let back: () -> Void
 
     /// How high the sentence's strip stands, which only the view can know and which the floating "+" stands above.
     @State private var sentenceHeight: CGFloat = 0
@@ -43,14 +43,9 @@ struct ListScreen: View {
     /// What the screen keeps of its rows' gestures.
     private var rowGestures = ListScreenGestures()
 
-    /// The list's model, what its gestures send, and the way back, which is the window's stack's and no action of the
-    /// list's (ADR-0009, amendment of 2026-10-22, point 4).
-    init(
-        model: TaskList.Model, send: @escaping (TaskList.UserAction) -> Void, back: @escaping () -> Void
-    ) {
+    init(model: TaskList.Model, send: @escaping (TaskList.UserAction) -> Void) {
         self.model = model
         self.send = send
-        self.back = back
     }
 
     var body: some View {
@@ -187,7 +182,7 @@ struct ListScreen: View {
                 fadeUnderTheButtons(fade)
             }
             HStack(spacing: 0) {
-                GlassButton(model.back, action: back)
+                GlassButton(model.back, send: send)
                 Spacer(minLength: 0)
                 showAs
             }
@@ -216,7 +211,7 @@ struct ListScreen: View {
         #if os(watchOS)
         EmptyView()
         #else
-        Menu { MenuItems(model.showAs, send: send) } label: { GlassButton.Face(model.more) }
+        Menu { MenuItems(model.showAs, send: send) } label: { GlassButtonFace(model.more) }
             #if os(macOS)
             // Its label alone, as a plain button draws it: the Mac's default style puts it in a pull-down's bezel.
             .menuStyle(.button)

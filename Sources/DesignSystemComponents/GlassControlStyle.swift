@@ -1,7 +1,7 @@
 // Sources/DesignSystemComponents/GlassControlStyle.swift
 import DesignSystem
 
-/// The numbers a `GlassButtonModel` is drawn with, in points, and its surface, hairline and shadow, which a builder
+/// The numbers a `GlassButtonLabelModel` is drawn with, in points, and its surface, hairline and shadow, which a builder
 /// hands over as one value.
 public struct GlassControlStyle: Equatable, Sendable {
     /// How far the glyph is moved from the centre, rightward where positive: the back chevron sits 2 pt left of it on

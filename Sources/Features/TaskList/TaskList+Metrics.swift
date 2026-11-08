@@ -48,6 +48,7 @@ extension TaskList {
             let metaIconSpacing: Double
             let swipe: SwipeStyle?
             let indicator: (@Sendable (Tile) -> DropIndicatorStyle)?
+            let dropTint: (@Sendable (Tile) -> BlockDropStyle)?
         }
 
         /// A pill of the open card: its numbers and the sizes of its glyphs, the sun's, the flag's and the hash's.
@@ -256,7 +257,8 @@ extension TaskList {
                             color: color
                         )
                     },
-                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil, indicator: nil
+                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil, indicator: nil,
+                    dropTint: nil
                 ),
                 openCard: Card(
                     style: { color, isOpen in
@@ -365,7 +367,7 @@ extension TaskList {
                 threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
                 buttonCornerRadius: 12, background: .red, animation: .swipe
             ),
-            indicator: phoneDropMark
+            indicator: phoneDropMark, dropTint: phoneDropTint
         )
 
         /// The phone's open card (Task 8's table, Card; `Phone.dc.html`, the open card): 6 10 10 from what stands round
@@ -432,6 +434,17 @@ extension TaskList {
         /// rows' leading edge: the circle 8 across at 52, ringed 2 in the list's check fill and filled with the paper,
         /// which stands in for the canvas's unfilled dot since the mark stands on the screen's paper, and the line 2
         /// thick in the check fill, rounded 1, from 62 to 20 short of the right edge.
+        /// The tint of a block a task from another block would land in on the phone, a column's (Task 8's table, Board)
+        /// in the list: the block's drop tint and its check's fill as a 2 pt ring, rounded 18, on the drop's highlight;
+        /// 6 in from the screen's sides, so that the ring stands clear of the rows' checks (the owner's review of
+        /// #177, 2026-11-08).
+        private static let phoneDropTint: @Sendable (Tile) -> BlockDropStyle = { color in
+            BlockDropStyle(
+                tint: color.dropTint, ring: color.check.fill, ringWidth: 2, cornerRadius: 18, inset: 6,
+                animation: .dropHighlights
+            )
+        }
+
         private static let phoneDropMark: @Sendable (Tile) -> DropIndicatorStyle = { color in
             DropIndicatorStyle(
                 height: 10, line: LineStyle(color: color.check.fill, width: 2, dash: []), lineOffset: 62,

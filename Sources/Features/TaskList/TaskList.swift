@@ -27,8 +27,10 @@ public final class TaskList: Routable {
     /// What a view may send, each case named for the control and the gesture and never for the operation it triggers
     /// (ADR-0006). The way back from a screen over the list is not one: SwiftUI reports it only as the shorter path it
     /// wrote, which the root view sends the window whole, and the stack tells the list `.uncovered` (navigation state
-    /// spec, section 3).
+    /// spec, section 3). The list's own back button is one, since it is the list's control and no bar's.
     public enum UserAction: Equatable, Sendable {
+        /// The glass back button over the content.
+        case backButtonTapped
         /// A row of a block or of the strip, beside its check, tapped or clicked.
         case rowTapped(TaskID)
         /// A row's or a strip row's check, or the open card's.
@@ -175,6 +177,13 @@ public final class TaskList: Routable {
         // controller's ruling on #177, 2026-11-07); the drop sets it again once it has landed.
         if case .action = event { state.fresh = nil }
         switch event {
+        case .action(.backButtonTapped):
+            // The list asks its opener to close it, as it does when its view is gone, and the stack drops it with what
+            // stands over it (the owner's review of #177, 2026-11-08). The open card closes first by the rule of every
+            // close, so that what was typed into it is written, and a new task with nothing put in it is not left
+            // behind: nothing after this reaches the list, the field's lost focus among it.
+            closeCard()
+            return .closeRequested
         case .action(.rowTapped(let id)): openCard(on: id)
         case .action(.checkTapped(let id)): check(id)
         case .action(.backgroundTapped), .action(.titleFieldCancelled): dismissCard()
