@@ -25,8 +25,8 @@ struct BlockRowID: Hashable {
 /// block the task takes the place the point names, the upper half of a row being before it and the lower half after it,
 /// read by the rows' middles alone, so that the gap the mark opens, which moves the rows under a still finger, does not
 /// move the slot; on a column only among the cards in sight, since a card scrolled out of it keeps a frame under its
-/// header. A block that keeps no dropped place, a list inside that groups its tasks, offers none, since the task would
-/// keep to its own group wherever it was let go. In another block the module writes no place, a manual list taking the
+/// header. A block that keeps no dropped place, a list inside whose tasks stand in more than one group, offers none,
+/// since the task would keep to its own group wherever it was let go. In another block the module writes no place, a manual list taking the
 /// task last and any other standing it by its order, so the slot is that block, which its tint marks, and no place in
 /// it (the owner's review of #177, 2026-11-08).
 struct RowLift: Equatable {

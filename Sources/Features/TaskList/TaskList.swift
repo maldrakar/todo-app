@@ -122,6 +122,11 @@ public final class TaskList: Routable {
         /// close it (spec section 3; the controller's ruling on #175, 2026-11-04); the stack drops what stands over it
         /// with it.
         case closeRequested
+
+        /// The person went back from the list with its back button, so the list asks its opener to close it, which
+        /// the opener takes as the person going back to it, as when the stack tells it `.uncovered` (the owner's
+        /// review of #177, 2026-11-08); the stack drops what stands over it with it.
+        case wentBack
     }
 
     /// What a view draws, computed from the state on every read and never kept beside it, so that what the list holds
@@ -178,12 +183,17 @@ public final class TaskList: Routable {
         if case .action = event { state.fresh = nil }
         switch event {
         case .action(.backButtonTapped):
-            // The list asks its opener to close it, as it does when its view is gone, and the stack drops it with what
-            // stands over it (the owner's review of #177, 2026-11-08). The open card closes first by the rule of every
-            // close, so that what was typed into it is written, and a new task with nothing put in it is not left
-            // behind: nothing after this reaches the list, the field's lost focus among it.
+            // The person goes back, which the list answers to its opener, and the stack drops it with what stands over
+            // it (the owner's review of #177, 2026-11-08). What is open closes first by the rule of every close, a
+            // list's name being typed and the card, as before "+ Add list": what was typed is written and a new task
+            // with nothing put in it is not left behind, since nothing after this reaches the list, a field's lost
+            // focus among it. A write the store refuses keeps the list, so that its sentence stands, and a second Back
+            // closes it, the card having closed all the same.
+            state.problem = nil
+            settleListName()
             closeCard()
-            return .closeRequested
+            guard state.problem == nil else { return nil }
+            return .wentBack
         case .action(.rowTapped(let id)): openCard(on: id)
         case .action(.checkTapped(let id)): check(id)
         case .action(.backgroundTapped), .action(.titleFieldCancelled): dismissCard()
@@ -277,10 +287,11 @@ public final class TaskList: Routable {
             state.problem = nil
             setDestination(route.tail)
             return nil
-        case .destinationAnswered(.task(.closeRequested)), .destinationAnswered(.list(.closeRequested)), .uncovered:
+        case .destinationAnswered(.task(.closeRequested)), .destinationAnswered(.list(.closeRequested)),
+             .destinationAnswered(.list(.wentBack)), .uncovered:
             // The screen over the list asked to be closed, its task or its view gone (spec section 3), or the person
-            // went back to the list and the screen is gone already, and a list cannot keep a destination the person
-            // closed (navigation state spec, section 3). Either way the list declares nothing over it, the stack drops
+            // went back to the list, with the back button of a list over it or by the stack, where the screen is gone
+            // already, and a list cannot keep a destination the person closed (navigation state spec, section 3). Either way the list declares nothing over it, the stack drops
             // the screen with whatever stands over it, and the route names nothing over the list. None is a gesture on
             // the list, so the sentence stays: one written while the screen was up, by a link to a task that is gone
             // or a reread that failed, is one the person first sees now that the list is uncovered. The stack tells

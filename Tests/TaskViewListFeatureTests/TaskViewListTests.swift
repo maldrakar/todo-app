@@ -166,6 +166,37 @@ private func title(of row: TaskViewList.Model.Row) -> String? {
     #expect(renaming.destination.pushed == nil)
 }
 
+/// The list's own back button answers that the person went back, which the sidebar takes as it takes `.uncovered`,
+/// and not as a view gone: the destination empties, the highlight goes, and so does the sentence, except an open
+/// field's (the owner's review of #177, 2026-11-08).
+@Test func theListsBackButtonIsGoingBackToTheViews() throws {
+    let store = try makeStore()
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let gone = try store.createView(NewTaskView(title: "Errands", filter: .status([.open])))
+    let list = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, day: testDay, capabilities: iPhone
+    )
+    try store.delete(view: gone)
+    _ = list.send(.action(.rowSelected(gone)))
+    _ = list.send(.notOpened(.notFound(gone), stillOpen: on(BuiltInTaskViews.inbox, task: id).list))
+    #expect(list.model.problem == "The list could not be opened.", "the sentence is the setup; without it this proves nothing")
+    #expect(list.send(.destinationAnswered(.wentBack)) == nil)
+    #expect(list.destination.pushed == nil)
+    #expect(highlighted(in: list.model).isEmpty)
+    #expect(list.model.problem == nil)
+    #expect(list.route == .init(list: nil))
+    let renaming = try TaskViewList(
+        store: store, route: on(BuiltInTaskViews.inbox, task: id), width: .narrow, day: testDay, capabilities: iPhone
+    )
+    _ = renaming.send(.action(.renameMenuItemChosen(BuiltInTaskViews.today)))
+    _ = renaming.send(.action(.titleFieldChanged(" ")))
+    _ = renaming.send(.action(.titleFieldSubmitted))
+    #expect(renaming.model.problem == "A title cannot be empty.", "the field's refusal is the setup")
+    #expect(renaming.send(.destinationAnswered(.wentBack)) == nil)
+    #expect(renaming.model.problem == "A title cannot be empty.")
+    #expect(renaming.destination.pushed == nil)
+}
+
 /// After the way back to the views, the view that was highlighted is chosen like any other: a click declares its
 /// list again and a link does too, each a write the stack follows by pushing the list (#107, #113).
 @Test func aClickOrARouteAfterBeingUncoveredDeclaresTheListAgain() throws {

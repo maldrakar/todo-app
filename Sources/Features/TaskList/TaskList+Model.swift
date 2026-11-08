@@ -130,7 +130,7 @@ extension TaskList {
             /// The block's look while a task dragged from another block would land in it, in the colour of its list,
             /// where the block takes it last or by its order and no line could say where; nil in columns, where its
             /// column's tint marks the drop (the owner's review of #177, 2026-11-08).
-            public let dropTint: BlockDropStyle?
+            public let dropStyle: BlockDropStyle?
         }
 
         /// A row of a block, a view switching over its kind to pick the row to draw, every case drawn (`docs/style.md`,

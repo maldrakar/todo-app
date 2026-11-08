@@ -98,7 +98,7 @@ extension TaskList {
                     isFolded: isFolded, column: nil,
                     addTask: isFolded ? nil : addTaskRow(for: block, addTaskMetrics), takesDrop: block.edit != nil,
                     keepsDroppedPlace: block.keepsDroppedPlace, indicator: rowMetrics.indicator?(block.color),
-                    dropTint: rowMetrics.dropTint?(block.color)
+                    dropStyle: rowMetrics.dropStyle?(block.color)
                 )
             })
         case .columns(let board):
@@ -112,7 +112,7 @@ extension TaskList {
                             block.heading ?? Heading(title: title, subtitle: nil), of: block, context, board
                         ),
                         addTask: addTaskRow(for: block, board.addTask), takesDrop: block.edit != nil,
-                        keepsDroppedPlace: block.keepsDroppedPlace, indicator: nil, dropTint: nil
+                        keepsDroppedPlace: block.keepsDroppedPlace, indicator: nil, dropStyle: nil
                     )
                 },
                 spacing: board.spacing, horizontalPadding: board.horizontalPadding, endRoom: board.endRoom,

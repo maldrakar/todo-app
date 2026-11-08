@@ -34,9 +34,13 @@ struct BlockView: View {
                 AddRowView(addTask, send: send)
             }
         }
+        // The screen's width, whatever it holds: a block with no header and no rows, its "+ Add task" alone, was only
+        // as wide as that row, its tint a pill round it and its frame a drop's nearest block for none of the screen's
+        // right side.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .overlay {
-            if let tint = block.dropTint {
-                BlockDropTint(tint, isOn: gestures.lift?.slot == .into(block.id))
+            if let style = block.dropStyle {
+                BlockDropTint(style, isOn: gestures.lift?.slot == .into(block.id))
             }
         }
         .reportsLiftFrame(\.blocks, block.id, to: gestures.dragState)

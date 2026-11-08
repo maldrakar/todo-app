@@ -3,7 +3,7 @@ import DesignSystemComponents
 import SwiftUI
 
 /// A round button on glass over the list screen's content as its model describes it (`GlassButtonModel`;
-/// `Phone.dc.html`, `.glass`), sending its model's action. "…" is the same circle as a `Menu`'s label (`Face`).
+/// `Phone.dc.html`, `.glass`), sending its model's action. "…" is the same circle as a `Menu`'s label (`GlassButtonFace`).
 struct GlassButton<Action: Equatable & Sendable>: View {
     private let model: GlassButtonModel<Action>
     private let send: (Action) -> Void

@@ -556,7 +556,7 @@ private enum WasmSizeProbe {
             let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.fold?.accessibilityLabel ?? "")" } }
             let adds = blocks.compactMap(\.addTask).map(\.title.text).joined(separator: "/")
             shape = "\(blocks.count) blocks, marked \(blocks.first?.indicator?.height ?? 0), tinted "
-                + "\(blocks.first?.dropTint?.cornerRadius ?? 0), \(blocks.filter(\.keepsDroppedPlace).count) keeping a place, "
+                + "\(blocks.first?.dropStyle?.cornerRadius ?? 0), \(blocks.filter(\.keepsDroppedPlace).count) keeping a place, "
                 + "\(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):
             let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, tinting on \($0.style.dropAnimation.duration), \($0.isDropTarget ? "taking" : "refusing") a drop" } }

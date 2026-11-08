@@ -277,6 +277,27 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     #expect(relaunched.route.path == "/view/\(inbox)")
 }
 
+/// The list's own back button goes back one screen, as the stack's pop does: a list over a list closes onto it, and
+/// the base list onto the views, the highlight going as it does with Back (the owner's review of #177, 2026-11-08).
+@Test func theListsBackButtonGoesBackOneScreen() throws {
+    let store = try makeStore()
+    let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let house = try store.createView(NewTaskView(title: "House", parent: parent, filter: .status([.open])))
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(parent)/view/\(house)"), width: .narrow, day: testDay,
+        capabilities: iPhone
+    )
+    let path = idsOverTheSidebar(in: app.model)
+    try #require(path.count == 2)
+    #expect(app.send(.action(.screen(path[1], .list(.backButtonTapped)))) == nil)
+    #expect(idsOverTheSidebar(in: app.model) == [path[0]])
+    #expect(app.route.path == "/view/\(parent)")
+    #expect(app.send(.action(.screen(path[0], .list(.backButtonTapped)))) == nil)
+    #expect(idsOverTheSidebar(in: app.model).isEmpty)
+    #expect(app.model.taskViewList.rows.filter(isHighlighted).isEmpty)
+    #expect(app.route.path == "/")
+}
+
 /// The long-press menu on the back button goes back several screens at once, and SwiftUI writes the path it went
 /// back to in one write: from the task straight to the views, the list and the task close together, and the
 /// highlight with them (spec section 3).

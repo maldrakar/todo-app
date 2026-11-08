@@ -38,8 +38,9 @@ extension TaskList {
         /// A task's row, or a column's card: its style for whether the task is open, whether it can be lifted, which it
         /// can where it has a menu, and whether it is the task just dropped; its check's for the block's colour, the
         /// title's font, the meta line's glyph and its gap to its text; its swipe, nil for a column's card, which has
-        /// none (canvas); and the mark of a drop's place among such rows for the block's colour, nil for a column's
-        /// card, whose column's tint marks the drop.
+        /// none (canvas); and for the block's colour the mark of a drop's place among such rows and the look of their
+        /// block while a task from another block would land in it, both nil for a column's card, whose column's tint
+        /// marks the drop.
         struct Row {
             let style: @Sendable (_ isOpen: Bool, _ lifts: Bool, _ isFresh: Bool) -> TaskRowStyle
             let check: @Sendable (Tile) -> CheckStyle
@@ -48,7 +49,7 @@ extension TaskList {
             let metaIconSpacing: Double
             let swipe: SwipeStyle?
             let indicator: (@Sendable (Tile) -> DropIndicatorStyle)?
-            let dropTint: (@Sendable (Tile) -> BlockDropStyle)?
+            let dropStyle: (@Sendable (Tile) -> BlockDropStyle)?
         }
 
         /// A pill of the open card: its numbers and the sizes of its glyphs, the sun's, the flag's and the hash's.
@@ -258,7 +259,7 @@ extension TaskList {
                         )
                     },
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil, indicator: nil,
-                    dropTint: nil
+                    dropStyle: nil
                 ),
                 openCard: Card(
                     style: { color, isOpen in
@@ -367,7 +368,7 @@ extension TaskList {
                 threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
                 buttonCornerRadius: 12, background: .red, animation: .swipe
             ),
-            indicator: phoneDropMark, dropTint: phoneDropTint
+            indicator: phoneDropMark, dropStyle: phoneBlockDrop
         )
 
         /// The phone's open card (Task 8's table, Card; `Phone.dc.html`, the open card): 6 10 10 from what stands round
@@ -430,21 +431,21 @@ extension TaskList {
             )
         }
 
-        /// The mark of a drop's place among the phone's rows (Task 8's table, Lift and slot), 10 high, placed from the
-        /// rows' leading edge: the circle 8 across at 52, ringed 2 in the list's check fill and filled with the paper,
-        /// which stands in for the canvas's unfilled dot since the mark stands on the screen's paper, and the line 2
-        /// thick in the check fill, rounded 1, from 62 to 20 short of the right edge.
         /// The tint of a block a task from another block would land in on the phone, a column's (Task 8's table, Board)
         /// in the list: the block's drop tint and its check's fill as a 2 pt ring, rounded 18, on the drop's highlight;
-        /// 6 in from the screen's sides, so that the ring stands clear of the rows' checks (the owner's review of
+        /// 6 in from the block's sides, so that the ring stands clear of the rows' checks (the owner's review of
         /// #177, 2026-11-08).
-        private static let phoneDropTint: @Sendable (Tile) -> BlockDropStyle = { color in
+        private static let phoneBlockDrop: @Sendable (Tile) -> BlockDropStyle = { color in
             BlockDropStyle(
                 tint: color.dropTint, ring: color.check.fill, ringWidth: 2, cornerRadius: 18, inset: 6,
                 animation: .dropHighlights
             )
         }
 
+        /// The mark of a drop's place among the phone's rows (Task 8's table, Lift and slot), 10 high, placed from the
+        /// rows' leading edge: the circle 8 across at 52, ringed 2 in the list's check fill and filled with the paper,
+        /// which stands in for the canvas's unfilled dot since the mark stands on the screen's paper, and the line 2
+        /// thick in the check fill, rounded 1, from 62 to 20 short of the right edge.
         private static let phoneDropMark: @Sendable (Tile) -> DropIndicatorStyle = { color in
             DropIndicatorStyle(
                 height: 10, line: LineStyle(color: color.check.fill, width: 2, dash: []), lineOffset: 62,

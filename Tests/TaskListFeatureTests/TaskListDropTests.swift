@@ -92,6 +92,9 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     let twoDays = try list(parent, in: store)
     #expect(block(.list(week), of: twoDays.model)?.keepsDroppedPlace == false)
     #expect(block(.list(house), of: twoDays.model)?.keepsDroppedPlace == true)
+    let b = try #require(rowIDs(of: .list(week), in: twoDays.model).last)
+    #expect(commits(of: store) { twoDays.tap(.rowDropped(b, from: .list(week), in: .list(week), after: nil)) } == 0)
+    #expect(try store.manualList(of: week).isEmpty, "a reorder sent all the same writes nothing")
     twoDays.tap(.showAsChosen(.columns))
     #expect(block(.list(week), of: twoDays.model)?.keepsDroppedPlace == false)
 }

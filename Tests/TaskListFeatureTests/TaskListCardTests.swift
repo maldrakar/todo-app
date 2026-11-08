@@ -150,24 +150,50 @@ private func cardOnATask(_ store: Store, title: String = "Buy milk") throws -> (
     #expect(module.destination.pushed == .task(TaskScreen.Route(head: id)))
 }
 
-/// The back button asks the list's opener to close it, and an open card closes first by the rule of every close, since
+/// The back button answers that the person went back, and an open card closes first by the rule of every close, since
 /// nothing after the tap reaches the list: a title typed is written, and a new task with nothing put in it is deleted
 /// (the owner's review of #177, 2026-11-08).
-@Test func theBackButtonClosesTheCardAndAsksTheOpenerToCloseTheList() throws {
+@Test func theBackButtonClosesTheCardAndAnswersThatThePersonWentBack() throws {
     let store = try makeStore()
     let (module, id) = try cardOnATask(store)
     module.tap(.titleFieldChanged("Buy oat milk"))
-    #expect(module.send(.action(.backButtonTapped)) == .closeRequested)
+    #expect(module.send(.action(.backButtonTapped)) == .wentBack)
     #expect(try stored(id, in: store).title == "Buy oat milk")
     #expect(openCard(in: module.model) == nil)
     let new = try list(inbox, in: store)
     new.tap(.addTaskButtonTapped)
     let empty = try #require(openCard(in: new.model)?.id)
-    #expect(new.send(.action(.backButtonTapped)) == .closeRequested)
+    #expect(new.send(.action(.backButtonTapped)) == .wentBack)
     #expect(try store.task(empty) == nil, "it never had anything in it")
     let bare = try list(inbox, in: store)
-    #expect(bare.send(.action(.backButtonTapped)) == .closeRequested, "with no card open it only asks")
+    #expect(bare.send(.action(.backButtonTapped)) == .wentBack, "with no card open it only answers")
     #expect(bare.model == (try list(inbox, in: store).model))
+}
+
+/// The back button settles a list's name being typed first, as "+ Add list" does, so the name is not lost with the
+/// field's lost focus, which reaches no list once it is closed (the owner's review of #177, 2026-11-08).
+@Test func theBackButtonWritesTheNameOfANewList() throws {
+    let store = try makeStore()
+    let parent = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let module = try list(parent, in: store)
+    module.tap(.addListTapped)
+    let made = try #require(try store.children(ofView: parent).last)
+    module.tap(.listNameFieldChanged("Errands"))
+    #expect(module.send(.action(.backButtonTapped)) == .wentBack)
+    #expect(try store.view(made.id)?.title == "Errands")
+}
+
+/// A close the store refused keeps the list on Back, so that its sentence stands and a title that was not saved is not
+/// passed over in silence; the card is closed, so a second Back goes (the owner's review of #177, 2026-11-08).
+@Test func aCloseTheStoreRefusedKeepsTheListOnBack() throws {
+    let store = try makeStore()
+    let (module, id) = try cardOnATask(store)
+    module.tap(.titleFieldChanged("Typed"))
+    try store.delete(task: id)
+    #expect(module.send(.action(.backButtonTapped)) == nil)
+    #expect(module.model.problem == "The change could not be saved, so nothing was written.")
+    #expect(openCard(in: module.model) == nil)
+    #expect(module.send(.action(.backButtonTapped)) == .wentBack)
 }
 
 @Test func aCardClosingWithNoTitleDeletesTheTask() throws {

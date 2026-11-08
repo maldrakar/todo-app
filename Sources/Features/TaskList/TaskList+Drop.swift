@@ -7,12 +7,14 @@ import TodoCore
 /// which is what keeps the rereads few.
 extension TaskList {
     /// Checks a drop against the model: both blocks drawn, the task a row of the one it was dragged from, the other
-    /// taking a drop, and `anchor` a row of it other than the task. Anything else writes nothing.
+    /// taking a drop, a drop within one block only where it keeps the place, and `anchor` a row of it other than the
+    /// task. Anything else writes nothing.
     func drop(_ id: TaskID, from source: Model.BlockID, in target: Model.BlockID, after anchor: TaskID?) {
         let drawn = TaskList.blocks(in: model.layout)
         guard let drawnSource = drawn.first(where: { $0.id == source }),
               let drawnTarget = drawn.first(where: { $0.id == target }),
               drawnSource.rows.contains(where: { $0.id == id }), drawnTarget.takesDrop,
+              source != target || drawnTarget.keepsDroppedPlace,
               anchor != id, anchor.map({ anchor in drawnTarget.rows.contains { $0.id == anchor } }) != false
         else { return }
         let blocks = state.pageBlocks

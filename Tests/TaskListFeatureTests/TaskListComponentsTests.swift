@@ -573,10 +573,10 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         )
     }
     let module = try list(parent, in: store)
-    #expect(block(.own(nil), of: module.model)?.dropTint == tint(.rose))
-    #expect(block(.list(house), of: module.model)?.dropTint == tint(.teal))
+    #expect(block(.own(nil), of: module.model)?.dropStyle == tint(.rose))
+    #expect(block(.list(house), of: module.model)?.dropStyle == tint(.teal))
     module.tap(.showAsChosen(.columns))
-    #expect(blocks(of: module.model).allSatisfy { $0.column != nil && $0.dropTint == nil })
+    #expect(blocks(of: module.model).allSatisfy { $0.column != nil && $0.dropStyle == nil })
 }
 
 /// A row answers its lift and its swipe whatever its kind: a task's row those of its model, and an open card, which is
