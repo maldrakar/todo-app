@@ -23,8 +23,9 @@ import TaskListFeature
 /// card takes its own (`TaskCardView`).
 ///
 /// A row's drag, menu, swipe and landing are its own (`BlockRow`); the surface keeps what they share, the drag in
-/// progress and the row swiped aside, and stands the drop on its scroll views (`RowDropTarget`). Any control of the
-/// content, and either "+", closes a row left swiped open.
+/// progress and the row swiped aside, and stands the system's drop on its scroll views on iOS (`RowDropTarget`) and the
+/// pointer's drag on their content on the Mac (`RowPointerDrag`). Any control of the content, and either "+", closes a
+/// row left swiped open.
 ///
 /// `ListSurface` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
@@ -126,7 +127,7 @@ struct ListSurface<Buttons: ViewModifier>: View {
             .padding(.top, model.style.contentTop)
             .padding(.bottom, model.style.contentBottom + bottomInset)
             .modifier(ContentWidth(model.style))
-            .modifier(rowGestures.listContent(blocks))
+            .modifier(rowGestures.listContent(blocks, send: send))
         }
         .scrollIndicators(.hidden)
         .modifier(rowGestures.dropTarget(blocks, settleInset: nil, send: send))
@@ -143,10 +144,13 @@ struct ListSurface<Buttons: ViewModifier>: View {
                 EmptyScreenView(empty)
                     .padding(.bottom, empty.style.bottomMargin)
             }
-            BoardView(board, gestures: rowGestures.forRows(delete: send), send: sendClosingSwipe)
-                .modifier(rowGestures.dropTarget(
-                    board.columns, settleInset: board.snaps ? board.horizontalPadding : nil, send: send
-                ))
+            BoardView(
+                board, gestures: rowGestures.forRows(delete: send),
+                dragContent: rowGestures.boardContent(board.columns, send: send), send: sendClosingSwipe
+            )
+            .modifier(rowGestures.dropTarget(
+                board.columns, settleInset: board.snaps ? board.horizontalPadding : nil, send: send
+            ))
         }
         .padding(.top, model.style.contentTop)
         .modifier(ContentWidth(model.style))

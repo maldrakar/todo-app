@@ -72,8 +72,9 @@ final class RowDragState {
 }
 
 extension RowLift {
-    /// The name of the space the frames are reported in, which is the content's of the list or of the board.
-    fileprivate static let contentSpace = "RowLift.content"
+    /// The name of the space the frames are reported in, which is the content's of the list or of the board, and the
+    /// Mac's pointer is read in.
+    static let contentSpace = "RowLift.content"
 }
 
 extension View {
@@ -91,17 +92,25 @@ extension View {
 }
 
 /// The content of the list or of the board as the space a drag finds its place in, which its rows report their frames
-/// in, and on iOS what only UIKit gives it (`ScrollContentFinder`).
+/// in, and on iOS what only UIKit gives it (`ScrollContentFinder`), on the Mac the pointer's drag over it
+/// (`RowPointerDrag`), which reads the pointer in that space and so stands inside it.
 struct RowDragContent: ViewModifier {
     private let dragState: RowDragState
     #if os(iOS)
     private let finder: ScrollContentFinder
+    #elseif os(macOS)
+    private let pointerDrag: RowPointerDrag
     #endif
 
     #if os(iOS)
     init(dragState: RowDragState, finder: ScrollContentFinder) {
         self.dragState = dragState
         self.finder = finder
+    }
+    #elseif os(macOS)
+    init(dragState: RowDragState, pointerDrag: RowPointerDrag) {
+        self.dragState = dragState
+        self.pointerDrag = pointerDrag
     }
     #else
     init(dragState: RowDragState) {
@@ -111,6 +120,9 @@ struct RowDragContent: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            #if os(macOS)
+            .modifier(pointerDrag)
+            #endif
             .coordinateSpace(.named(RowLift.contentSpace))
             #if os(iOS)
             .background { finder }

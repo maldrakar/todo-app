@@ -9,7 +9,7 @@ import TaskListFeature
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 @MainActor
 struct ListScreenGestures: DynamicProperty {
-    /// The task the system's drag has lifted, and nil while none is.
+    /// The task a drag has lifted, the system's on iOS or the pointer's on the Mac, and nil while none is.
     @State private var lift: RowLift?
 
     /// What the drag and the swipe read of the layout, which nothing observes.
@@ -34,9 +34,12 @@ struct ListScreenGestures: DynamicProperty {
         RowDropTarget(blocks, lift: $lift, gestures: forRows(delete: send), settleInset: settleInset, send: send)
     }
 
-    /// The list's content as the space a drag finds its place in, and what its rows' swipe reads there.
-    func listContent(_ blocks: [TaskList.Model.Block]) -> RowDragContent {
-        // iOS alone: its finder is UIKit's.
+    /// The list's content as the space a drag finds its place in, and what its rows' swipe reads there on iOS, or the
+    /// pointer's drag over it on the Mac, which sends its drop.
+    func listContent(
+        _ blocks: [TaskList.Model.Block], send: @escaping (TaskList.UserAction) -> Void
+    ) -> RowDragContent {
+        // iOS alone: its finder is UIKit's. The Mac alone: the drag is its pointer's.
         #if os(iOS)
         RowDragContent(
             dragState: dragState,
@@ -44,8 +47,34 @@ struct ListScreenGestures: DynamicProperty {
                 RowSwipe.row(at: point, moved: moved, from: swipe.current, among: blocks, frames: dragState.frames)
             }
         )
+        #elseif os(macOS)
+        RowDragContent(dragState: dragState, pointerDrag: pointerDrag(blocks, send: send))
         #else
         RowDragContent(dragState: dragState)
         #endif
     }
+
+    /// The board's content as the space a drag finds its place in, or the pointer's drag over it on the Mac, which
+    /// sends its drop.
+    func boardContent(
+        _ columns: [TaskList.Model.Block], send: @escaping (TaskList.UserAction) -> Void
+    ) -> RowDragContent {
+        // iOS alone: its finder is UIKit's. The Mac alone: the drag is its pointer's.
+        #if os(iOS)
+        RowDragContent(dragState: dragState, finder: ScrollContentFinder(dragState: dragState))
+        #elseif os(macOS)
+        RowDragContent(dragState: dragState, pointerDrag: pointerDrag(columns, send: send))
+        #else
+        RowDragContent(dragState: dragState)
+        #endif
+    }
+
+    #if os(macOS)
+    /// The pointer's drag over a content of the blocks drawn, the list's or the board's.
+    private func pointerDrag(
+        _ blocks: [TaskList.Model.Block], send: @escaping (TaskList.UserAction) -> Void
+    ) -> RowPointerDrag {
+        RowPointerDrag(blocks, lift: $lift, dragState: dragState, send: send)
+    }
+    #endif
 }

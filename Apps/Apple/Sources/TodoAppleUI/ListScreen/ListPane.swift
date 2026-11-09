@@ -22,8 +22,8 @@ import TaskListFeature
 ///
 /// The row's gestures are the phone's, wired the same way (`ListSurface`), and the platform decides which are there:
 /// on the iPad the system's drag and menu and the swipe (spike #174, y1); on the Mac a click on a row opens its card,
-/// which is the row's tap, the right click opens the row's menu, and the pointer's drag is another part's. Esc closes
-/// an open card wherever a keyboard has one.
+/// which is the row's tap, the right click opens the row's menu, and the pointer drags a row or a column's card
+/// (`RowPointerDrag`). Esc closes an open card wherever a keyboard has one, and puts no carried row down.
 ///
 /// `ListPane` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and Observation
 /// for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
