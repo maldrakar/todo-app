@@ -208,10 +208,12 @@ screen's own "+" adds inline, so no Quick Entry button stands on it; quick entry
 On the Mac and in a wide iPad window the same screen is the detail pane beside the sidebar, at the Mac's numbers: the
 content stands at most 780 points wide in the middle of the pane, rows are 36 points high with their notes, subtasks,
 tags and deadline on the title's line, and a board's columns are 288 wide and scroll freely sideways, with no snap. The
-back and the capsule with "+" and "…" are items of the window's bar, beside the button that shows the sidebar, and the
-bar has no title over the list's own; the back stands only on a list opened over another, since the sidebar is the way
-back to any other list. A click opens a task's card where its row stood, Esc on the Mac closes it, and the right
-click opens the row's menu with Delete. The Mac's pointer drags a row of a list or a card of a column the way a finger
+capsule with "+" and "…" stands at the right of the window's bar, and the bar has no title over the list's own. Only a list
+opened over another has a way back, since the sidebar is the way back to any other list: on the iPad the glass back,
+beside the button that shows the sidebar, and on the Mac the toolbar's own back, as on a task opened full screen. A
+click opens a task's card where its row stood, Esc on the Mac closes it unless text is being typed in the window, where
+Esc is the field's first, ⌘. closes it too, and the right click opens the row's menu with Delete. A list chosen
+in the sidebar opens at its top. The Mac's pointer drags a row of a list or a card of a column the way a finger
 does on the iPhone, with the line, the circle and the tint, carrying a copy of the row under the pointer; it scrolls
 nothing by itself, and a release outside the part of the list in sight puts the row down where it was. The iPad drags
 with the system's drag and drop, opens the system's menu on a press that holds still and slides out Delete on a swipe,
