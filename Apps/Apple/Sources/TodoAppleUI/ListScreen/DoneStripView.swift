@@ -49,9 +49,7 @@ struct DoneStripView<Action: Equatable & Sendable>: View {
             .padding(.leading, model.style.leadingPadding)
             .padding(.trailing, model.style.trailingPadding)
             .frame(height: model.style.height)
-            .hoverTint(
-                model.style.hover, in: RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
-            )
+            .hoverTint(model.style.hover)
             .background(
                 Color(model.style.background), in: .rect(cornerRadius: model.style.cornerRadius, style: .circular)
             )

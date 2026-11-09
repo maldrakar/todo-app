@@ -33,9 +33,7 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
             .padding(.leading, model.style.leading)
             .padding(.trailing, model.style.trailing)
             .frame(minHeight: model.style.minimumHeight, alignment: .top)
-            .hoverTint(
-                model.style.hover, in: RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
-            )
+            .hoverTint(model.style.hover)
         }
     }
 

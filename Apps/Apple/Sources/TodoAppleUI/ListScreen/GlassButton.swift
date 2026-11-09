@@ -76,6 +76,7 @@ struct GlassButtonFace: View {
         Icon(model.icon)
             .offset(x: model.style.iconOffset)
             .frame(width: model.style.diameter, height: model.style.height)
+            .hoverTint(model.style.hover)
             .contentShape(shape)
             .glassSurface(model.style.glass, in: shape)
     }
