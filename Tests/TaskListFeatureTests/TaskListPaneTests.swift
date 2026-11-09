@@ -251,7 +251,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(style.fill == .fill)
     #expect(style.cardBackground == .surface)
     #expect(style.cardShadow == .resting)
-    #expect(style.cardHover == ColumnStyle.CardHover(shadow: .hovered, animation: .hoverShadows))
+    #expect(style.cardHover == CardHoverStyle(shadow: .hovered, animation: .hoverShadows))
     #expect(style.dropRingWidth == 2)
     #expect(column.header.style == BlockHeaderStyle(
         titleToSubtitle: 8, rule: nil, height: 31, topMargin: 5, trailingMargin: 0, bottomMargin: 0, leadingMargin: 6,
