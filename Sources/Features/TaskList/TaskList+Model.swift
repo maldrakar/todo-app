@@ -17,8 +17,8 @@ extension TaskList {
         /// The glass button that goes back, over the content at the top left.
         public let back: GlassButtonModel<UserAction>
 
-        /// The glass "+" in the capsule beside "…", nil where the "+" floats (`addTask`) and where no task can be added
-        /// (spec section 4). A screen has one of the two or none, and both send the same action.
+        /// The glass "+" in the capsule beside "…", nil where the "+" floats (`addTask`) and where no task can be
+        /// added (spec section 4). A screen has one of the two or none, and both send the same action.
         public let glassAddTask: GlassButtonModel<UserAction>?
 
         /// How the screen itself stands: what it stands on, how the glass buttons and their fade stand over the

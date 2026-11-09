@@ -64,6 +64,10 @@ extension TaskList {
             /// The capsule a tag stands on in the meta line, written without its hash, and nil where the tag is written
             /// out as "#home" (`MetaItemStyle.Capsule`).
             let tagCapsule: MetaItemStyle.Capsule?
+
+            /// Whether a tag is written "#home", and not "home": the phone's text, and the Mac's card's, where the
+            /// Mac's row has the capsule in the hash's place.
+            let tagsHaveHash: Bool
             let swipe: SwipeStyle?
             let indicator: (@Sendable (Tile) -> DropIndicatorStyle)?
             let dropStyle: (@Sendable (Tile) -> BlockDropStyle)?
@@ -123,8 +127,8 @@ extension TaskList {
             let glyphWeight: DesignSystem.Font.Weight
         }
 
-        /// The glass buttons over the content: the back button's numbers, glyph and the glyph's weight, "…"'s, and the
-        /// "+" beside it where the screen has one in place of the floating one.
+        /// The glass buttons over the content: the back button's numbers, glyph and the glyph's weight, "…"'s, and
+        /// the "+" beside it where the screen has one in place of the floating one.
         struct Glass {
             let back: GlassControlStyle
             let backGlyphSize: Double
@@ -292,7 +296,8 @@ extension TaskList {
                         )
                     },
                     title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, metaOrder: phoneMetaOrder,
-                    tagCapsule: nil, swipe: nil, indicator: nil, dropStyle: nil
+                    tagCapsule: nil, tagsHaveHash: true, swipe: nil, indicator: nil,
+                    dropStyle: nil
                 ),
                 openCard: Card(
                     style: { color, isOpen in
@@ -401,7 +406,7 @@ extension TaskList {
                 )
             },
             check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, metaOrder: phoneMetaOrder,
-            tagCapsule: nil, swipe: swipe, indicator: phoneDropMark, dropStyle: phoneBlockDrop
+            tagCapsule: nil, tagsHaveHash: true, swipe: swipe, indicator: phoneDropMark, dropStyle: phoneBlockDrop
         )
 
         /// The meta line's order on the phone, in a row and on a column's card, and on the Mac's card (`Phone.dc.html`,

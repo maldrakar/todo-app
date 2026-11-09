@@ -69,15 +69,18 @@ extension TaskList {
     /// the block it adds to, by what that block's rule asks (spec section 4; the controller's ruling on #176,
     /// 2026-11-05). A list that takes no task has neither "+", the target being the one condition that decides both.
     /// The card that was open closes first, which can change which block that is, and a close the store refused stops
-    /// the add, so that its sentence stands; the card is closed, so a second tap adds.
+    /// the add, so that its sentence stands; the card is closed, so a second tap adds. The page's blocks are built once
+    /// for the action, and again only if a card was open, whose close can change them.
     func addFromButton() {
         func target() -> (edit: TaskEdit, view: TaskView)? {
             TaskList.floatingTarget(in: state.pageBlocks, of: state.snapshot, head: state.head, today: state.day.day)
         }
-        guard target() != nil else { return }
+        let first = target()
+        guard first != nil else { return }
+        let hadCard = state.card != nil
         state.problem = nil
         closeCard()
-        guard state.problem == nil, let target = target() else { return }
+        guard state.problem == nil, let target = hadCard ? target() : first else { return }
         addTask(target.edit, at: .start, onTopOf: target.view)
     }
 

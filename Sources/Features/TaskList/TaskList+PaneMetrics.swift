@@ -115,7 +115,8 @@ extension TaskList.Metrics {
                 },
                 check: { color in paneRowCheck(color, hitWidth: 34, hitHeight: 36) },
                 title: .nestedRowTitle, metaIconSize: 12, metaIconSpacing: 3, metaOrder: phoneMetaOrder,
-                tagCapsule: nil, swipe: nil, indicator: nil, dropStyle: nil
+                tagCapsule: nil, tagsHaveHash: true, swipe: nil, indicator: nil,
+                dropStyle: nil
             ),
             openCard: paneOpenCard(
                 cornerRadius: 10, margins: (top: 0, horizontal: 0, bottom: 0), shadow: .resting, bodyLeading: 36,
@@ -283,9 +284,13 @@ extension TaskList.Metrics {
             )
         },
         check: { color in paneRowCheck(color, hitWidth: 32, hitHeight: 36) },
-        title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, metaOrder: [.notes, .subtasks, .tags, .deadline],
-        tagCapsule: paneTagCapsule, swipe: swipe, indicator: paneDropMark, dropStyle: paneBlockDrop
+        title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, metaOrder: paneMetaOrder,
+        tagCapsule: paneTagCapsule, tagsHaveHash: false, swipe: swipe, indicator: paneDropMark, dropStyle: paneBlockDrop
     )
+
+    /// The meta line's order on the Mac's row, the canvas's, which lists the notes' glyph, the subtasks, the tags and
+    /// the deadline (`Mac.dc.html`, :349-352).
+    static let paneMetaOrder: [MetaKind] = [.notes, .subtasks, .tags, .deadline]
 
     private static let paneDropMark: @Sendable (Tile) -> DropIndicatorStyle = { color in
         DropIndicatorStyle(

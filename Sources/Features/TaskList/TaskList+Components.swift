@@ -297,7 +297,7 @@ extension TaskList {
                 }
             case .tags:
                 items += tags.titles(of: task.tags).map {
-                    item(nil, metrics.tagCapsule == nil ? "#\($0)" : $0, capsule: metrics.tagCapsule)
+                    item(nil, metrics.tagsHaveHash ? "#\($0)" : $0, capsule: metrics.tagCapsule)
                 }
             case .subtasks:
                 if task.subtasks > 0 { items.append(item(.list, "\(task.subtasksDone)/\(task.subtasks)")) }
