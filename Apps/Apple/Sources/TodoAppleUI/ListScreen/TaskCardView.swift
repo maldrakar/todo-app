@@ -88,6 +88,7 @@ struct TaskCardView<Action: Equatable & Sendable>: View {
             Button { send(model.expand.action) } label: {
                 expandFace
                     .frame(width: model.style.expandHitSide, height: model.style.expandHitSide)
+                    .hoverTint(model.style.expandHover)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)

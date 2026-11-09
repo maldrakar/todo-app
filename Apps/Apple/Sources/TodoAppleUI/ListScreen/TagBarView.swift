@@ -55,6 +55,7 @@ struct TagBarView<Action: Equatable & Sendable>: View {
             .padding(.leading, chip.style.leadingPadding)
             .padding(.trailing, chip.style.trailingPadding)
             .frame(height: chip.style.height)
+            .hoverTint(chip.style.hover)
             .background(
                 Color(chip.style.background), in: .rect(cornerRadius: chip.style.cornerRadius, style: .circular)
             )

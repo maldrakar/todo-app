@@ -364,3 +364,20 @@ import TodoCore
     list.hear(.moved(list.centre(of: list.b, in: own)), session: press, in: sessions)
     #expect(list.lift == nil)
 }
+
+/// The mark's line ends at the right of the block it stands in, measured from the block's own leading edge, where the
+/// mark is drawn: the frames are the content's, and a block of the pane stands in from the content's side by the
+/// pane's padding and the room either side of its widest, which the line's end must not count again (the Mac,
+/// 2026-11-09: a line as long as the block's right edge in the content widened the block by that inset while a row
+/// was carried).
+@Test func theMarksLineEndsAtTheBlocksOwnRightEdge() {
+    var frames = RowLift.Frames()
+    let own = TaskList.Model.BlockID.own(nil)
+    frames.blocks[own] = CGRect(x: 56, y: 120, width: 684, height: 200)
+    #expect(frames.lineEnd(in: own) == 684)
+}
+
+/// A block that has reported no frame yet draws no line rather than one of a guessed length.
+@Test func aBlockWithNoFrameEndsItsLineAtItsStart() {
+    #expect(RowLift.Frames().lineEnd(in: .own(nil)) == 0)
+}

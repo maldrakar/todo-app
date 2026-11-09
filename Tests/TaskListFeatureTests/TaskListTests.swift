@@ -28,7 +28,7 @@ private func titles(of model: TaskList.Model) -> [String] {
 /// after an event: the rows as a read now answers them on the day, the test's unless another is named, and no
 /// sentence.
 private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay) throws -> TaskList.Model {
-    try TaskList(store: store, route: on(view), day: day).model
+    try TaskList(store: store, route: on(view), day: day, width: .narrow).model
 }
 
 /// The rows are the query's answer in the query's order, which is the rank and not the order the tasks were
@@ -39,7 +39,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let second = try store.createTask(NewTask(title: "Second"))
     let third = try store.createTask(NewTask(title: "Third"), at: .start)
     try store.createTask(NewTask(title: "Someday", when: Day(year: 2030, month: 1, day: 1)))
-    let list = try TaskList(store: store, route: on(inbox), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow)
     let query = try store.tasks(in: inbox, today: testDay.day)
     #expect(ids(of: list.model) == query.map(\.id))
     #expect(ids(of: list.model) == [third, first, second], "a task with a day is not the Inbox's")
@@ -54,8 +54,9 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func aListIsTitledByItsView() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
-    #expect(try TaskList(store: store, route: on(inbox), day: testDay).model.header.title.text == "Inbox")
-    #expect(try TaskList(store: store, route: on(work), day: testDay).model.header.title.text == "Work")
+    let made = try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow)
+    #expect(made.model.header.title.text == "Inbox")
+    #expect(try TaskList(store: store, route: on(work), day: testDay, width: .narrow).model.header.title.text == "Work")
 }
 
 /// A list on a view that is gone is not made, and its `init` says which view it looked for: the stack keeps what
@@ -64,9 +65,13 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.delete(view: gone)
-    #expect(throws: StoreError.notFound(gone)) { try TaskList(store: store, route: on(gone), day: testDay) }
+    #expect(throws: StoreError.notFound(gone)) {
+        try TaskList(store: store, route: on(gone), day: testDay, width: .narrow)
+    }
     let unknown = ViewID()
-    #expect(throws: StoreError.notFound(unknown)) { try TaskList(store: store, route: on(unknown), day: testDay) }
+    #expect(throws: StoreError.notFound(unknown)) {
+        try TaskList(store: store, route: on(unknown), day: testDay, width: .narrow)
+    }
 }
 
 /// A link to a task, or a window restored onto one, makes the list with the task declared over it, which the
@@ -76,7 +81,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let route = on(inbox, task: id)
-    let list = try TaskList(store: store, route: route, day: testDay)
+    let list = try TaskList(store: store, route: route, day: testDay, width: .narrow)
     #expect(list.destination.pushed == route.tail)
     #expect(list.model == (try listOn(inbox, in: store)), "the rows and no sentence: the task is the stack's to make")
     #expect(list.route == route)
@@ -92,11 +97,11 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Buy milk"))
     try store.createTask(NewTask(title: "Call the bank"))
-    let list = try TaskList(store: store, route: on(inbox), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow)
     #expect(list.send(.action(.rowTapped(id))) == nil)
     #expect(list.destination.pushed == nil, "a tap opens the card in place")
     #expect(list.send(.action(.openFullScreenTapped)) == nil)
-    let linked = try TaskList(store: store, route: on(inbox, task: id), day: testDay)
+    let linked = try TaskList(store: store, route: on(inbox, task: id), day: testDay, width: .narrow)
     #expect(linked.send(.action(.rowTapped(id))) == nil)
     #expect(list.destination.pushed == .task(TaskScreen.Route(head: id)))
     #expect(list.model == linked.model, "what the button opens and what a link opens are one thing")
@@ -110,7 +115,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func aTapOnARowNotInTheListOpensNothing() throws {
     let store = try makeStore()
     let gone = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: on(inbox, task: gone), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox, task: gone), day: testDay, width: .narrow)
     try store.delete(task: gone)
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     let told = list.model
@@ -131,7 +136,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: on(inbox, task: open), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox, task: open), day: testDay, width: .narrow)
     _ = list.send(.route(on(inbox, task: gone)))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: .task(.init(head: open))))
     #expect(list.destination.pushed == .task(.init(head: open)), "the screen that was open stays; this is the setup")
@@ -153,7 +158,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let other = try store.createTask(NewTask(title: "Call the bank"))
     let gone = try store.createTask(NewTask(title: "File the expenses"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: on(inbox, task: open), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox, task: open), day: testDay, width: .narrow)
     _ = list.send(.route(on(inbox, task: gone)))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: .task(.init(head: open))))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
@@ -182,7 +187,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let kept = try store.createTask(NewTask(title: "Call the bank"))
     let gone = try store.createTask(NewTask(title: "File the expenses"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: on(inbox, task: open), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox, task: open), day: testDay, width: .narrow)
     _ = list.send(.route(on(inbox, task: gone)))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: .task(.init(head: open))))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
@@ -207,9 +212,9 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let open = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
-    let tapped = try TaskList(store: store, route: on(inbox, task: open), day: testDay)
-    let linked = try TaskList(store: store, route: on(inbox, task: gone), day: testDay)
-    let unread = try TaskList(store: store, route: on(inbox, task: open), day: testDay)
+    let tapped = try TaskList(store: store, route: on(inbox, task: open), day: testDay, width: .narrow)
+    let linked = try TaskList(store: store, route: on(inbox, task: gone), day: testDay, width: .narrow)
+    let unread = try TaskList(store: store, route: on(inbox, task: open), day: testDay, width: .narrow)
     for list in [tapped, linked, unread] { #expect(list.send(.action(.rowTapped(gone))) == nil) }
     try store.delete(task: gone)
     #expect(tapped.send(.action(.openFullScreenTapped)) == nil)
@@ -235,7 +240,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let route = TaskList.Route(head: .init(view: inbox), tail: .list(on(work)))
-    let list = try TaskList(store: store, route: route, day: testDay)
+    let list = try TaskList(store: store, route: route, day: testDay, width: .narrow)
     #expect(list.destination.pushed == .list(on(work)))
     #expect(list.route == route)
     #expect(list.model == (try listOn(inbox, in: store)), "what stands over the list is the stack's to make")
@@ -243,7 +248,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
         head: .init(view: BuiltInTaskViews.upcoming),
         tail: .list(TaskList.Route(head: .init(view: BuiltInTaskViews.upcoming, group: .day(1))))
     )
-    #expect(try TaskList(store: store, route: grouped, day: testDay).destination.pushed == grouped.tail)
+    #expect(try TaskList(store: store, route: grouped, day: testDay, width: .narrow).destination.pushed == grouped.tail)
 }
 
 /// A list opened over this one asks to be closed when its view is gone, and the stack hands the answer to this list,
@@ -251,7 +256,10 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func theListOverTheListAnswersToCloseAndEmptiesTheDestination() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
-    let list = try TaskList(store: store, route: TaskList.Route(head: .init(view: inbox), tail: .list(on(work))), day: testDay)
+    let list = try TaskList(
+        store: store, route: TaskList.Route(head: .init(view: inbox), tail: .list(on(work))), day: testDay,
+        width: .narrow
+    )
     let before = list.model
     #expect(list.send(.destinationAnswered(.list(.closeRequested))) == nil)
     #expect(list.destination.pushed == nil)
@@ -265,7 +273,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func whatCouldNotBeOpenedOverTheListIsWhatTheSentenceNames() throws {
     let store = try makeStore()
     let gone = ViewID()
-    let list = try TaskList(store: store, route: on(inbox), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow)
     let overAList = TaskList.Route(head: .init(view: inbox), tail: .list(on(gone)))
     let overAGroup = TaskList.Route(
         head: .init(view: inbox), tail: .list(TaskList.Route(head: .init(view: inbox, group: .day(1))))
@@ -292,7 +300,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let id = try store.createTask(NewTask(title: "Buy milk"))
     let gone = try store.createTask(NewTask(title: "Call the bank"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: on(inbox, task: gone), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox, task: gone), day: testDay, width: .narrow)
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Write it down")) }
     #expect(list.send(.changed(created)) == nil)
@@ -306,7 +314,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 
 @Test func aChangeNamingATaskRereadsTheRows() throws {
     let store = try makeStore()
-    let list = try TaskList(store: store, route: on(inbox), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow)
     let created = try changeSet(of: store) { try store.createTask(NewTask(title: "Buy milk")) }
     #expect(list.send(.changed(created)) == nil)
     #expect(list.model == (try listOn(inbox, in: store)))
@@ -319,7 +327,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: on(work), day: testDay)
+    let list = try TaskList(store: store, route: on(work), day: testDay, width: .narrow)
     let renamed = try changeSet(of: store) { try store.update(view: work, [.title("Office")]) }
     #expect(list.send(.changed(renamed)) == nil)
     #expect(list.model.header.title.text == "Office")
@@ -333,7 +341,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: on(work), day: testDay)
+    let list = try TaskList(store: store, route: on(work), day: testDay, width: .narrow)
     let before = list.model
     #expect(list.send(.changed(try unreadableFilter(on: work, in: store, renamedTo: "Office"))) == nil)
     #expect(list.model.header.title.text == "Office")
@@ -348,7 +356,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let errand = try store.createTag(title: "Errand")
     let errands = try store.createView(NewTaskView(title: "Errands", filter: .hasTag(errand)))
     let id = try store.createTask(NewTask(title: "Buy milk", tags: [errand]))
-    let list = try TaskList(store: store, route: on(errands), day: testDay)
+    let list = try TaskList(store: store, route: on(errands), day: testDay, width: .narrow)
     #expect(ids(of: list.model) == [id], "the tag is what puts the task in the view; this is the setup")
     let deleted = try changeSet(of: store) { try store.delete(tag: errand) }
     #expect(deleted.tasks.isEmpty && deleted.views.isEmpty, "the change names the tag and nothing else")
@@ -363,7 +371,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: on(work, task: id), day: testDay)
+    let list = try TaskList(store: store, route: on(work, task: id), day: testDay, width: .narrow)
     let before = list.model
     let peer = Store.newDeviceID()
     let later = HLC(millis: 1_800_000_000_000, counter: 0)
@@ -385,7 +393,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let id = try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: on(work, task: id), day: testDay)
+    let list = try TaskList(store: store, route: on(work, task: id), day: testDay, width: .narrow)
     let before = list.model
     #expect(list.send(.changed(try unreadableFilter(on: work, in: store))) == nil, "the view is there, so the list stays")
     #expect(list.model.layout == before.layout)
@@ -405,7 +413,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     let gone = try store.createTask(NewTask(title: "Buy milk"))
     try store.delete(task: gone)
-    let list = try TaskList(store: store, route: on(work), day: testDay)
+    let list = try TaskList(store: store, route: on(work), day: testDay, width: .narrow)
     _ = list.send(.route(on(work, task: gone)))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
@@ -431,7 +439,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let id = try store.createTask(NewTask(title: "Call the bank", when: testDay.day))
     let route = on(BuiltInTaskViews.today, task: id)
-    let list = try TaskList(store: store, route: route, day: deviceDay(testDay.day.advanced(by: -1)))
+    let list = try TaskList(store: store, route: route, day: deviceDay(testDay.day.advanced(by: -1)), width: .narrow)
     #expect(ids(of: list.model).isEmpty, "the task is tomorrow's; this is the setup")
     #expect(list.send(.dayChanged(testDay)) == nil)
     #expect(list.model == (try listOn(BuiltInTaskViews.today, in: store)))
@@ -447,7 +455,9 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let gone = try store.createTask(NewTask(title: "Buy milk"))
     try store.delete(task: gone)
     let today = BuiltInTaskViews.today
-    let list = try TaskList(store: store, route: on(today), day: deviceDay(testDay.day.advanced(by: -1)))
+    let list = try TaskList(
+        store: store, route: on(today), day: deviceDay(testDay.day.advanced(by: -1)), width: .narrow
+    )
     _ = list.send(.route(on(today, task: gone)))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")
@@ -461,7 +471,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 /// the rows, where a list made anew reads it, so a reread would have shown it. A new day then reads it.
 @Test func theSameDayAgainReadsNothing() throws {
     let store = try makeStore()
-    let list = try TaskList(store: store, route: on(inbox), day: testDay)
+    let list = try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow)
     let before = list.model
     try store.createTask(NewTask(title: "Buy milk"))
     #expect(list.send(.dayChanged(testDay)) == nil)
@@ -478,7 +488,7 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.createTask(NewTask(title: "Buy milk"))
-    let list = try TaskList(store: store, route: on(work), day: testDay)
+    let list = try TaskList(store: store, route: on(work), day: testDay, width: .narrow)
     let before = list.model
     _ = try unreadableFilter(on: work, in: store)
     #expect(list.send(.dayChanged(deviceDay(testDay.day.advanced(by: 1)))) == nil)

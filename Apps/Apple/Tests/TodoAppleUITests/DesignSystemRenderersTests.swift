@@ -70,6 +70,8 @@ import Testing
     #expect(Animation(.titleFades) == .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.25).delay(0))
     #expect(Animation(.chipToggles) == .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.18).delay(0))
     #expect(Animation(.dropHighlights) == .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.15).delay(0))
+    #expect(Animation(.hoverTints) == .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12).delay(0))
+    #expect(Animation(.hoverShadows) == .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.15).delay(0))
 }
 
 /// A symbol that does not exist draws nothing and says nothing, so the system is asked for the symbol of every icon,

@@ -23,6 +23,14 @@ public struct BlockHeaderStyle: Equatable, Sendable {
     /// column's is.
     public let foldHitSide: Double?
 
+    /// Whether the title's button fills the header beside the chevron, as a block's does, or fits its words, as a
+    /// column's does on the Mac (`Mac.dc.html`, the column's title), the padding round them the button's own.
+    public let titleFills: Bool
+
+    /// The tint over the title, and over the chevron's cell, while the pointer is over either, and nil where there is
+    /// no pointer to be, the phone's.
+    public let hover: HoverStyle?
+
     public init(
         titleToSubtitle: Double,
         rule: LineStyle?,
@@ -35,7 +43,9 @@ public struct BlockHeaderStyle: Equatable, Sendable {
         horizontalPadding: Double,
         bottomPadding: Double,
         cornerRadius: Double,
-        foldHitSide: Double?
+        foldHitSide: Double?,
+        titleFills: Bool,
+        hover: HoverStyle?
     ) {
         self.titleToSubtitle = titleToSubtitle
         self.rule = rule
@@ -49,5 +59,7 @@ public struct BlockHeaderStyle: Equatable, Sendable {
         self.bottomPadding = bottomPadding
         self.cornerRadius = cornerRadius
         self.foldHitSide = foldHitSide
+        self.titleFills = titleFills
+        self.hover = hover
     }
 }

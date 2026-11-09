@@ -50,7 +50,7 @@ struct BlockView: View {
     /// stands in the flow, as the canvas's does (`Phone.dc.html`, `slotBefore`).
     @ViewBuilder private func mark(after row: TaskID?) -> some View {
         if gestures.lift?.slot == .place(block.id, after: row), let indicator = block.indicator {
-            DropIndicator(indicator, from: 0, visibleRight: gestures.dragState.frames.blocks[block.id]?.maxX ?? 0)
+            DropIndicator(indicator, from: 0, visibleRight: gestures.dragState.frames.lineEnd(in: block.id))
                 .accessibilityHidden(true)
         }
     }
@@ -192,17 +192,18 @@ struct BlockRow: View {
         }
     }
 
-    /// What a card of a column stands on, and nothing for a row of the list.
+    /// What a card of a column stands on, casting its shadow, or the deeper one its style gives while the pointer is
+    /// over it (`Hovering`; `Mac.dc.html`, `.card:hover`); and nothing for a row of the list.
     private struct ColumnCardSurface: ViewModifier {
         let column: ColumnStyle?
 
         func body(content: Content) -> some View {
             if let column {
-                content.background {
+                content.modifier(Hovering(animation: column.cardHover?.animation) { isHovered in
                     RoundedRectangle(cornerRadius: column.cardCornerRadius, style: .circular)
                         .fill(Color(column.cardBackground))
-                        .shadow(column.cardShadow)
-                }
+                        .shadow(isHovered ? column.cardHover?.shadow ?? column.cardShadow : column.cardShadow)
+                })
             } else {
                 content
             }

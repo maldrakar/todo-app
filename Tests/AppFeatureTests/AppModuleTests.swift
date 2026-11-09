@@ -74,9 +74,9 @@ private func draft(of row: TaskViewList.Model.Row) -> String? {
 /// standing in the window is compared with: the rows as a read now answers them on the day, the test's unless another
 /// is named, and no sentence.
 private func listOn(
-    _ view: ViewID, in store: Store, on day: DeviceDay = testDay, card: TaskID? = nil
+    _ view: ViewID, in store: Store, on day: DeviceDay = testDay, width: WindowWidth = .wide, card: TaskID? = nil
 ) throws -> AppModule.ScreenModel {
-    let list = try TaskList(store: store, route: .init(head: .init(view: view)), day: day)
+    let list = try TaskList(store: store, route: .init(head: .init(view: view)), day: day, width: width)
     if let card { _ = list.send(.action(.rowTapped(card))) }
     return .list(list.model)
 }
@@ -84,9 +84,12 @@ private func listOn(
 /// The model of the screen of one of a list's own groups made now, as an element of the window's stack holds it, which
 /// is what a group standing over its list is compared with.
 private func groupOn(
-    _ group: TaskList.Route.Group, of view: ViewID, in store: Store, on day: DeviceDay = testDay
+    _ group: TaskList.Route.Group, of view: ViewID, in store: Store, on day: DeviceDay = testDay,
+    width: WindowWidth = .wide
 ) throws -> AppModule.ScreenModel {
-    .list(try TaskList(store: store, route: .init(head: .init(view: view, group: group)), day: day).model)
+    .list(try TaskList(
+        store: store, route: .init(head: .init(view: view, group: group)), day: day, width: width
+    ).model)
 }
 
 /// The model of a task screen made now on a task, as an element of the window's stack holds it.
@@ -261,7 +264,7 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     try #require(path.count == 2)
     #expect(app.send(.action(.wentBack(to: [path[0]]))) == nil)
     #expect(idsOverTheSidebar(in: app.model) == [path[0]])
-    #expect(try standing(in: app) == [listOn(inbox, in: store)])
+    #expect(try standing(in: app) == [listOn(inbox, in: store, width: .narrow)])
     #expect(app.model.taskViewList == (try sidebarOn(inbox, in: store, width: .narrow)))
     #expect(app.route.path == "/view/\(inbox)")
     #expect(app.send(.action(.wentBack(to: []))) == nil)
@@ -358,7 +361,10 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
         Issue.record("a window made narrow is laid out narrow, and is \(app.model.layout)")
         return
     }
-    #expect(try path.map { try #require(app.model.screens[$0]) } == [listOn(inbox, in: store), taskOn(id, in: store)])
+    #expect(
+        try path.map { try #require(app.model.screens[$0]) }
+            == [listOn(inbox, in: store, width: .narrow), taskOn(id, in: store)]
+    )
     #expect(app.model.screens.count == path.count, "a model for every id of the path, and none beside")
 }
 
@@ -419,7 +425,10 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     #expect(app.send(.widthChanged(.narrow)) == nil)
     #expect(app.model.layout == .narrow(path: ids))
     #expect(app.model.taskViewList == narrowSidebar.model)
-    #expect(app.model.screens == wide.screens)
+    #expect(
+        try standing(in: app) == [listOn(inbox, in: store, width: .narrow), taskOn(id, in: store)],
+        "the list draws the phone's numbers and the task screen is as it was"
+    )
     #expect(app.model.quickEntry == wide.quickEntry)
     #expect(app.model.problem == wide.problem)
     #expect(app.route == route)
@@ -899,7 +908,7 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     #expect(app.send(.route(.default)) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(work.view, in: store, width: .narrow)))
     #expect(idsOverTheSidebar(in: app.model) == path, "the same list and the same task, by their ids")
-    #expect(try standing(in: app) == [listOn(work.view, in: store), taskOn(report, in: store)])
+    #expect(try standing(in: app) == [listOn(work.view, in: store, width: .narrow), taskOn(report, in: store)])
     #expect(app.model.quickEntry == nil)
     #expect(app.model.problem == nil)
     #expect(app.route.path == "/view/\(work.view)/task/\(report)")
@@ -907,7 +916,7 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     #expect(app.send(.route(.default)) == nil)
     #expect(app.model.taskViewList == (try sidebarOn(work.view, in: store, width: .narrow)))
     #expect(idsOverTheSidebar(in: app.model) == [path[0]], "the same list, by its id, and no task")
-    #expect(try standing(in: app) == [listOn(work.view, in: store)])
+    #expect(try standing(in: app) == [listOn(work.view, in: store, width: .narrow)])
     #expect(app.model.quickEntry == nil)
     #expect(app.model.problem == nil)
     #expect(app.route.path == "/view/\(work.view)")
@@ -1058,7 +1067,9 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     let path = idsOverTheSidebar(in: app.model)
     #expect(path.count == 2)
     #expect(Set(path).count == 2, "two elements, two ids")
-    #expect(try standing(in: app) == [listOn(projects, in: store), listOn(home, in: store)])
+    #expect(
+        try standing(in: app) == [listOn(projects, in: store, width: .narrow), listOn(home, in: store, width: .narrow)]
+    )
     #expect(app.model.taskViewList == (try sidebarOn(projects, in: store, width: .narrow)), "the light on the base")
     #expect(app.route.path == "/view/\(projects)/view/\(home)")
 }
@@ -1075,7 +1086,10 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
         capabilities: iPhone
     )
     #expect(idsOverTheSidebar(in: app.model).count == 3)
-    #expect(try standing(in: app) == [listOn(upcoming, in: store), groupOn(.day(1), of: upcoming, in: store), taskOn(id, in: store)])
+    #expect(try standing(in: app) == [
+        listOn(upcoming, in: store, width: .narrow), groupOn(.day(1), of: upcoming, in: store, width: .narrow),
+        taskOn(id, in: store),
+    ])
     #expect(app.model.taskViewList == (try sidebarOn(upcoming, in: store, width: .narrow)))
     #expect(app.route.path == "/view/\(upcoming)/day/+1/task/\(id)")
 }
@@ -1132,13 +1146,13 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     let path = idsOverTheSidebar(in: backed.model)
     try #require(path.count == 2)
     #expect(backed.send(.action(.wentBack(to: [path[0]]))) == nil)
-    #expect(try standing(in: backed) == [listOn(projects, in: store)])
+    #expect(try standing(in: backed) == [listOn(projects, in: store, width: .narrow)])
     #expect(backed.route.path == "/view/\(projects)")
     let answered = try AppModule(store: store, route: route, width: .narrow, day: testDay, capabilities: iPhone)
     let deleted = try changeSet(of: store) { try store.delete(view: home) }
     #expect(answered.send(.changed(deleted)) == nil)
     #expect(idsOverTheSidebar(in: answered.model).count == 1)
-    #expect(try standing(in: answered) == [listOn(projects, in: store)])
+    #expect(try standing(in: answered) == [listOn(projects, in: store, width: .narrow)])
     #expect(answered.route.path == "/view/\(projects)")
 }
 
@@ -1252,11 +1266,18 @@ private let linkSentence = "The link could not be opened."
         let list = try #require(idsOverTheSidebar(in: window.model).first)
         #expect(window.send(.action(.screen(list, .list(.rowTapped(open))))) == nil)
         #expect(window.send(.action(.screen(list, .list(.openFullScreenTapped)))) == nil)
-        #expect(try standing(in: window) == [listOn(inbox, in: store, card: open), taskOn(open, in: store)], "Open full screen pushed the task; this is the setup")
+        #expect(
+            try standing(in: window)
+                == [listOn(inbox, in: store, width: .narrow, card: open), taskOn(open, in: store)],
+            "Open full screen pushed the task; this is the setup"
+        )
         #expect(window.send(.action(.wentBack(to: [list]))) == nil)
         #expect(window.send(.action(.quickEntry(.titleFieldChanged("Call the bank")))) == nil)
     }
-    #expect(try standing(in: twin) == [listOn(inbox, in: store, card: open)], "the way back closed the task, and left its card; this is the setup")
+    #expect(
+        try standing(in: twin) == [listOn(inbox, in: store, width: .narrow, card: open)],
+        "the way back closed the task, and left its card; this is the setup"
+    )
     #expect(twin.model.quickEntry?.draft == "Call the bank", "and quick entry took the keystroke")
     #expect(app.model.taskViewList == twin.model.taskViewList)
     #expect(app.model.layout == twin.model.layout)
@@ -1307,4 +1328,55 @@ private let linkSentence = "The link could not be opened."
     #expect(app.model.taskViewList == (try sidebarOn(ViewID(), in: store, width: .wide)), "the views, nothing highlighted and nothing said")
     #expect(app.route == .default)
     #expect(try store.view(reviews) == nil)
+}
+
+/// The window's width reaches every list standing in the stack, the one over the sidebar and the one over it, at the
+/// same event, and the task screen over them is handed nothing: it is the one it was. The lists draw the pane's numbers
+/// in a wide window and the phone's in a narrow one, each as a list made at that width, and the same width again moves
+/// nothing (list screen plan, Task 9; the controller's ruling R192).
+@Test func theWidthReachesEveryListOfTheStackAndNotTheTaskScreen() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects, filter: .status([.open])))
+    let id = try store.createTask(NewTask(title: "Buy milk"))
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(projects)/view/\(home)/task/\(id)"), width: .narrow,
+        day: testDay, capabilities: iPhone
+    )
+    let phone = try [
+        listOn(projects, in: store, width: .narrow), listOn(home, in: store, width: .narrow),
+        taskOn(id, in: store),
+    ]
+    let pane = try [
+        listOn(projects, in: store, width: .wide), listOn(home, in: store, width: .wide), taskOn(id, in: store),
+    ]
+    #expect(try standing(in: app) == phone, "the lists draw the phone's numbers; this is the setup")
+    #expect(phone != pane, "the two widths draw differently; this is the setup")
+    #expect(app.send(.widthChanged(.wide)) == nil)
+    #expect(try standing(in: app) == pane)
+    #expect(app.send(.widthChanged(.wide)) == nil)
+    #expect(try standing(in: app) == pane, "the same width again moves nothing")
+    #expect(app.send(.widthChanged(.narrow)) == nil)
+    #expect(try standing(in: app) == phone)
+}
+
+/// A list the window makes after its width changed starts on that width, the one a link opens and the one a list
+/// declares over itself alike: the stack makes both from the root's width as it makes them from its day.
+@Test func aListMadeAfterTheWidthChangedStartsOnIt() throws {
+    let store = try makeStore()
+    let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
+    let home = try store.createView(NewTaskView(title: "Home", parent: projects, filter: .status([.open])))
+    let app = try AppModule(
+        store: store, route: try Route(path: "/view/\(inbox)"), width: .narrow, day: testDay,
+        capabilities: iPhone
+    )
+    #expect(app.send(.widthChanged(.wide)) == nil)
+    #expect(app.send(.route(try Route(path: "/view/\(projects)"))) == nil)
+    #expect(try standing(in: app) == [listOn(projects, in: store, width: .wide)], "a link made a list on the new width")
+    let outer = try #require(idsOverTheSidebar(in: app.model).first)
+    #expect(app.send(.action(.screen(outer, .list(.blockTitleTapped(.list(home)))))) == nil)
+    #expect(
+        try standing(in: app) == [listOn(projects, in: store, width: .wide), listOn(home, in: store, width: .wide)],
+        "a list the list declared stands on it too"
+    )
 }

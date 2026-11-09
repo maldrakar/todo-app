@@ -186,7 +186,7 @@ row's menu, the bar at the bottom of the column holds "…", the search capsule 
 lifts a row, a line with a circle marking where it lands.
 
 The list screen on iPhone is the canvas's too, in a narrow window; a wide one, the iPad's or that of an iPhone Plus or
-Pro Max turned sideways, still draws the plain list until the pane of the Mac and the iPad replaces it. The glass back
+Pro Max turned sideways, draws the pane of the Mac and the iPad, below. The glass back
 and "…" float at the top corners over the list, which scrolls under them, and under them the list's tile, its title, the
 day it shows when its rule names one, and a bar of the tags its open tasks carry: a tap lights a tag and the list or the
 board shows the tasks that carry any tag lit. The list's own tasks come first, then a block for each list inside it, or
@@ -204,6 +204,23 @@ a task that lands in a list is tinted for a moment, and on a board it springs in
 Columns, when the list offers them, turns the blocks into a board of columns that snap one at a time, and where Columns
 is greyed with its reason when it does not. A swipe from the left edge, or the back circle, goes back one screen. The
 screen's own "+" adds inline, so no Quick Entry button stands on it; quick entry stays the Lists screen's.
+
+On the Mac and in a wide iPad window the same screen is the detail pane beside the sidebar, at the Mac's numbers: the
+content stands at most 780 points wide in the middle of the pane, rows are 36 points high with their notes, subtasks,
+tags and deadline on the title's line, and a board's columns are 288 wide and scroll freely sideways, with no snap. The
+capsule with "+" and "…" stands at the right of the window's bar, and the bar has no title over the list's own. Only a list
+opened over another has a way back, since the sidebar is the way back to any other list: on the iPad the glass back,
+beside the button that shows the sidebar, and on the Mac the toolbar's own back, as on a task opened full screen. A
+click opens a task's card where its row stood, Esc on the Mac closes it unless text is being typed in the window, where
+Esc is the field's first, ⌘. closes it too, and the right click opens the row's menu with Delete. A list chosen
+in the sidebar opens at its top. The Mac's pointer drags a row of a list or a card of a column the way a finger
+does on the iPhone, with the line, the circle and the tint, carrying a copy of the row under the pointer; it scrolls
+nothing by itself, and a release outside the part of the list in sight puts the row down where it was. The iPad drags
+with the system's drag and drop, opens the system's menu on a press that holds still and slides out Delete on a swipe,
+as the iPhone does. Under the pointer a row, a block's header, "+ Add task", the Done strip, a tag's chip and the
+capsule's buttons are tinted. In portrait the bar's button shows the sidebar over the list and the same button in the
+sidebar hides it, and a wide iPad window in landscape opens on the pane alone, the same button bringing the sidebar.
+The Mac keeps its window title in the toolbar on macOS 14.
 
 iOS asks "Open in “Todo”?" before it hands the app a link from `simctl openurl`. After the system ends the app in
 the background, the next launch opens the window on the route it showed.

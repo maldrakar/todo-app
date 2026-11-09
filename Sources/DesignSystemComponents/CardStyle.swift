@@ -41,6 +41,10 @@ public struct CardStyle: Equatable, Sendable {
     /// title with no line through it, so a done task's card is another instance.
     public let titleStrike: DesignSystem.Color?
 
+    /// The tint over Open full screen's cell while the pointer is over it, and nil where there is no pointer to be,
+    /// the phone's.
+    public let expandHover: HoverStyle?
+
     public init(
         expandHitSide: Double,
         cornerRadius: Double,
@@ -60,7 +64,8 @@ public struct CardStyle: Equatable, Sendable {
         notesToSubtasks: Double,
         subtaskDraftCircle: CheckStyle,
         leaving: TaskLeavingStyle,
-        titleStrike: DesignSystem.Color?
+        titleStrike: DesignSystem.Color?,
+        expandHover: HoverStyle?
     ) {
         self.expandHitSide = expandHitSide
         self.cornerRadius = cornerRadius
@@ -81,5 +86,6 @@ public struct CardStyle: Equatable, Sendable {
         self.subtaskDraftCircle = subtaskDraftCircle
         self.leaving = leaving
         self.titleStrike = titleStrike
+        self.expandHover = expandHover
     }
 }

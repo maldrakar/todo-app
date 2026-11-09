@@ -1,6 +1,7 @@
 import Testing
 import TestSupport
 import DesignSystemComponents
+import FeatureModule
 import TaskListFeature
 import TodoCore
 
@@ -12,14 +13,19 @@ func day(_ offset: Int) -> Day {
     testDay.day.advanced(by: offset)
 }
 
-/// A list made now on the route, on the day, the test's unless another is named.
-func list(_ route: TaskList.Route, in store: Store, on day: DeviceDay = testDay) throws -> TaskList {
-    try TaskList(store: store, route: route, day: day)
+/// A list made now on the route, on the day, the test's unless another is named, in a window of the width, the
+/// phone's unless another is named.
+func list(
+    _ route: TaskList.Route, in store: Store, on day: DeviceDay = testDay, width: WindowWidth = .narrow
+) throws -> TaskList {
+    try TaskList(store: store, route: route, day: day, width: width)
 }
 
 /// A list made now on a view, with nothing declared over it.
-func list(_ view: ViewID, in store: Store, on day: DeviceDay = testDay) throws -> TaskList {
-    try list(TaskList.Route(head: .init(view: view)), in: store, on: day)
+func list(
+    _ view: ViewID, in store: Store, on day: DeviceDay = testDay, width: WindowWidth = .narrow
+) throws -> TaskList {
+    try list(TaskList.Route(head: .init(view: view)), in: store, on: day, width: width)
 }
 
 /// The blocks a model draws, whichever its layout: a list's, or the board's columns, read over the layout's shapes as

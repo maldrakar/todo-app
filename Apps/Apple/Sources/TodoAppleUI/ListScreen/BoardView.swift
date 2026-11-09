@@ -4,15 +4,21 @@ import TaskListFeature
 
 /// The list's blocks as the board's columns as its model describes them (`TaskList.Model.Board`; `Phone.dc.html`,
 /// `.board`): a `ScrollView` sideways, snapping to a column where the model says so, its columns as high as it is,
-/// and after them the dashed "+ Add list" at the height of its own button (`.bcol`'s `align-self`).
+/// and after them the dashed "+ Add list" at the height of its own button (`.bcol`'s `align-self`). Its content is the
+/// space a drag finds its place in, as its screen makes it (`ListScreenGestures`).
 struct BoardView: View {
     private let board: TaskList.Model.Board
     private let gestures: RowGestures
+    private let dragContent: RowDragContent
     private let send: (TaskList.UserAction) -> Void
 
-    init(_ board: TaskList.Model.Board, gestures: RowGestures, send: @escaping (TaskList.UserAction) -> Void) {
+    init(
+        _ board: TaskList.Model.Board, gestures: RowGestures, dragContent: RowDragContent,
+        send: @escaping (TaskList.UserAction) -> Void
+    ) {
         self.board = board
         self.gestures = gestures
+        self.dragContent = dragContent
         self.send = send
     }
 
@@ -33,7 +39,7 @@ struct BoardView: View {
             }
             .scrollTargetLayout()
             .padding(.trailing, board.endRoom)
-            .modifier(rowDragContent)
+            .modifier(dragContent)
             // At the top of the scroll view whatever it holds, which would centre what is shorter than itself.
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -41,16 +47,6 @@ struct BoardView: View {
         .contentMargins(.bottom, board.bottomPadding, for: .scrollContent)
         .scrollIndicators(.hidden)
         .modifier(Snapping(snaps: board.snaps))
-    }
-
-    /// The board's content as the space a drag finds its place in.
-    private var rowDragContent: RowDragContent {
-        // iOS alone: its finder is UIKit's.
-        #if os(iOS)
-        RowDragContent(dragState: gestures.dragState, finder: ScrollContentFinder(dragState: gestures.dragState))
-        #else
-        RowDragContent(dragState: gestures.dragState)
-        #endif
     }
 
     /// The snap to a column, and none where the board scrolls freely, whose two behaviours have different types.

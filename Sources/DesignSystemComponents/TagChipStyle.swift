@@ -15,6 +15,9 @@ public struct TagChipStyle: Equatable, Sendable {
     /// The motion the chip's colours change on as it lights and goes out.
     public let animation: DesignSystem.Animation
 
+    /// The tint over the chip while the pointer is over it, and nil where there is no pointer to be, the phone's.
+    public let hover: HoverStyle?
+
     public init(
         height: Double,
         cornerRadius: Double,
@@ -23,7 +26,8 @@ public struct TagChipStyle: Equatable, Sendable {
         spacing: Double,
         hitHeight: Double,
         background: DesignSystem.Color,
-        animation: DesignSystem.Animation
+        animation: DesignSystem.Animation,
+        hover: HoverStyle?
     ) {
         self.height = height
         self.cornerRadius = cornerRadius
@@ -33,5 +37,6 @@ public struct TagChipStyle: Equatable, Sendable {
         self.hitHeight = hitHeight
         self.background = background
         self.animation = animation
+        self.hover = hover
     }
 }

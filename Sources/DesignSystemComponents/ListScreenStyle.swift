@@ -15,6 +15,11 @@ import DesignSystem
 /// the board's header at 54 + 44 + 12 = 110, the same. The list ends 150 above the screen's bottom (`.ph-scroll`'s
 /// padding), 116 above a safe area 34 high.
 ///
+/// The Mac's pane stands the same way with more of its own: its content is `contentMaxWidth` wide at most, centred,
+/// `contentHorizontalPadding` in from the pane's sides, and its buttons stand in the window's bar, which the safe area
+/// holds, the "+" and the "…" in one glass `capsule`. The phone has no capsule, no cap on its content and none of
+/// that padding.
+///
 /// `ListScreenStyle` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 public struct ListScreenStyle: Equatable, Sendable {
@@ -41,13 +46,33 @@ public struct ListScreenStyle: Equatable, Sendable {
     public let contentBottom: Double
     public let background: DesignSystem.Color
 
+    /// How far the content stands in from the screen's sides, which the header and the blocks draw their own margins
+    /// inside of.
+    public let contentHorizontalPadding: Double
+
+    /// The widest the content gets, centred when the screen is wider, and nil for none.
+    public let contentMaxWidth: Double?
+
+    /// The glass capsule round "+" and "…", and nil where the "+" floats and "…" stands alone.
+    public let capsule: GlassCapsuleStyle?
+
     public init(
-        edgeInset: Double, fade: Fade?, contentTop: Double, contentBottom: Double, background: DesignSystem.Color
+        edgeInset: Double,
+        fade: Fade?,
+        contentTop: Double,
+        contentBottom: Double,
+        background: DesignSystem.Color,
+        contentHorizontalPadding: Double,
+        contentMaxWidth: Double?,
+        capsule: GlassCapsuleStyle?
     ) {
         self.edgeInset = edgeInset
         self.fade = fade
         self.contentTop = contentTop
         self.contentBottom = contentBottom
         self.background = background
+        self.contentHorizontalPadding = contentHorizontalPadding
+        self.contentMaxWidth = contentMaxWidth
+        self.capsule = capsule
     }
 }

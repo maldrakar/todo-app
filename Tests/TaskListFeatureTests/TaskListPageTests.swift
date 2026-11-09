@@ -57,7 +57,7 @@ private func lit(in model: TaskList.Model) -> [String] {
 
 /// The item of Show as that chooses the layout.
 private func item(_ kind: TaskList.Model.Layout.Kind, in model: TaskList.Model) throws -> MenuModel<TaskList.UserAction>.Item {
-    try #require(model.showAs.sections.flatMap(\.items).first { $0.action == .showAsChosen(kind) })
+    try #require(model.showAs.menu.sections.flatMap(\.items).first { $0.action == .showAsChosen(kind) })
 }
 
 /// A list of the open tasks grouped by the day of When, of any day, which no seeded list is, with a list inside it
@@ -602,7 +602,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     let store = try makeStore()
     #expect(throws: StoreError.self) { try list(screen(.deadline(1), of: upcoming), in: store) }
     do {
-        _ = try TaskList(store: store, route: screen(.day(1), of: inbox), day: testDay)
+        _ = try TaskList(store: store, route: screen(.day(1), of: inbox), day: testDay, width: .narrow)
         Issue.record("the Inbox groups by nothing")
     } catch {
         guard case .invalid = error else { Issue.record("refused with \(error)"); return }

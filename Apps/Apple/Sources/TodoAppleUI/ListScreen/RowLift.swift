@@ -13,11 +13,12 @@ struct BlockRowID: Hashable {
     let task: TaskID
 }
 
-/// A task lifted out of a block by the system's drag (spike #174, y1), from its first point over the screen's scroll
-/// view to its release there: which task, the block it was dragged from, and where it would land. It is the view's own
-/// state, which nothing else can know, and it sends nothing until the release, which reports `rowDropped` once; what
-/// the drop means is the module's to read. Each stage of the drag moves it through one step,
-/// `after(_:from:among:frames:)`, which knows no platform, so that the drag is tested on the host (`RowLiftTests`).
+/// A task lifted out of a block, by the system's drag on iOS (spike #174, y1), from its first point over the screen's
+/// scroll view to its release there, or by the pointer's on the Mac (`RowPointerDrag`), from its first move to its
+/// release: which task, the block it was dragged from, and where it would land. It is the view's own state, which
+/// nothing else can know, and it sends nothing until the release, which reports `rowDropped` once; what the drop means
+/// is the module's to read. Each stage of the drag moves it through one step, `after(_:from:among:frames:)`, which
+/// knows no platform, so that the drag is tested on the host (`RowLiftTests`).
 ///
 /// The point picks the block whose frame holds it, or the nearest where none does: a list's blocks stand under one
 /// another and a board's side by side, so one rule reads both, a point above the first block being the first block's
@@ -30,10 +31,11 @@ struct BlockRowID: Hashable {
 /// task last and any other standing it by its order, so the slot is that block, which its tint marks, and no place in
 /// it (the owner's review of #177, 2026-11-08).
 struct RowLift: Equatable {
-    /// A stage of the drag, as its drop delegate reports it (`RowDragSessions`), with the point in the content's own
-    /// coordinates where it has one: the drag is first seen, moves, is let go once, or leaves. `onDrag` says what is
-    /// carried and the first point over the scroll view says where, since the drag has no other beginning that a press
-    /// which opens the menu instead does not also have (spike #174).
+    /// A stage of the drag, as its drop delegate reports it (`RowDragSessions`) or the Mac's pointer does
+    /// (`RowPointerPress`), with the point in the content's own coordinates where it has one: the drag is first seen,
+    /// moves, is let go once, or leaves. `onDrag` says what is carried and the first point over the scroll view says
+    /// where, since the drag has no other beginning that a press which opens the menu instead does not also have (spike
+    /// #174); the pointer's press says both at its first move.
     enum Phase {
         case began(task: TaskID, block: TaskList.Model.BlockID, session: String, at: CGPoint)
         case changed(CGPoint)
@@ -61,6 +63,14 @@ struct RowLift: Equatable {
         var rows: [BlockRowID: CGRect] = [:]
         var blocks: [TaskList.Model.BlockID: CGRect] = [:]
         var columns: [TaskList.Model.BlockID: CGRect] = [:]
+
+        /// Where the mark's line ends in a block, from the block's own leading edge, where the mark is drawn: the
+        /// block's width, and nothing before the block has reported. Its right edge in the content is not it, since a
+        /// block of the pane stands in from the content's side, and the line that long widened the block it stood in
+        /// by that inset while a row was carried (the Mac, 2026-11-09).
+        func lineEnd(in block: TaskList.Model.BlockID) -> CGFloat {
+            blocks[block]?.width ?? 0
+        }
     }
 
     let task: TaskID
@@ -68,7 +78,8 @@ struct RowLift: Equatable {
     /// The block it was dragged from, which names one of the two that draw a task both select.
     let source: TaskList.Model.BlockID
 
-    /// The drag's session, which `RowDragSessions` tells apart from any other press.
+    /// The drag's session, which `RowDragSessions` tells apart from any other press, and on the Mac the pointer's
+    /// press's own.
     let session: String
 
     /// Where it would land, and nil over a block that takes no drop and over its own where it keeps no dropped place.
@@ -100,11 +111,15 @@ struct RowLift: Equatable {
     private init?(
         lifting task: TaskID, from source: TaskList.Model.BlockID, session: String, among blocks: [TaskList.Model.Block]
     ) {
-        let row = blocks.first { $0.id == source }?.rows.first { $0.id == task }
-        guard row?.lift != nil else { return nil }
         self.task = task
         self.source = source
         self.session = session
+        guard row(among: blocks)?.lift != nil else { return nil }
+    }
+
+    /// The task's row in the block it was dragged from, among the blocks drawn, and nil where it is drawn no longer.
+    func row(among blocks: [TaskList.Model.Block]) -> TaskList.Model.Row? {
+        blocks.first { $0.id == source }?.rows.first { $0.id == task }
     }
 
     private func moved(to point: CGPoint, among blocks: [TaskList.Model.Block], frames: Frames) -> RowLift {

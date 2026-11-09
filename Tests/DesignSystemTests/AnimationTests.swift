@@ -29,8 +29,9 @@ private typealias Animation = DesignSystem.Animation
 /// The list screen's motions are the canvas's (`Phone.dc.html`): a card opening in place over 0.26 s and a row sliding
 /// for its Delete over 0.25 s on (.2, .8, .2, 1); a card landing on a 0.32 s spring; and a chevron turning over 0.22 s
 /// and a dropped row's highlight fading over 1.6 s on CSS's `ease`, (.25, .1, .25, 1), as the small fades under them
-/// run on it: a check's colours over 0.22 s, a title's over 0.25 s, a chip's over 0.18 s, and a card dimming or a column
-/// tinting under a drag over 0.15 s. Each starts at once.
+/// run on it: a check's colours over 0.22 s, a title's over 0.25 s, a chip's over 0.18 s, a card dimming or a column
+/// tinting under a drag over 0.15 s, and on the Mac's pane (`Mac.dc.html`) a control's tint under the pointer over
+/// 0.12 s and a column's card's deeper shadow over 0.15 s. Each starts at once.
 @Test func theListScreensMotionsAreTheCanvass() {
     let motions: [(String, Animation, Animation.Curve, Double)] = [
         ("cardOpens", .cardOpens, .bezier(x1: 0.2, y1: 0.8, x2: 0.2, y2: 1), 0.26),
@@ -42,6 +43,8 @@ private typealias Animation = DesignSystem.Animation
         ("titleFades", .titleFades, .bezier(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1), 0.25),
         ("chipToggles", .chipToggles, .bezier(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1), 0.18),
         ("dropHighlights", .dropHighlights, .bezier(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1), 0.15),
+        ("hoverTints", .hoverTints, .bezier(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1), 0.12),
+        ("hoverShadows", .hoverShadows, .bezier(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1), 0.15),
     ]
     for (name, motion, curve, duration) in motions {
         #expect(motion.curve == curve, "\(name)")

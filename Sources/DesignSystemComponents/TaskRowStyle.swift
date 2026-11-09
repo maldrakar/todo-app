@@ -49,6 +49,15 @@ public struct TaskRowStyle: Equatable, Sendable {
     /// it, and nil where it stands on something else: a column's card has its surface.
     public let ground: DesignSystem.Color?
 
+    /// Whether the meta line stands on the title's line, after the title, `titleToMeta` from it, the title keeping to
+    /// one line and the items not wrapping (`Mac.dc.html`, the row), and not under it, where it wraps
+    /// (`Phone.dc.html`).
+    public let metaTrailing: Bool
+
+    /// The tint over the row while the pointer is over it, and nil where there is no pointer to be, the phone's, and
+    /// for a column's card, which casts a shadow instead (`ColumnStyle.cardHover`).
+    public let hover: HoverStyle?
+
     public init(
         titleToMeta: Double,
         metaSpacing: Double,
@@ -67,7 +76,9 @@ public struct TaskRowStyle: Equatable, Sendable {
         landingAnimation: DesignSystem.Animation,
         titleAnimation: DesignSystem.Animation,
         leaving: TaskLeavingStyle,
-        ground: DesignSystem.Color?
+        ground: DesignSystem.Color?,
+        metaTrailing: Bool,
+        hover: HoverStyle?
     ) {
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing
@@ -87,5 +98,7 @@ public struct TaskRowStyle: Equatable, Sendable {
         self.titleAnimation = titleAnimation
         self.leaving = leaving
         self.ground = ground
+        self.metaTrailing = metaTrailing
+        self.hover = hover
     }
 }

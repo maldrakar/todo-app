@@ -11,7 +11,8 @@ import UniformTypeIdentifiers
 /// where its model gives it a menu and a lift, which the module gives together: a still press opens the menu, and a
 /// move after the press drags. While it is lifted the row it was dragged from dims to its lift's opacity on the lift's
 /// motion; the dragged copy is the system's, on the lift's background and corners. Delete in the menu sends what
-/// `delete` does, on its way out. The watch has no such menu, and the Mac's pointer drag is another task's.
+/// `delete` does, on its way out. The watch has no such menu. On the Mac the menu is the secondary click's, and the
+/// drag is the pointer's, on the content (`RowPointerDrag`), which dims the row as the system's drag does.
 struct RowDragSource: ViewModifier {
     private let task: TaskRowModel<TaskList.UserAction>
     private let row: BlockRowID
@@ -58,16 +59,11 @@ struct RowDragSource: ViewModifier {
     }
 }
 
-#if os(iOS)
-extension UTType {
-    /// A task carried by the drag, which only this app reads (`TodoIOS`, which says why its Info.plist exports it).
-    fileprivate static let todoTask = UTType(exportedAs: "dev.maldrakar.todo.task")
-}
-
-/// The system's copy of the row it drags, on the lift's background and corners, as wide as the row stands: alone it
-/// would stand as wide as its title on one line. A view of its own, so that the width is read when the copy is drawn,
-/// by when the row has laid out, and not when `onDrag`'s preview is asked for, with every draw of the row.
-private struct RowDragCopy: View {
+/// The copy of the row a drag carries, the system's on iOS and the one under the Mac's pointer (`RowPointerDrag`), on
+/// the lift's background and corners, as wide as the row stands: alone it would stand as wide as its title on one line.
+/// A view of its own, so that the width is read when the copy is drawn, by when the row has laid out, and not when
+/// `onDrag`'s preview is asked for, with every draw of the row.
+struct RowDragCopy: View {
     let task: TaskRowModel<TaskList.UserAction>
     let lift: TaskLiftStyle
     let row: BlockRowID
@@ -78,6 +74,12 @@ private struct RowDragCopy: View {
             .frame(width: dragState.frames.rows[row]?.width)
             .background(Color(lift.background), in: .rect(cornerRadius: lift.cornerRadius, style: .circular))
     }
+}
+
+#if os(iOS)
+extension UTType {
+    /// A task carried by the drag, which only this app reads (`TodoIOS`, which says why its Info.plist exports it).
+    fileprivate static let todoTask = UTType(exportedAs: "dev.maldrakar.todo.task")
 }
 
 /// The drag's item: the task's id in the private type, seen by this process alone, under its session's token. The drop
@@ -145,8 +147,10 @@ private struct RowDropDelegate: DropDelegate {
 /// A `ScrollView` of the list or the board as the target of the system's drag (spike #174, y1): on the scroll view, its
 /// margins included, and not on its content, and with the screen's content going down under the home indicator
 /// (`ListScreen`), since a release in that inset cancelled. The system scrolls the scroll views under the drag, so it
-/// has no display link. A board that snaps comes to rest on a column when the lift ends. iOS alone: the Mac's pointer
-/// drag is another task's, and the watch has neither.
+/// has no display link. A board that snaps comes to rest on a column when the lift ends. On the Mac the drag is the
+/// pointer's, on the content and not its scroll view (`RowPointerDrag`), and the scroll view is only the space the
+/// content's place is read in and how large it is, which say what of the content is in sight, where a drop can land;
+/// the watch has neither.
 struct RowDropTarget: ViewModifier {
     private let blocks: [TaskList.Model.Block]
     @Binding private var lift: RowLift?
@@ -183,6 +187,12 @@ struct RowDropTarget: ViewModifier {
             .task(id: lift != nil) {
                 if lift != nil { await cleanUpOnSilence() }
             }
+        #elseif os(macOS)
+        content
+            .coordinateSpace(.named(RowLift.viewportSpace))
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { [dragState = gestures.dragState] size in
+                dragState.viewportSize = size
+            }
         #else
         content
         #endif
@@ -209,11 +219,8 @@ struct RowDropTarget: ViewModifier {
     /// A stage of the drag: the lift it leaves, the drop it reports, and, where it ended a lift, the board brought to
     /// rest on a column.
     private func step(_ phase: RowLift.Phase, settling: Bool = true) {
-        let step = RowLift.after(phase, from: lift, among: blocks, frames: gestures.dragState.frames)
-        let hasEnded = lift != nil && step.lift == nil
-        if step.lift != nil { gestures.swipe.close() }
-        if step.lift != lift { lift = step.lift }
-        if let drop = step.drop { send(drop) }
+        let hasEnded = RowLift.step(phase, of: $lift, among: blocks, frames: gestures.dragState.frames, send: send)
+        if lift != nil { gestures.swipe.close() }
         if hasEnded, settling, let settleInset {
             gestures.dragState.settle(among: blocks, inset: settleInset, animated: !reduceMotion)
         }

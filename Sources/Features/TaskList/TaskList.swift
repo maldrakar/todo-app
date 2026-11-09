@@ -1,4 +1,5 @@
 // Sources/Features/TaskList/TaskList.swift
+import DesignSystemComponents
 import FeatureModule
 import TaskScreenFeature
 import TodoCore
@@ -115,6 +116,14 @@ public final class TaskList: Routable {
         /// the list already has reads nothing. Neither is a gesture on the list, so the sentence on screen and the
         /// destination stay.
         case dayChanged(DeviceDay)
+
+        /// The width class of the window, which the root hands every screen of its stack when the window's view reports
+        /// it: an event of the world and not a `UserAction`, as the day is (ADR-0006, amendment of 2026-10-22). It
+        /// moves the width alone, which the components' numbers are computed from on every read of the model, the
+        /// phone's in a narrow window and the Mac pane's in a wide one, so they follow it with no read of the store;
+        /// the sentence, the open card and its drafts, the picked tags and the destination stay, and the width the list
+        /// already has moves nothing.
+        case widthChanged(WindowWidth)
     }
 
     public enum Output: Equatable, Sendable {
@@ -153,7 +162,9 @@ public final class TaskList: Routable {
     ///
     /// The day is the device's, which the window's stack hands the list when it makes it, the day its root has then, so
     /// that a list made after midnight starts on the new day (spec section 8). It has no default, as the root's has
-    /// none: the day is the platform's to say (`docs/style.md`, "A lower layer holds no policy of its client").
+    /// none: the day is the platform's to say (`docs/style.md`, "A lower layer holds no policy of its client"). The
+    /// width is the window's, handed the same way and with no default for the same reason: a list made in a wide
+    /// window starts at the pane's numbers, and a list a list declares starts on the width of the window it stands in.
     ///
     /// Throws when the page cannot be read, a view that is gone among it, which is refused with `.notFound` and the
     /// view's id: a list that came up empty would look like a view with nothing in it, and the stack keeps what was
@@ -163,7 +174,7 @@ public final class TaskList: Routable {
     /// 2026-11-02). What the tail names that cannot be made does not stop the list: a link to a task that is gone opens
     /// the view it names, and the stack tells the list, which says why with nothing open over it, which is what still
     /// exists (spec section 3, the fourth flow).
-    public init(store: Store, route: Route, day: DeviceDay) throws(StoreError) {
+    public init(store: Store, route: Route, day: DeviceDay, width: WindowWidth) throws(StoreError) {
         let snapshot = try TaskList.read(store, head: route.head, day: day)
         if let group = route.head.group, let refusal = TaskList.refusal(of: group, in: snapshot) { throw refusal }
         let isGroup = route.head.group != nil
@@ -172,7 +183,7 @@ public final class TaskList: Routable {
             head: route.head, title: snapshot.page.view.title, snapshot: snapshot, day: day,
             folded: isGroup ? [] : try TaskList.keptFolds(in: store, of: route.head.view),
             layout: isGroup ? .list : try TaskList.keptLayout(in: store, of: route.head.view), picks: [], card: nil,
-            isDoneOpen: false, naming: nil, fresh: nil, destination: Destination(), problem: nil
+            isDoneOpen: false, naming: nil, fresh: nil, destination: Destination(), problem: nil, width: width
         )
         setDestination(route.tail)
     }
@@ -211,7 +222,7 @@ public final class TaskList: Routable {
         case .action(.subtaskFieldLostFocus): writeSubtask(thenOpensNext: false)
         case .action(.subtaskFieldCancelled): state.card?.subtaskDraft = nil
         case .action(.openFullScreenTapped): openFullScreen()
-        case .action(.addTaskButtonTapped): addFromFloatingButton()
+        case .action(.addTaskButtonTapped): addFromButton()
         case .action(.addTaskRowTapped(let block)): addFromRow(in: block)
         case .action(.addListTapped): addList()
         case .action(.listNameFieldChanged(let text)): typeListName(text)
@@ -266,7 +277,7 @@ public final class TaskList: Routable {
             // An item is checked against the model: Columns disabled moves nothing (spec section 5). The choice is the
             // device's, kept per list (ADR-0010), and a group's screen keeps none, its one layout being the list's. The
             // sentence stays, as for a fold.
-            guard model.showAs.sections.flatMap(\.items).contains(where: {
+            guard model.showAs.menu.sections.flatMap(\.items).contains(where: {
                 $0.action == .showAsChosen(layout) && !$0.isDisabled
             }), layout != state.layout else { return nil }
             // A write that fails is not said, as a fold's is not: the layout stays on screen until the next list made
@@ -354,6 +365,12 @@ public final class TaskList: Routable {
             } catch {
                 if state.problem == nil { state.problem = Problem.couldNotReadTasks.sentence }
             }
+            return nil
+        case .widthChanged(let width):
+            // The numbers are computed from the width on every read of the model, so this moves them alone and reads
+            // nothing; the same width again moves nothing.
+            guard width != state.width else { return nil }
+            state.width = width
             return nil
         }
         return nil
@@ -473,6 +490,10 @@ public final class TaskList: Routable {
         var destination: Destination<Route.Tail>
         var problem: String?
 
+        /// The width class of the window the list stands in, which the components' numbers are cut by and nothing else
+        /// reads.
+        var width: WindowWidth
+
         /// The blocks of the page as this snapshot reads them, before the tag bar's filter.
         var pageBlocks: [PageBlock] {
             TaskList.blocks(of: snapshot, head: head, today: day.day)
@@ -510,10 +531,11 @@ public final class TaskList: Routable {
             let shown = blocks.map { $0.keeping(kept($0.tasks)) }
             let canBoard = head.group == nil && (view.groupBy != nil || blocks.count > 1)
             let shape = canBoard ? layout : .list
-            let metrics = Metrics.of(shape)
+            let metrics = Metrics.of(shape, in: width)
             let color = TaskList.tileColor(view.color)
             let icon = TaskList.tileIcon(view.icon)
             let tags = TagNames(snapshot.tags)
+            let addsTask = TaskList.floatingTarget(in: blocks, of: snapshot, head: head, today: today) != nil
             let context = RowContext(today: today, tags: tags, card: card, naming: naming, fresh: fresh)
             let hasListsInside = blocks.contains { if case .list = $0.id { true } else { false } }
             let heading = TaskList.screenHeading(
@@ -533,19 +555,19 @@ public final class TaskList: Routable {
             return Model(
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
                 back: TaskList.back(metrics.glass),
-                more: TaskList.more(metrics.glass),
+                glassAddTask: addsTask ? metrics.glass.add.map { TaskList.glassAddTask($0) } : nil,
                 style: metrics.style,
                 tagBar: TaskList.tagBar(chips, picked: picked, color: color, metrics.tagBar),
                 layout: TaskList.layout(
                     shown, title: title, folded: folded, addList: addList, context, metrics.blocks
                 ),
-                showAs: TaskList.showAs(current: shape, canBoard: canBoard),
+                showAs: GlassMenuButtonModel(
+                    label: TaskList.more(metrics.glass), menu: TaskList.showAs(current: shape, canBoard: canBoard)
+                ),
                 empty: empty,
                 done: done.strip,
                 doneRows: done.rows,
-                addTask: TaskList.floatingTarget(in: blocks, of: snapshot, head: head, today: today).map { _ in
-                    TaskList.floatingButton(metrics.floatingButton)
-                },
+                addTask: addsTask ? metrics.floatingButton.map { TaskList.floatingButton($0) } : nil,
                 addList: shape == .list ? addList : nil,
                 problem: problem
             )
