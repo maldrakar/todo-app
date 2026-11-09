@@ -13,9 +13,13 @@
 /// keeps only its reaction to the `Output` of what it opened.
 ///
 /// The flow's base is not a case. It is the owner's typed module, which the owner makes and hands to the stack,
-/// and the stack reaches it through the three static requirements, so that the base's events, model and
-/// answers keep their own types. Swift 6.4 infers neither `Base` nor `Failure` from the requirements that use
+/// and the stack reaches it through the three static requirements that take it, so that the base's events, model
+/// and answers keep their own types. Swift 6.4 infers neither `Base` nor `Failure` from the requirements that use
 /// them, so a conforming enum spells `typealias Base` and `typealias Failure`.
+///
+/// The enum also tells the stack which of the owner's events are a change the store committed, the base's and an
+/// element's, which is all `isChange` decides: the stack lets screens go unheard in a call that hands one
+/// (ADR-0009, amendment of 2026-11-10).
 public protocol StackScreen {
     /// The flow's base, the screen the stack stands on: for a window, the sidebar.
     associatedtype Base: Routable
