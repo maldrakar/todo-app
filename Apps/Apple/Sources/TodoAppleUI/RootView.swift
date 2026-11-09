@@ -31,32 +31,32 @@ struct RootView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // The one switch over the layout, every shape drawn and none by `default` (`docs/style.md`, "Views"). A
-            // window that narrows or widens gets the other shape from the root in the event its view reported, with the
-            // same screens, and is drawn in the other tree.
-            Group {
-                switch host.model.layout {
-                case .narrow(let path):
-                    narrowStack(path: path)
-                case .wide(let column, let path):
-                    splitView(column: column, path: path)
-                }
+        // The one switch over the layout, every shape drawn and none by `default` (`docs/style.md`, "Views"). A window
+        // that narrows or widens gets the other shape from the root in the event its view reported, with the same
+        // screens, and is drawn in the other tree.
+        Group {
+            switch host.model.layout {
+            case .narrow(let path):
+                narrowStack(path: path)
+            case .wide(let column, let path):
+                splitView(column: column, path: path)
             }
-            // The root's sentence is about the window, a link that could not be opened in it, so it shows across the
-            // window and not under one column, drawn as the pane's sentence is. Under the containers and not inset over
-            // them, so that they end above it and the sidebar's sentence, under the sidebar's rows or inset on a
-            // screen, stands above it. Inset over them, it covered the sidebar's (#131): in the iOS 26.3 simulator on
-            // 2026-10-24 the inset reached the root screen of a stack alone, and on a screen pushed over it both strips
-            // stood in one frame at the bottom; on 2026-10-25, on macOS 26.7.1, with both sentences sent by a scratch
-            // build, since no link reaches the executable while it runs, the sidebar's stood under the root's strip,
-            // under the rows and at the bottom of the pane alike. Under them, the same day, both showed: on iPhone, and
-            // on the iPad and the Mac with the sidebar hidden, the sidebar's right above the root's; with the sidebar
-            // shown, the sidebar's under its rows and the root's across the window under both columns, which ended
-            // above it. On iPhone the last row of a list scrolled to its end stands above the strip, where under the
-            // inset it stood under it, and when the strip goes it rests 34 pt low, over the home indicator, until the
-            // next scroll. While it shows, the Mac's toolbar draws an opaque bar over the pane where over the inset it
-            // was clear, which the executable cannot show today, since nothing it receives writes the root's sentence.
+        }
+        // The root's sentence is about the window, a link that could not be opened in it, so it shows across the window
+        // and not under one column, drawn as the pane's sentence is. Under the containers and not inset over them, so
+        // that they end above it and the sidebar's sentence, under the sidebar's rows or under a screen, stands above
+        // it. Inset over them, it covered the sidebar's (#131): in the iOS 26.3 simulator on 2026-10-24 the inset
+        // reached the root screen of a stack alone, and on a screen pushed over it both strips stood in one frame at
+        // the bottom; on 2026-10-25, on macOS 26.7.1, with both sentences sent by a scratch build, since no link
+        // reaches the executable while it runs, the sidebar's stood under the root's strip, under the rows and at the
+        // bottom of the pane alike. Under them, the same day, both showed: on iPhone, and on the iPad and the Mac with
+        // the sidebar hidden, the sidebar's right above the root's; with the sidebar shown, the sidebar's under its
+        // rows and the root's across the window under both columns, which ended above it. On iPhone the last row of a
+        // list scrolled to its end stands above the strip, where under the inset it stood under it, and when the strip
+        // goes it rests 34 pt low, over the home indicator, until the next scroll. While it shows, the Mac's toolbar
+        // draws an opaque bar over the pane where over the inset it was clear, which the executable cannot show today,
+        // since nothing it receives writes the root's sentence.
+        .stripUnder {
             if let problem = host.model.problem {
                 sentenceStrip(problem)
             }
@@ -104,12 +104,12 @@ struct RootView: View {
                             .toolbar { quickEntryButton }
                     }
                 }
-                .safeAreaInset(edge: .bottom) {
+                .stripUnder {
                     HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
                 }
                 .navigationDestination(for: StackElementID.self) { id in
                     wideScreen(id, showsBack: true)
-                        .safeAreaInset(edge: .bottom) {
+                        .stripUnder {
                             HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
                         }
                 }
@@ -135,14 +135,14 @@ struct RootView: View {
                     // The sidebar's sentence on every screen pushed over the Lists screen, which draws it above its
                     // bar when it is on top, so it shows once on whichever screen is on top, a task's included
                     // (#110).
-                    .safeAreaInset(edge: .bottom) { sidebarSentence }
+                    .stripUnder { sidebarSentence }
                 }
         }
     }
 
-    /// The strip with the sidebar's sentence for a screen of the window's stack, the one strip both trees inset at the
-    /// bottom of their screens: the sidebar's rows put the sentence under them as text of their own, and a screen of
-    /// the stack carries this strip where the rows are out of sight, hidden beside it or covered by it.
+    /// The strip with the sidebar's sentence for a screen of the window's stack, the one strip both trees lay under
+    /// their screens (`stripUnder`): the sidebar's rows put the sentence under them as text of their own, and a screen
+    /// of the stack carries this strip where the rows are out of sight, hidden beside it or covered by it.
     @ViewBuilder private var sidebarSentence: some View {
         if let problem = host.model.taskViewList.problem {
             sentenceStrip(problem)
@@ -264,6 +264,29 @@ private struct HiddenSidebarStrip<Strip: View>: View {
     var body: some View {
         if columnVisibility.wrappedValue == .detailOnly {
             strip
+        }
+    }
+}
+
+extension View {
+    /// This view with `strip` laid out under it, the one shape of a sentence's strip standing alone at the bottom of
+    /// the window or of a screen: the root's under the containers, the sidebar's under each screen of a stack, and a
+    /// list's own under its content (`ListSurface`). Under and not inset over, so that what is drawn above ends at the
+    /// strip's top and measures its margins at the bottom from there, as it does from the screen's bottom with no
+    /// strip, and what scrolls ends at the strip's top instead of passing under it. A strip inset with `.safeAreaInset`
+    /// was part of the safe area at the bottom, which the list screen's content and floating "+" go under to stand at
+    /// the canvas's margins from the screen's edge, so they went under the strip too: on iPhone the sidebar's covered
+    /// the "+", a tap there opening nothing, and the last card of a column, and the "+" stood 4 pt into the list's own,
+    /// where over the root's, the one strip laid out under, it stood 30 above (the iOS 26.3 simulator, 2026-11-09,
+    /// #193). The Lists screen's sentence and the sidebar's under its rows do not stand alone: they are part of the
+    /// inset of the bar and of the rows, which the rows scroll under on purpose.
+    ///
+    /// `stripUnder` was probed free as `DesignSystem` was: unresolved on a view in a file importing SwiftUI, Foundation
+    /// and Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
+    func stripUnder(@ViewBuilder _ strip: () -> some View) -> some View {
+        VStack(spacing: 0) {
+            self
+            strip()
         }
     }
 }

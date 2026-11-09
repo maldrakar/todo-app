@@ -34,11 +34,8 @@ struct ListSurface<Buttons: ViewModifier>: View {
     private let send: (TaskList.UserAction) -> Void
     private let buttons: (_ sendFromContent: @escaping (TaskList.UserAction) -> Void) -> Buttons
 
-    /// How high the sentence's strip stands, which only the view can know and which the floating "+" stands above.
-    @State private var sentenceHeight: CGFloat = 0
-
-    /// What the safe area covers at the bottom, the home indicator and the sentence, which the list's scroll view goes
-    /// under and its content keeps clear of.
+    /// What the safe area covers at the bottom, the home indicator while no sentence's strip stands under the content,
+    /// which the list's scroll view goes under and its content keeps clear of.
     @State private var bottomInset: CGFloat = 0
 
     /// What the surface keeps of its rows' gestures.
@@ -60,20 +57,21 @@ struct ListSurface<Buttons: ViewModifier>: View {
             .contentShape(.rect)
             .onTapGesture { sendClosingSwipe(.backgroundTapped) }
             // The content goes down under the home indicator, whichever its layout, for the drop (`RowDropTarget`) and
-            // so that the board's columns end above the screen's bottom and not the safe area's (`.board`'s padding);
+            // so that the board's columns end above the screen's bottom and not the safe area's (`.board`'s padding),
+            // or above a sentence's strip, which stands under the content and not over it (`stripUnder`, #193);
             // and here, outside the shape above, which ends a hit where it ends: inside it, a drop's point left the
             // target at the safe area's foot (the iOS 26.3 simulator, 2026-11-07). The keyboard still shortens it, its
             // region not ignored.
             .ignoresSafeArea(.container, edges: .bottom)
             .modifier(BottomInsetReader(inset: $bottomInset))
-            .safeAreaInset(edge: .bottom, spacing: 0) { sentence }
+            .overlay { floatingButton }
+            .stripUnder { sentence }
             .overlay(alignment: .top) {
                 if let fade = model.style.fade {
                     fadeUnderTheButtons(fade)
                 }
             }
             .modifier(buttons(sendClosingSwipe))
-            .overlay { floatingButton }
             .background(Color(model.style.background))
             // The screen's title is the header's, which names the list in the back button's menu over what stands on it
             // (#126), and in the Mac's toolbar.
@@ -199,26 +197,28 @@ struct ListSurface<Buttons: ViewModifier>: View {
         .allowsHitTesting(false)
     }
 
-    /// The floating "+", its margins from the screen's edges and not the safe area's, standing above the sentence while
-    /// there is one. The keyboard covers it (`Phone.dc.html`, the keyboard's `z-index`), so it does not rise with it.
-    /// The frame takes the room the safe area gave back, which the button alone, at its own size, stayed clear of.
+    /// The floating "+" over the content alone, its margins from the content's edges and not the safe area's: from the
+    /// screen's bottom while nothing stands under the content, and from the top of a sentence's strip while one does,
+    /// the list's own or the sidebar's its window lays under the screen, which the content ends at (`stripUnder`). The
+    /// keyboard covers it (`Phone.dc.html`, the keyboard's `z-index`), so it does not rise with it while nothing stands
+    /// under the content; a strip rises with the keyboard, and the "+" stands above the strip there, as it did over
+    /// the root's before (the iOS 26.3 simulator, 2026-11-09). The frame takes the room the safe area gave back, which
+    /// the button alone, at its own size, stayed clear of.
     @ViewBuilder private var floatingButton: some View {
         if let addTask = model.addTask {
             FloatingButton(addTask, send: sendClosingSwipe)
                 .padding(.trailing, addTask.style.trailingMargin)
-                .padding(.bottom, addTask.style.bottomMargin + sentenceHeight)
+                .padding(.bottom, addTask.style.bottomMargin)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .ignoresSafeArea([.container, .keyboard], edges: .bottom)
         }
     }
 
-    /// What went wrong, drawn as the sidebar's sentence is, across the bottom of the screen.
+    /// What went wrong, drawn as the sidebar's sentence is, across the bottom of the screen, under the content.
     @ViewBuilder private var sentence: some View {
         if let problem = model.problem {
             Text(problem)
                 .listsSentence(on: model.style.background)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { sentenceHeight = $0 }
-                .onDisappear { sentenceHeight = 0 }
         }
     }
 }
