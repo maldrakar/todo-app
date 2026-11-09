@@ -3,12 +3,15 @@ import DesignSystem
 
 /// A task's card, its row opened in place (`Phone.dc.html`, the open card; `Mac.dc.html`, the pane's): `topMargin`
 /// below what stands before it, `horizontalMargin` in from either side and `bottomMargin` above what follows, on
-/// `background` with corners of `cornerRadius`, casting `shadow`, opening on `animation`. Along its top stand its
-/// check, its title's field and the button that opens it full screen, centred in a square cell `expandHitSide` on a
-/// side; under them its body, `bodyLeading` in from its leading edge, under the title, and `bodyTrailing` from its
-/// trailing edge, ending `bodyBottom` above its bottom: the notes' field, the subtasks, the field of the subtask being
-/// typed where there is one, the row that adds a subtask, and `subtasksToPills` under them its pills, `pillSpacing`
-/// apart, in points. Its numbers, its `background`, its `shadow` and its `animation` are the fields of its `CardStyle`.
+/// `background` with corners of `cornerRadius`, casting `shadow`, coming in by `entrance`. Along its top stand its
+/// check, its title's field, struck through in `titleStrike` where the task is done, and the button that opens it full
+/// screen, centred in a square cell `expandHitSide` on a side; under them its body, `bodyLeading` in from its leading
+/// edge, under the title, and `bodyTrailing` from its trailing edge, ending `bodyBottom` above its bottom:
+/// `titleToNotes` under the top row the notes' field; `notesToSubtasks` under it the subtasks, `subtasksOutdent`
+/// outside the body's leading edge, and after them, as far outside, the field of the subtask being typed where there is
+/// one, led by `subtaskDraftCircle`, and the row that adds a subtask; and `subtasksToPills` under them its pills,
+/// `pillSpacing` apart, in points. Its numbers, its `background`, its `shadow`, its `entrance`, its circle and how it
+/// leaves are the fields of its `CardStyle`.
 ///
 /// The actions the typed text of its three fields sends are not here, as no field's is (`TextFieldModel`): a card's
 /// view takes them beside the model. It holds no id of the store's: the feature module's row carries the task's id

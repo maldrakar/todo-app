@@ -42,8 +42,8 @@ private func field(_ text: String) -> TextFieldModel<Action> {
     TextFieldModel(
         text: text, placeholder: "Title",
         style: FieldStyle(
-            font: .rowTitle, color: .ink, background: .surface, minimumWidth: 140, height: 34, padding: 10,
-            cornerRadius: 10, ring: stroke
+            font: .rowTitle, color: .ink, placeholder: .placeholder, background: .surface, minimumWidth: 140,
+            height: 34, padding: 10, cornerRadius: 10, ring: stroke
         ),
         submitted: .first, cancelled: .first, focusLost: .first
     )
@@ -193,7 +193,8 @@ private func check(isChecked: Bool = false) -> CheckModel<Action> {
     CheckModel(
         style: .init(
             diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
-            animation: .check, colors: DesignSystem.Color.Components.Tile.blue.check
+            animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+            mark: checkMark, colors: DesignSystem.Color.Components.Tile.blue.check
         ),
         isChecked: isChecked,
         accessibilityLabel: "Complete", action: .first
@@ -205,13 +206,20 @@ private let swipe = SwipeModel<Action>(
         threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
         buttonCornerRadius: 12, background: .red, animation: .swipe
     ),
-    button: TextModel(text: "Delete", style: TextStyle(font: .barLabel, color: .onAccent)), action: .second
+    button: TextModel(text: "Delete", style: TextStyle(font: .barLabel, color: .onAccent)),
+    accessibilityLabel: "Delete Call the plumber", action: .second
+)
+
+private let taskLeaving = TaskLeavingStyle(
+    titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves,
+    reducedAnimation: .rowLeavesWithNoMotion, deleteAnimation: .rowDeleted
 )
 
 private let taskRowStyle = TaskRowStyle(
     titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
-    leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0, freshAnimation: .fresh,
-    strike: nil, lift: nil, fresh: nil
+    leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 0,
+    strike: nil, lift: nil, fresh: nil, landingScale: nil, landingAnimation: .drop, titleAnimation: .titleFades,
+    leaving: taskLeaving, ground: nil
 )
 
 private func taskRow(
@@ -231,8 +239,9 @@ private func taskRow(
         "meta": taskRow(meta: [MetaItemModel(icon: icon, text: text, style: MetaItemStyle(spacing: 3, capsule: nil))]),
         "style": taskRow(style: .init(
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
-            leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9, freshAnimation: .fresh,
-            strike: nil, lift: nil, fresh: nil
+            leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 9,
+            strike: nil, lift: nil, fresh: nil, landingScale: nil, landingAnimation: .drop,
+            titleAnimation: .titleFades, leaving: taskLeaving, ground: nil
         )),
         "swipe": taskRow(swipe: swipe),
         "tap": taskRow(tap: .second),
@@ -265,10 +274,27 @@ private let expand = ButtonModel<Action>(
     action: .first
 )
 
+private let cardEntrance = EntranceStyle(
+    opacity: 0.3, scale: 0.97, offset: -4, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
+)
+
 private let cardStyle = CardStyle(
     expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
     bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .raised, background: .surface,
-    animation: .cardOpens
+    entrance: cardEntrance, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: draftCircle,
+    leaving: taskLeaving, titleStrike: nil
+)
+
+private let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
+
+private let checkMark = CheckStyle.Mark(
+    box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)], isRound: true
+)
+
+private let draftCircle = CheckStyle(
+    diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44, animation: .check,
+    fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
+    mark: checkMark, colors: DesignSystem.Color.Components.Tile.blue.check
 )
 
 private func card(
@@ -290,7 +316,9 @@ private func card(
         "title": card(title: field("Call the plumber today")),
         "notes": card(notes: field("Ask about the boiler")),
         "subtasks": card(subtasks: [
-            SubtaskRowModel(check: check(), title: text, style: .init(height: 44, strike: nil)),
+            SubtaskRowModel(
+                check: check(), title: text, style: .init(height: 44, strike: nil, titleAnimation: .titleFades)
+            ),
         ]),
         "subtaskField": card(subtaskField: field("")),
         "addSubtask": card(addSubtask: AddRowModel(
@@ -308,7 +336,8 @@ private func card(
         "style": card(style: .init(
             expandHitSide: 44, cornerRadius: 18, topMargin: 6, horizontalMargin: 10, bottomMargin: 10, bodyLeading: 46,
             bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6, shadow: .lifted,
-            background: .surface, animation: .cardOpens
+            background: .surface, entrance: cardEntrance, subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4,
+            subtaskDraftCircle: draftCircle, leaving: taskLeaving, titleStrike: nil
         )),
         "backgroundTapped": card(backgroundTapped: .second),
     ])
@@ -378,9 +407,16 @@ private func addRow(
     ])
 }
 
+private let doneRowsEntrance = EntranceStyle(
+    opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
+)
+
+private let doneBump = DoneStripStyle.Bump(scale: 1.22, peakAt: 0.4, animation: .check)
+
 private let doneStripStyle = DoneStripStyle(
     height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-    leadingMargin: 14, trailingMargin: 16, background: .fill
+    leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance,
+    bump: doneBump
 )
 
 private func doneStrip(
@@ -407,7 +443,8 @@ private func doneStrip(
         "chevron": doneStrip(rotation: 180),
         "style": doneStrip(style: .init(
             height: 30, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
-            leadingMargin: 14, trailingMargin: 16, background: .fill
+            leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance,
+            bump: doneBump
         )),
         "isOpen": doneStrip(isOpen: true),
         "action": doneStrip(action: .second),

@@ -14,15 +14,25 @@ extension TaskList {
         /// 2).
         public let header: ScreenHeaderModel
 
+        /// The glass button that goes back, over the content at the top left.
+        public let back: GlassButtonModel<UserAction>
+
+        /// The glass button at the top right, the label of `showAs`, which it puts up.
+        public let more: GlassButtonLabelModel
+
+        /// How the screen itself stands: what it stands on, how the glass buttons and their fade stand over the
+        /// content, and where the content starts and ends under them.
+        public let style: ListScreenStyle
+
         /// The tags of the list's open tasks, the most used first, and nil when no chip would show (spec section 7).
         public let tagBar: TagBarModel<UserAction>?
 
         /// The blocks, as a list or as the board's columns.
         public let layout: Layout
 
-        /// "…" and its menu, Show as: List, and Columns, disabled with its reason where there is nothing to show as
-        /// columns (spec section 5).
-        public let showAs: MenuButtonModel<UserAction>
+        /// The menu `more` puts up, Show as: List, and Columns, disabled with its reason where there is nothing to show
+        /// as columns, the layout the list is shown as checked (spec section 5).
+        public let showAs: MenuModel<UserAction>
 
         /// What the screen shows when no block has a row, after the tag bar's filter, and the list has no lists inside,
         /// and nil otherwise (canvas, the empty state).
@@ -66,12 +76,14 @@ extension TaskList {
         }
 
         /// The blocks as the board's columns, each with its column's look, `spacing` apart, the board
-        /// `horizontalPadding` in from the screen's sides and `bottomPadding` above its bottom, in points, snapping to
-        /// a column as it scrolls where `snaps` says so: the phone's does, the Mac's scrolls freely (spec section 5).
+        /// `horizontalPadding` in from the screen's sides, with `endRoom` more after the last column, and
+        /// `bottomPadding` above its bottom, in points, snapping to a column as it scrolls where `snaps` says so: the
+        /// phone's does, the Mac's scrolls freely (spec section 5).
         public struct Board: Equatable, Sendable {
             public let columns: [Block]
             public let spacing: Double
             public let horizontalPadding: Double
+            public let endRoom: Double
             public let bottomPadding: Double
             public let snaps: Bool
 
@@ -104,6 +116,21 @@ extension TaskList {
             /// Whether the block takes a dropped task, by its rule read as an edit, as its column's `isDropTarget` says
             /// it: a view draws no slot and no tint where it does not (spec section 6).
             public let takesDrop: Bool
+
+            /// Whether a task dragged within the block lands where it is let go, its rows being one manual order: each
+            /// of the list's own blocks, and a list inside with one group of rows. A list inside that groups its tasks
+            /// orders each group apart, so a task dragged in it keeps to its group wherever it is let go, and a view
+            /// marks no place there and takes no drop (the owner's review of #177, 2026-11-08).
+            public let keepsDroppedPlace: Bool
+
+            /// The mark of the place where a task dragged within the block would land among its rows, in the colour of
+            /// its list, and nil in columns, where its column's tint marks the drop.
+            public let indicator: DropIndicatorStyle?
+
+            /// The block's look while a task dragged from another block would land in it, in the colour of its list,
+            /// where the block takes it last or by its order and no line could say where; nil in columns, where its
+            /// column's tint marks the drop (the owner's review of #177, 2026-11-08).
+            public let dropStyle: BlockDropStyle?
         }
 
         /// A row of a block, a view switching over its kind to pick the row to draw, every case drawn (`docs/style.md`,
@@ -117,6 +144,24 @@ extension TaskList {
             public var id: TaskID {
                 switch self {
                 case .task(let id, _), .card(let id, _): id
+                }
+            }
+
+            /// How the row looks lifted, and nil for one that cannot be: an open card, which is neither lifted nor has
+            /// a menu (the controller's ruling on #177, 2026-11-07), and a row with no menu.
+            public var lift: TaskLiftStyle? {
+                switch self {
+                case .task(_, let row): row.style.lift
+                case .card: nil
+                }
+            }
+
+            /// The row's swipe to its Delete, and nil for one that is not swiped: an open card, a row of the strip, a
+            /// task in the Trash and a column's card.
+            public var swipe: SwipeModel<UserAction>? {
+                switch self {
+                case .task(_, let row): row.swipe
+                case .card: nil
                 }
             }
         }

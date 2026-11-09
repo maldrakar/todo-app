@@ -44,6 +44,7 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(rowIDs(of: block, in: module.model) == [ids[3], ids[0], ids[1], ids[4], ids[2]])
     module.tap(.rowDropped(ids[3], from: block, in: block, after: ids[4]))
     #expect(rowIDs(of: block, in: module.model) == [ids[0], ids[1], ids[4], ids[3], ids[2]], "a pinned task moves too")
+    module.tap(.backgroundTapped)  // the drop's highlight is the one thing a list made now does not draw
     #expect(try list(inbox, in: store).model == module.model, "and keeps it")
 }
 
@@ -68,6 +69,34 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     #expect(rowIDs(of: block, in: group.model) == [a, c, b], "the order is one on both screens")
     group.tap(.rowDropped(b, from: block, in: block, after: nil))
     #expect(try store.manualList(of: week) == [b, a, c], "a group's reorder pins in the list")
+}
+
+/// A block keeps a dropped task's place where its rows are one manual order: each of the list's own blocks, and a list
+/// inside with one group of rows. A list inside that groups its tasks orders each group apart, so a task dragged in it
+/// keeps to its own group wherever it is let go, and the model says so for the view, which marks no place there; in
+/// columns alike (the owner's review of #177, 2026-11-08).
+@Test func aListInsideWithItsTasksInGroupsKeepsNoDroppedPlace() throws {
+    let store = try makeStore()
+    let home = try store.createTag(title: "home")
+    let parent = try projects(store)
+    let house = try store.createView(NewTaskView(title: "House", parent: parent, filter: .hasTag(home)))
+    let week = try store.createView(
+        NewTaskView(title: "Week", parent: parent, filter: .hasTag(home), groupBy: .whenDay)
+    )
+    try store.createTask(NewTask(title: "a", when: day(1), tags: [home]))
+    let module = try list(parent, in: store)
+    #expect(block(.own(nil), of: module.model)?.keepsDroppedPlace == true)
+    #expect(block(.list(house), of: module.model)?.keepsDroppedPlace == true)
+    #expect(block(.list(week), of: module.model)?.keepsDroppedPlace == true, "one day, one group")
+    try store.createTask(NewTask(title: "b", when: day(2), tags: [home]))
+    let twoDays = try list(parent, in: store)
+    #expect(block(.list(week), of: twoDays.model)?.keepsDroppedPlace == false)
+    #expect(block(.list(house), of: twoDays.model)?.keepsDroppedPlace == true)
+    let b = try #require(rowIDs(of: .list(week), in: twoDays.model).last)
+    #expect(commits(of: store) { twoDays.tap(.rowDropped(b, from: .list(week), in: .list(week), after: nil)) } == 0)
+    #expect(try store.manualList(of: week).isEmpty, "a reorder sent all the same writes nothing")
+    twoDays.tap(.showAsChosen(.columns))
+    #expect(block(.list(week), of: twoDays.model)?.keepsDroppedPlace == false)
 }
 
 /// A list inside keeps its order in its own manual list, not its parent's (spec section 6).
@@ -465,5 +494,117 @@ private func tasks(_ titles: String..., in store: Store) throws -> [TaskID] {
     let id = try store.createTask(NewTask(title: "Fix the door"))
     let module = try list(parent, in: store)
     module.tap(.rowDropped(id, from: .own(nil), in: .list(house), after: nil))
+    #expect(freshIDs(in: module.model) == [id], "the highlight is the one thing a list made now does not draw")
+    module.tap(.backgroundTapped)
     #expect(module.model == (try list(parent, in: store).model))
+}
+
+// MARK: - The row just dropped
+
+/// The ids of the task rows a model draws fresh, in the list's blocks or the board's columns.
+private func freshIDs(in model: TaskList.Model) -> [TaskID] {
+    blocks(of: model).flatMap(\.rows).compactMap { row in
+        if case .task(let id, let model) = row, model.style.fresh != nil || model.style.landingScale != nil { id } else { nil }
+    }
+}
+
+/// Two days of Upcoming, each with a task, and the module on them: the first task is dragged to the second day.
+private func twoDays(_ store: Store) throws -> (list: TaskList, first: TaskID, second: TaskID, other: TaskID) {
+    let first = try store.createTask(NewTask(title: "First", when: day(1)))
+    let second = try store.createTask(NewTask(title: "Second", when: day(2)))
+    let other = try store.createTask(NewTask(title: "Other", when: day(3)))
+    return (try list(BuiltInTaskViews.upcoming, in: store), first, second, other)
+}
+
+/// A task dropped into another block lands fresh: the `fresh` colour on its row, over the `fresh` motion, and on no
+/// other row (the controller's ruling on #177, 2026-11-07, R145).
+@Test func aDropLandsFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, _) = try twoDays(store)
+    #expect(freshIDs(in: module.model).isEmpty)
+    module.tap(.rowDropped(first, from: .own(.day(day(1))), in: .own(.day(day(2))), after: second))
+    #expect(freshIDs(in: module.model) == [first])
+    let landed = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
+    #expect(landed.style.fresh == .fresh)
+    #expect(landed.style.landingAnimation == .fresh)
+}
+
+/// A reorder in the block it was dragged from lands fresh too.
+@Test func aReorderLandsFresh() throws {
+    let store = try makeStore()
+    let ids = try tasks("a", "b", "c", in: store)
+    let module = try list(inbox, in: store)
+    let block = TaskList.Model.BlockID.own(nil)
+    module.tap(.rowDropped(ids[2], from: block, in: block, after: nil))
+    #expect(freshIDs(in: module.model) == [ids[2]])
+}
+
+/// A column's card lands as the canvas lands it (R157): not a fade of the `fresh` colour but a spring from scale 1.05
+/// over the `drop` motion (`.card-drop`), and a list's row the other way about.
+@Test func aDropLandsFreshOnAColumnsCard() throws {
+    let store = try makeStore()
+    let (module, first, second, _) = try twoDays(store)
+    module.tap(.showAsChosen(.columns))
+    module.tap(.rowDropped(first, from: .own(.day(day(1))), in: .own(.day(day(2))), after: second))
+    #expect(freshIDs(in: module.model) == [first])
+    let card = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
+    #expect(card.style.fresh == nil)
+    #expect(card.style.landingScale == 1.05)
+    #expect(card.style.landingAnimation == .drop)
+    let settled = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == second }))
+    #expect(settled.style.landingScale == nil)
+    module.tap(.showAsChosen(.list))
+    module.tap(.rowDropped(first, from: .own(.day(day(2))), in: .own(.day(day(2))), after: second))
+    let landed = row(try #require(blocks(of: module.model).flatMap(\.rows).first { $0.id == first }))
+    #expect(landed.style.fresh == .fresh && landed.style.landingScale == nil, "a list's row fades")
+}
+
+/// A drop that moves nothing or is refused lands nothing fresh, and takes the last drop's highlight away like any
+/// other action.
+@Test func aDropThatFailsOrRefusesLandsNothingFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, other) = try twoDays(store)
+    let one = TaskList.Model.BlockID.own(.day(day(1)))
+    let two = TaskList.Model.BlockID.own(.day(day(2)))
+    let three = TaskList.Model.BlockID.own(.day(day(3)))
+    module.tap(.rowDropped(second, from: two, in: three, after: other))
+    #expect(freshIDs(in: module.model) == [second])
+    module.tap(.rowDropped(first, from: one, in: one, after: nil))
+    #expect(freshIDs(in: module.model).isEmpty, "where it stood")
+    module.tap(.rowDropped(other, from: three, in: one, after: first))
+    #expect(freshIDs(in: module.model) == [other])
+    module.tap(.rowDropped(other, from: three, in: .list(ViewID("gone")), after: nil))
+    #expect(freshIDs(in: module.model).isEmpty, "a block that is not drawn")
+}
+
+/// Any later action of the person's clears it, the ones that change nothing too (R145).
+@Test func aLaterActionClearsFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, other) = try twoDays(store)
+    let one = TaskList.Model.BlockID.own(.day(day(1)))
+    let two = TaskList.Model.BlockID.own(.day(day(2)))
+    let three = TaskList.Model.BlockID.own(.day(day(3)))
+    module.tap(.rowDropped(first, from: one, in: two, after: second))
+    #expect(freshIDs(in: module.model) == [first])
+    module.tap(.rowTapped(other))
+    #expect(freshIDs(in: module.model).isEmpty)
+    module.tap(.backgroundTapped)
+    module.tap(.rowDropped(other, from: three, in: two, after: first))
+    #expect(freshIDs(in: module.model) == [other])
+    module.tap(.blockTitleTapped(.own(nil)))
+    #expect(freshIDs(in: module.model).isEmpty, "an action the module refuses clears it as well")
+}
+
+/// An event of the world leaves it, a change and a new day and being made alike (R145).
+@Test func aChangeDoesNotClearFresh() throws {
+    let store = try makeStore()
+    let (module, first, second, _) = try twoDays(store)
+    module.tap(.rowDropped(first, from: .own(.day(day(1))), in: .own(.day(day(2))), after: second))
+    let renamed = try changeSet(of: store) { try store.update(task: second, [.title("Second, renamed")]) }
+    #expect(module.send(.changed(renamed)) == nil)
+    #expect(rows(of: module.model).contains { $0.title == "Second, renamed" })
+    #expect(freshIDs(in: module.model) == [first])
+    #expect(module.send(.dayChanged(testDay)) == nil)
+    #expect(module.send(.created) == nil)
+    #expect(freshIDs(in: module.model) == [first])
 }

@@ -27,8 +27,10 @@ public final class TaskList: Routable {
     /// What a view may send, each case named for the control and the gesture and never for the operation it triggers
     /// (ADR-0006). The way back from a screen over the list is not one: SwiftUI reports it only as the shorter path it
     /// wrote, which the root view sends the window whole, and the stack tells the list `.uncovered` (navigation state
-    /// spec, section 3).
+    /// spec, section 3). The list's own back button is one, since it is the list's control and no bar's.
     public enum UserAction: Equatable, Sendable {
+        /// The glass back button over the content.
+        case backButtonTapped
         /// A row of a block or of the strip, beside its check, tapped or clicked.
         case rowTapped(TaskID)
         /// A row's or a strip row's check, or the open card's.
@@ -120,6 +122,11 @@ public final class TaskList: Routable {
         /// close it (spec section 3; the controller's ruling on #175, 2026-11-04); the stack drops what stands over it
         /// with it.
         case closeRequested
+
+        /// The person went back from the list with its back button, so the list asks its opener to close it, which
+        /// the opener takes as the person going back to it, as when the stack tells it `.uncovered` (the owner's
+        /// review of #177, 2026-11-08); the stack drops what stands over it with it.
+        case wentBack
     }
 
     /// What a view draws, computed from the state on every read and never kept beside it, so that what the list holds
@@ -165,13 +172,28 @@ public final class TaskList: Routable {
             head: route.head, title: snapshot.page.view.title, snapshot: snapshot, day: day,
             folded: isGroup ? [] : try TaskList.keptFolds(in: store, of: route.head.view),
             layout: isGroup ? .list : try TaskList.keptLayout(in: store, of: route.head.view), picks: [], card: nil,
-            isDoneOpen: false, naming: nil, destination: Destination(), problem: nil
+            isDoneOpen: false, naming: nil, fresh: nil, destination: Destination(), problem: nil
         )
         setDestination(route.tail)
     }
 
     public func send(_ event: Event) -> Output? {
+        // A drop's highlight lasts until the person does anything else, and no event of the world ends it (the
+        // controller's ruling on #177, 2026-11-07); the drop sets it again once it has landed.
+        if case .action = event { state.fresh = nil }
         switch event {
+        case .action(.backButtonTapped):
+            // The person goes back, which the list answers to its opener, and the stack drops it with what stands over
+            // it (the owner's review of #177, 2026-11-08). What is open closes first by the rule of every close, a
+            // list's name being typed and the card, as before "+ Add list": what was typed is written and a new task
+            // with nothing put in it is not left behind, since nothing after this reaches the list, a field's lost
+            // focus among it. A write the store refuses keeps the list, so that its sentence stands, and a second Back
+            // closes it, the card having closed all the same.
+            state.problem = nil
+            settleListName()
+            closeCard()
+            guard state.problem == nil else { return nil }
+            return .wentBack
         case .action(.rowTapped(let id)): openCard(on: id)
         case .action(.checkTapped(let id)): check(id)
         case .action(.backgroundTapped), .action(.titleFieldCancelled): dismissCard()
@@ -244,7 +266,7 @@ public final class TaskList: Routable {
             // An item is checked against the model: Columns disabled moves nothing (spec section 5). The choice is the
             // device's, kept per list (ADR-0010), and a group's screen keeps none, its one layout being the list's. The
             // sentence stays, as for a fold.
-            guard model.showAs.menu.sections.flatMap(\.items).contains(where: {
+            guard model.showAs.sections.flatMap(\.items).contains(where: {
                 $0.action == .showAsChosen(layout) && !$0.isDisabled
             }), layout != state.layout else { return nil }
             // A write that fails is not said, as a fold's is not: the layout stays on screen until the next list made
@@ -265,10 +287,11 @@ public final class TaskList: Routable {
             state.problem = nil
             setDestination(route.tail)
             return nil
-        case .destinationAnswered(.task(.closeRequested)), .destinationAnswered(.list(.closeRequested)), .uncovered:
+        case .destinationAnswered(.task(.closeRequested)), .destinationAnswered(.list(.closeRequested)),
+             .destinationAnswered(.list(.wentBack)), .uncovered:
             // The screen over the list asked to be closed, its task or its view gone (spec section 3), or the person
-            // went back to the list and the screen is gone already, and a list cannot keep a destination the person
-            // closed (navigation state spec, section 3). Either way the list declares nothing over it, the stack drops
+            // went back to the list, with the back button of a list over it or by the stack, where the screen is gone
+            // already, and a list cannot keep a destination the person closed (navigation state spec, section 3). Either way the list declares nothing over it, the stack drops
             // the screen with whatever stands over it, and the route names nothing over the list. None is a gesture on
             // the list, so the sentence stays: one written while the screen was up, by a link to a task that is gone
             // or a reread that failed, is one the person first sees now that the list is uncovered. The stack tells
@@ -426,10 +449,10 @@ public final class TaskList: Routable {
     /// Everything the list holds between two events: its head; its view's title, which a change naming the view gives
     /// it even when the page's read fails; the snapshot of the store the blocks, the tile, the rule and the strip are
     /// read from, and the device's day it was taken by; the folds and the layout the device keeps, and what this
-    /// session keeps, the picked tags, the open card, whether the strip is open and the list being named; what it
-    /// declared over itself; and the sentence a person was last told. One value, moved field by field, and the one
-    /// place any of it is kept: the model is assembled from it on every read, in `model` and nowhere else (owner's
-    /// reviews of #77, #101 and #188).
+    /// session keeps, the picked tags, the open card, whether the strip is open, the list being named and the task a
+    /// drop just landed; what it declared over itself; and the sentence a person was last told. One value, moved field
+    /// by field, and the one place any of it is kept: the model is assembled from it on every read, in `model` and
+    /// nowhere else (owner's reviews of #77, #101 and #188).
     ///
     /// The destination is a field of the state, because what a screen declared over it is the navigation state, which
     /// the window's stack follows (ADR-0009, amendment of 2026-10-22, point 2).
@@ -444,6 +467,9 @@ public final class TaskList: Routable {
         var card: OpenCard?
         var isDoneOpen: Bool
         var naming: ListNaming?
+
+        /// The task a drop has just landed, whose rows are drawn fresh until the next action of the person's.
+        var fresh: TaskID?
         var destination: Destination<Route.Tail>
         var problem: String?
 
@@ -488,7 +514,7 @@ public final class TaskList: Routable {
             let color = TaskList.tileColor(view.color)
             let icon = TaskList.tileIcon(view.icon)
             let tags = TagNames(snapshot.tags)
-            let context = RowContext(today: today, tags: tags, card: card, naming: naming)
+            let context = RowContext(today: today, tags: tags, card: card, naming: naming, fresh: fresh)
             let hasListsInside = blocks.contains { if case .list = $0.id { true } else { false } }
             let heading = TaskList.screenHeading(
                 head: head, title: title, rule: view.filter, snapshot: snapshot, today: today
@@ -506,11 +532,14 @@ public final class TaskList: Routable {
             )
             return Model(
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
+                back: TaskList.back(metrics.glass),
+                more: TaskList.more(metrics.glass),
+                style: metrics.style,
                 tagBar: TaskList.tagBar(chips, picked: picked, color: color, metrics.tagBar),
                 layout: TaskList.layout(
                     shown, title: title, folded: folded, addList: addList, context, metrics.blocks
                 ),
-                showAs: TaskList.showAs(canBoard: canBoard),
+                showAs: TaskList.showAs(current: shape, canBoard: canBoard),
                 empty: empty,
                 done: done.strip,
                 doneRows: done.rows,

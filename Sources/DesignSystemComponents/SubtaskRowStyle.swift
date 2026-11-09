@@ -10,8 +10,12 @@ public struct SubtaskRowStyle: Equatable, Sendable {
     /// no line through it.
     public let strike: DesignSystem.Color?
 
-    public init(height: Double, strike: DesignSystem.Color?) {
+    /// The motion the title changes colour on as the subtask is checked.
+    public let titleAnimation: DesignSystem.Animation
+
+    public init(height: Double, strike: DesignSystem.Color?, titleAnimation: DesignSystem.Animation) {
         self.height = height
         self.strike = strike
+        self.titleAnimation = titleAnimation
     }
 }

@@ -57,7 +57,7 @@ private func lit(in model: TaskList.Model) -> [String] {
 
 /// The item of Show as that chooses the layout.
 private func item(_ kind: TaskList.Model.Layout.Kind, in model: TaskList.Model) throws -> MenuModel<TaskList.UserAction>.Item {
-    try #require(model.showAs.menu.sections.flatMap(\.items).first { $0.action == .showAsChosen(kind) })
+    try #require(model.showAs.sections.flatMap(\.items).first { $0.action == .showAsChosen(kind) })
 }
 
 /// A list of the open tasks grouped by the day of When, of any day, which no seeded list is, with a list inside it

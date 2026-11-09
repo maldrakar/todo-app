@@ -5,8 +5,9 @@ import DesignSystem
 /// corners of `cornerRadius`, its header at its top and under it its cards, `cardSpacing` apart and `padding` in from
 /// its sides and its bottom, each on `cardBackground` with corners of `cardCornerRadius`, ringed with `cardRing` and
 /// casting `cardShadow`, in points. Where it takes a dropped card, a card dragged over it tints it `dropTint` and rings
-/// it inside in `dropRing`, `dropRingWidth` thick. Its numbers, its `fill`, its `dropTint`, its `dropRing`, its
-/// `cardBackground`, its `cardRing` and its `cardShadow` are the fields of its `ColumnStyle`.
+/// it inside in `dropRing`, `dropRingWidth` thick, on `dropAnimation`. Its numbers, its `fill`, its `dropTint`, its
+/// `dropRing`, its `dropAnimation`, its `cardBackground`, its `cardRing` and its `cardShadow` are the fields of its
+/// `ColumnStyle`.
 ///
 /// It is the column's look: its cards are the feature module's rows drawn in the card look, and the row that adds to it
 /// is the block's, so the model holds neither.

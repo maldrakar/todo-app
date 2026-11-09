@@ -478,8 +478,9 @@ public final class TaskViewList: Routable {
             // compiling until this module has decided what it means (spec section 4).
             setDestination(nil)
             return nil
-        case .uncovered:
-            // The list is gone already, and this module cannot keep a destination the person closed (navigation
+        case .uncovered, .destinationAnswered(.wentBack):
+            // The list is gone already, or the person tapped its back button and it asks to go (the owner's review of
+            // #177, 2026-11-08), and this module cannot keep a destination the person closed (navigation
             // state spec, section 3), so the highlight goes with it: on a narrow window the list is a screen pushed
             // over this one, and Back closes that screen, so nothing stays chosen (owner, 2026-10-21), as iPhone's
             // System Settings leaves nothing chosen after Back. The route then names no list, which a window

@@ -3,7 +3,7 @@ import DesignSystem
 
 /// A subtask's row in an open card (`Phone.dc.html`, the card's subtasks): its check, then its title, struck through in
 /// `strike` where the subtask is done, `height` high, in points. Its numbers and its `strike` are the fields of its
-/// `SubtaskRowStyle`.
+/// `SubtaskRowStyle`, as is the motion its title changes colour on.
 public struct SubtaskRowModel<Action: Equatable & Sendable>: Equatable, Sendable {
     public let check: CheckModel<Action>
 

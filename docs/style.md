@@ -116,6 +116,16 @@ value a peer wrote is as arbitrary as one a person typed.
   only what only it can know, such as focus, scroll, hover, the
   window's width, which it reports (below), or a drag in progress.
   (ADR-0006, spec section 2)
+- **A component's view takes its model and `send`, and nothing beside
+  them.** It draws what its model holds from the model and sends the
+  actions its model holds through its screen's one
+  `send: (Action) -> Void`, the way back and a row's tap among them: no
+  closure for a gesture, and no parameter for a value the model already
+  has, such as whether a check is checked. What only the view can know
+  that changes what is drawn, a check drawn checked while its task
+  leaves, it draws from another instance of the model (`CompletingTask`).
+  The one closure beside `send` makes the action for typed text, which a
+  model cannot hold (#163). (PR #194)
 - **A view reports the width of its window and decides nothing by
   it.** It hands the width class, narrow or wide, to the host's
   entrance for events of the world, as it hands a link, and draws the

@@ -85,6 +85,9 @@ extension DesignSystem {
         /// light and white at 8 % in the dark.
         public static let fresh = Color(light: accentShade.withOpacity(0.12), dark: .white.withOpacity(0.08))
 
+        /// What a field shows while it holds nothing (`Phone.dc.html`, `input::placeholder`): the second ink at 80 %.
+        public static let placeholder = Color(light: ink2.light.withOpacity(0.8), dark: ink2.dark.withOpacity(0.8))
+
         /// The accent's one shade, which both its appearances share and the dark accent soft and the selection mix
         /// toward, spelled once.
         private static let accentShade = RGB(hex: 0x3653C9)

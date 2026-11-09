@@ -40,7 +40,7 @@ extension TaskList {
     static func floatingButton(_ metrics: Metrics.FloatingButton) -> FloatingButtonModel<UserAction> {
         FloatingButtonModel(
             icon: IconModel(
-                icon: .plus, style: IconStyle(size: metrics.glyphSize, weight: .semibold, color: .onAccent)
+                icon: .plus, style: IconStyle(size: metrics.glyphSize, weight: .medium, color: .onAccent)
             ),
             style: metrics.style, accessibilityLabel: newTaskTitle, action: .addTaskButtonTapped
         )
@@ -61,7 +61,7 @@ extension TaskList {
             chevron: AccessoryModel.Chevron(
                 icon: IconModel(
                     icon: .chevron,
-                    style: IconStyle(size: metrics.chevronSize, weight: .semibold, color: .ink2)
+                    style: IconStyle(size: metrics.chevronSize, weight: .regular, color: .ink2)
                 ),
                 accessibilityLabel: isOpen ? "Hide done tasks" : "Show done tasks", action: .doneStripTapped,
                 style: ChevronStyle(rotation: isOpen ? 180 : 0, animation: .fold)
@@ -73,12 +73,12 @@ extension TaskList {
     /// What a row's swipe and its menu both call what they do.
     private static let deleteTitle = "Delete"
 
-    /// A row's swipe to its Delete.
-    static func swipe(of id: TaskID, _ style: SwipeStyle) -> SwipeModel<UserAction> {
+    /// A row's swipe to its Delete, which reads aloud what it deletes, the title the row draws (canvas).
+    static func swipe(of id: TaskID, title: String, _ style: SwipeStyle) -> SwipeModel<UserAction> {
         SwipeModel(
             style: style,
             button: TextModel(text: deleteTitle, style: TextStyle(font: .barLabel, color: .onAccent)),
-            action: .deleteSwiped(id)
+            accessibilityLabel: "\(deleteTitle) \(title)", action: .deleteSwiped(id)
         )
     }
 

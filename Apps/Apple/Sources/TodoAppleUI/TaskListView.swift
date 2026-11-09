@@ -3,12 +3,12 @@ import DesignSystemComponents
 import SwiftUI
 import TaskListFeature
 
-/// The blocks of one list, drawn as plain sections until the list screen draws the components' models (list screen
-/// plan, Task 8): each row's check, its title and its Delete, the card in its place with its fields, its subtasks, Open
-/// full screen and a plain close, "+ Add task", "+ Add list", the strip and the rows under it, and the floating "+"
-/// under the list, every control sent as the action its model carries (`docs/style.md`). A drop stays out, Task 8's and
-/// 9's. It is the root of the stack in a wide window's detail column, and a screen pushed over the views in a narrow
-/// window's one stack, and what the list declared over itself, a task or another list, is pushed over it either way,
+/// The blocks of one list in a wide window, drawn as plain sections until the pane draws the components' models (list
+/// screen plan, Task 9), as a narrow window's `ListScreen` does: each row's check, its title and its Delete, the card
+/// in its place with its fields, its subtasks, Open full screen and a plain close, "+ Add task", "+ Add list", the
+/// strip and the rows under it, and the floating "+" under the list, every control sent as the action its model carries
+/// (`docs/style.md`). A drop stays out, Task 9's. It is the root of the stack in a wide window's detail column, or a
+/// screen pushed in that stack, and what the list declared over itself, a task or another list, is pushed over it,
 /// drawn by the root view's one destination for the window's stack, so the list draws nothing of it (navigation state
 /// spec, section 6). What opens is the list's to decide, so a row and a block's title report the tap and nothing else.
 /// The screen's title is the header's, which names the list in the back button's menu over what stands on it (#126).
@@ -35,8 +35,8 @@ struct TaskListView: View {
                         }
                     } header: {
                         // A block's header in the list, or its column's in columns, which this view draws as the same
-                        // sections until the board is drawn (Task 8); its title opens what the block is, and its field
-                        // stands in its place while the list is being named.
+                        // sections until the pane draws the board (Task 9); its title opens what the block is, and its
+                        // field stands in its place while the list is being named.
                         if let header = block.header ?? block.column?.header {
                             if let field = header.field {
                                 PlainField(
@@ -156,56 +156,5 @@ struct TaskListView: View {
     private func addRow(_ row: AddRowModel<TaskList.UserAction>) -> some View {
         Button(row.title.text) { send(row.action) }
             .buttonStyle(.plain)
-    }
-}
-
-/// A text field the module's field model drives and no look, until the list screen draws the card (list screen plan,
-/// Task 8): what is typed goes up through `changed`, while the field has the focus, since a field writes its text back
-/// through its binding as it goes too, and that echo, which names no card, would land on the one opened since; Return,
-/// Esc and a lost focus go as the model's actions. It is its own view and not `TitleField`, which asks the caret back
-/// on every lost focus and cannot stand beside another field.
-private struct PlainField: View {
-    private let model: TextFieldModel<TaskList.UserAction>
-    private let focusesOnAppear: Bool
-    private let changed: (String) -> TaskList.UserAction
-    private let send: (TaskList.UserAction) -> Void
-
-    @FocusState private var isFocused: Bool
-
-    init(
-        _ model: TextFieldModel<TaskList.UserAction>, focusesOnAppear: Bool,
-        changed: @escaping (String) -> TaskList.UserAction, send: @escaping (TaskList.UserAction) -> Void
-    ) {
-        self.model = model
-        self.focusesOnAppear = focusesOnAppear
-        self.changed = changed
-        self.send = send
-    }
-
-    var body: some View {
-        field
-            .focused($isFocused)
-            .onSubmit { send(model.submitted) }
-            .onChange(of: isFocused) { _, isFocused in
-                if !isFocused { send(model.focusLost) }
-            }
-            .onAppear {
-                if focusesOnAppear { isFocused = true }
-            }
-    }
-
-    /// The field, which reads Esc where a keyboard has one: `onKeyPress` has no watchOS.
-    @ViewBuilder private var field: some View {
-        let text = TextField(model.placeholder, text: Binding(get: { model.text }, set: { text in
-            if isFocused { send(changed(text)) }
-        }))
-        #if os(watchOS)
-        text
-        #else
-        text.onKeyPress(.escape) {
-            send(model.cancelled)
-            return .handled
-        }
-        #endif
     }
 }

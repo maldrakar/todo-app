@@ -1,7 +1,7 @@
 // Sources/DesignSystemComponents/CardStyle.swift
 import DesignSystem
 
-/// The numbers a `CardModel` is drawn with, in points, and the card's background, shadow and animation, which the
+/// The numbers a `CardModel` is drawn with, in points, and the card's background, shadow and entrance, which the
 /// layout knows whole and a builder hands over as one value.
 public struct CardStyle: Equatable, Sendable {
     public let expandHitSide: Double
@@ -16,7 +16,30 @@ public struct CardStyle: Equatable, Sendable {
     public let pillSpacing: Double
     public let shadow: DesignSystem.Shadow
     public let background: DesignSystem.Color
-    public let animation: DesignSystem.Animation
+
+    /// How the card comes in as it opens in its row's place.
+    public let entrance: EntranceStyle
+
+    /// How far the subtasks, the row that adds one and the field of the one being typed stand outside the body's
+    /// leading edge, so that their checks stand under the card's own.
+    public let subtasksOutdent: Double
+
+    /// How far the notes stand below the card's top row (`Phone.dc.html`, the notes' `margin`).
+    public let titleToNotes: Double
+
+    /// How far the subtasks stand below the notes.
+    public let notesToSubtasks: Double
+
+    /// The circle before the field of the subtask being typed: a check's ring in the list's colour and nothing in it,
+    /// the shape of a subtask's check with no task yet to mark.
+    public let subtaskDraftCircle: CheckStyle
+
+    /// How the card leaves as its check completes its task, as a row does.
+    public let leaving: TaskLeavingStyle
+
+    /// The colour of the line through the title, the canvas's ink 3 through a done task's (`.tt-done`), and nil for a
+    /// title with no line through it, so a done task's card is another instance.
+    public let titleStrike: DesignSystem.Color?
 
     public init(
         expandHitSide: Double,
@@ -31,7 +54,13 @@ public struct CardStyle: Equatable, Sendable {
         pillSpacing: Double,
         shadow: DesignSystem.Shadow,
         background: DesignSystem.Color,
-        animation: DesignSystem.Animation
+        entrance: EntranceStyle,
+        subtasksOutdent: Double,
+        titleToNotes: Double,
+        notesToSubtasks: Double,
+        subtaskDraftCircle: CheckStyle,
+        leaving: TaskLeavingStyle,
+        titleStrike: DesignSystem.Color?
     ) {
         self.expandHitSide = expandHitSide
         self.cornerRadius = cornerRadius
@@ -45,6 +74,12 @@ public struct CardStyle: Equatable, Sendable {
         self.pillSpacing = pillSpacing
         self.shadow = shadow
         self.background = background
-        self.animation = animation
+        self.entrance = entrance
+        self.subtasksOutdent = subtasksOutdent
+        self.titleToNotes = titleToNotes
+        self.notesToSubtasks = notesToSubtasks
+        self.subtaskDraftCircle = subtaskDraftCircle
+        self.leaving = leaving
+        self.titleStrike = titleStrike
     }
 }

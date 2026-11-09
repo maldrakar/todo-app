@@ -1,13 +1,13 @@
 // Sources/DesignSystemComponents/MenuModel.swift
 import DesignSystem
 
-/// A menu as every platform puts it up: its items in sections, in the order given, with a divider between two sections.
-/// How it opens is the platform's, a long press on what it belongs to, a secondary click, or a press of the button that
-/// holds it.
+/// A menu as every platform puts it up: its items in sections, in the order given, with a divider between two sections,
+/// and a `heading` over them where it has one. How it opens is the platform's, a long press on what it belongs to, a
+/// secondary click, or a press of the button that holds it.
 public struct MenuModel<Action: Equatable & Sendable>: Equatable, Sendable {
     /// An item of the menu: its title, the line under it where it has one, its icon, whether it destroys something,
-    /// which a platform draws as such, whether it can be chosen, the keys that choose it, and the action choosing it
-    /// sends.
+    /// which a platform draws as such, whether it can be chosen, whether it is the one a choice among them stands on
+    /// now, the keys that choose it, and the action choosing it sends.
     public struct Item: Equatable, Sendable {
         /// The keys of an item on a platform with a keyboard, which shows them beside the item: a key pressed with the
         /// modifiers held, ⇧⌘N as `n` with the shift and command keys. They choose the item where the platform answers
@@ -42,22 +42,27 @@ public struct MenuModel<Action: Equatable & Sendable>: Equatable, Sendable {
         /// grouping, which has no columns to show (list screen spec, section 5).
         public let isDisabled: Bool
 
+        /// Whether the item is the choice the menu stands on now, which a platform marks with a check, as Show as's
+        /// current layout is (list screen spec, section 5).
+        public let isChecked: Bool
+
         /// The keys that choose the item, and nil for an item with none.
         public let shortcut: Shortcut?
 
         public let action: Action
 
-        /// An item with no line under its title can be chosen unless it says otherwise, so that the menus that have
-        /// neither build their items without naming them.
+        /// An item with no line under its title can be chosen, and is no current choice, unless it says otherwise, so
+        /// that the menus that have none of these build their items without naming them.
         public init(
             title: String, subtitle: String? = nil, icon: DesignSystem.Icon, isDestructive: Bool,
-            isDisabled: Bool = false, shortcut: Shortcut?, action: Action
+            isDisabled: Bool = false, isChecked: Bool = false, shortcut: Shortcut?, action: Action
         ) {
             self.title = title
             self.subtitle = subtitle
             self.icon = icon
             self.isDestructive = isDestructive
             self.isDisabled = isDisabled
+            self.isChecked = isChecked
             self.shortcut = shortcut
             self.action = action
         }
@@ -72,9 +77,14 @@ public struct MenuModel<Action: Equatable & Sendable>: Equatable, Sendable {
         }
     }
 
+    /// The words over the items, finished, such as "Show as", and nil for a menu with none: a menu is headed only
+    /// where its items stand for one choice among several.
+    public let heading: String?
+
     public let sections: [Section]
 
-    public init(sections: [Section]) {
+    public init(heading: String? = nil, sections: [Section]) {
+        self.heading = heading
         self.sections = sections
     }
 }
