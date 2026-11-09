@@ -160,6 +160,8 @@ extension AppModule {
                 nil
             case (.task, .destinationAnswered), (.task, .uncovered), (.task, .notOpened):
                 nil
+            case (.list, .dropped), (.task, .dropped):
+                nil
             }
         }
 
@@ -181,12 +183,31 @@ extension AppModule {
             case .destinationAnswered(.list(let output)): base.send(.destinationAnswered(output))
             case .uncovered: base.send(.uncovered)
             case .notOpened(let error, let stillOpen): base.send(.notOpened(error, stillOpen: stillOpen?.list))
-            case .created, .declared, .destinationAnswered(.task): nil
+            case .created, .declared, .dropped, .destinationAnswered(.task): nil
             }
         }
 
         static func route(of base: TaskViewList, over above: Route?) -> TaskViewList.Route {
             TaskViewList.Route(list: above?.list)
+        }
+
+        /// A change the store committed is the one event of the sidebar's that is, so that a screen the walk after it
+        /// lets go writes nothing in answer to it (ADR-0009, amendment of 2026-11-10): a list the change deleted, or
+        /// one standing over it, loses what was typed in it and not yet written, which the owner accepted.
+        static func isChange(_ event: TaskViewList.Event) -> Bool {
+            switch event {
+            case .changed: true
+            case .action, .created, .route, .destinationAnswered, .uncovered, .notOpened, .widthChanged, .dayChanged:
+                false
+            }
+        }
+
+        /// A change the store committed is the one event of a screen's that is, as for the sidebar's.
+        static func isChange(_ event: Event) -> Bool {
+            switch event {
+            case .changed: true
+            case .action, .dayChanged, .widthChanged: false
+            }
         }
     }
 }

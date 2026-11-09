@@ -14,7 +14,9 @@ private struct Refusal: Error, Equatable {
 ///
 /// It answers every event by naming it, so that what a call on the stack returns says which of the base's
 /// answers reached the owner, and its model carries what it declares and every event it has been sent, since
-/// the stack keeps the base to itself and hands out nothing of it but its model.
+/// the stack keeps the base to itself and hands out nothing of it but its model. A change the store committed
+/// writes its destination, as a sidebar's would if a change could move what it declares, so that a test sees
+/// the walk after a change let screens go.
 private final class StubBase: Routable {
     struct Route: RouteValue {
         let head = NoHead()
@@ -33,6 +35,7 @@ private final class StubBase: Routable {
 
     enum Event: RoutedEvent {
         case action(UserAction)
+        case changed(StubList.Route?)
         case created
         case route(Route)
         case destinationAnswered(StubList.Output)
@@ -52,14 +55,19 @@ private final class StubBase: Routable {
 
     private var received: [Event] = []
 
-    init(route: Route) {
+    private let journal: Journal
+
+    init(route: Route, journal: Journal) {
+        self.journal = journal
         setDestination(route.list)
     }
 
     func send(_ event: Event) -> Output? {
         received.append(event)
+        journal.record(.base(event))
         switch event {
         case .action(.viewClicked(let view)): setDestination(StubList.Route(head: view, task: nil))
+        case .changed(let list): setDestination(list)
         case .route(let route): setDestination(route.list)
         case .uncovered: setDestination(nil)
         case .notOpened(_, let stillOpen): setDestination(stillOpen)
@@ -85,7 +93,8 @@ private final class StubBase: Routable {
 /// came down and the call return that answer before the one the walk draws: a double tap on a row declares the
 /// row's task, as a tap does, and tells its opener the row was double-tapped; and a list on view 5 does not
 /// take being uncovered, but writes the task it declared again and tells its opener it reopened it, as a screen
-/// that tried to keep a destination the person closed would.
+/// that tried to keep a destination the person closed would. It answers being dropped with its head, so that a
+/// test sees that answer reach nobody.
 private final class StubList {
     struct Route: RouteValue {
         let head: Int
@@ -105,6 +114,7 @@ private final class StubList {
         case destinationAnswered(StubTask.Output)
         case uncovered
         case notOpened(Refusal, stillOpen: StubTask.Route?)
+        case dropped
     }
 
     enum Output: Equatable, Sendable {
@@ -112,6 +122,7 @@ private final class StubList {
         case doubleTapped(Int)
         case reopened(Int)
         case passedOn(StubTask.Output)
+        case dropped(Int)
     }
 
     var route: Route { Route(head: head, task: destination.pushed) }
@@ -124,13 +135,17 @@ private final class StubList {
 
     private var received: [Event] = []
 
-    init(route: Route) {
+    private let journal: Journal
+
+    init(route: Route, journal: Journal) {
         head = route.head
+        self.journal = journal
         setDestination(route.task)
     }
 
     func send(_ event: Event) -> Output? {
         received.append(event)
+        journal.record(.list(head, event))
         switch event {
         case .rowTapped(let task): setDestination(StubTask.Route(head: task, subtask: nil))
         case .rowDoubleTapped(let task):
@@ -144,6 +159,7 @@ private final class StubList {
         case .destinationAnswered(.closeRequested), .uncovered: setDestination(nil)
         case .destinationAnswered(let output): return .passedOn(output)
         case .notOpened(_, let stillOpen): setDestination(stillOpen)
+        case .dropped: return .dropped(head)
         }
         return nil
     }
@@ -159,8 +175,9 @@ private final class StubList {
 ///
 /// It records what it hears as the list does. It answers `.created` with its head, or, made on a task whose
 /// subject is gone, with a request to be closed, the way a screen whose subject is gone asks (ADR-0006,
-/// amendment of 2026-10-14); it asks to be closed when its close button is tapped, answers a tap on its other
-/// button with its head, and empties its destination when the task over it asks to be closed.
+/// amendment of 2026-10-14); it asks to be closed when its close button is tapped, or when a change the store
+/// committed reaches it, as one whose subject the change took; it answers a tap on its other button and being
+/// dropped with its head, and empties its destination when the task over it asks to be closed.
 private final class StubTask {
     struct Route: RouteValue {
         let head: Int
@@ -176,17 +193,20 @@ private final class StubTask {
         case subtaskTapped(Int)
         case closeButtonTapped
         case buttonTapped
+        case changed
         case created
         case declared(Route)
         case destinationAnswered(Output)
         case uncovered
         case notOpened(Refusal, stillOpen: Route?)
+        case dropped
     }
 
     enum Output: Equatable, Sendable {
         case opened(Int)
         case tapped(Int)
         case closeRequested
+        case dropped(Int)
     }
 
     var route: Route { Route(head: head, subtask: destination.pushed?.head) }
@@ -201,23 +221,28 @@ private final class StubTask {
 
     private var received: [Event] = []
 
-    init(route: Route, gone: Bool) {
+    private let journal: Journal
+
+    init(route: Route, gone: Bool, journal: Journal) {
         head = route.head
         self.gone = gone
+        self.journal = journal
         setDestination(route.subtask)
     }
 
     func send(_ event: Event) -> Output? {
         received.append(event)
+        journal.record(.task(head, event))
         switch event {
         case .subtaskTapped(let subtask): setDestination(subtask)
-        case .closeButtonTapped: return .closeRequested
+        case .closeButtonTapped, .changed: return .closeRequested
         case .buttonTapped: return .tapped(head)
         case .created: return gone ? .closeRequested : .opened(head)
         case .declared(let route): setDestination(route.subtask)
         case .destinationAnswered(.closeRequested), .uncovered: setDestination(nil)
         case .destinationAnswered: break
         case .notOpened(_, let stillOpen): setDestination(stillOpen?.head)
+        case .dropped: return .dropped(head)
         }
         return nil
     }
@@ -327,6 +352,8 @@ private enum Screen: StackScreen {
         case (.task, .uncovered): return send(.task(.uncovered))
         case (.task, .notOpened(let refusal, let stillOpen)):
             return send(.task(.notOpened(refusal, stillOpen: stillOpen?.task)))
+        case (.list, .dropped): return send(.list(.dropped))
+        case (.task, .dropped): return send(.task(.dropped))
         case (.list, .declared(.task)), (.list, .destinationAnswered(.list)):
             return nil
         case (.task, .declared(.list)), (.task, .destinationAnswered(.list)):
@@ -350,24 +377,77 @@ private enum Screen: StackScreen {
         case .destinationAnswered(.list(let output)): return base.send(.destinationAnswered(output))
         case .uncovered: return base.send(.uncovered)
         case .notOpened(let refusal, let stillOpen): return base.send(.notOpened(refusal, stillOpen: stillOpen?.list))
-        case .created, .declared, .destinationAnswered(.task): return nil
+        case .created, .declared, .dropped, .destinationAnswered(.task): return nil
         }
     }
 
     static func route(of base: StubBase, over above: Route?) -> StubBase.Route {
         StubBase.Route(list: above?.list)
     }
+
+    static func isChange(_ event: StubBase.Event) -> Bool {
+        switch event {
+        case .changed: true
+        case .action, .created, .route, .destinationAnswered, .uncovered, .notOpened: false
+        }
+    }
+
+    static func isChange(_ event: Event) -> Bool {
+        switch event {
+        case .task(.changed): true
+        case .list, .task: false
+        }
+    }
+}
+
+/// What the base and every screen of a stub stack were sent, and every screen its factory made, in the order it
+/// happened, so that a test reads the order the stack told them in, a screen it let go among them, whose model the
+/// stack no longer hands out.
+private final class Journal {
+    enum Entry: Equatable {
+        case made(Screen.Route.Head)
+        case base(StubBase.Event)
+        case list(Int, StubList.Event)
+        case task(Int, StubTask.Event)
+    }
+
+    private(set) var entries: [Entry] = []
+
+    /// The `.dropped` each screen heard, in order.
+    var drops: [Entry] {
+        entries.filter { entry in
+            switch entry {
+            case .list(_, .dropped), .task(_, .dropped): true
+            case .made, .base, .list, .task: false
+            }
+        }
+    }
+
+    func record(_ entry: Entry) {
+        entries.append(entry)
+    }
+
+    /// What was recorded after the first `count` entries.
+    func entries(after count: Int) -> [Entry] {
+        Array(entries.dropFirst(count))
+    }
 }
 
 /// A stack over a stub base made on `route`, built once, the way a flow's owner builds its stack: its factory
 /// refuses a head of 99, of either kind, and makes every other screen, a task on a head in `gone` as one whose
-/// subject is gone.
-private func stubStack(on route: StubBase.Route, gone: Set<Int> = []) -> ScreenStack<Screen> {
-    ScreenStack(base: StubBase(route: route)) { route throws(Refusal) in
+/// subject is gone. The base and every screen record what they are sent in `journal`, and the factory every screen
+/// it makes.
+private func stubStack(
+    on route: StubBase.Route, gone: Set<Int> = [], journal: Journal = Journal()
+) -> ScreenStack<Screen> {
+    ScreenStack(base: StubBase(route: route, journal: journal)) { route throws(Refusal) in
         switch route {
-        case .list(let list) where list.head != 99: return .list(StubList(route: list))
+        case .list(let list) where list.head != 99:
+            journal.record(.made(route.head))
+            return .list(StubList(route: list, journal: journal))
         case .task(let task) where task.head != 99:
-            return .task(StubTask(route: task, gone: gone.contains(task.head)))
+            journal.record(.made(route.head))
+            return .task(StubTask(route: task, gone: gone.contains(task.head), journal: journal))
         case .list, .task: throw Refusal(head: route.head)
         }
     }
@@ -672,4 +752,126 @@ private func link(list: Int, task: Int? = nil) -> StubBase.Route {
     #expect(stack.send(.task(.buttonTapped), to: path[1]) == nil)
     #expect(stack.models == models)
     #expect(stack.baseModel == base)
+}
+
+/// A stack over the link to list 1 with task 7 over it and task 8 over that, a chain three screens high, recording in
+/// `journal`.
+private func threeHigh(_ journal: Journal) throws -> ScreenStack<Screen> {
+    var stack = stubStack(on: link(list: 1, task: 7), journal: journal)
+    _ = stack.send(.created)
+    try #require(stack.path.count == 2)
+    _ = stack.send(.task(.subtaskTapped(8)), to: stack.path[1])
+    try #require(stack.path.count == 3)
+    return stack
+}
+
+/// Every screen the way back lets go hears `.dropped` last, top down, each before it goes and before the screen now
+/// on top hears `.uncovered`, so that it closes what it has open; the screen that stays hears none. What a dropped
+/// screen answers reaches nobody: no opener hears it, the task under a dropped task and the list under it included,
+/// and the call returns none of it (ADR-0009, amendment of 2026-11-10).
+@Test func wentBackHandsEveryScreenItDropsTheLastNoticeTopDownBeforeUncovering() throws {
+    let journal = Journal()
+    var stack = try threeHigh(journal)
+    let path = stack.path
+    var before = journal.entries.count
+    #expect(stack.wentBack(to: [path[0]]) == nil, "nothing a dropped task answered came out of the call")
+    #expect(stack.path == [path[0]])
+    #expect(journal.entries(after: before) == [.task(8, .dropped), .task(7, .dropped), .list(1, .uncovered)])
+    before = journal.entries.count
+    #expect(stack.wentBack(to: []) == .heard(.uncovered), "the base's answer, and not the list's to being dropped")
+    #expect(journal.entries(after: before) == [.list(1, .dropped), .base(.uncovered)])
+}
+
+/// An opener that empties its destination lets go of everything over it, top down, each screen hearing `.dropped`
+/// before it goes: a list whose task asked to be closed, the task that asked among what goes, and the base that a
+/// link naming no list reaches. What a dropped screen answers reaches neither its opener nor the owner.
+@Test func anOpenerEmptyingItsDestinationHandsEveryScreenItLetsGoTheLastNotice() throws {
+    let journal = Journal()
+    var stack = try threeHigh(journal)
+    let path = stack.path
+    var before = journal.entries.count
+    #expect(stack.send(.task(.closeButtonTapped), to: path[1]) == nil)
+    #expect(stack.path == [path[0]])
+    let closed: [Journal.Entry] = [
+        .task(7, .closeButtonTapped), .list(1, .destinationAnswered(.closeRequested)), .task(8, .dropped),
+        .task(7, .dropped),
+    ]
+    #expect(journal.entries(after: before) == closed)
+    _ = stack.send(.list(.rowTapped(9)), to: path[0])
+    try #require(stack.path.count == 2)
+    before = journal.entries.count
+    let nothing = StubBase.Route(list: nil)
+    #expect(stack.send(.route(nothing)) == .heard(.route(nothing)), "the base's answer to the link alone")
+    #expect(stack.path.isEmpty)
+    #expect(journal.entries(after: before) == [.base(.route(nothing)), .task(9, .dropped), .list(1, .dropped)])
+}
+
+/// An opener that declares another screen over itself lets go of what stood there once the new screen is made, top
+/// down, each hearing `.dropped` before it goes, and the new screen hears `.created` after them: a list declaring
+/// another task, and the base another list, which replaces the list and the task over it. What the dropped screens
+/// answer reaches nobody, and the call returns the answer the new screen drew.
+@Test func anOpenerDeclaringAnotherScreenHandsWhatItReplacesTheLastNoticeOnceTheNewOneIsMade() throws {
+    let journal = Journal()
+    var stack = stubStack(on: link(list: 1, task: 7), journal: journal)
+    _ = stack.send(.created)
+    let path = stack.path
+    try #require(path.count == 2)
+    var before = journal.entries.count
+    #expect(stack.send(.list(.rowTapped(8)), to: path[0]) == .heard(.destinationAnswered(.passedOn(.opened(8)))))
+    let replaced: [Journal.Entry] = [
+        .list(1, .rowTapped(8)), .made(.task(8)), .task(7, .dropped), .task(8, .created),
+        .list(1, .destinationAnswered(.opened(8))), .base(.destinationAnswered(.passedOn(.opened(8)))),
+    ]
+    #expect(journal.entries(after: before) == replaced)
+    before = journal.entries.count
+    #expect(stack.send(.action(.viewClicked(2))) == .heard(.action(.viewClicked(2))))
+    let other: [Journal.Entry] = [
+        .base(.action(.viewClicked(2))), .made(.list(2)), .task(8, .dropped), .list(1, .dropped),
+        .list(2, .created), .base(.destinationAnswered(.opened(2))),
+    ]
+    #expect(journal.entries(after: before) == other)
+}
+
+/// A screen that cannot be made lets nothing go, so nobody hears `.dropped`; and a screen the walk keeps by its head
+/// hears none, while the screen its emptied destination lets go over it does.
+@Test func aScreenThatCannotBeMadeOrIsKeptHearsNoDrop() throws {
+    let journal = Journal()
+    var stack = stubStack(on: link(list: 1, task: 7), journal: journal)
+    _ = stack.send(.created)
+    let path = stack.path
+    try #require(path.count == 2)
+    var before = journal.entries.count
+    _ = stack.send(.action(.viewClicked(99)))
+    #expect(stack.path == path)
+    let open = StubList.Route(head: 1, task: StubTask.Route(head: 7, subtask: nil))
+    let refused: [Journal.Entry] = [
+        .base(.action(.viewClicked(99))), .base(.notOpened(Refusal(head: .list(99)), stillOpen: open)),
+    ]
+    #expect(journal.entries(after: before) == refused)
+    before = journal.entries.count
+    _ = stack.send(.action(.viewClicked(1)))
+    #expect(stack.path == [path[0]])
+    let kept: [Journal.Entry] = [
+        .base(.action(.viewClicked(1))), .list(1, .declared(StubList.Route(head: 1, task: nil))), .task(7, .dropped),
+    ]
+    #expect(journal.entries(after: before) == kept)
+}
+
+/// A call that hands a change the store committed lets screens go with no `.dropped`, since a screen closing what it
+/// has open writes and no module writes in answer to a change (ADR-0009, amendment of 2026-11-10); the owner's enum
+/// says which of its events are changes, the base's and an element's. A task whose subject a change took asks to be
+/// closed and goes with the task over it, the base declaring another list in a change replaces the list, and the
+/// base emptying its destination in one lets go of the rest: nobody hears a drop.
+@Test func aDropInACallThatHandsAChangeHandsNothing() throws {
+    let journal = Journal()
+    var stack = try threeHigh(journal)
+    let path = stack.path
+    #expect(stack.send(.task(.changed), to: path[1]) == nil)
+    #expect(stack.path == [path[0]])
+    _ = stack.send(.changed(link(list: 2).list))
+    let replaced = stack.path
+    #expect(replaced.count == 1 && replaced != [path[0]], "list 2 replaced list 1")
+    _ = stack.send(.changed(nil))
+    #expect(stack.path.isEmpty)
+    #expect(journal.drops.isEmpty)
 }
