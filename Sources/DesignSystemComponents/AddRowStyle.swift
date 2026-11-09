@@ -27,8 +27,8 @@ public struct AddRowStyle: Equatable, Sendable {
     public let leadingMargin: Double
     public let trailingMargin: Double
 
-    /// The tint over the row while the pointer is over it, in its corners, and nil where there is no pointer to be,
-    /// the phone's.
+    /// The tint over the row while the pointer is over it, and nil where there is no pointer to be, the phone's, and
+    /// for "+ Add list", which the Mac's canvas does not draw.
     public let hover: HoverStyle?
 
     public init(

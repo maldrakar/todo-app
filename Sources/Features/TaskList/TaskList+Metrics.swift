@@ -301,7 +301,7 @@ extension TaskList {
                             bodyLeading: 44, bodyTrailing: 12, bodyBottom: 12, subtasksToPills: 10, pillSpacing: 6,
                             shadow: .resting, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
                             titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color),
-                            leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3
+                            leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3, expandHover: nil
                         )
                     },
                     check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
@@ -430,7 +430,7 @@ extension TaskList {
                     bodyLeading: 46, bodyTrailing: 14, bodyBottom: 14, subtasksToPills: 10, pillSpacing: 6,
                     shadow: .raised, background: .surface, entrance: cardEntrance, subtasksOutdent: 12,
                     titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: phoneSubtaskCheck(color),
-                    leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3
+                    leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3, expandHover: nil
                 )
             },
             check: phoneCheck, subtaskCheck: phoneSubtaskCheck, subtask: phoneSubtask, titleHeight: 44,
@@ -504,11 +504,11 @@ extension TaskList {
         /// across set 2 left of centre, "…" 22.
         private static let phoneGlass = Glass(
             back: GlassControlStyle(
-                iconOffset: -2, diameter: 44, height: 44, glass: phoneGlassUnder
+                iconOffset: -2, diameter: 44, height: 44, glass: phoneGlassUnder, hover: nil
             ),
             backGlyphSize: 24, backGlyphWeight: .regular,
             more: GlassControlStyle(
-                iconOffset: 0, diameter: 44, height: 44, glass: phoneGlassUnder
+                iconOffset: 0, diameter: 44, height: 44, glass: phoneGlassUnder, hover: nil
             ),
             moreGlyphSize: 22, add: nil
         )
@@ -565,7 +565,7 @@ extension TaskList {
             chip: { color, isLit in
                 .init(
                     height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,
-                    background: isLit ? color.check.fill : .fill, animation: .chipToggles
+                    background: isLit ? color.check.fill : .fill, animation: .chipToggles, hover: nil
                 )
             },
             hashSize: 13

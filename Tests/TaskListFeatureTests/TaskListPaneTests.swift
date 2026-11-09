@@ -25,9 +25,12 @@ private let tagCapsule = MetaItemStyle.Capsule(
     background: .fill, height: 20, cornerRadius: 10, leadingPadding: 8, trailingPadding: 8
 )
 
-/// The pane's tint under a control the pointer is over: the canvas's `--hover` over 0.12 s (`Mac.dc.html`, `.mc-tap`
-/// and `.mc-trow`; the controller's ruling R209).
-private let hoverTint = HoverStyle(color: .hover, animation: .hoverTints)
+/// The pane's tint under a control the pointer is over, within corners of the radius given: the canvas's `--hover`
+/// over 0.12 s (`Mac.dc.html`, `.mc-tap`, `.mc-trow`, `.mc-ib`, `.mc-gi` and `.tchip`; the controller's rulings R209
+/// and R213).
+private func hoverTint(_ cornerRadius: Double) -> HoverStyle {
+    HoverStyle(color: .hover, cornerRadius: cornerRadius, animation: .hoverTints)
+}
 
 /// A list "Projects" with a list inside it, "House", a task in both with a tag, notes, a subtask and a deadline, and a
 /// task done today, on a wide window.
@@ -67,7 +70,7 @@ private func taskRowStyle(
         titleToMeta: 12, metaSpacing: 8, metaLineSpacing: 0, verticalPadding: 9, titleLeading: 4, titleTrailing: 0,
         leading: 4, trailing: 10, minimumHeight: 36, cornerRadius: 9, strike: isOpen ? nil : .ink3, lift: lift,
         fresh: fresh ? .fresh : nil, landingScale: nil, landingAnimation: .fresh, titleAnimation: .titleFades,
-        leaving: taskLeaving, ground: .paper, metaTrailing: true, hover: hoverTint
+        leaving: taskLeaving, ground: .paper, metaTrailing: true, hover: hoverTint(9)
     )
 }
 
@@ -99,7 +102,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let chip = try #require(bar.chips.first)
     #expect(chip.style == TagChipStyle(
         height: 26, cornerRadius: 13, leadingPadding: 8, trailingPadding: 10, spacing: 5, hitHeight: 32,
-        background: .fill, animation: .chipToggles
+        background: .fill, animation: .chipToggles, hover: hoverTint(13)
     ))
     #expect(chip.icon.style.size == 12)
 
@@ -108,13 +111,14 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(header.style == BlockHeaderStyle(
         titleToSubtitle: 8, rule: rule, height: 34, topMargin: 14, trailingMargin: 0, bottomMargin: 2,
         leadingMargin: 4, topPadding: 9, horizontalPadding: 6, bottomPadding: 0, cornerRadius: 7, foldHitSide: 30,
-        hover: hoverTint
+        hover: hoverTint(7)
     ))
     #expect(header.fold?.icon.style.size == 15)
     let addTask = try #require(house.addTask)
     #expect(addTask.style == AddRowStyle(
         iconCellWidth: 32, spacing: 0, height: 32, width: nil, cornerRadius: 8, topPadding: 0, leadingPadding: 4,
-        trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: hoverTint
+        trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
+        hover: hoverTint(8)
     ))
     #expect(addTask.icon.style.size == 15)
     #expect(house.indicator == DropIndicatorStyle(
@@ -156,7 +160,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
         rowsEntrance: EntranceStyle(
             opacity: 0, scale: 0.94, offset: -6, anchorX: 0.12, anchorY: 0, animation: .popover
         ),
-        bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: hoverTint
+        bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: hoverTint(15)
     ))
     #expect(done.icon.style.size == 16)
     #expect(done.chevron.icon.style.size == 13)
@@ -214,7 +218,8 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect([check.diameter, check.ringWidth, check.markSize, check.hitWidth, check.hitHeight] == [15, 1.5, 10, 30, 30])
     #expect(card.addSubtask.style == AddRowStyle(
         iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0, leadingPadding: 0,
-        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8, trailingMargin: 0, hover: hoverTint
+        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8, trailingMargin: 0,
+        hover: hoverTint(7)
     ))
     #expect(card.addSubtask.icon.style.size == 14)
     let pill = try #require(card.pills.first)
@@ -249,7 +254,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(style.dropRingWidth == 2)
     #expect(column.header.style == BlockHeaderStyle(
         titleToSubtitle: 8, rule: nil, height: 36, topMargin: 0, trailingMargin: 0, bottomMargin: 0, leadingMargin: 0,
-        topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 7, foldHitSide: nil, hover: hoverTint
+        topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 0, foldHitSide: nil, hover: hoverTint(7)
     ))
     let block = try scene.block(.list(scene.house))
     guard case .task(_, let card)? = block.rows.first else {
@@ -271,7 +276,8 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let addTask = try #require(block.addTask)
     #expect(addTask.style == AddRowStyle(
         iconCellWidth: 15, spacing: 6, height: 32, width: nil, cornerRadius: 9, topPadding: 0, leadingPadding: 10,
-        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: hoverTint
+        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
+        hover: hoverTint(9)
     ))
     #expect(addTask.icon.style.size == 15)
 
@@ -314,4 +320,70 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let phoneRow = try line(phone.model)
     #expect(phoneRow.icons == [.flag, nil, .list, .note])
     #expect(Array(phoneRow.words.dropFirst()) == ["#home", "0/1", nil])
+}
+
+/// Every control the Mac canvas tints under the pointer has the pane's tint, in its own corners, and none of the
+/// phone's has one: a row, a block's header and its chevron, "+ Add task", "Add subtask", the Done strip, a tag's chip,
+/// the capsule's "+" and "…" and Open full screen in the list; a column's header and its "+ Add task" on the board, a
+/// column's card casting its shadow instead. The back circle and "+ Add list", which the canvas does not tint, have
+/// none (`Mac.dc.html`, `.mc-tap`, `.mc-trow`, `.mc-ib`, `.mc-gi`, `.tchip`; the controller's rulings R209 and R213).
+@Test func everyControlTheCanvasTintsHasThePanesTintAndNoneThePhones() throws {
+    let scene = try Scene()
+    /// The tints a list draws, its first row's read before that row opens into the card whose own are read after.
+    func tints(_ module: TaskList) throws -> [String: HoverStyle?] {
+        let firstRow = blocks(of: module.model).flatMap(\.rows).compactMap { row -> TaskRowModel<Action>? in
+            if case .task(_, let task) = row { task } else { nil }
+        }.first
+        let row = try #require(firstRow)
+        module.tap(.rowTapped(scene.milk))
+        defer { module.tap(.backgroundTapped) }
+        let model = module.model
+        let house = try #require(blocks(of: model).first { $0.id == .list(scene.house) })
+        let card = try #require(openCard(in: model)).card
+        return [
+            "row": row.style.hover, "header": house.header?.style.hover, "add task": house.addTask?.style.hover,
+            "add subtask": card.addSubtask.style.hover, "expand": card.style.expandHover,
+            "strip": model.done?.style.hover, "chip": model.tagBar?.chips.first?.style.hover,
+            "more": model.more.style.hover, "back": model.back.label.style.hover,
+            "add list": model.addList?.style.hover,
+        ]
+    }
+    func tints(onTheBoardOf model: TaskList.Model) throws -> [String: HoverStyle?] {
+        let house = try #require(blocks(of: model).first { $0.id == .list(scene.house) })
+        let column = try #require(house.column)
+        let card = try #require(house.rows.compactMap { row -> TaskRowModel<Action>? in
+            if case .task(_, let task) = row { task } else { nil }
+        }.first)
+        return [
+            "column header": column.header.style.hover, "column add task": house.addTask?.style.hover,
+            "card": card.style.hover,
+        ]
+    }
+
+    var pane = try tints(scene.module)
+    #expect(scene.model.glassAddTask?.label.style.hover == hoverTint(14))
+    #expect(pane.removeValue(forKey: "row") == hoverTint(9))
+    #expect(pane.removeValue(forKey: "header") == hoverTint(7))
+    #expect(pane.removeValue(forKey: "add task") == hoverTint(8))
+    #expect(pane.removeValue(forKey: "add subtask") == hoverTint(7))
+    #expect(pane.removeValue(forKey: "expand") == hoverTint(7))
+    #expect(pane.removeValue(forKey: "strip") == hoverTint(15))
+    #expect(pane.removeValue(forKey: "chip") == hoverTint(13))
+    #expect(pane.removeValue(forKey: "more") == hoverTint(14))
+    #expect(pane.compactMapValues { $0 }.isEmpty, "the back circle and \"+ Add list\" are not tinted: \(pane)")
+    scene.module.tap(.showAsChosen(.columns))
+    let board = try tints(onTheBoardOf: scene.model)
+    #expect(board["column header"] == hoverTint(7))
+    #expect(board["column add task"] == hoverTint(9))
+    #expect(board["card"] == .some(nil), "a column's card casts its shadow instead")
+    guard case .columns(let columns) = scene.model.layout else {
+        Issue.record("the list stands as columns")
+        return
+    }
+    #expect(columns.addList?.style.hover == nil, "the board's \"+ Add list\" is not tinted")
+    scene.module.tap(.showAsChosen(.list))
+
+    let phone = try list(scene.projects, in: scene.store)
+    #expect(try tints(phone).compactMapValues { $0 }.isEmpty, "the phone has no pointer")
+    #expect(phone.model.addTask != nil && phone.model.glassAddTask == nil)
 }

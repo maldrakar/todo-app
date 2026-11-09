@@ -34,14 +34,14 @@ extension TaskList.Metrics {
             header: .init(
                 titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 34, topMargin: 14,
                 trailingMargin: 0, bottomMargin: 2, leadingMargin: 4, topPadding: 9, horizontalPadding: 6,
-                bottomPadding: 0, cornerRadius: 7, foldHitSide: 30, hover: paneHover
+                bottomPadding: 0, cornerRadius: 7, foldHitSide: 30, hover: paneHover(7)
             ),
             chevronSize: 15, row: paneRow, card: paneCard,
             addTask: TaskList.Metrics.AddRow(
                 style: .init(
                     iconCellWidth: 32, spacing: 0, height: 32, width: nil, cornerRadius: 8, topPadding: 0,
                     leadingPadding: 4, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-                    trailingMargin: 0, hover: paneHover
+                    trailingMargin: 0, hover: paneHover(8)
                 ),
                 iconSize: 15, font: .addRow
             ),
@@ -52,7 +52,7 @@ extension TaskList.Metrics {
                     rowsEntrance: EntranceStyle(
                         opacity: 0, scale: 0.94, offset: -6, anchorX: 0.12, anchorY: 0, animation: .popover
                     ),
-                    bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: paneHover
+                    bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: paneHover(15)
                 ),
                 iconSize: 16, chevronSize: 13
             )
@@ -98,8 +98,8 @@ extension TaskList.Metrics {
             },
             header: .init(
                 titleToSubtitle: 8, rule: nil, height: 36, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
-                leadingMargin: 0, topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 7,
-                foldHitSide: nil, hover: paneHover
+                leadingMargin: 0, topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 0,
+                foldHitSide: nil, hover: paneHover(7)
             ),
             card: TaskList.Metrics.Row(
                 style: { isOpen, lifts, isFresh in
@@ -123,7 +123,7 @@ extension TaskList.Metrics {
                 style: .init(
                     iconCellWidth: 15, spacing: 6, height: 32, width: nil, cornerRadius: 9, topPadding: 0,
                     leadingPadding: 10, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-                    trailingMargin: 0, hover: paneHover
+                    trailingMargin: 0, hover: paneHover(9)
                 ),
                 iconSize: 15, font: .addRow
             )
@@ -162,17 +162,22 @@ extension TaskList.Metrics {
     /// under the bar's own controls, and clear 8 under it, where the canvas's ends (R211).
     private static let paneFade = ListScreenStyle.Fade(color: .paper, height: 8, solidDepth: 0)
 
-    /// The pane's tint under a control the pointer is over: the canvas's `--hover`, the ink at 5 % in the light and
-    /// white at 5 % in the dark, over 0.12 s (`Mac.dc.html`, `.mc-tap` and `.mc-trow`; the controller's ruling R209).
-    private static let paneHover = HoverStyle(color: .hover, animation: .hoverTints)
+    /// The pane's tint under a control the pointer is over, within the control's corners: the canvas's `--hover`, the
+    /// ink at 5 % in the light and white at 5 % in the dark, over 0.12 s (`Mac.dc.html`, `.mc-tap`, `.mc-trow`,
+    /// `.mc-ib`, `.mc-gi` and `.tchip`; the controller's rulings R209 and R213). The chip's tint comes at once in the
+    /// canvas, whose chip moves only its colours; it comes on the same motion here, one hover for every control.
+    private static func paneHover(_ cornerRadius: Double) -> HoverStyle {
+        HoverStyle(color: .hover, cornerRadius: cornerRadius, animation: .hoverTints)
+    }
 
     /// The pane's glass buttons (Task 9's table, Pane): the back button a 34 circle on the glass with its chevron 19
     /// set 1 left of centre and stroked a little heavier than the phone's, and in the capsule the "+" 17, stroked
     /// heavier too, and the "…" 18, each in a 30 by 28 item. The back button stands on glass of its own; the items
-    /// stand on the capsule's (`paneStyle`) and have none.
+    /// stand on the capsule's (`paneStyle`) and have none, and are tinted under the pointer, where the back is not
+    /// (`Mac.dc.html`, `.mc-gi` and the back's `.mc-press`).
     private static let paneGlass = TaskList.Metrics.Glass(
         back: GlassControlStyle(
-            iconOffset: -1, diameter: 34, height: 34, glass: paneGlassUnder
+            iconOffset: -1, diameter: 34, height: 34, glass: paneGlassUnder, hover: nil
         ),
         backGlyphSize: 19, backGlyphWeight: .medium,
         more: paneCapsuleItem,
@@ -180,7 +185,11 @@ extension TaskList.Metrics {
         add: TaskList.Metrics.GlassAdd(style: paneCapsuleItem, glyphSize: 17, glyphWeight: .medium)
     )
 
-    private static let paneCapsuleItem = GlassControlStyle(iconOffset: 0, diameter: 30, height: 28, glass: nil)
+    /// An item of the capsule: 30 by 28 on the capsule's glass, tinted under the pointer as a capsule (`Mac.dc.html`,
+    /// `.mc-gi`).
+    private static let paneCapsuleItem = GlassControlStyle(
+        iconOffset: 0, diameter: 30, height: 28, glass: nil, hover: paneHover(14)
+    )
 
     /// The glass of the pane: the canvas's `.glass`, its surface edged with a 0.5 hairline and casting the raised
     /// shadow (`Mac.dc.html`, the back button's and the capsule's), the back button's and the capsule's.
@@ -204,7 +213,7 @@ extension TaskList.Metrics {
     /// The pane's tag bar (Task 9's table, Tag bar): 10 under the header and 40 in, so that its chips stand under the
     /// title, 12 past the content's end, its chips 6 apart in a row padded 12 with 12 more after the last, fading in
     /// over 12 and out over 24; a chip 26 high, a capsule, padded 8 and 10, its hash 12 and 5 before its title, in a 32
-    /// tap area.
+    /// tap area, tinted under the pointer (`Mac.dc.html`, `.tchip:hover`).
     private static let paneTagBar = TaskList.Metrics.TagBar(
         style: .init(
             topMargin: 10, spacing: 6, padding: 12, endRoom: 12, fadeIn: 12, fadeOut: 24, leadingMargin: 40,
@@ -213,7 +222,7 @@ extension TaskList.Metrics {
         chip: { color, isLit in
             .init(
                 height: 26, cornerRadius: 13, leadingPadding: 8, trailingPadding: 10, spacing: 5, hitHeight: 32,
-                background: isLit ? color.check.fill : .fill, animation: .chipToggles
+                background: isLit ? color.check.fill : .fill, animation: .chipToggles, hover: paneHover(13)
             )
         },
         hashSize: 12
@@ -269,7 +278,7 @@ extension TaskList.Metrics {
                 strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 11) : nil,
                 fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .fresh,
                 titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper, metaTrailing: true,
-                hover: paneHover
+                hover: paneHover(9)
             )
         },
         check: { color in paneRowCheck(color, hitWidth: 32, hitHeight: 36) },
@@ -300,12 +309,12 @@ extension TaskList.Metrics {
     )
 
     /// The open card of the pane, in the list or in a column (Task 9's table, Card and Board): its check 18 across in a
-    /// hit of the width given and 40 high, its title field 40 high and padded 2, Open full screen 16 in a 30 hit, the
-    /// notes 20 high, the subtasks 4 under them and 8 outside the body's leading edge, one 30 high with its check 15
-    /// across and its field 30 high, "Add subtask" 30 high, rounded 7, its plus 14 in a 30 cell, 10 short of its end,
-    /// the pills 6 apart and 8 under the subtasks, each 26 high, a capsule, padded 8 and 10, its glyph 5 before its
-    /// text, the sun 14, the flag 13, the hash 12. The card comes in from .3 opaque, .98 of its size and 3 above where
-    /// it rests (`Mac.dc.html`, `xIn`), over the card's motion.
+    /// hit of the width given and 40 high, its title field 40 high and padded 2, Open full screen 16 in a 30 hit tinted
+    /// under the pointer within corners of 7 (`.mc-ib`), the notes 20 high, the subtasks 4 under them and 8 outside the
+    /// body's leading edge, one 30 high with its check 15 across and its field 30 high, "Add subtask" 30 high, rounded
+    /// 7, its plus 14 in a 30 cell, 10 short of its end, the pills 6 apart and 8 under the subtasks, each 26 high, a
+    /// capsule, padded 8 and 10, its glyph 5 before its text, the sun 14, the flag 13, the hash 12. The card comes in
+    /// from .3 opaque, .98 of its size and 3 above where it rests (`Mac.dc.html`, `xIn`), over the card's motion.
     private static func paneOpenCard(
         cornerRadius: Double, margins: (top: Double, horizontal: Double, bottom: Double), shadow: DesignSystem.Shadow,
         bodyLeading: Double, bodyTrailing: Double, bodyBottom: Double, checkHitWidth: Double
@@ -322,7 +331,7 @@ extension TaskList.Metrics {
                     ),
                     subtasksOutdent: 8, titleToNotes: 2, notesToSubtasks: 4,
                     subtaskDraftCircle: paneSubtaskCheck(color),
-                    leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3
+                    leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3, expandHover: paneHover(7)
                 )
             },
             check: { color in paneRowCheck(color, hitWidth: checkHitWidth, hitHeight: 40) },
@@ -335,7 +344,7 @@ extension TaskList.Metrics {
                 style: .init(
                     iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0,
                     leadingPadding: 0, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8,
-                    trailingMargin: 0, hover: paneHover
+                    trailingMargin: 0, hover: paneHover(7)
                 ),
                 iconSize: 14, font: .notes
             ),

@@ -34,15 +34,21 @@ public struct GlassControlStyle: Equatable, Sendable {
     /// The glass under the button, and nil for one inside a capsule, which has the glass of its own.
     public let glass: Glass?
 
+    /// The tint over the button while the pointer is over it, and nil where there is none: the phone's, and the pane's
+    /// back, which the canvas does not tint.
+    public let hover: HoverStyle?
+
     public init(
         iconOffset: Double,
         diameter: Double,
         height: Double,
-        glass: Glass?
+        glass: Glass?,
+        hover: HoverStyle?
     ) {
         self.iconOffset = iconOffset
         self.diameter = diameter
         self.height = height
         self.glass = glass
+        self.hover = hover
     }
 }

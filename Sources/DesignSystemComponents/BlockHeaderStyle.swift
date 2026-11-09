@@ -17,15 +17,14 @@ public struct BlockHeaderStyle: Equatable, Sendable {
     public let topPadding: Double
     public let horizontalPadding: Double
     public let bottomPadding: Double
-
-    /// The radius of the corners of the tint over the title while the pointer is over it.
     public let cornerRadius: Double
 
     /// The side of the square cell the chevron that folds the block is centred in, and nil for a header with none, as a
     /// column's is.
     public let foldHitSide: Double?
 
-    /// The tint over the title while the pointer is over it, and nil where there is no pointer to be, the phone's.
+    /// The tint over the title, and over the chevron's cell, while the pointer is over either, and nil where there is
+    /// no pointer to be, the phone's.
     public let hover: HoverStyle?
 
     public init(

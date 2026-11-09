@@ -556,7 +556,8 @@ private enum WasmSizeProbe {
             + " in \(list.header.style.horizontalPadding), then \(list.header.style.bottomMargin)"
         let chips = list.tagBar.map {
             "\($0.chips.count) chips, \($0.chips.filter(\.isLit).count) lit, \($0.style.topMargin) under, "
-                + "\($0.style.endRoom) after, lit on \($0.chips.first?.style.animation.duration ?? 0)"
+                + "\($0.style.endRoom) after, lit on \($0.chips.first?.style.animation.duration ?? 0), "
+                + "tinting \($0.chips.first?.style.hover?.cornerRadius ?? 0)"
         } ?? "no tag bar"
         let shape: String
         let rows = switch list.layout {
@@ -610,7 +611,8 @@ private enum WasmSizeProbe {
         let fade = bar.fade.map { "fade \($0.color.light.red) \($0.height)/\($0.solidDepth)" } ?? "no fade"
         let glass = "\(list.back.label.accessibilityLabel) \(list.back.label.style.diameter) at "
             + "\(list.back.label.style.iconOffset), "
-            + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "
+            + "\(list.more.accessibilityLabel) \(list.more.icon.style.size) "
+            + "tinting \(list.more.style.hover?.cornerRadius ?? 0), \(list.showAs.heading ?? "no heading") "
             + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
             + "on \(bar.background.light.red), content "
             + "\(bar.contentHorizontalPadding)/\(bar.contentMaxWidth ?? 0), "
@@ -632,7 +634,8 @@ private enum WasmSizeProbe {
             let subtasks = card.subtasks.map { "\($0.check.accessibilityLabel) \($0.title.text)" }
             let pills = card.pills.map(\.text.text)
             let circle = card.style.subtaskDraftCircle
-            return "card \(card.title.text) (\(card.notes.text), \(card.notes.style.placeholder.light.opacity)), \(card.style.titleToNotes) then \(card.style.notesToSubtasks) under, in \(card.style.entrance.opacity)/\(card.style.entrance.scale)/\(card.style.entrance.offset) about \(card.style.entrance.anchorX),\(card.style.entrance.anchorY) on \(card.style.entrance.animation.duration), leaves by \(card.style.leaving.offset), struck \(card.style.titleStrike?.light.red ?? 0), sub on \(card.subtasks.first?.style.titleAnimation.duration ?? 0), \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel)"
+            return "card \(card.title.text) (\(card.notes.text), \(card.notes.style.placeholder.light.opacity)), \(card.style.titleToNotes) then \(card.style.notesToSubtasks) under, in \(card.style.entrance.opacity)/\(card.style.entrance.scale)/\(card.style.entrance.offset) about \(card.style.entrance.anchorX),\(card.style.entrance.anchorY) on \(card.style.entrance.animation.duration), leaves by \(card.style.leaving.offset), struck \(card.style.titleStrike?.light.red ?? 0), sub on \(card.subtasks.first?.style.titleAnimation.duration ?? 0), \(card.style.subtasksOutdent) out, \(circle.diameter) ring \(circle.ringWidth), \(subtasks.joined(separator: "/")), field \(card.subtaskField?.placeholder ?? "closed"), \(card.addSubtask.title.text), \(pills.joined(separator: "/")), \(card.expand.label.accessibilityLabel) "
+                + "tinting \(card.style.expandHover?.cornerRadius ?? 0)"
         }
         return "no card"
     }

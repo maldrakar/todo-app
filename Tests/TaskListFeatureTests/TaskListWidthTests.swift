@@ -61,8 +61,8 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
         divider: LineStyle(color: .line, width: 1, dash: []), dividerHeight: 16
     ), "the capsule's glass is its own")
     #expect(model.back.label.style == GlassControlStyle(
-        iconOffset: -1, diameter: 34, height: 34, glass: glass
-    ), "the back button stands alone, on its glass")
+        iconOffset: -1, diameter: 34, height: 34, glass: glass, hover: nil
+    ), "the back button stands alone, on its glass, and the canvas does not tint it")
     #expect(model.more.style.glass == nil, "the capsule's items draw none")
     #expect(model.back.label.icon.style == IconStyle(size: 19, weight: .medium, color: .ink))
     #expect(model.more.icon.style == IconStyle(size: 18, weight: .regular, color: .ink))
@@ -71,7 +71,10 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(model.glassAddTask == GlassButtonModel(
         label: GlassButtonLabelModel(
             icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .medium, color: .ink)),
-            style: GlassControlStyle(iconOffset: 0, diameter: 30, height: 28, glass: nil),
+            style: GlassControlStyle(
+                iconOffset: 0, diameter: 30, height: 28, glass: nil,
+                hover: HoverStyle(color: .hover, cornerRadius: 14, animation: .hoverTints)
+            ),
             accessibilityLabel: "New task"
         ),
         action: .addTaskButtonTapped

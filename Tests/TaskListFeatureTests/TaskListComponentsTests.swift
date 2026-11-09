@@ -179,7 +179,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             title: TextModel(text: "home", style: TextStyle(font: .pill, color: isLit ? Tile.amber.check.mark : .ink)),
             style: .init(
                 height: 30, cornerRadius: 15, leadingPadding: 10, trailingPadding: 12, spacing: 5, hitHeight: 44,
-                background: isLit ? Tile.amber.check.fill : .fill, animation: .chipToggles
+                background: isLit ? Tile.amber.check.fill : .fill, animation: .chipToggles, hover: nil
             ),
             isLit: isLit, action: .tagChipTapped(home)
         )
@@ -279,7 +279,10 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: .ink)),
             style: GlassControlStyle(
                 iconOffset: offset, diameter: 44, height: 44,
-                glass: .init(surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised)
+                glass: .init(
+                    surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+                ),
+                hover: nil
             ),
             accessibilityLabel: label
         )
@@ -738,7 +741,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                     opacity: 0.3, scale: 0.97, offset: -4, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
                 ),
                 subtasksOutdent: 12, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: subtaskCircle,
-                leaving: taskLeaving, titleStrike: nil
+                leaving: taskLeaving, titleStrike: nil, expandHover: nil
             ),
             backgroundTapped: .backgroundTapped
         )
