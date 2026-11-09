@@ -108,7 +108,7 @@ private struct ListPaneBar: ViewModifier {
         if let capsule = model.style.capsule {
             self.capsule(capsule)
         } else {
-            GlassMenu(model.more, menu: model.showAs, send: send)
+            GlassMenu(model.showAs, send: send)
         }
     }
 
@@ -123,7 +123,7 @@ private struct ListPaneBar: ViewModifier {
                 Rule(style.divider, along: .vertical)
                     .frame(height: style.dividerHeight)
             }
-            GlassMenu(model.more, menu: model.showAs, send: send)
+            GlassMenu(model.showAs, send: send)
         }
         .padding(.horizontal, style.horizontalPadding)
         .frame(height: style.height)

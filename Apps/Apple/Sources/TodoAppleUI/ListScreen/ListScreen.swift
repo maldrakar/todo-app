@@ -50,7 +50,7 @@ private struct GlassRow: ViewModifier {
             HStack(spacing: 0) {
                 GlassButton(model.back, send: send)
                 Spacer(minLength: 0)
-                GlassMenu(model.more, menu: model.showAs, send: send)
+                GlassMenu(model.showAs, send: send)
             }
             .padding(.horizontal, model.style.edgeInset)
         }

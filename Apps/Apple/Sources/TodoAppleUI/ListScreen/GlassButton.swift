@@ -21,20 +21,19 @@ struct GlassButton<Action: Equatable & Sendable>: View {
     }
 }
 
-/// A glass button's face as the label of the menu its screen holds, "…" with Show as (list screen spec, section 5):
-/// the system's menu, its items in the model's order with their checks and their headings (`MenuItems`). Left out on
-/// the watch, where `Menu` is unavailable, and whose build is a compile check in this epic.
+/// A glass button that puts a menu up as its model describes it (`GlassMenuButtonModel`), "…" with Show as (list
+/// screen spec, section 5): its glass face as the label of the system's menu, the menu's items in the model's order
+/// with their checks and their headings (`MenuItems`). Left out on the watch, where `Menu` is unavailable, and whose
+/// build is a compile check in this epic.
 ///
 /// `GlassMenu` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
 struct GlassMenu<Action: Equatable & Sendable>: View {
-    private let label: GlassButtonLabelModel
-    private let menu: MenuModel<Action>
+    private let model: GlassMenuButtonModel<Action>
     private let send: (Action) -> Void
 
-    init(_ label: GlassButtonLabelModel, menu: MenuModel<Action>, send: @escaping (Action) -> Void) {
-        self.label = label
-        self.menu = menu
+    init(_ model: GlassMenuButtonModel<Action>, send: @escaping (Action) -> Void) {
+        self.model = model
         self.send = send
     }
 
@@ -42,7 +41,7 @@ struct GlassMenu<Action: Equatable & Sendable>: View {
         #if os(watchOS)
         EmptyView()
         #else
-        Menu { MenuItems(menu, send: send) } label: { GlassButtonFace(label) }
+        Menu { MenuItems(model.menu, send: send) } label: { GlassButtonFace(model.label) }
             #if os(macOS)
             // Its label alone, as a plain button draws it: the Mac's default style puts it in a pull-down's bezel.
             .menuStyle(.button)
@@ -50,7 +49,7 @@ struct GlassMenu<Action: Equatable & Sendable>: View {
             .menuIndicator(.hidden)
             #endif
             .menuOrder(.fixed)
-            .accessibilityLabel(label.accessibilityLabel)
+            .accessibilityLabel(model.label.accessibilityLabel)
         #endif
     }
 }
