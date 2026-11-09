@@ -85,10 +85,11 @@ extension AppModule {
     #expect(try store.view(made.id)?.title == "Errands")
 }
 
-/// One pop of several screens, the long-press menu's on iPhone, lets a list go with the screen over it, and the list
-/// closes what it has open as it goes: a list whose card stayed open under the list inside it that its block's title
-/// pushed writes the card's title, and a list whose card's Open full screen pushed the task screen deletes its new
-/// task with nothing in it.
+/// One pop of several screens lets a list go with the screen over it, and the list closes what it has open as it goes:
+/// a list whose card stayed open under the list inside it that its block's title pushed writes the card's title, and
+/// a list whose card's Open full screen pushed the task screen deletes its new task with nothing in it. On iPhone such
+/// a pop is the long-press menu of a task screen's back, since a list screen hides its bar: the pop of the two lists
+/// is what that menu does with a task screen on top of them, which the stack lets go first.
 @Test func aListLetGoWithTheScreenOverItClosesWhatItHasOpen() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
@@ -116,11 +117,11 @@ extension AppModule {
     #expect(try store.task(new) == nil)
 }
 
-/// On the Mac the toolbar's back and its long-press menu are the stack's pop in the wide layout, over the column: a
-/// list over the column's list closes what it has open as it goes, by one pop its card's title and notes written,
-/// and by a pop of several its new task with nothing in it deleted from under the task screen. The column's list
-/// stays.
-@Test func theMacsToolbarBackOverAListClosesWhatTheListHasOpen() throws {
+/// In a wide window the way back is the stack's pop over the column: on the Mac the toolbar's back, which pops one
+/// screen, and on the iPad a task screen's back, which the system keeps, and its long-press menu, which pops several. A
+/// list over the column's list closes what it has open as it goes, by one pop its card's title and notes written, and
+/// by a pop of several its new task with nothing in it deleted from under the task screen. The column's list stays.
+@Test func theWayBackOverAListInAWideWindowClosesWhatTheListHasOpen() throws {
     let store = try makeStore()
     let projects = try store.createView(NewTaskView(title: "Projects", filter: .status([.open])))
     let house = try store.createView(NewTaskView(title: "House", parent: projects, filter: .status([.open])))

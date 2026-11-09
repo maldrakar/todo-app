@@ -323,13 +323,13 @@ public final class TaskList: Routable {
             state.problem = problem.sentence
             return nil
         case .dropped:
-            // The stack lets the list go, by the edge swipe or the Mac's toolbar back and its menu, or because its
-            // opener emptied its destination or declared another screen there, and nothing reaches it after this, a
-            // field's lost focus among it, so what is open closes by the rule of every close, as on the back button:
-            // what was typed is written and a new task with nothing put in it is not left behind (ADR-0009, amendment
-            // of 2026-11-10). A write the store refuses is not said: there is no screen left to say it on, where the
-            // back button keeps the list for its sentence. The stack hands what a dropped screen answers to nobody, so
-            // the list answers nothing.
+            // The stack lets the list go, by the edge swipe, the Mac's toolbar back, or a task screen's back over it
+            // and that back's long-press menu, or because its opener emptied its destination or declared another
+            // screen there, and nothing reaches it after this, a field's lost focus among it, so what is open closes by
+            // the rule of every close, as on the back button: what was typed is written and a new task with nothing
+            // put in it is not left behind (ADR-0009, amendment of 2026-11-10). A write the store refuses is not said:
+            // there is no screen left to say it on, where the back button keeps the list for its sentence. The stack
+            // hands what a dropped screen answers to nobody, so the list answers nothing.
             closeWhatIsOpen()
             return nil
         case .changed(let changes):

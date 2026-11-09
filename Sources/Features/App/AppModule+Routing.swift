@@ -191,9 +191,10 @@ extension AppModule {
             TaskViewList.Route(list: above?.list)
         }
 
-        /// A change the store committed is the one event of the sidebar's that is, so that a screen the walk after it
-        /// lets go writes nothing in answer to it (ADR-0009, amendment of 2026-11-10): a list the change deleted, or
-        /// one standing over it, loses what was typed in it and not yet written, which the owner accepted.
+        /// A change the store committed is the one event of the sidebar's that is. The sidebar keeps its destination on
+        /// a change, so the walk after it lets nothing go and this decides nothing today: the protocol asks for the
+        /// base's events too, so that a sidebar that learns to empty its destination on a change lets the list go
+        /// unheard, writing nothing in answer to it (ADR-0009, amendment of 2026-11-10).
         static func isChange(_ event: TaskViewList.Event) -> Bool {
             switch event {
             case .changed: true
@@ -202,7 +203,10 @@ extension AppModule {
             }
         }
 
-        /// A change the store committed is the one event of a screen's that is, as for the sidebar's.
+        /// A change the store committed is the one event of a screen's that is, so that a screen the walk after it lets
+        /// go writes nothing in answer to it (ADR-0009, amendment of 2026-11-10): a list a change deleted, or a group's
+        /// screen whose group a change took, asks to be closed and goes unheard, and it and every screen standing over
+        /// it lose what was typed in them and not yet written, which the owner accepted.
         static func isChange(_ event: Event) -> Bool {
             switch event {
             case .changed: true

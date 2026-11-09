@@ -2,8 +2,8 @@ import AppFeature
 import FeatureModule
 import TodoCore
 
-// The helpers the target's test files share: one shape for making a window's root and reading what stands in it
-// (`docs/style.md`, "One shape everywhere it fits").
+// The helpers the target's test files share: the Inbox's id, what iPhone's window offers, a view of one tag, and the
+// ids of the screens standing over the sidebar.
 
 let inbox = BuiltInTaskViews.inbox
 
