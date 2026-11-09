@@ -142,7 +142,8 @@ extension AppModule {
         /// A notice of the stack, in each module's own terms: `.declared` reaches a kept screen as its `.route`, and
         /// the rest as the events of the same names, a list hearing the answer of the task screen or of a list over it
         /// as its own `Route.Tail.Answer` and what still stands over it as its `Route.Tail`. The task screen declares
-        /// nothing, so nothing stands over it to answer it, be gone from over it or be refused it.
+        /// nothing, so nothing stands over it to answer it, be gone from over it or be refused it, and has no field of
+        /// its own, so being dropped closes nothing in it.
         func take(_ notice: StackNotice<Screen>) -> Output? {
             switch (self, notice) {
             case (.list(let list), .created): list.send(.created).map(Output.list)
@@ -154,13 +155,12 @@ extension AppModule {
             case (.list(let list), .uncovered): list.send(.uncovered).map(Output.list)
             case (.list(let list), .notOpened(let error, let stillOpen)):
                 list.send(.notOpened(error, stillOpen: stillOpen?.tail)).map(Output.list)
+            case (.list(let list), .dropped): list.send(.dropped).map(Output.list)
             case (.task(let task), .created): task.send(.created).map(Output.task)
             case (.task(let task), .declared(.task(let route))): task.send(.route(route)).map(Output.task)
             case (.list, .declared(.task)), (.task, .declared(.list)):
                 nil
-            case (.task, .destinationAnswered), (.task, .uncovered), (.task, .notOpened):
-                nil
-            case (.list, .dropped), (.task, .dropped):
+            case (.task, .destinationAnswered), (.task, .uncovered), (.task, .notOpened), (.task, .dropped):
                 nil
             }
         }
