@@ -4,7 +4,8 @@ import SwiftUI
 
 /// A row that adds as its model describes it (`AddRowModel`; `Phone.dc.html`, "+ Add task", "Add subtask" and "+ Add
 /// list"): its rule along its top and the room under it, where it has one; its glyph centred in its cell and its title
-/// after it, the whole of it the button; its dashed edge where it has one; and its margins.
+/// after it, the whole of it the button, tinted under the pointer where its style gives the tint (`Hovering`); its
+/// dashed edge where it has one; and its margins.
 struct AddRowView<Action: Equatable & Sendable>: View {
     private let model: AddRowModel<Action>
     private let send: (Action) -> Void
@@ -29,6 +30,9 @@ struct AddRowView<Action: Equatable & Sendable>: View {
                 .padding(.leading, model.style.leadingPadding)
                 .padding(.trailing, model.style.trailingPadding)
                 .frame(width: model.style.width.map { CGFloat($0) }, alignment: .leading)
+                .hoverTint(
+                    model.style.hover, in: RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
+                )
                 .contentShape(.rect(cornerRadius: model.style.cornerRadius, style: .circular))
             }
             .buttonStyle(.plain)

@@ -6,7 +6,7 @@ import TaskListFeature
 /// A block's or a column's header as its model describes it (`BlockHeaderModel`; `Phone.dc.html`, the group header and
 /// `.bcol-h`): its title and its subtitle on one baseline as the button that opens the block, or the field in their
 /// place while the list is being named; the chevron that folds it, where it has one; and its rule along its bottom,
-/// where it has one.
+/// where it has one. The title is tinted under the pointer where the style gives the tint (`Hovering`).
 struct BlockHeaderView: View {
     private let model: BlockHeaderModel<TaskList.UserAction>
     private let send: (TaskList.UserAction) -> Void
@@ -64,6 +64,9 @@ struct BlockHeaderView: View {
                 .padding(.horizontal, model.style.horizontalPadding)
                 .padding(.bottom, model.style.bottomPadding)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .hoverTint(
+                    model.style.hover, in: RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
+                )
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)

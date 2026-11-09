@@ -192,26 +192,18 @@ struct BlockRow: View {
         }
     }
 
-    /// What a card of a column stands on, casting its shadow, or the one its style gives while the pointer is over
-    /// it, which only the view can know (`Mac.dc.html`, `.card:hover`); and nothing for a row of the list.
+    /// What a card of a column stands on, casting its shadow, or the deeper one its style gives while the pointer is
+    /// over it (`Hovering`; `Mac.dc.html`, `.card:hover`); and nothing for a row of the list.
     private struct ColumnCardSurface: ViewModifier {
         let column: ColumnStyle?
 
-        @State private var isHovered = false
-
         func body(content: Content) -> some View {
             if let column {
-                let shadow = isHovered ? column.cardHoverShadow ?? column.cardShadow : column.cardShadow
-                content
-                    .background {
-                        RoundedRectangle(cornerRadius: column.cardCornerRadius, style: .circular)
-                            .fill(Color(column.cardBackground))
-                            .shadow(shadow)
-                    }
-                    #if !os(watchOS)
-                    // The watch has no pointer, nor the modifier.
-                    .onHover { isHovered = $0 }
-                    #endif
+                content.modifier(Hovering(animation: column.cardHover?.animation) { isHovered in
+                    RoundedRectangle(cornerRadius: column.cardCornerRadius, style: .circular)
+                        .fill(Color(column.cardBackground))
+                        .shadow(isHovered ? column.cardHover?.shadow ?? column.cardShadow : column.cardShadow)
+                })
             } else {
                 content
             }

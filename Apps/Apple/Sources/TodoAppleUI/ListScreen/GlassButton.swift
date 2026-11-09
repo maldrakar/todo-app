@@ -21,6 +21,40 @@ struct GlassButton<Action: Equatable & Sendable>: View {
     }
 }
 
+/// A glass button's face as the label of the menu its screen holds, "…" with Show as (list screen spec, section 5):
+/// the system's menu, its items in the model's order with their checks and their headings (`MenuItems`). Left out on
+/// the watch, where `Menu` is unavailable, and whose build is a compile check in this epic.
+///
+/// `GlassMenu` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
+struct GlassMenu<Action: Equatable & Sendable>: View {
+    private let label: GlassButtonLabelModel
+    private let menu: MenuModel<Action>
+    private let send: (Action) -> Void
+
+    init(_ label: GlassButtonLabelModel, menu: MenuModel<Action>, send: @escaping (Action) -> Void) {
+        self.label = label
+        self.menu = menu
+        self.send = send
+    }
+
+    var body: some View {
+        #if os(watchOS)
+        EmptyView()
+        #else
+        Menu { MenuItems(menu, send: send) } label: { GlassButtonFace(label) }
+            #if os(macOS)
+            // Its label alone, as a plain button draws it: the Mac's default style puts it in a pull-down's bezel.
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            #endif
+            .menuOrder(.fixed)
+            .accessibilityLabel(label.accessibilityLabel)
+        #endif
+    }
+}
+
 /// The face of a glass button, its glyph moved off centre where its look says so, in a capsule as wide and as high as
 /// its look says, which is a circle where the two are the same (`GlassButtonLabelModel`; `Mac.dc.html`, `.mc-gi`'s
 /// rounding): a `GlassButton`'s, and "…"'s as the label of its menu. It stands on the glass its look gives it, and on

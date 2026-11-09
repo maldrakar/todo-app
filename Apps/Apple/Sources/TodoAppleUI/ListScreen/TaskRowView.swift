@@ -9,7 +9,7 @@ import SwiftUI
 /// is the module's: a tap beside the check sends its `tap`, which a click is on the Mac.
 ///
 /// A tap on an open row's check takes the row away as `CompletingTask` says. While the pointer is over the row it is
-/// tinted where its style gives the tint, which only the view can know.
+/// tinted where its style gives the tint (`Hovering`).
 ///
 /// The drag, the menu, the swipe and the fresh fade wrap this view from outside (`BlockRow`).
 struct TaskRowView<Action: Equatable & Sendable>: View {
@@ -17,9 +17,6 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
     private let send: (Action) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    /// Whether the pointer is over the row.
-    @State private var isHovered = false
 
     init(_ model: TaskRowModel<Action>, send: @escaping (Action) -> Void) {
         self.model = model
@@ -36,18 +33,10 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
             .padding(.leading, model.style.leading)
             .padding(.trailing, model.style.trailing)
             .frame(minHeight: model.style.minimumHeight, alignment: .top)
-            .background {
-                if let hover = model.style.hover {
-                    RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
-                        .fill(Color(hover))
-                        .opacity(isHovered ? 1 : 0)
-                }
-            }
+            .hoverTint(
+                model.style.hover, in: RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
+            )
         }
-        #if !os(watchOS)
-        // The watch has no pointer, nor the modifier.
-        .onHover { isHovered = $0 }
-        #endif
     }
 
     /// The title and the meta line, the whole width the check leaves a place to tap: on the title's line after it,

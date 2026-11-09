@@ -300,12 +300,13 @@ import TodoCore
     }
 }
 
-/// What the pane sends reaches the list it draws through the window's host, wrapped as the root view wraps the column's
-/// screen (list screen plan, Task 9): a wide window's list has the capsule's "+" and no floating one; the "+" opens a
-/// new task's card, and Esc, which the pane sends on the Mac, closes it and takes the task with nothing in it away; a
-/// click on a row opens its card, and Esc closes it; and Delete in the row's menu, the Mac's right click, puts the task
-/// in the Trash.
-@Test @MainActor func thePanesControlsReachItsListThroughTheHost() throws {
+/// A wide window's list answers, through the window's host, the actions the pane's controls send, a regression check of
+/// the wide window's model and not of `RootView`'s wiring, which the test spells as the root view does,
+/// `.screen(column, .list(_))`, and which a change in `RootView.wideScreen(_:showsBack:)` would not fail (list screen
+/// plan, Task 9): the list has the capsule's "+" and no floating one; the "+" opens a new task's card, and Esc, which
+/// the pane sends on the Mac, closes it and takes the task with nothing in it away; a click on a row opens its card,
+/// and Esc closes it; and Delete in the row's menu, the Mac's right click, puts the task in the Trash.
+@Test @MainActor func aWideWindowsListAnswersThePanesActions() throws {
     try withFreshDatabase { database in
         do {
             let store = try Store.open(path: database, device: Store.newDeviceID(), now: Store.systemNow)

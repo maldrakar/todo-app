@@ -7,12 +7,12 @@ import TaskListFeature
 /// pane of a wide one (`ListPane`), as the canvas draws it (`Phone.dc.html`, `Mac.dc.html`; list screen spec, sections
 /// 1 to 7 and 10): the content, a `ScrollView` of the header, the blocks, the empty state, "+ Add list" and the Done
 /// strip, or the board under a header that stays, at most as wide as the model's style says and centred; over it the
-/// row of glass buttons, back where the screen has it, then "…" with Show as, alone or in the capsule beside the "+",
-/// and the floating "+" where the "+" floats; and under it the sentence. Everything it draws arrives finished in the
-/// model, each part of it the model of the component that draws it, the numbers of the phone or of the pane as the
-/// window's width chose them (`TaskList.Metrics`), and each gesture is sent as the action its control's model holds, so
-/// it decides only what is the platform's: its containers, scrolling and focus (`docs/style.md`, "Views"). Whether it
-/// draws its back is its screen's, which knows where it stands in its stack.
+/// fade where the layout has one, and the floating "+" where the "+" floats; and under it the sentence. Everything it
+/// draws arrives finished in the model, each part of it the model of the component that draws it, the numbers of the
+/// phone or of the pane as the window's width chose them (`TaskList.Metrics`), and each gesture is sent as the action
+/// its control's model holds, so it decides only what is the platform's: its containers, scrolling and focus
+/// (`docs/style.md`, "Views"). Where the glass buttons stand is its screen's, over the content on the phone and in the
+/// window's bar in the pane, which `buttons` puts there, handed what a control of the content sends.
 ///
 /// The content is a `VStack` in a `ScrollView`, not a `List`, which moves a row up and down a flat list and takes the
 /// row's look, and not a `LazyVStack`, which dropped a field scrolled out of sight and lost its focus with it (spike
@@ -28,10 +28,10 @@ import TaskListFeature
 ///
 /// `ListSurface` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
-struct ListSurface: View {
+struct ListSurface<Buttons: ViewModifier>: View {
     private let model: TaskList.Model
     private let send: (TaskList.UserAction) -> Void
-    private let showsBack: Bool
+    private let buttons: (_ sendFromContent: @escaping (TaskList.UserAction) -> Void) -> Buttons
 
     /// How high the sentence's strip stands, which only the view can know and which the floating "+" stands above.
     @State private var sentenceHeight: CGFloat = 0
@@ -43,10 +43,15 @@ struct ListSurface: View {
     /// What the surface keeps of its rows' gestures.
     private var rowGestures = ListScreenGestures()
 
-    init(model: TaskList.Model, send: @escaping (TaskList.UserAction) -> Void, showsBack: Bool) {
+    /// The surface of the list, with its screen's glass buttons, which `buttons` stands where the screen has them,
+    /// handed the send of a control of the content, which closes a row a swipe left open, for its "+".
+    init(
+        model: TaskList.Model, send: @escaping (TaskList.UserAction) -> Void,
+        buttons: @escaping (_ sendFromContent: @escaping (TaskList.UserAction) -> Void) -> Buttons
+    ) {
         self.model = model
         self.send = send
-        self.showsBack = showsBack
+        self.buttons = buttons
     }
 
     var body: some View {
@@ -61,7 +66,12 @@ struct ListSurface: View {
             .ignoresSafeArea(.container, edges: .bottom)
             .modifier(BottomInsetReader(inset: $bottomInset))
             .safeAreaInset(edge: .bottom, spacing: 0) { sentence }
-            .overlay(alignment: .top) { glassButtons }
+            .overlay(alignment: .top) {
+                if let fade = model.style.fade {
+                    fadeUnderTheButtons(fade)
+                }
+            }
+            .modifier(buttons(sendClosingSwipe))
             .overlay { floatingButton }
             .background(Color(model.style.background))
             // The screen's title is the header's, which names the list in the back button's menu over what stands on it
@@ -169,33 +179,10 @@ struct ListSurface: View {
         .padding(.bottom, style.bottomMargin)
     }
 
-    /// The row of glass buttons at the safe area's top, as high as the style says, over the fade where the layout has
-    /// one: back where the screen draws it, at the leading edge, and at the trailing one the capsule where the style
-    /// has one, or "…" alone.
-    private var glassButtons: some View {
-        ZStack(alignment: .top) {
-            if let fade = model.style.fade {
-                fadeUnderTheButtons(fade)
-            }
-            HStack(spacing: model.style.barSpacing) {
-                if showsBack {
-                    GlassButton(model.back, send: send)
-                }
-                Spacer(minLength: 0)
-                if let capsule = model.style.capsule {
-                    self.capsule(capsule)
-                } else {
-                    showAs
-                }
-            }
-            .frame(height: model.style.barHeight)
-            .padding(.horizontal, model.style.edgeInset)
-        }
-    }
-
     /// What scrolls under the buttons leaves by this, the paper down to its solid depth under the safe area's top and
-    /// the same colour clear at its end. Two parts, so that the solid one reaches up under the status bar or the
-    /// toolbar whatever its inset; it takes no touch, so that a row behind it is still tapped.
+    /// the same colour clear at its end. Two parts, so that the solid one reaches up under the status bar or the bar
+    /// whatever its inset, the phone's circles or the pane's bar standing over it; it takes no touch, so that a row
+    /// behind it is still tapped.
     private func fadeUnderTheButtons(_ fade: ListScreenStyle.Fade) -> some View {
         let color = Color(fade.color)
         return VStack(spacing: 0) {
@@ -206,41 +193,6 @@ struct ListSurface: View {
                 .frame(height: fade.height - fade.solidDepth)
         }
         .allowsHitTesting(false)
-    }
-
-    /// The glass capsule of the pane (`Mac.dc.html`, the nav row's `.glass`): the "+" where the list takes a task, the
-    /// divider after it, and "…", standing on the capsule's glass and on none of their own (`GlassButtonFace`).
-    private func capsule(_ style: GlassCapsuleStyle) -> some View {
-        let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .circular)
-        return HStack(spacing: 0) {
-            if let addTask = model.glassAddTask {
-                GlassButton(addTask, send: sendClosingSwipe)
-                Rule(style.divider, along: .vertical)
-                    .frame(height: style.dividerHeight)
-            }
-            showAs
-        }
-        .padding(.horizontal, style.horizontalPadding)
-        .frame(height: style.height)
-        .glassSurface(style.glass, in: shape)
-    }
-
-    /// "…" with Show as (list screen spec, section 5). Left out on the watch, where `Menu` is unavailable, and whose
-    /// build is a compile check in this epic.
-    @ViewBuilder private var showAs: some View {
-        #if os(watchOS)
-        EmptyView()
-        #else
-        Menu { MenuItems(model.showAs, send: send) } label: { GlassButtonFace(model.more) }
-            #if os(macOS)
-            // Its label alone, as a plain button draws it: the Mac's default style puts it in a pull-down's bezel.
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            #endif
-            .menuOrder(.fixed)
-            .accessibilityLabel(model.more.accessibilityLabel)
-        #endif
     }
 
     /// The floating "+", its margins from the screen's edges and not the safe area's, standing above the sentence while

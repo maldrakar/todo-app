@@ -4,7 +4,8 @@ import SwiftUI
 
 /// The Done strip's capsule as its model describes it (`DoneStripModel`; `Phone.dc.html`, the Done strip): its glyph,
 /// its label and its chevron, turning on its motion, on the capsule, all of it the button that opens and closes the
-/// strip, its words bumping as they change. The tasks under it are the module's rows, which the screen draws
+/// strip, its words bumping as they change, the capsule tinted under the pointer where its style gives the tint
+/// (`Hovering`). The tasks under it are the module's rows, which the screen draws
 /// (`ListScreen`).
 struct DoneStripView<Action: Equatable & Sendable>: View {
     private let model: DoneStripModel<Action>
@@ -48,6 +49,9 @@ struct DoneStripView<Action: Equatable & Sendable>: View {
             .padding(.leading, model.style.leadingPadding)
             .padding(.trailing, model.style.trailingPadding)
             .frame(height: model.style.height)
+            .hoverTint(
+                model.style.hover, in: RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
+            )
             .background(
                 Color(model.style.background), in: .rect(cornerRadius: model.style.cornerRadius, style: .circular)
             )
