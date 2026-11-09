@@ -50,7 +50,7 @@ struct BlockView: View {
     /// stands in the flow, as the canvas's does (`Phone.dc.html`, `slotBefore`).
     @ViewBuilder private func mark(after row: TaskID?) -> some View {
         if gestures.lift?.slot == .place(block.id, after: row), let indicator = block.indicator {
-            DropIndicator(indicator, from: 0, visibleRight: gestures.dragState.frames.blocks[block.id]?.maxX ?? 0)
+            DropIndicator(indicator, from: 0, visibleRight: gestures.dragState.frames.lineEnd(in: block.id))
                 .accessibilityHidden(true)
         }
     }

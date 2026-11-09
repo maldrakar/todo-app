@@ -63,6 +63,14 @@ struct RowLift: Equatable {
         var rows: [BlockRowID: CGRect] = [:]
         var blocks: [TaskList.Model.BlockID: CGRect] = [:]
         var columns: [TaskList.Model.BlockID: CGRect] = [:]
+
+        /// Where the mark's line ends in a block, from the block's own leading edge, where the mark is drawn: the
+        /// block's width, and nothing before the block has reported. Its right edge in the content is not it, since a
+        /// block of the pane stands in from the content's side, and the line that long widened the block it stood in
+        /// by that inset while a row was carried (the Mac, 2026-11-09).
+        func lineEnd(in block: TaskList.Model.BlockID) -> CGFloat {
+            blocks[block]?.width ?? 0
+        }
     }
 
     let task: TaskID
