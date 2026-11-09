@@ -5,6 +5,17 @@ import DesignSystem
 /// its drop tint and ring, which a builder hands over as one value. The tint and the ring's colour are the block's, so
 /// a column in another list's colour is another instance.
 public struct ColumnStyle: Equatable, Sendable {
+    /// What a card casts while the pointer is over it, coming and going on `animation`.
+    public struct CardHover: Equatable, Sendable {
+        public let shadow: DesignSystem.Shadow
+        public let animation: DesignSystem.Animation
+
+        public init(shadow: DesignSystem.Shadow, animation: DesignSystem.Animation) {
+            self.shadow = shadow
+            self.animation = animation
+        }
+    }
+
     public let width: Double
     public let cornerRadius: Double
     public let cardSpacing: Double
@@ -18,7 +29,7 @@ public struct ColumnStyle: Equatable, Sendable {
     public let cardShadow: DesignSystem.Shadow
 
     /// What a card casts while the pointer is over it, and nil where there is no pointer to be: the phone's.
-    public let cardHoverShadow: DesignSystem.Shadow?
+    public let cardHover: CardHover?
 
     /// How thick the ring is inside the column's edge while a card is dragged over it.
     public let dropRingWidth: Double
@@ -42,7 +53,7 @@ public struct ColumnStyle: Equatable, Sendable {
         fill: DesignSystem.Color,
         cardBackground: DesignSystem.Color,
         cardShadow: DesignSystem.Shadow,
-        cardHoverShadow: DesignSystem.Shadow?,
+        cardHover: CardHover?,
         dropRingWidth: Double,
         dropTint: DesignSystem.Color,
         dropRing: DesignSystem.Color,
@@ -57,7 +68,7 @@ public struct ColumnStyle: Equatable, Sendable {
         self.fill = fill
         self.cardBackground = cardBackground
         self.cardShadow = cardShadow
-        self.cardHoverShadow = cardHoverShadow
+        self.cardHover = cardHover
         self.dropRingWidth = dropRingWidth
         self.dropTint = dropTint
         self.dropRing = dropRing

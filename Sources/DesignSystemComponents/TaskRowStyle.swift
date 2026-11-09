@@ -54,9 +54,9 @@ public struct TaskRowStyle: Equatable, Sendable {
     /// (`Phone.dc.html`).
     public let metaTrailing: Bool
 
-    /// The colour under the row while the pointer is over it, and nil where there is no pointer to be: the phone's,
-    /// and a column's card, which casts a shadow instead (`ColumnStyle.cardHoverShadow`).
-    public let hover: DesignSystem.Color?
+    /// The tint over the row while the pointer is over it, in the corners of `cornerRadius`, and nil where there is no
+    /// pointer to be, the phone's, and for a column's card, which casts a shadow instead (`ColumnStyle.cardHover`).
+    public let hover: HoverStyle?
 
     public init(
         titleToMeta: Double,
@@ -78,7 +78,7 @@ public struct TaskRowStyle: Equatable, Sendable {
         leaving: TaskLeavingStyle,
         ground: DesignSystem.Color?,
         metaTrailing: Bool,
-        hover: DesignSystem.Color?
+        hover: HoverStyle?
     ) {
         self.titleToMeta = titleToMeta
         self.metaSpacing = metaSpacing

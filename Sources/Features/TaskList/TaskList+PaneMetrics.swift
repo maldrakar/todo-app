@@ -11,10 +11,10 @@ import DesignSystemComponents
 extension TaskList.Metrics {
     private typealias Tile = DesignSystem.Color.Components.Tile
 
-    /// The pane's list: the content 780 wide at most, centred, 62 under the top, 48 in at its sides and 140 above its
-    /// foot, under a fade of the paper 60 high, solid to 33; the row of buttons 52 high, 14 in at its sides, 8 apart,
-    /// the back button a 34 circle with its chevron 19 set 1 left of centre, and the capsule 34 high, rounded as far as
-    /// it goes, padded 3, with its "+" 17 and its "…" 18 in 30 by 28 items on either side of a 1 by 16 divider; the
+    /// The pane's list: the content 780 wide at most, centred, 10 under the window's bar, 48 in at its sides and 140
+    /// above its foot, under the paper up to the bar's foot and clear 8 under it (`paneStyle`); the back button in the
+    /// bar a 34 circle with its chevron 19 set 1 left of centre, and the capsule 34 high, rounded as far as it goes,
+    /// padded 3, with its "+" 17 and its "…" 18 in 30 by 28 items on either side of a 1 by 16 divider; the
     /// header's tile 40 across, rounded 11, its glyph 24, the title 12 after it and the subtitle 6 under it and 52 in;
     /// the tag bar 10 under it, 40 in and 12 past the content's end, its chips 6 apart in a row padded 12 with 12 more
     /// after the last, fading in over 12 and out over 24, a chip 26 high, a capsule, padded 8 and 10, its hash 12 and 5
@@ -34,14 +34,14 @@ extension TaskList.Metrics {
             header: .init(
                 titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 34, topMargin: 14,
                 trailingMargin: 0, bottomMargin: 2, leadingMargin: 4, topPadding: 9, horizontalPadding: 6,
-                bottomPadding: 0, cornerRadius: 7, foldHitSide: 30
+                bottomPadding: 0, cornerRadius: 7, foldHitSide: 30, hover: paneHover
             ),
             chevronSize: 15, row: paneRow, card: paneCard,
             addTask: TaskList.Metrics.AddRow(
                 style: .init(
                     iconCellWidth: 32, spacing: 0, height: 32, width: nil, cornerRadius: 8, topPadding: 0,
                     leadingPadding: 4, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-                    trailingMargin: 0
+                    trailingMargin: 0, hover: paneHover
                 ),
                 iconSize: 15, font: .addRow
             ),
@@ -52,7 +52,7 @@ extension TaskList.Metrics {
                     rowsEntrance: EntranceStyle(
                         opacity: 0, scale: 0.94, offset: -6, anchorX: 0.12, anchorY: 0, animation: .popover
                     ),
-                    bump: .init(scale: 1.22, peakAt: 0.4, animation: .check)
+                    bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: paneHover
                 ),
                 iconSize: 16, chevronSize: 13
             )
@@ -61,7 +61,7 @@ extension TaskList.Metrics {
             style: .init(
                 iconCellWidth: 32, spacing: 0, height: 36, width: nil, cornerRadius: 9, topPadding: 4,
                 leadingPadding: 0, trailingPadding: 12, dash: nil, rule: LineStyle(color: .line, width: 1, dash: []),
-                topMargin: 10, leadingMargin: 4, trailingMargin: 0
+                topMargin: 10, leadingMargin: 4, trailingMargin: 0, hover: nil
             ),
             iconSize: 15, font: .barLabel
         ),
@@ -72,10 +72,12 @@ extension TaskList.Metrics {
     /// list for, the header padded 28 in and 14 above the columns, and the buttons standing over it: 12 between
     /// columns, 24 in at its sides and at its bottom, 12 more after its last column, scrolling freely; a column 288
     /// wide and rounded 14, its header padded 11 12 7 (the column's own 6 stand under the 1 left to the header's
-    /// bottom), its cards 6 apart and 6 in, each rounded 10 with a 0.5 hairline and the resting shadow, a hover shadow
-    /// of 8 % with a blur of 10 dropped 3; a card's check 18 across with a 1.5 ring and the 12 pt mark in a 34 by 36
-    /// hit, its title callout-sized, 9 above and below it and 10 short of its end, the meta 3 under it, its items 9
-    /// apart and its lines 2, its glyphs 12 and 3 before their text, at least 36 high; its open card in the card, its
+    /// bottom) and tinted under the pointer within corners of 7 (`Mac.dc.html`, the column title's `.mc-tap`), its
+    /// cards 6 apart and 6 in, each rounded 10 with a 0.5 hairline and the resting shadow, a hover shadow of 8 % with a
+    /// blur of 10 dropped 3 over 0.15 s; a card's check 18 across with a 1.5 ring and the 12 pt mark in a 34 by 36
+    /// hit, its title callout-sized, 9 above and below it and 10 short of its end, the meta 3 under it in the phone's
+    /// order, a tag written out as "#name" (`Mac.dc.html`, :460-463), its items 9 apart and its lines 2, its glyphs 12
+    /// and 3 before their text, at least 36 high; its open card in the card, its
     /// check in a 34 by 40 hit, its body 36 in and 12 short of its end and bottom; "+ Add task" 32 high, rounded 9,
     /// padded 10, the plus 15 and 6 before its title. The table gives "+ Add list" nothing: a column 200 wide edged in
     /// a 1.5 dashed line, as rounded as a column, 44 high, padded 14, the plus 15 and 8 before its title, the phone's
@@ -89,14 +91,15 @@ extension TaskList.Metrics {
                 .init(
                     width: 288, cornerRadius: 14, cardSpacing: 6, padding: 6, cardCornerRadius: 10,
                     cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill,
-                    cardBackground: .surface, cardShadow: .resting, cardHoverShadow: .hovered, dropRingWidth: 2,
+                    cardBackground: .surface, cardShadow: .resting,
+                    cardHover: .init(shadow: .hovered, animation: .hoverShadows), dropRingWidth: 2,
                     dropTint: color.dropTint, dropRing: color.check.fill, dropAnimation: .dropHighlights
                 )
             },
             header: .init(
                 titleToSubtitle: 8, rule: nil, height: 36, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
-                leadingMargin: 0, topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 0,
-                foldHitSide: nil
+                leadingMargin: 0, topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 7,
+                foldHitSide: nil, hover: paneHover
             ),
             card: TaskList.Metrics.Row(
                 style: { isOpen, lifts, isFresh in
@@ -109,8 +112,8 @@ extension TaskList.Metrics {
                     )
                 },
                 check: { color in paneRowCheck(color, hitWidth: 34, hitHeight: 36) },
-                title: .nestedRowTitle, metaIconSize: 12, metaIconSpacing: 3, tagCapsule: paneTagCapsule, swipe: nil,
-                indicator: nil, dropStyle: nil
+                title: .nestedRowTitle, metaIconSize: 12, metaIconSpacing: 3, metaOrder: phoneMetaOrder,
+                tagCapsule: nil, swipe: nil, indicator: nil, dropStyle: nil
             ),
             openCard: paneOpenCard(
                 cornerRadius: 10, margins: (top: 0, horizontal: 0, bottom: 0), shadow: .resting, bodyLeading: 36,
@@ -120,7 +123,7 @@ extension TaskList.Metrics {
                 style: .init(
                     iconCellWidth: 15, spacing: 6, height: 32, width: nil, cornerRadius: 9, topPadding: 0,
                     leadingPadding: 10, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-                    trailingMargin: 0
+                    trailingMargin: 0, hover: paneHover
                 ),
                 iconSize: 15, font: .addRow
             )
@@ -129,22 +132,23 @@ extension TaskList.Metrics {
             style: .init(
                 iconCellWidth: 15, spacing: 8, height: 44, width: 200, cornerRadius: 14, topPadding: 0,
                 leadingPadding: 14, trailingPadding: 14, dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]),
-                rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
+                rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: nil
             ),
             iconSize: 15, font: .barLabel
         ),
         floatingButton: nil
     )
 
-    /// The pane's screen (Task 9's table, Pane; `Mac.dc.html`, the nav row and the scroller): the buttons' row 52 high
-    /// and 14 in from the pane's sides, 8 apart, under a fade (`paneFade`), the content 62 under the top and ending
-    /// 140 above the foot, all of it on the paper; the list's content is `contentMaxWidth` at most and
-    /// `contentHorizontalPadding` in, and the board's the pane's width, its own paddings standing instead.
+    /// The pane's screen (Task 9's table, Pane; `Mac.dc.html`, the nav row and the scroller): its buttons in the
+    /// window's bar, which stands where the canvas's 52 high nav row does and which the safe area holds (the
+    /// controller's ruling R211), so the content starts 10 under the bar, the canvas's 62 less the row's 52, and ends
+    /// 140 above the foot, under a fade (`paneFade`), all of it on the paper; the list's content is `contentMaxWidth`
+    /// at most and `contentHorizontalPadding` in, and the board's the pane's width, its own paddings standing instead.
+    /// The canvas's 14 in from the sides is the bar's to place.
     private static func paneStyle(contentHorizontalPadding: Double, contentMaxWidth: Double?) -> ListScreenStyle {
         ListScreenStyle(
-            edgeInset: 14, fade: paneFade, contentTop: 62, contentBottom: 140, background: .paper,
-            contentHorizontalPadding: contentHorizontalPadding, contentMaxWidth: contentMaxWidth, barHeight: 52,
-            barSpacing: 8,
+            edgeInset: 14, fade: paneFade, contentTop: 10, contentBottom: 140, background: .paper,
+            contentHorizontalPadding: contentHorizontalPadding, contentMaxWidth: contentMaxWidth,
             capsule: GlassCapsuleStyle(
                 height: 34, cornerRadius: 99, horizontalPadding: 3, glass: paneGlassUnder,
                 divider: LineStyle(color: .line, width: 1, dash: []), dividerHeight: 16
@@ -153,9 +157,14 @@ extension TaskList.Metrics {
     }
 
     /// The pane's fade under the buttons' row, in both layouts (`Mac.dc.html`, the div at the pane's level above the
-    /// list and the board; the controller's ruling R204): 60 high, the paper solid down to 55 % of it, 33, then clear.
-    /// The pane has no safe area, so the depth is measured from its top.
-    private static let paneFade = ListScreenStyle.Fade(color: .paper, height: 60, solidDepth: 33)
+    /// list and the board; the controller's ruling R204): the canvas's is 60 high from the pane's top, solid to 33,
+    /// down a 52 row; with the row the window's bar, which the safe area holds, it is the paper up to the bar's foot,
+    /// under the bar's own controls, and clear 8 under it, where the canvas's ends (R211).
+    private static let paneFade = ListScreenStyle.Fade(color: .paper, height: 8, solidDepth: 0)
+
+    /// The pane's tint under a control the pointer is over: the canvas's `--hover`, the ink at 5 % in the light and
+    /// white at 5 % in the dark, over 0.12 s (`Mac.dc.html`, `.mc-tap` and `.mc-trow`; the controller's ruling R209).
+    private static let paneHover = HoverStyle(color: .hover, animation: .hoverTints)
 
     /// The pane's glass buttons (Task 9's table, Pane): the back button a 34 circle on the glass with its chevron 19
     /// set 1 left of centre and stroked a little heavier than the phone's, and in the capsule the "+" 17, stroked
@@ -219,8 +228,8 @@ extension TaskList.Metrics {
         tile: TaskList.Metrics.TileSize(side: 60, cornerRadius: 17, glyphSize: 30)
     )
 
-    /// A tag in a row's or a card's meta line (Task 9's table, Row): a 20 high capsule of the fill, padded 8, with the
-    /// tag's name and no hash.
+    /// A tag in a row's meta line (Task 9's table, Row): a 20 high capsule of the fill, padded 8, with the tag's name
+    /// and no hash. A column's card writes it out as "#name" (`Mac.dc.html`, :461).
     private static let paneTagCapsule = MetaItemStyle.Capsule(
         background: .fill, height: 20, cornerRadius: 10, leadingPadding: 8, trailingPadding: 8
     )
@@ -245,7 +254,9 @@ extension TaskList.Metrics {
 
     /// The pane's row (Task 9's table, Row): 36 high, padded 0 10 0 4, rounded 9, tinted under the pointer, its check
     /// `paneRowCheck` in a 32 by 36 hit, its title 4 after the hit and one line, with the meta line on it 12 after the
-    /// title, its items 8 apart, its glyphs 13 and 3 before their text, a tag on a 20 high capsule. The title is
+    /// title, its items 8 apart in the Mac's order, the notes, the subtasks, the tags and the deadline (`Mac.dc.html`,
+    /// :349-352; the controller's ruling R210), its glyphs 13 and 3 before their text, a tag on a 20 high capsule. The
+    /// title is
     /// padded 9 above and below; the swipe is the phone's, which the iPad keeps, and the lift is the phone's at the
     /// row's scale, rounded 2 more than the row. The mark of a drop's place and the look of the block a task from
     /// another block would land in are the phone's at the pane's scale: the mark's circle at 36 across from the row's
@@ -258,12 +269,12 @@ extension TaskList.Metrics {
                 strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 11) : nil,
                 fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .fresh,
                 titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper, metaTrailing: true,
-                hover: .hover
+                hover: paneHover
             )
         },
         check: { color in paneRowCheck(color, hitWidth: 32, hitHeight: 36) },
-        title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, tagCapsule: paneTagCapsule, swipe: swipe,
-        indicator: paneDropMark, dropStyle: paneBlockDrop
+        title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, metaOrder: [.notes, .subtasks, .tags, .deadline],
+        tagCapsule: paneTagCapsule, swipe: swipe, indicator: paneDropMark, dropStyle: paneBlockDrop
     )
 
     private static let paneDropMark: @Sendable (Tile) -> DropIndicatorStyle = { color in
@@ -324,7 +335,7 @@ extension TaskList.Metrics {
                 style: .init(
                     iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0,
                     leadingPadding: 0, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8,
-                    trailingMargin: 0
+                    trailingMargin: 0, hover: paneHover
                 ),
                 iconSize: 14, font: .notes
             ),

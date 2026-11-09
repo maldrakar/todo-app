@@ -16,9 +16,9 @@ import DesignSystem
 /// padding), 116 above a safe area 34 high.
 ///
 /// The Mac's pane stands the same way with more of its own: its content is `contentMaxWidth` wide at most, centred,
-/// `contentHorizontalPadding` in from the pane's sides, and its buttons stand in a row `barHeight` high, `barSpacing`
-/// apart, the "+" and the "…" in one glass `capsule`. The phone has no capsule, no cap on its content and none of
-/// that padding, and its row is as high as its circles.
+/// `contentHorizontalPadding` in from the pane's sides, and its buttons stand in the window's bar, which the safe area
+/// holds, the "+" and the "…" in one glass `capsule`. The phone has no capsule, no cap on its content and none of
+/// that padding.
 ///
 /// `ListScreenStyle` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
@@ -53,12 +53,6 @@ public struct ListScreenStyle: Equatable, Sendable {
     /// The widest the content gets, centred when the screen is wider, and nil for none.
     public let contentMaxWidth: Double?
 
-    /// How high the row of glass buttons is.
-    public let barHeight: Double
-
-    /// The gap between the back button and the capsule where there is a capsule.
-    public let barSpacing: Double
-
     /// The glass capsule round "+" and "…", and nil where the "+" floats and "…" stands alone.
     public let capsule: GlassCapsuleStyle?
 
@@ -70,8 +64,6 @@ public struct ListScreenStyle: Equatable, Sendable {
         background: DesignSystem.Color,
         contentHorizontalPadding: Double,
         contentMaxWidth: Double?,
-        barHeight: Double,
-        barSpacing: Double,
         capsule: GlassCapsuleStyle?
     ) {
         self.edgeInset = edgeInset
@@ -81,8 +73,6 @@ public struct ListScreenStyle: Equatable, Sendable {
         self.background = background
         self.contentHorizontalPadding = contentHorizontalPadding
         self.contentMaxWidth = contentMaxWidth
-        self.barHeight = barHeight
-        self.barSpacing = barSpacing
         self.capsule = capsule
     }
 }

@@ -17,11 +17,16 @@ public struct BlockHeaderStyle: Equatable, Sendable {
     public let topPadding: Double
     public let horizontalPadding: Double
     public let bottomPadding: Double
+
+    /// The radius of the corners of the tint over the title while the pointer is over it.
     public let cornerRadius: Double
 
     /// The side of the square cell the chevron that folds the block is centred in, and nil for a header with none, as a
     /// column's is.
     public let foldHitSide: Double?
+
+    /// The tint over the title while the pointer is over it, and nil where there is no pointer to be, the phone's.
+    public let hover: HoverStyle?
 
     public init(
         titleToSubtitle: Double,
@@ -35,7 +40,8 @@ public struct BlockHeaderStyle: Equatable, Sendable {
         horizontalPadding: Double,
         bottomPadding: Double,
         cornerRadius: Double,
-        foldHitSide: Double?
+        foldHitSide: Double?,
+        hover: HoverStyle?
     ) {
         self.titleToSubtitle = titleToSubtitle
         self.rule = rule
@@ -49,5 +55,6 @@ public struct BlockHeaderStyle: Equatable, Sendable {
         self.bottomPadding = bottomPadding
         self.cornerRadius = cornerRadius
         self.foldHitSide = foldHitSide
+        self.hover = hover
     }
 }

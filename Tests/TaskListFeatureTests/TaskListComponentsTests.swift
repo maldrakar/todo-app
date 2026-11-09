@@ -217,7 +217,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             style: .init(
                 titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
                 trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
-                bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
+                bottomPadding: 0, cornerRadius: 0, foldHitSide: 44, hover: nil
             ),
             titleTapped: .blockTitleTapped(id)
         )
@@ -296,7 +296,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         #expect(model.more == button(.ellipsis, size: 22, offset: 0, "More"))
         let style = ListScreenStyle(
             edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56, contentBottom: 116, background: .paper,
-            contentHorizontalPadding: 0, contentMaxWidth: nil, barHeight: 44, barSpacing: 0, capsule: nil
+            contentHorizontalPadding: 0, contentMaxWidth: nil, capsule: nil
         )
         #expect(model.style == style, "the fade is the list's alone; the board's circles stand in the flow")
     }
@@ -357,14 +357,14 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             style: .init(
                 titleToSubtitle: 8, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
                 leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0,
-                foldHitSide: nil
+                foldHitSide: nil, hover: nil
             ),
             titleTapped: .blockTitleTapped(blockID)
         ),
         style: .init(
             width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
             cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill, cardBackground: .surface,
-            cardShadow: .resting, cardHoverShadow: nil, dropRingWidth: 2, dropTint: Tile.rose.dropTint,
+            cardShadow: .resting, cardHover: nil, dropRingWidth: 2, dropTint: Tile.rose.dropTint,
             dropRing: Tile.rose.check.fill, dropAnimation: .dropHighlights
         ),
         isDropTarget: true
@@ -448,7 +448,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         icon: plus(18), title: TextModel(text: "Add task", style: TextStyle(font: .addRow, color: .ink2)),
         style: .init(
             iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
-            trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+            trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12, hover: nil
         ),
         action: .addTaskRowTapped(in: id)
     ))
@@ -457,7 +457,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         style: .init(
             iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 4, leadingPadding: 0,
             trailingPadding: 12, dash: nil, rule: LineStyle(color: .line, width: 1, dash: []), topMargin: 10,
-            leadingMargin: 12, trailingMargin: 6
+            leadingMargin: 12, trailingMargin: 6, hover: nil
         ),
         action: .addListTapped
     ))
@@ -466,7 +466,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         icon: plus(18), title: TextModel(text: "Add task", style: TextStyle(font: .addRow, color: .ink2)),
         style: .init(
             iconCellWidth: 18, spacing: 6, height: 44, width: nil, cornerRadius: 13, topPadding: 0, leadingPadding: 11,
-            trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
+            trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: nil
         ),
         action: .addTaskRowTapped(in: id)
     ))
@@ -476,7 +476,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         style: .init(
             iconCellWidth: 18, spacing: 8, height: 52, width: 200, cornerRadius: 18, topPadding: 0, leadingPadding: 16,
             trailingPadding: 16, dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
-            leadingMargin: 0, trailingMargin: 0
+            leadingMargin: 0, trailingMargin: 0, hover: nil
         ),
         action: .addListTapped
     ))
@@ -519,7 +519,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 rowsEntrance: EntranceStyle(
                     opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
                 ),
-                bump: .init(scale: 1.22, peakAt: 0.4, animation: .check)
+                bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: nil
             ),
             isOpen: isOpen, action: .doneStripTapped
         )
@@ -713,7 +713,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
                 style: .init(
                     iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 0,
                     leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: -12,
-                    trailingMargin: 0
+                    trailingMargin: 0, hover: nil
                 ),
                 action: .addSubtaskTapped
             ),

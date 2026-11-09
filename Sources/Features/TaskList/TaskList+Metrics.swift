@@ -38,18 +38,28 @@ extension TaskList {
             let hashSize: Double
         }
 
+        /// What a task's meta line holds, each kind standing where its row's order puts it (`Row.metaOrder`): the
+        /// deadline, the tags, the subtasks done over all and the notes' glyph.
+        enum MetaKind {
+            case deadline, tags, subtasks, notes
+        }
+
         /// A task's row, or a column's card: its style for whether the task is open, whether it can be lifted, which it
         /// can where it has a menu, and whether it is the task just dropped; its check's for the block's colour, the
-        /// title's font, the meta line's glyph and its gap to its text; its swipe, nil for a column's card, which has
-        /// none (canvas); and for the block's colour the mark of a drop's place among such rows and the look of their
-        /// block while a task from another block would land in it, both nil for a column's card, whose column's tint
-        /// marks the drop.
+        /// title's font, the meta line's glyph, its gap to its text and the order of its items; its swipe, nil for a
+        /// column's card, which has none (canvas); and for the block's colour the mark of a drop's place among such
+        /// rows and the look of their block while a task from another block would land in it, both nil for a column's
+        /// card, whose column's tint marks the drop.
         struct Row {
             let style: @Sendable (_ isOpen: Bool, _ lifts: Bool, _ isFresh: Bool) -> TaskRowStyle
             let check: @Sendable (Tile) -> CheckStyle
             let title: DesignSystem.Font
             let metaIconSize: Double
             let metaIconSpacing: Double
+
+            /// The meta line's kinds in the order the layout's canvas draws them, each standing once where the task
+            /// has it (the controller's ruling R210).
+            let metaOrder: [MetaKind]
 
             /// The capsule a tag stands on in the meta line, written without its hash, and nil where the tag is written
             /// out as "#home" (`MetaItemStyle.Capsule`).
@@ -198,14 +208,14 @@ extension TaskList {
                 header: .init(
                     titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
                     trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
-                    bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
+                    bottomPadding: 0, cornerRadius: 0, foldHitSide: 44, hover: nil
                 ),
                 chevronSize: 18, row: phoneRow, card: phoneCard,
                 addTask: AddRow(
                     style: .init(
                         iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0,
                         leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8,
-                        trailingMargin: 12
+                        trailingMargin: 12, hover: nil
                     ),
                     iconSize: 18, font: .addRow
                 ),
@@ -216,7 +226,7 @@ extension TaskList {
                         rowsEntrance: EntranceStyle(
                             opacity: 0, scale: 0.92, offset: -8, anchorX: 0.2, anchorY: 0, animation: .popover
                         ),
-                        bump: .init(scale: 1.22, peakAt: 0.4, animation: .check)
+                        bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: nil
                     ),
                     iconSize: 18, chevronSize: 15
                 )
@@ -226,7 +236,7 @@ extension TaskList {
                     iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 4,
                     leadingPadding: 0, trailingPadding: 12, dash: nil,
                     rule: LineStyle(color: .line, width: 1, dash: []), topMargin: 10, leadingMargin: 12,
-                    trailingMargin: 6
+                    trailingMargin: 6, hover: nil
                 ),
                 iconSize: 18, font: .barLabel
             ),
@@ -255,7 +265,7 @@ extension TaskList {
                     .init(
                         width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
                         cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill,
-                        cardBackground: .surface, cardShadow: .resting, cardHoverShadow: nil,
+                        cardBackground: .surface, cardShadow: .resting, cardHover: nil,
                         dropRingWidth: 2, dropTint: color.dropTint,
                         dropRing: color.check.fill, dropAnimation: .dropHighlights
                     )
@@ -263,7 +273,7 @@ extension TaskList {
                 header: .init(
                     titleToSubtitle: 8, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
                     leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0,
-                    foldHitSide: nil
+                    foldHitSide: nil, hover: nil
                 ),
                 card: Row(
                     style: { isOpen, lifts, isFresh in
@@ -281,8 +291,8 @@ extension TaskList {
                             hitHeight: 44, color: color
                         )
                     },
-                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, tagCapsule: nil, swipe: nil,
-                    indicator: nil, dropStyle: nil
+                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, metaOrder: phoneMetaOrder,
+                    tagCapsule: nil, swipe: nil, indicator: nil, dropStyle: nil
                 ),
                 openCard: Card(
                     style: { color, isOpen in
@@ -302,7 +312,7 @@ extension TaskList {
                     style: .init(
                         iconCellWidth: 18, spacing: 6, height: 44, width: nil, cornerRadius: 13, topPadding: 0,
                         leadingPadding: 11, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-                        trailingMargin: 0
+                        trailingMargin: 0, hover: nil
                     ),
                     iconSize: 18, font: .addRow
                 )
@@ -312,7 +322,7 @@ extension TaskList {
                     iconCellWidth: 18, spacing: 8, height: 52, width: 200, cornerRadius: 18, topPadding: 0,
                     leadingPadding: 16, trailingPadding: 16,
                     dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
-                    leadingMargin: 0, trailingMargin: 0
+                    leadingMargin: 0, trailingMargin: 0, hover: nil
                 ),
                 iconSize: 18, font: .barLabel
             ),
@@ -390,9 +400,13 @@ extension TaskList {
                     titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper, metaTrailing: false, hover: nil
                 )
             },
-            check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, tagCapsule: nil, swipe: swipe,
-            indicator: phoneDropMark, dropStyle: phoneBlockDrop
+            check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, metaOrder: phoneMetaOrder,
+            tagCapsule: nil, swipe: swipe, indicator: phoneDropMark, dropStyle: phoneBlockDrop
         )
+
+        /// The meta line's order on the phone, in a row and on a column's card, and on the Mac's card (`Phone.dc.html`,
+        /// :349-352; `Mac.dc.html`, :460-463): the deadline, the tags, the subtasks and the notes.
+        static let phoneMetaOrder: [MetaKind] = [.deadline, .tags, .subtasks, .notes]
 
         /// A row's swipe (Task 8's table, Swipe), the phone's and the iPad's, which has the Mac's pane and the phone's
         /// gestures: dragged 40 leftward it stays moved 88, over a Delete 78 wide, 3 in from its top and bottom and 10
@@ -437,7 +451,7 @@ extension TaskList {
             style: .init(
                 iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 0,
                 leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: -12,
-                trailingMargin: 0
+                trailingMargin: 0, hover: nil
             ),
             iconSize: 17, font: .notes
         )
@@ -511,7 +525,7 @@ extension TaskList {
         private static func phoneStyle(fade: ListScreenStyle.Fade?) -> ListScreenStyle {
             ListScreenStyle(
                 edgeInset: 14, fade: fade, contentTop: 56, contentBottom: 116, background: .paper,
-                contentHorizontalPadding: 0, contentMaxWidth: nil, barHeight: 44, barSpacing: 0, capsule: nil
+                contentHorizontalPadding: 0, contentMaxWidth: nil, capsule: nil
             )
         }
 

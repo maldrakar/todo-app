@@ -42,19 +42,20 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
 }
 
 /// A list made wide carries the pane's numbers, in the list and in columns: the glass "+" in the capsule, no floating
-/// one, the content 780 wide at most and the board free (Task 9's table).
+/// one, the content 780 wide at most and the board free (Task 9's table). The buttons' row is the window's bar, which
+/// the safe area holds, so the content starts 10 under it, the canvas's 62 less the row's 52, and the fade is the
+/// paper up to the bar's foot and clear 8 under it, where the canvas's ends 60 down a 52 row (the controller's ruling
+/// R211).
 @Test func aWideListCarriesThePanesNumbers() throws {
     let store = try makeStore()
     try store.createTask(NewTask(title: "Buy milk", when: day(1)))
     let module = try list(BuiltInTaskViews.upcoming, in: store, width: .wide)
     let model = module.model
-    #expect(model.style.contentTop == 62)
+    #expect(model.style.contentTop == 10)
     #expect(model.style.contentBottom == 140)
     #expect(model.style.contentHorizontalPadding == 48)
     #expect(model.style.contentMaxWidth == 780)
-    #expect(model.style.fade == ListScreenStyle.Fade(color: .paper, height: 60, solidDepth: 33))
-    #expect(model.style.barHeight == 52)
-    #expect(model.style.barSpacing == 8)
+    #expect(model.style.fade == ListScreenStyle.Fade(color: .paper, height: 8, solidDepth: 0))
     #expect(model.style.capsule == GlassCapsuleStyle(
         height: 34, cornerRadius: 99, horizontalPadding: 3, glass: glass,
         divider: LineStyle(color: .line, width: 1, dash: []), dividerHeight: 16
@@ -102,7 +103,7 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(module.model.style.contentHorizontalPadding == 0)
     #expect(module.model.style.contentMaxWidth == nil)
     #expect(
-        module.model.style.fade == ListScreenStyle.Fade(color: .paper, height: 60, solidDepth: 33),
+        module.model.style.fade == ListScreenStyle.Fade(color: .paper, height: 8, solidDepth: 0),
         "the pane's fade is the pane's, over the board as over the list"
     )
     #expect(module.model.addTask == nil)
@@ -118,8 +119,7 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     let model = module.model
     #expect(model.style == ListScreenStyle(
         edgeInset: 14, fade: ListScreenStyle.Fade(color: .paper, height: 54, solidDepth: 15.12), contentTop: 56,
-        contentBottom: 116, background: .paper, contentHorizontalPadding: 0, contentMaxWidth: nil, barHeight: 44,
-        barSpacing: 0, capsule: nil
+        contentBottom: 116, background: .paper, contentHorizontalPadding: 0, contentMaxWidth: nil, capsule: nil
     ))
     #expect(model.addTask != nil)
     #expect(model.glassAddTask == nil)

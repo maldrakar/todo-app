@@ -75,6 +75,12 @@ extension DesignSystem {
         /// and `.bcol`).
         public static let dropHighlights = Animation(curve: ease, duration: 0.15)
 
+        /// A control's tint coming and going under the pointer, over 0.12 s (`Mac.dc.html`, `.mc-tap` and `.mc-trow`).
+        public static let hoverTints = Animation(curve: ease, duration: 0.12)
+
+        /// A column's card casting its deeper shadow under the pointer and back, over 0.15 s (`Mac.dc.html`, `.card`).
+        public static let hoverShadows = Animation(curve: ease, duration: 0.15)
+
         /// The curve a screen, a card and a row settle on, (.2, .8, .2, 1), quick and then slow.
         private static let settle = Curve.bezier(x1: 0.2, y1: 0.8, x2: 0.2, y2: 1)
 

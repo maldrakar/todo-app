@@ -261,7 +261,7 @@ private let addSubtask = AddRowModel<Action>(
     title: TextModel(text: "Add subtask", style: TextStyle(font: .notes, color: .ink2)),
     style: .init(
         iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 0, topPadding: 0, leadingPadding: 0,
-        trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
+        trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: nil
     ),
     action: .first
 )
@@ -327,7 +327,7 @@ private func card(
             style: .init(
                 iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0,
                 leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-                trailingMargin: 0
+                trailingMargin: 0, hover: nil
             ),
             action: .first
         )),
@@ -350,7 +350,7 @@ private let chevron = AccessoryModel<Action>.Chevron(
 
 private let blockHeaderStyle = BlockHeaderStyle(
     titleToSubtitle: 8, rule: stroke, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12,
-    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
+    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44, hover: nil
 )
 
 private func blockHeader(
@@ -374,7 +374,8 @@ private func blockHeader(
         "fold": blockHeader(fold: nil),
         "style": blockHeader(style: .init(
             titleToSubtitle: 8, rule: nil, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2,
-            leadingMargin: 12, topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44
+            leadingMargin: 12, topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44,
+            hover: nil
         )),
         "titleTapped": blockHeader(titleTapped: .second),
     ])
@@ -384,7 +385,7 @@ private let plus = IconModel(icon: .plus, style: IconStyle(size: 18, weight: .re
 
 private let addRowStyle = AddRowStyle(
     iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
-    trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+    trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12, hover: nil
 )
 
 private func addRow(
@@ -401,7 +402,7 @@ private func addRow(
         "title": addRow(title: TextModel(text: "Add list", style: TextStyle(font: .barLabel, color: .ink2))),
         "style": addRow(style: .init(
             iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
-            trailingPadding: 12, dash: line, rule: line, topMargin: 0, leadingMargin: 8, trailingMargin: 12
+            trailingPadding: 12, dash: line, rule: line, topMargin: 0, leadingMargin: 8, trailingMargin: 12, hover: nil
         )),
         "action": addRow(action: .second),
     ])
@@ -416,7 +417,7 @@ private let doneBump = DoneStripStyle.Bump(scale: 1.22, peakAt: 0.4, animation: 
 private let doneStripStyle = DoneStripStyle(
     height: 36, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
     leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance,
-    bump: doneBump
+    bump: doneBump, hover: nil
 )
 
 private func doneStrip(
@@ -444,7 +445,7 @@ private func doneStrip(
         "style": doneStrip(style: .init(
             height: 30, cornerRadius: 18, spacing: 8, leadingPadding: 10, trailingPadding: 14, topMargin: 20,
             leadingMargin: 14, trailingMargin: 16, background: .fill, capsuleToRows: 6, rowsEntrance: doneRowsEntrance,
-            bump: doneBump
+            bump: doneBump, hover: nil
         )),
         "isOpen": doneStrip(isOpen: true),
         "action": doneStrip(action: .second),

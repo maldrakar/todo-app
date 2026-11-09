@@ -27,6 +27,10 @@ public struct AddRowStyle: Equatable, Sendable {
     public let leadingMargin: Double
     public let trailingMargin: Double
 
+    /// The tint over the row while the pointer is over it, in its corners, and nil where there is no pointer to be,
+    /// the phone's.
+    public let hover: HoverStyle?
+
     public init(
         iconCellWidth: Double,
         spacing: Double,
@@ -40,7 +44,8 @@ public struct AddRowStyle: Equatable, Sendable {
         rule: LineStyle?,
         topMargin: Double,
         leadingMargin: Double,
-        trailingMargin: Double
+        trailingMargin: Double,
+        hover: HoverStyle?
     ) {
         self.iconCellWidth = iconCellWidth
         self.spacing = spacing
@@ -55,5 +60,6 @@ public struct AddRowStyle: Equatable, Sendable {
         self.topMargin = topMargin
         self.leadingMargin = leadingMargin
         self.trailingMargin = trailingMargin
+        self.hover = hover
     }
 }

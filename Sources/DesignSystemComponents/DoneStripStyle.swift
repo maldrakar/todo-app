@@ -38,6 +38,10 @@ public struct DoneStripStyle: Equatable, Sendable {
 
     public let bump: Bump
 
+    /// The tint over the capsule's fill while the pointer is over it, and nil where there is no pointer to be, the
+    /// phone's.
+    public let hover: HoverStyle?
+
     public init(
         height: Double,
         cornerRadius: Double,
@@ -50,7 +54,8 @@ public struct DoneStripStyle: Equatable, Sendable {
         background: DesignSystem.Color,
         capsuleToRows: Double,
         rowsEntrance: EntranceStyle,
-        bump: Bump
+        bump: Bump,
+        hover: HoverStyle?
     ) {
         self.height = height
         self.cornerRadius = cornerRadius
@@ -64,5 +69,6 @@ public struct DoneStripStyle: Equatable, Sendable {
         self.capsuleToRows = capsuleToRows
         self.rowsEntrance = rowsEntrance
         self.bump = bump
+        self.hover = hover
     }
 }

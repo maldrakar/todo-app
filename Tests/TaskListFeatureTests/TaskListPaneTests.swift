@@ -25,11 +25,16 @@ private let tagCapsule = MetaItemStyle.Capsule(
     background: .fill, height: 20, cornerRadius: 10, leadingPadding: 8, trailingPadding: 8
 )
 
+/// The pane's tint under a control the pointer is over: the canvas's `--hover` over 0.12 s (`Mac.dc.html`, `.mc-tap`
+/// and `.mc-trow`; the controller's ruling R209).
+private let hoverTint = HoverStyle(color: .hover, animation: .hoverTints)
+
 /// A list "Projects" with a list inside it, "House", a task in both with a tag, notes, a subtask and a deadline, and a
 /// task done today, on a wide window.
 private struct Scene {
     let store: Store
     let module: TaskList
+    let projects: ViewID
     let house: ViewID
     let milk: TaskID
     let tag: TagID
@@ -37,7 +42,7 @@ private struct Scene {
     init() throws {
         store = try makeStore()
         tag = try store.createTag(title: "home")
-        let projects = try store.createView(NewTaskView(title: "Projects", color: .rose, filter: .trashed(false)))
+        projects = try store.createView(NewTaskView(title: "Projects", color: .rose, filter: .trashed(false)))
         house = try store.createView(
             NewTaskView(title: "House", parent: projects, color: .teal, filter: .hasTag(tag))
         )
@@ -62,7 +67,7 @@ private func taskRowStyle(
         titleToMeta: 12, metaSpacing: 8, metaLineSpacing: 0, verticalPadding: 9, titleLeading: 4, titleTrailing: 0,
         leading: 4, trailing: 10, minimumHeight: 36, cornerRadius: 9, strike: isOpen ? nil : .ink3, lift: lift,
         fresh: fresh ? .fresh : nil, landingScale: nil, landingAnimation: .fresh, titleAnimation: .titleFades,
-        leaving: taskLeaving, ground: .paper, metaTrailing: true, hover: .hover
+        leaving: taskLeaving, ground: .paper, metaTrailing: true, hover: hoverTint
     )
 }
 
@@ -102,13 +107,14 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let header = try #require(house.header)
     #expect(header.style == BlockHeaderStyle(
         titleToSubtitle: 8, rule: rule, height: 34, topMargin: 14, trailingMargin: 0, bottomMargin: 2,
-        leadingMargin: 4, topPadding: 9, horizontalPadding: 6, bottomPadding: 0, cornerRadius: 7, foldHitSide: 30
+        leadingMargin: 4, topPadding: 9, horizontalPadding: 6, bottomPadding: 0, cornerRadius: 7, foldHitSide: 30,
+        hover: hoverTint
     ))
     #expect(header.fold?.icon.style.size == 15)
     let addTask = try #require(house.addTask)
     #expect(addTask.style == AddRowStyle(
         iconCellWidth: 32, spacing: 0, height: 32, width: nil, cornerRadius: 8, topPadding: 0, leadingPadding: 4,
-        trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
+        trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: hoverTint
     ))
     #expect(addTask.icon.style.size == 15)
     #expect(house.indicator == DropIndicatorStyle(
@@ -120,7 +126,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let addList = try #require(model.addList)
     #expect(addList.style == AddRowStyle(
         iconCellWidth: 32, spacing: 0, height: 36, width: nil, cornerRadius: 9, topPadding: 4, leadingPadding: 0,
-        trailingPadding: 12, dash: nil, rule: rule, topMargin: 10, leadingMargin: 4, trailingMargin: 0
+        trailingPadding: 12, dash: nil, rule: rule, topMargin: 10, leadingMargin: 4, trailingMargin: 0, hover: nil
     ))
     #expect(addList.icon.style.size == 15)
 
@@ -150,7 +156,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
         rowsEntrance: EntranceStyle(
             opacity: 0, scale: 0.94, offset: -6, anchorX: 0.12, anchorY: 0, animation: .popover
         ),
-        bump: .init(scale: 1.22, peakAt: 0.4, animation: .check)
+        bump: .init(scale: 1.22, peakAt: 0.4, animation: .check), hover: hoverTint
     ))
     #expect(done.icon.style.size == 16)
     #expect(done.chevron.icon.style.size == 13)
@@ -208,7 +214,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect([check.diameter, check.ringWidth, check.markSize, check.hitWidth, check.hitHeight] == [15, 1.5, 10, 30, 30])
     #expect(card.addSubtask.style == AddRowStyle(
         iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0, leadingPadding: 0,
-        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8, trailingMargin: 0
+        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8, trailingMargin: 0, hover: hoverTint
     ))
     #expect(card.addSubtask.icon.style.size == 14)
     let pill = try #require(card.pills.first)
@@ -221,10 +227,11 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(sizes.last == 12, "the hash")
 }
 
-/// The board: a column 288 wide rounded 14 with its header padded 11 12 7, its cards 6 apart and 6 in, each rounded 10
-/// with the resting shadow and the hover shadow, its check 18 across in a 34 by 36 hit, its title callout-sized and
-/// its meta 12 on a capsule for a tag, its open card 36 in and 12 short of its end, "+ Add task" 32 high (Task 9's
-/// table, Board).
+/// The board: a column 288 wide rounded 14 with its header padded 11 12 7 and tinted under the pointer within corners
+/// of 7, its cards 6 apart and 6 in, each rounded 10 with the resting shadow and the hover shadow over 0.15 s, its
+/// check 18 across in a 34 by 36 hit, its title callout-sized and its meta 12 with a tag as "#name", its open card 36
+/// in and 12 short of its end, "+ Add task" 32 high and tinted under the pointer (Task 9's table, Board;
+/// `Mac.dc.html`, the card's markup, :460-463, and `.card:hover`; the controller's rulings R209 and R210).
 @Test func thePanesBoardCarriesTheMacsNumbers() throws {
     let scene = try Scene()
     scene.module.tap(.showAsChosen(.columns))
@@ -238,11 +245,11 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(style.fill == .fill)
     #expect(style.cardBackground == .surface)
     #expect(style.cardShadow == .resting)
-    #expect(style.cardHoverShadow == .hovered)
+    #expect(style.cardHover == ColumnStyle.CardHover(shadow: .hovered, animation: .hoverShadows))
     #expect(style.dropRingWidth == 2)
     #expect(column.header.style == BlockHeaderStyle(
         titleToSubtitle: 8, rule: nil, height: 36, topMargin: 0, trailingMargin: 0, bottomMargin: 0, leadingMargin: 0,
-        topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 0, foldHitSide: nil
+        topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 7, foldHitSide: nil, hover: hoverTint
     ))
     let block = try scene.block(.list(scene.house))
     guard case .task(_, let card)? = block.rows.first else {
@@ -258,13 +265,13 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(card.title.style.font == .nestedRowTitle)
     #expect([card.check.style.diameter, card.check.style.hitWidth, card.check.style.hitHeight] == [18, 34, 36])
     #expect(card.swipe == nil)
-    let tag = try #require(card.meta.first { $0.text?.text == "home" })
-    #expect(tag.style.capsule == tagCapsule)
+    let tag = try #require(card.meta.first { $0.text?.text == "#home" }, "a card writes a tag out, on no capsule")
+    #expect(tag.style.capsule == nil)
     #expect(card.meta.compactMap(\.icon).allSatisfy { $0.style.size == 12 })
     let addTask = try #require(block.addTask)
     #expect(addTask.style == AddRowStyle(
         iconCellWidth: 15, spacing: 6, height: 32, width: nil, cornerRadius: 9, topPadding: 0, leadingPadding: 10,
-        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0
+        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: hoverTint
     ))
     #expect(addTask.icon.style.size == 15)
 
@@ -275,4 +282,36 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect([open.bodyLeading, open.bodyTrailing, open.bodyBottom] == [36, 12, 12])
     #expect(open.shadow == .resting)
     #expect(try #require(openCard(in: scene.model)).card.check.style.hitWidth == 34)
+}
+
+/// The meta line's order is the layout's: the pane's row reads notes, subtasks, tags and the deadline, the Mac canvas's
+/// row's (`Mac.dc.html`, :349-352), and the pane's card the deadline, tags, subtasks and notes, its own canvas's
+/// (:460-463), as the phone's row and card keep theirs (`Phone.dc.html`, :349-352) (the controller's ruling R210).
+@Test func theMetaLineFollowsItsLayoutsOrder() throws {
+    let scene = try Scene()
+    func line(_ model: TaskList.Model) throws -> (icons: [DesignSystem.Icon?], words: [String?]) {
+        let house = try #require(blocks(of: model).first { $0.id == .list(scene.house) })
+        guard case .task(_, let milk)? = house.rows.first else {
+            Issue.record("the first row of House is Buy milk's")
+            return ([], [])
+        }
+        return (milk.meta.map { $0.icon?.icon }, milk.meta.map { $0.text?.text })
+    }
+    let pane = try line(scene.model)
+    #expect(pane.icons == [.note, .list, nil, .flag])
+    #expect(Array(pane.words.prefix(3)) == [nil, "0/1", "home"])
+    scene.module.tap(.showAsChosen(.columns))
+    let card = try line(scene.model)
+    #expect(card.icons == [.flag, nil, .list, .note])
+    #expect(Array(card.words.dropFirst()) == ["#home", "0/1", nil])
+
+    // The device keeps the layout per list, so the phone's module opens on the board the pane chose.
+    let phone = try list(scene.projects, in: scene.store)
+    let phoneCard = try line(phone.model)
+    #expect(phoneCard.icons == [.flag, nil, .list, .note])
+    #expect(Array(phoneCard.words.dropFirst()) == ["#home", "0/1", nil])
+    phone.tap(.showAsChosen(.list))
+    let phoneRow = try line(phone.model)
+    #expect(phoneRow.icons == [.flag, nil, .list, .note])
+    #expect(Array(phoneRow.words.dropFirst()) == ["#home", "0/1", nil])
 }

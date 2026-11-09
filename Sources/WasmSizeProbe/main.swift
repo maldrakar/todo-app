@@ -565,13 +565,18 @@ private enum WasmSizeProbe {
         }
         switch list.layout {
         case .list(let blocks):
-            let headers = blocks.compactMap { $0.header.map { "\($0.title.text) \($0.fold?.accessibilityLabel ?? "")" } }
-            let adds = blocks.compactMap(\.addTask).map(\.title.text).joined(separator: "/")
+            let headers = blocks.compactMap { block in
+                block.header.map {
+                    "\($0.title.text) \($0.fold?.accessibilityLabel ?? "") \($0.style.hover?.color.light.opacity ?? 0)"
+                }
+            }
+            let adds = blocks.compactMap(\.addTask)
+                .map { "\($0.title.text) \($0.style.hover?.animation.duration ?? 0)" }.joined(separator: "/")
             shape = "\(blocks.count) blocks, marked \(blocks.first?.indicator?.height ?? 0), tinted "
                 + "\(blocks.first?.dropStyle?.cornerRadius ?? 0), \(blocks.filter(\.keepsDroppedPlace).count) keeping a place, "
                 + "\(blocks.filter(\.isFolded).count) folded, headed \(headers.joined(separator: "/")), adding \(adds), then \(list.addList?.title.text ?? "no list to add")"
         case .columns(let board):
-            let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, tinting on \($0.style.dropAnimation.duration), \($0.isDropTarget ? "taking" : "refusing") a drop" } }
+            let headers = board.columns.compactMap { $0.column.map { "\($0.header.field?.text ?? $0.header.title.text) \($0.style.width) wide, tinting on \($0.style.dropAnimation.duration), \($0.isDropTarget ? "taking" : "refusing") a drop, hovered \($0.header.style.hover?.animation.duration ?? 0)/\($0.style.cardHover.map { "\($0.shadow.radius) on \($0.animation.duration)" } ?? "flat")" } }
             shape = "\(board.columns.count) columns, \(board.snaps ? "snapping" : "free"), \(board.endRoom) after, headed \(headers.joined(separator: "/")), then \(board.addList?.title.text ?? "no list to add")"
         }
         let first = rows.first.map { row in
@@ -593,7 +598,8 @@ private enum WasmSizeProbe {
                     + "\(task.check.style.pop.peakScale) at \(task.check.style.pop.peakAt), "
                     + "ticks through \(task.check.style.mark.points.map { [$0.x, $0.y] }) in \(task.check.style.mark.box), "
                     + "round \(task.check.style.mark.isRound), "
-                    + "dims on \(task.style.lift?.dimAnimation.duration ?? 0)"
+                    + "dims on \(task.style.lift?.dimAnimation.duration ?? 0), "
+                    + "tints \(task.style.hover.map { "\($0.color.light.opacity)/\($0.animation.duration)" } ?? "no")"
             case .card(_, let card):
                 "a card on \(card.title.text)"
             }
@@ -606,7 +612,7 @@ private enum WasmSizeProbe {
             + "\(list.back.label.style.iconOffset), "
             + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "
             + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
-            + "on \(bar.background.light.red), row \(bar.barHeight)/\(bar.barSpacing), content "
+            + "on \(bar.background.light.red), content "
             + "\(bar.contentHorizontalPadding)/\(bar.contentMaxWidth ?? 0), "
             + (bar.capsule.map { "capsule \($0.height)/\($0.dividerHeight)" } ?? "no capsule")
         let empty = list.empty.map { "empty: \($0.title.text), \($0.style.bottomMargin) above what follows" } ?? "not empty"
@@ -650,7 +656,7 @@ private enum WasmSizeProbe {
             case .card(_, let card): "a card on \(card.title.text)"
             }
         }
-        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") \(list.done?.style.capsuleToRows ?? 0) in \(list.done.map { let e = $0.style.rowsEntrance; return "\(e.opacity)/\(e.scale)/\(e.offset) about \(e.anchorX),\(e.anchorY) on \(e.animation.duration)" } ?? "none"), bumps to \(list.done?.style.bump.scale ?? 0) at \(list.done?.style.bump.peakAt ?? 0) on \(list.done?.style.bump.animation.duration ?? 0) over \(rows.joined(separator: "/"))"
+        return "\(list.done?.label.text ?? "no strip") \(list.done?.chevron.accessibilityLabel ?? "") \(list.done?.style.capsuleToRows ?? 0) in \(list.done.map { let e = $0.style.rowsEntrance; return "\(e.opacity)/\(e.scale)/\(e.offset) about \(e.anchorX),\(e.anchorY) on \(e.animation.duration)" } ?? "none"), tints \(list.done?.style.hover?.animation.duration ?? 0), bumps to \(list.done?.style.bump.scale ?? 0) at \(list.done?.style.bump.peakAt ?? 0) on \(list.done?.style.bump.animation.duration ?? 0) over \(rows.joined(separator: "/"))"
     }
 
     /// The first task under an open strip, which the probe checks to reopen it.
