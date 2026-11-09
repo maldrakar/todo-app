@@ -146,7 +146,7 @@ extension TaskList.Metrics {
             contentHorizontalPadding: contentHorizontalPadding, contentMaxWidth: contentMaxWidth, barHeight: 52,
             barSpacing: 8,
             capsule: GlassCapsuleStyle(
-                height: 34, cornerRadius: 99, horizontalPadding: 3,
+                height: 34, cornerRadius: 99, horizontalPadding: 3, glass: paneGlassUnder,
                 divider: LineStyle(color: .line, width: 1, dash: []), dividerHeight: 16
             )
         )
@@ -159,12 +159,11 @@ extension TaskList.Metrics {
 
     /// The pane's glass buttons (Task 9's table, Pane): the back button a 34 circle on the glass with its chevron 19
     /// set 1 left of centre and stroked a little heavier than the phone's, and in the capsule the "+" 17, stroked
-    /// heavier too, and the "…" 18, each in a 30 by 28 item. The glass is the three buttons' alike, held here once and
-    /// drawn round the capsule by a platform and not round its items.
+    /// heavier too, and the "…" 18, each in a 30 by 28 item. The back button stands on glass of its own; the items
+    /// stand on the capsule's (`paneStyle`) and have none.
     private static let paneGlass = TaskList.Metrics.Glass(
         back: GlassControlStyle(
-            iconOffset: -1, diameter: 34, height: 34, surface: .glass,
-            line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+            iconOffset: -1, diameter: 34, height: 34, glass: paneGlassUnder
         ),
         backGlyphSize: 19, backGlyphWeight: .medium,
         more: paneCapsuleItem,
@@ -172,9 +171,12 @@ extension TaskList.Metrics {
         add: TaskList.Metrics.GlassAdd(style: paneCapsuleItem, glyphSize: 17, glyphWeight: .medium)
     )
 
-    private static let paneCapsuleItem = GlassControlStyle(
-        iconOffset: 0, diameter: 30, height: 28, surface: .glass,
-        line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+    private static let paneCapsuleItem = GlassControlStyle(iconOffset: 0, diameter: 30, height: 28, glass: nil)
+
+    /// The glass of the pane: the canvas's `.glass`, its surface edged with a 0.5 hairline and casting the raised
+    /// shadow (`Mac.dc.html`, the back button's and the capsule's), the back button's and the capsule's.
+    private static let paneGlassUnder = GlassControlStyle.Glass(
+        surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
     )
 
     /// The pane's header (Task 9's table, Header): the tile 40 across, rounded 11, its glyph 24, 12 before the title,

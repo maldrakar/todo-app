@@ -39,16 +39,19 @@ struct GlassButtonFace: View {
             .contentShape(Circle())
         // iOS 26's glass, which casts a shadow of its own and answers a press, and the Mac's and the watch's of the
         // same year; before them the canvas's: its surface over the material the bar's controls stand on, which
-        // stands in for its backdrop blur, edged with its hairline and casting its shadow (`GlassControlStyle`).
+        // stands in for its backdrop blur, edged with its hairline and casting its shadow (`GlassControlStyle.Glass`).
         if #available(iOS 26, macOS 26, watchOS 26, *) {
             glyph.glassEffect(.regular.interactive(), in: Circle())
         } else {
-            glyph
-                .background(Color(model.style.surface), in: Circle())
-                .glass(
-                    in: Circle(), edge: Color(model.style.line.color), edgeWidth: model.style.line.width,
-                    shadow: model.style.shadow
-                )
+            if let glass = model.style.glass {
+                glyph
+                    .background(Color(glass.surface), in: Circle())
+                    .glass(
+                        in: Circle(), edge: Color(glass.line.color), edgeWidth: glass.line.width, shadow: glass.shadow
+                    )
+            } else {
+                glyph
+            }
         }
     }
 }

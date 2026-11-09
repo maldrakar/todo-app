@@ -10,7 +10,9 @@ import TodoCore
 // in a narrow window and the Mac's pane in a wide one (list screen plan, Task 9; the controller's rulings R192 and
 // R195).
 
-private let grayLine = LineStyle(color: .glassLine, width: 0.5, dash: [])
+private let glass = GlassControlStyle.Glass(
+    surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+)
 
 private func columns(of model: TaskList.Model) -> TaskList.Model.Board? {
     switch model.layout {
@@ -54,12 +56,13 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(model.style.barHeight == 52)
     #expect(model.style.barSpacing == 8)
     #expect(model.style.capsule == GlassCapsuleStyle(
-        height: 34, cornerRadius: 99, horizontalPadding: 3,
+        height: 34, cornerRadius: 99, horizontalPadding: 3, glass: glass,
         divider: LineStyle(color: .line, width: 1, dash: []), dividerHeight: 16
-    ))
+    ), "the capsule's glass is its own")
     #expect(model.back.label.style == GlassControlStyle(
-        iconOffset: -1, diameter: 34, height: 34, surface: .glass, line: grayLine, shadow: .raised
-    ))
+        iconOffset: -1, diameter: 34, height: 34, glass: glass
+    ), "the back button stands alone, on its glass")
+    #expect(model.more.style.glass == nil, "the capsule's items draw none")
     #expect(model.back.label.icon.style == IconStyle(size: 19, weight: .medium, color: .ink))
     #expect(model.more.icon.style == IconStyle(size: 18, weight: .regular, color: .ink))
     #expect(model.more.style.diameter == 30)
@@ -67,9 +70,7 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(model.glassAddTask == GlassButtonModel(
         label: GlassButtonLabelModel(
             icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .medium, color: .ink)),
-            style: GlassControlStyle(
-                iconOffset: 0, diameter: 30, height: 28, surface: .glass, line: grayLine, shadow: .raised
-            ),
+            style: GlassControlStyle(iconOffset: 0, diameter: 30, height: 28, glass: nil),
             accessibilityLabel: "New task"
         ),
         action: .addTaskButtonTapped

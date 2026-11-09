@@ -278,8 +278,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         GlassButtonLabelModel(
             icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: .ink)),
             style: GlassControlStyle(
-                iconOffset: offset, diameter: 44, height: 44, surface: .glass,
-                line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+                iconOffset: offset, diameter: 44, height: 44,
+                glass: .init(surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised)
             ),
             accessibilityLabel: label
         )

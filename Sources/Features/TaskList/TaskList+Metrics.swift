@@ -490,15 +490,17 @@ extension TaskList {
         /// across set 2 left of centre, "…" 22.
         private static let phoneGlass = Glass(
             back: GlassControlStyle(
-                iconOffset: -2, diameter: 44, height: 44, surface: .glass,
-                line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+                iconOffset: -2, diameter: 44, height: 44, glass: phoneGlassUnder
             ),
             backGlyphSize: 24, backGlyphWeight: .regular,
             more: GlassControlStyle(
-                iconOffset: 0, diameter: 44, height: 44, surface: .glass,
-                line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
+                iconOffset: 0, diameter: 44, height: 44, glass: phoneGlassUnder
             ),
             moreGlyphSize: 22, add: nil
+        )
+
+        private static let phoneGlassUnder = GlassControlStyle.Glass(
+            surface: .glass, line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
         )
 
         /// The phone's screen (Task 8's table, Glass buttons; `Phone.dc.html`, the buttons' row and the scroller): the
