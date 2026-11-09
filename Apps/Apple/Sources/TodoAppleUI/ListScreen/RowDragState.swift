@@ -68,6 +68,19 @@ final class RowDragState {
         else { return }
         scrollView.setContentOffset(CGPoint(x: nearest, y: scrollView.contentOffset.y), animated: animated)
     }
+    #elseif os(macOS)
+    /// How large the scroll view the content stands in is, below the window's bar, and where the content's top left
+    /// corner stands in it, as the sidebar reads its own (`ListsTree`'s `viewport` and `contentTop`): the one reported
+    /// by the scroll view (`RowDropTarget`), the other by the content (`RowPointerDrag`).
+    var viewportSize = CGSize.zero
+    var contentOrigin = CGPoint.zero
+
+    /// The part of the content in sight, in its own coordinates, its scroll view's margins included, which the
+    /// pointer's drag lets go of nothing outside: none until the scroll view reports its size, so that no press lifts
+    /// a row before.
+    var viewport: CGRect {
+        CGRect(origin: CGPoint(x: -contentOrigin.x, y: -contentOrigin.y), size: viewportSize)
+    }
     #endif
 }
 
@@ -75,6 +88,26 @@ extension RowLift {
     /// The name of the space the frames are reported in, which is the content's of the list or of the board, and the
     /// Mac's pointer is read in.
     static let contentSpace = "RowLift.content"
+
+    #if os(macOS)
+    /// The name of the space of the scroll view the content stands in, which the content's place is read in, on the
+    /// Mac alone, whose pointer's drag reads what of the content is in sight.
+    static let viewportSpace = "RowLift.viewport"
+    #endif
+
+    /// A stage of a screen's drag, the system's on iOS or the pointer's on the Mac: the lift it leaves, written into
+    /// the screen's where it changed, and the drop it reports, sent; and whether it put a lift down.
+    @MainActor @discardableResult
+    static func step(
+        _ phase: Phase, of lift: Binding<RowLift?>, among blocks: [TaskList.Model.Block], frames: Frames,
+        send: (TaskList.UserAction) -> Void
+    ) -> Bool {
+        let step = after(phase, from: lift.wrappedValue, among: blocks, frames: frames)
+        let hasEnded = lift.wrappedValue != nil && step.lift == nil
+        if step.lift != lift.wrappedValue { lift.wrappedValue = step.lift }
+        if let drop = step.drop { send(drop) }
+        return hasEnded
+    }
 }
 
 extension View {

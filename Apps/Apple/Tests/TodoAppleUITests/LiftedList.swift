@@ -20,6 +20,10 @@ struct LiftedList {
     /// The pointer's press under way, as the Mac's drag keeps it from its first move to its end.
     private(set) var pointerPress: RowPointerPress?
 
+    /// The part of the content in sight, in its own coordinates, which the Mac's drag lets go of nothing outside: the
+    /// whole of what the layout draws until a test scrolls it.
+    private(set) var viewport: CGRect
+
     private var scrolled: [TaskList.Model.BlockID: CGFloat] = [:]
     private var areasLeft: [TaskList.Model.BlockID: CGRect] = [:]
     private let module: TaskList
@@ -86,6 +90,12 @@ struct LiftedList {
             store: store, route: TaskList.Route(head: .init(view: parent)), day: testDay, width: pane ? .wide : .narrow
         )
         layout = pane ? .pane : .phone
+        // Five blocks, the list's own and the four lists inside, under one another or side by side.
+        let board = CGSize(
+            width: 5 * (layout.columnWidth + layout.columnGap), height: layout.columnHeader + layout.columnArea
+        )
+        let list = CGSize(width: 2 * layout.blockX + layout.blockWidth, height: 1_000)
+        viewport = CGRect(origin: .zero, size: columns ? board : list)
         if columns {
             _ = module.send(.action(.showAsChosen(.columns)))
         }
@@ -201,26 +211,21 @@ struct LiftedList {
         lift = step.lift
     }
 
-    /// The pointer pressed at `start` and moved to the point, handed on as the Mac's drag hands a move on: its first
-    /// move reads the press, the row it began on among the frames of what is drawn and its session, and each move the
-    /// stage it makes.
-    mutating func pointer(from start: CGPoint, to point: CGPoint) {
-        let pointerPress = pointerPress ?? RowPointerPress(at: start, among: blocks, frames: frames)
-        self.pointerPress = pointerPress
-        if let phase = pointerPress.phase(at: point, lift: lift) { press(phase) }
+    /// An event of the pointer's drag, handed on as the Mac's drag hands it on (`RowPointerDrag`): the press it leaves
+    /// and the stage it makes, over the frames of what is drawn now and the part of it in sight.
+    mutating func pointer(_ event: RowPointerPress.Event) {
+        let step = RowPointerPress.after(
+            event, from: pointerPress, lift: lift, among: blocks, frames: frames, viewport: viewport
+        )
+        pointerPress = step.press
+        if let phase = step.phase { press(phase) }
     }
 
-    /// The pointer let go, which ends its drag and its press.
-    mutating func pointerReleased() {
-        press(.ended)
-        pointerPress = nil
-    }
+    /// The pointer's press lost with the gesture's state, which SwiftUI may drop, its lift left drawn.
+    mutating func losePointerPress() { pointerPress = nil }
 
-    /// The pointer's drag cancelled by SwiftUI, which puts its row down and ends its press.
-    mutating func pointerCancelled() {
-        press(.cancelled)
-        pointerPress = nil
-    }
+    /// The content scrolled so that what is in sight begins at the height.
+    mutating func scroll(to y: CGFloat) { viewport.origin.y = y }
 
     /// What the module has to say after what it was sent, nil where nothing went wrong.
     var problem: String? { module.model.problem }
