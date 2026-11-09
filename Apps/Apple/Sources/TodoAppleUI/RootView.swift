@@ -93,6 +93,9 @@ struct RootView: View {
                 Group {
                     if let column {
                         wideScreen(column, showsBack: false)
+                            // Another list in the column is another pane, with nothing of the last one's: its scroll
+                            // started where the last list's stood (macOS 26.7.1, 2026-11-09).
+                            .id(column)
                     } else {
                         Text("Nothing to show")
                             .foregroundStyle(.secondary)
@@ -181,8 +184,9 @@ struct RootView: View {
         }
     }
 
-    /// A screen of the wide tree's stack, a list drawn as the pane, with its glass back where the tree says: none for
-    /// the column's list, the sidebar being the base and the column never popped, and one for a list pushed over it.
+    /// A screen of the wide tree's stack, a list drawn as the pane, on the iPad with its glass back where the tree says:
+    /// none for the column's list, the sidebar being the base and the column never popped, and one for a list pushed
+    /// over it. The Mac's back is its toolbar's own (`ListPane`).
     /// The pane carries no Quick Entry button, its capsule's "+" adding in place as the phone's floating "+" does;
     /// quick entry stays the sidebar's "+", ⌘N and the placeholder's button (the controller's ruling R197 on #178).
     private func wideScreen(_ id: StackElementID, showsBack: Bool) -> some View {
