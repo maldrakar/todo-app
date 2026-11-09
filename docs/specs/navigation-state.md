@@ -1,8 +1,10 @@
 # Spec: Navigation state the view only reads
 
-- Status: Approved 2026-10-22 (revision 3)
+- Status: Approved 2026-10-22 (revision 3); amended 2026-11-10 (#195)
 - Owner review: https://claude.ai/artifact/U3wtm2JcKqC9QEZe3p3mJv
 - Issue: #117
+
+> Amended 2026-11-10 (#195), on the owner's decision in chat: every screen the stack lets go, by Back or by its opener's slot, hears first that it goes, top down, and closes what it has open, and one let go in answer to a change the store committed hears nothing (sections 2, 3 and 8; ADR-0009, amendment of 2026-11-10).
 
 Written for the owner. The bar is readability: modules and their contracts in prose, types only where the design depends on them. Every type defined outside this document gets a one-line reminder at its first mention and an entry in the glossary at the end. Names in `code` that do not exist yet are working names, settled by a compiler probe in the plan, as the navigation spec did for `Seat`.
 
@@ -196,7 +198,7 @@ sequenceDiagram
   V->>V: SwiftUI pushes the task
 ```
 
-**Back twice, narrow window.** SwiftUI writes `[#1]`; the view sends `.wentBack(to: [#1])`. The flow tells #1 that what was over it was closed; the list empties its slot; the stack drops #2. The text is `/view/<v>`. The second Back writes `[]`; the sidebar is told; it empties its slot, and the highlight goes; the stack drops #1. The text is `/`, and a relaunch opens the Inbox, as a new window does.
+**Back twice, narrow window.** SwiftUI writes `[#1]`; the view sends `.wentBack(to: [#1])`. #2 hears that it goes and closes what it has open, and the stack drops it; then the flow tells #1 that what was over it was closed, and the list empties its slot. The text is `/view/<v>`. The second Back writes `[]`; #1 hears that it goes, closes its card and a new list's name, and the stack drops it; then the sidebar is told, it empties its slot, and the highlight goes. The text is `/`, and a relaunch opens the Inbox, as a new window does.
 
 **A task deleted while its screen is open, wide window.** The host delivers `.changed`; the stack hands it to every element, base first. #2 finds its task gone and answers that it asks to be closed; the stack hands that answer to #1, which empties its slot; the walk drops #2. The shape is `wide(column: #1, path: [])`, SwiftUI pops, and the write it may make afterwards names a prefix the stack holds, so it moves nothing.
 

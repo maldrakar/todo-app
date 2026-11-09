@@ -1,12 +1,14 @@
 # Spec: The list screen
 
-- Status: Approved 2026-11-01 (revision 5); amended 2026-11-02 (#182) and 2026-11-08 (#194)
+- Status: Approved 2026-11-01 (revision 5); amended 2026-11-02 (#182), 2026-11-08 (#194) and 2026-11-10 (#195)
 - Owner review: https://claude.ai/artifact/LkHnP681CciwgYNgJL8fkm
 - Issue: #166
 
 > Amended 2026-11-02 (#182), on the owner's decision in chat: a group opened as a screen is a view the module derives from its list and the group, stored nowhere and addressed by the list's id and the group's key, where revision 5 made it a row of kind `group`. Sections 2, 9 and 12, the testing paragraph, the diagram, the rejected alternatives, the risks, the ADR notes and the glossary changed with it; the owner reviewed the change in its pull request rather than on the review page.
 
 > Amended 2026-11-08 (#194), on the owner's answers in its review: a drag marks a place only where the task will take it, the block it was dragged from when its rows are one manual order, and tints another block as a column is tinted (sections 6 and 10); the back circle sends the list's own action (section 1).
+
+> Amended 2026-11-10 (#195), on the owner's decision in chat: the swipe from the edge, the Mac's toolbar back and every other way the stack lets a list go close what is open as the back circle does, a refused write unsaid (sections 1 and 10).
 
 Written for the owner. The bar is readability: modules and their contracts in prose, types only where the design depends on them. Every type defined outside this document gets a one-line reminder at its first mention and an entry in the glossary at the end. Names in `code` that do not exist yet are working names, settled by a compiler probe in the plan, as the Lists screen spec did.
 
