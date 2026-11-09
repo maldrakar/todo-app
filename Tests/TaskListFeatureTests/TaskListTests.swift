@@ -54,7 +54,8 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func aListIsTitledByItsView() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
-    #expect(try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow).model.header.title.text == "Inbox")
+    let made = try TaskList(store: store, route: on(inbox), day: testDay, width: .narrow)
+    #expect(made.model.header.title.text == "Inbox")
     #expect(try TaskList(store: store, route: on(work), day: testDay, width: .narrow).model.header.title.text == "Work")
 }
 
@@ -64,9 +65,13 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let store = try makeStore()
     let gone = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
     try store.delete(view: gone)
-    #expect(throws: StoreError.notFound(gone)) { try TaskList(store: store, route: on(gone), day: testDay, width: .narrow) }
+    #expect(throws: StoreError.notFound(gone)) {
+        try TaskList(store: store, route: on(gone), day: testDay, width: .narrow)
+    }
     let unknown = ViewID()
-    #expect(throws: StoreError.notFound(unknown)) { try TaskList(store: store, route: on(unknown), day: testDay, width: .narrow) }
+    #expect(throws: StoreError.notFound(unknown)) {
+        try TaskList(store: store, route: on(unknown), day: testDay, width: .narrow)
+    }
 }
 
 /// A link to a task, or a window restored onto one, makes the list with the task declared over it, which the
@@ -251,7 +256,10 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
 @Test func theListOverTheListAnswersToCloseAndEmptiesTheDestination() throws {
     let store = try makeStore()
     let work = try store.createView(NewTaskView(title: "Work", filter: .status([.open])))
-    let list = try TaskList(store: store, route: TaskList.Route(head: .init(view: inbox), tail: .list(on(work))), day: testDay, width: .narrow)
+    let list = try TaskList(
+        store: store, route: TaskList.Route(head: .init(view: inbox), tail: .list(on(work))), day: testDay,
+        width: .narrow
+    )
     let before = list.model
     #expect(list.send(.destinationAnswered(.list(.closeRequested))) == nil)
     #expect(list.destination.pushed == nil)
@@ -447,7 +455,9 @@ private func listOn(_ view: ViewID, in store: Store, on day: DeviceDay = testDay
     let gone = try store.createTask(NewTask(title: "Buy milk"))
     try store.delete(task: gone)
     let today = BuiltInTaskViews.today
-    let list = try TaskList(store: store, route: on(today), day: deviceDay(testDay.day.advanced(by: -1)), width: .narrow)
+    let list = try TaskList(
+        store: store, route: on(today), day: deviceDay(testDay.day.advanced(by: -1)), width: .narrow
+    )
     _ = list.send(.route(on(today, task: gone)))
     _ = list.send(.notOpened(.notFound(gone), stillOpen: nil))
     #expect(list.model.problem == "The task is gone.", "the sentence is the setup; without it this proves nothing")

@@ -117,11 +117,11 @@ public final class TaskList: Routable {
         case dayChanged(DeviceDay)
 
         /// The width class of the window, which the root hands every screen of its stack when the window's view reports
-        /// it: an event of the world and not a `UserAction`, as the day is (ADR-0006, amendment of 2026-10-22). It moves
-        /// the width alone, which the components' numbers are computed from on every read of the model, the phone's in
-        /// a narrow window and the Mac pane's in a wide one, so they follow it with no read of the store; the sentence,
-        /// the open card and its drafts, the picked tags and the destination stay, and the width the list already has
-        /// moves nothing.
+        /// it: an event of the world and not a `UserAction`, as the day is (ADR-0006, amendment of 2026-10-22). It
+        /// moves the width alone, which the components' numbers are computed from on every read of the model, the
+        /// phone's in a narrow window and the Mac pane's in a wide one, so they follow it with no read of the store;
+        /// the sentence, the open card and its drafts, the picked tags and the destination stay, and the width the list
+        /// already has moves nothing.
         case widthChanged(WindowWidth)
     }
 
@@ -221,7 +221,7 @@ public final class TaskList: Routable {
         case .action(.subtaskFieldLostFocus): writeSubtask(thenOpensNext: false)
         case .action(.subtaskFieldCancelled): state.card?.subtaskDraft = nil
         case .action(.openFullScreenTapped): openFullScreen()
-        case .action(.addTaskButtonTapped): addFromFloatingButton()
+        case .action(.addTaskButtonTapped): addFromButton()
         case .action(.addTaskRowTapped(let block)): addFromRow(in: block)
         case .action(.addListTapped): addList()
         case .action(.listNameFieldChanged(let text)): typeListName(text)
@@ -368,6 +368,7 @@ public final class TaskList: Routable {
         case .widthChanged(let width):
             // The numbers are computed from the width on every read of the model, so this moves them alone and reads
             // nothing; the same width again moves nothing.
+            guard width != state.width else { return nil }
             state.width = width
             return nil
         }

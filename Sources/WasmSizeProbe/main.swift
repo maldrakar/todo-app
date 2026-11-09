@@ -371,7 +371,10 @@ private enum WasmSizeProbe {
         print("bar \(bar); in edit mode \(editBar); without edit mode \(barLine(of: withoutEditMode.model))")
         print("asked \(asked ?? "nothing"); drag \(drag), narrow \(narrowDrag)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
-        print("chain at \(chainRoute): \(chain.joined(separator: " under ")); columns \(columns); wide \(wide); then \(pushedInside)")
+        print(
+            "chain at \(chainRoute): \(chain.joined(separator: " under ")); columns \(columns); wide \(wide); "
+                + "then \(pushedInside)"
+        )
         print("group at \(groupRoute): \(group); the next day \(nextDay)")
         print("edits \(edits)")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
@@ -611,7 +614,8 @@ private enum WasmSizeProbe {
         let glassPlus = list.glassAddTask.map {
             "glass \($0.label.accessibilityLabel) \($0.label.style.diameter)x\($0.label.style.height)"
         } ?? "no glass plus"
-        return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(glass), \(empty), \(plus), \(glassPlus)"
+        return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(glass), \(empty), \(plus), "
+            + glassPlus
     }
 
     /// The open card of a list standing in the window's stack as a line, every part a view draws, and "no card" when none

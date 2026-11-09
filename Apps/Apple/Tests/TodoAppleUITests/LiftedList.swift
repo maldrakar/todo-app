@@ -57,7 +57,9 @@ struct LiftedList {
         o2 = try store.createTask(NewTask(title: "O2", when: officeByDay ? testDay.day.advanced(by: 1) : nil, tags: [work]))
         e1 = try store.createTask(NewTask(title: "E1", tags: [x]))
         both = taskInHouseAndOffice ? try store.createTask(NewTask(title: "Both", tags: [home, work])) : nil
-        module = try TaskList(store: store, route: TaskList.Route(head: .init(view: parent)), day: testDay, width: .narrow)
+        module = try TaskList(
+            store: store, route: TaskList.Route(head: .init(view: parent)), day: testDay, width: .narrow
+        )
         if columns {
             _ = module.send(.action(.showAsChosen(.columns)))
         }

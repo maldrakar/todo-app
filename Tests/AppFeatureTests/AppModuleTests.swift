@@ -361,7 +361,10 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
         Issue.record("a window made narrow is laid out narrow, and is \(app.model.layout)")
         return
     }
-    #expect(try path.map { try #require(app.model.screens[$0]) } == [listOn(inbox, in: store, width: .narrow), taskOn(id, in: store)])
+    #expect(
+        try path.map { try #require(app.model.screens[$0]) }
+            == [listOn(inbox, in: store, width: .narrow), taskOn(id, in: store)]
+    )
     #expect(app.model.screens.count == path.count, "a model for every id of the path, and none beside")
 }
 
@@ -1064,7 +1067,9 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
     let path = idsOverTheSidebar(in: app.model)
     #expect(path.count == 2)
     #expect(Set(path).count == 2, "two elements, two ids")
-    #expect(try standing(in: app) == [listOn(projects, in: store, width: .narrow), listOn(home, in: store, width: .narrow)])
+    #expect(
+        try standing(in: app) == [listOn(projects, in: store, width: .narrow), listOn(home, in: store, width: .narrow)]
+    )
     #expect(app.model.taskViewList == (try sidebarOn(projects, in: store, width: .narrow)), "the light on the base")
     #expect(app.route.path == "/view/\(projects)/view/\(home)")
 }
@@ -1081,7 +1086,10 @@ private func rows(of list: TaskList.Model) -> [(id: TaskID, title: String)] {
         capabilities: iPhone
     )
     #expect(idsOverTheSidebar(in: app.model).count == 3)
-    #expect(try standing(in: app) == [listOn(upcoming, in: store, width: .narrow), groupOn(.day(1), of: upcoming, in: store, width: .narrow), taskOn(id, in: store)])
+    #expect(try standing(in: app) == [
+        listOn(upcoming, in: store, width: .narrow), groupOn(.day(1), of: upcoming, in: store, width: .narrow),
+        taskOn(id, in: store),
+    ])
     #expect(app.model.taskViewList == (try sidebarOn(upcoming, in: store, width: .narrow)))
     #expect(app.route.path == "/view/\(upcoming)/day/+1/task/\(id)")
 }
@@ -1258,11 +1266,18 @@ private let linkSentence = "The link could not be opened."
         let list = try #require(idsOverTheSidebar(in: window.model).first)
         #expect(window.send(.action(.screen(list, .list(.rowTapped(open))))) == nil)
         #expect(window.send(.action(.screen(list, .list(.openFullScreenTapped)))) == nil)
-        #expect(try standing(in: window) == [listOn(inbox, in: store, width: .narrow, card: open), taskOn(open, in: store)], "Open full screen pushed the task; this is the setup")
+        #expect(
+            try standing(in: window)
+                == [listOn(inbox, in: store, width: .narrow, card: open), taskOn(open, in: store)],
+            "Open full screen pushed the task; this is the setup"
+        )
         #expect(window.send(.action(.wentBack(to: [list]))) == nil)
         #expect(window.send(.action(.quickEntry(.titleFieldChanged("Call the bank")))) == nil)
     }
-    #expect(try standing(in: twin) == [listOn(inbox, in: store, width: .narrow, card: open)], "the way back closed the task, and left its card; this is the setup")
+    #expect(
+        try standing(in: twin) == [listOn(inbox, in: store, width: .narrow, card: open)],
+        "the way back closed the task, and left its card; this is the setup"
+    )
     #expect(twin.model.quickEntry?.draft == "Call the bank", "and quick entry took the keystroke")
     #expect(app.model.taskViewList == twin.model.taskViewList)
     #expect(app.model.layout == twin.model.layout)

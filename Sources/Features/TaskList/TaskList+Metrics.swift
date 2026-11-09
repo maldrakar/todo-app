@@ -337,8 +337,8 @@ extension TaskList {
             reducedAnimation: .rowLeavesWithNoMotion, deleteAnimation: .rowDeleted
         )
 
-        /// A check at its own size, in a hit as high and as wide as it says, in the colour given, on the motions, the pop
-        /// and the tick every check has.
+        /// A check at its own size, in a hit as high and as wide as it says, in the colour given, on the motions, the
+        /// pop and the tick every check has.
         static func checkStyle(
             diameter: Double, ringWidth: Double, markSize: Double, markStrokeWidth: Double, hitWidth: Double,
             hitHeight: Double, color: Tile

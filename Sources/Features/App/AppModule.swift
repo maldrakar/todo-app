@@ -133,10 +133,10 @@ public final class AppModule: Routable {
         /// pressed anything, and a view's closure spells user actions alone (the owner, 2026-10-20, on the window's
         /// way in).
         ///
-        /// It moves the layout, the sidebar's tiles and title fonts, which the sidebar builds for the width it is handed
-        /// (Lists screen spec, sections 8 and 9), and the numbers of every list over it, the phone's in a narrow window
-        /// and the Mac pane's in a wide one (list screen spec, section 9), and nothing else: no screen is made or
-        /// dropped, no sentence moves and the route stays, so the width the window already has moves nothing. It is
+        /// It moves the layout, the sidebar's tiles and title fonts, which the sidebar builds for the width it is
+        /// handed (Lists screen spec, sections 8 and 9), and the numbers of every list over it, the phone's in a narrow
+        /// window and the Mac pane's in a wide one (list screen spec, section 9), and nothing else: no screen is made
+        /// or dropped, no sentence moves and the route stays, so the width the window already has moves nothing. It is
         /// kept first, so that a list the walk after it makes, and every list made later, starts on it.
         case widthChanged(WindowWidth)
         /// The device's day as the window's view reports it, at the window's start and whenever it changes, at
@@ -211,10 +211,10 @@ public final class AppModule: Routable {
         )
         // The stack and the seat are built once, here, each with the way to make what it holds: a closure over the
         // `init` of the kind the route names that captures the store and never this root. The root holds both in its
-        // state, so a closure holding the root would close a cycle, root to state to stack or seat to closure to
-        // root, and none of them would ever be released (`ScreenStack.init`, `Seat.init`). The stack's closure
-        // captures the window's day and width the same way, in the reference the root keeps them in (`World`), and
-        // reads them when it makes a list. The stack's closure names its error, the screens' `Failure`; the seat's throws nothing, so
+        // state, so a closure holding the root would close a cycle, root to state to stack or seat to closure to root,
+        // and none of them would ever be released (`ScreenStack.init`, `Seat.init`). The stack's closure captures the
+        // window's day and width the same way, in the reference the root keeps them in (`World`), and reads them when
+        // it makes a list. The stack's closure names its error, the screens' `Failure`; the seat's throws nothing, so
         // it is applied without `try`.
         let world = World(day: day, width: width)
         let stack = ScreenStack<Screen>(base: taskViewList) { route throws(StoreError) in
@@ -297,6 +297,7 @@ public final class AppModule: Routable {
             // screen draws none, so its case of `Screen` hands it nothing. The sidebar answers nothing, and no list
             // writes a destination for it, so the walk after the event moves nothing. The same width again moves
             // nothing in any of them.
+            guard width != state.world.width else { return nil }
             state.world.width = width
             return sendToTheSidebarAndEveryScreen(sidebar: .widthChanged(width), screens: .widthChanged(width))
         case .dayChanged(let day):
@@ -315,10 +316,10 @@ public final class AppModule: Routable {
     /// the screens' words, bottom up, as the path stood when the event arrived, which is read before the sidebar takes
     /// it: a screen the walk after one of them drops, with what stands over it, is a screen whose id the loop then
     /// finds gone and hands nothing. Of what the sidebar answers the root returns the first drawn, as the stack does
-    /// within one call. One walk for every event the sidebar and every screen are handed, `.changed`, `.dayChanged` and `.widthChanged`,
-    /// so that the two reach the same modules in the same order. The event is spelled twice, since the sidebar and the
-    /// screens each have an enum of their own, and the labels put the two spellings side by side at the call, where a
-    /// pair that does not match shows.
+    /// within one call. One walk for every event the sidebar and every screen are handed, `.changed`, `.dayChanged` and
+    /// `.widthChanged`, so that the two reach the same modules in the same order. The event is spelled twice, since the
+    /// sidebar and the screens each have an enum of their own, and the labels put the two spellings side by side at the
+    /// call, where a pair that does not match shows.
     private func sendToTheSidebarAndEveryScreen(sidebar: TaskViewList.Event, screens: Screen.Event) -> Output? {
         let path = state.stack.path
         var output = react(to: state.stack.send(sidebar))
@@ -418,17 +419,17 @@ public final class AppModule: Routable {
         }
     }
 
-    /// The device's day and the window's width class as the window's view reported them last, or the ones the window was
-    /// made with: what the stack makes a list on, so that a list made after midnight starts on the new day (spec section
-    /// 8) and a list made in a window that was widened starts at the pane's numbers.
+    /// The device's day and the window's width class as the window's view reported them last, or the ones the window
+    /// was made with: what the stack makes a list on, so that a list made after midnight starts on the new day (spec
+    /// section 8) and a list made in a window that was widened starts at the pane's numbers.
     ///
     /// A reference, and not a value of the state, because the stack's closure is built once, in `init`, before the
-    /// state exists, and has to read the day and the width a list is made on when the list is made, not the ones the window was
-    /// made with. It captures this, as it captures the store, and never the root: the root holds the stack in its state, so
-    /// a closure holding the root would close a cycle, root to state to stack to closure to root, and none of them
-    /// would ever be released (`ScreenStack.init`). This holds nothing but the two, so the closure that holds it closes
-    /// no cycle. The state holds it too, so that it is the one place the root keeps either and `send` writes them
-    /// there; a value beside it would be a second copy.
+    /// state exists, and has to read the day and the width a list is made on when the list is made, not the ones the
+    /// window was made with. It captures this, as it captures the store, and never the root: the root holds the stack
+    /// in its state, so a closure holding the root would close a cycle, root to state to stack to closure to root, and
+    /// none of them would ever be released (`ScreenStack.init`). This holds nothing but the two, so the closure that
+    /// holds it closes no cycle. The state holds it too, so that it is the one place the root keeps either and `send`
+    /// writes them there; a value beside it would be a second copy.
     private final class World {
         var day: DeviceDay
         var width: WindowWidth

@@ -50,11 +50,11 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(model.style.contentBottom == 140)
     #expect(model.style.contentHorizontalPadding == 48)
     #expect(model.style.contentMaxWidth == 780)
-    #expect(model.style.fade == nil)
+    #expect(model.style.fade == ListScreenStyle.Fade(color: .paper, height: 60, solidDepth: 33))
     #expect(model.style.barHeight == 52)
     #expect(model.style.barSpacing == 8)
     #expect(model.style.capsule == GlassCapsuleStyle(
-        height: 34, cornerRadius: 99, horizontalPadding: 3, surface: .glass, line: grayLine, shadow: .raised,
+        height: 34, cornerRadius: 99, horizontalPadding: 3,
         divider: LineStyle(color: .line, width: 1, dash: []), dividerHeight: 16
     ))
     #expect(model.back.label.style == GlassControlStyle(
@@ -100,7 +100,10 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(try #require(board.columns.first?.column).style.width == 288)
     #expect(module.model.style.contentHorizontalPadding == 0)
     #expect(module.model.style.contentMaxWidth == nil)
-    #expect(module.model.style.fade == nil)
+    #expect(
+        module.model.style.fade == ListScreenStyle.Fade(color: .paper, height: 60, solidDepth: 33),
+        "the pane's fade is the pane's, over the board as over the list"
+    )
     #expect(module.model.addTask == nil)
     #expect(module.model.glassAddTask != nil)
 }
@@ -163,15 +166,27 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(openCard(in: narrow.model)?.card.subtaskField?.text == "Wipe the shelf", "the open card and its draft stay")
 }
 
-/// The width a list already has moves nothing, and reads nothing from the store.
-@Test func theSameWidthMovesNothing() throws {
+/// A width reads nothing from the store, the one it has and a new one alike: the page is state, and the numbers are
+/// computed from the width on every read of the model. A task renamed behind the module's back, with no change handed
+/// to it, shows on screen only if the page was read again, so the old title standing proves no read (a day's change
+/// is the control: it rereads and the new title shows). The guard on the width it already has is the sibling of the
+/// day's and moves nothing a test could see beyond that.
+@Test func aWidthRereadsNothingFromTheStore() throws {
     let store = try makeStore()
     let ids = try seeded(store)
-    for width in [WindowWidth.narrow, .wide] {
-        let module = try opened(in: store, width: width, ids)
-        let before = module.model
-        #expect(commits(of: store) { _ = module.send(.widthChanged(width)) } == 0)
-        #expect(module.model == before)
+    for (first, second) in [(WindowWidth.narrow, WindowWidth.wide), (.wide, .narrow)] {
+        let module = try opened(in: store, width: first, ids)
+        func titles() -> [String] { rows(of: module.model).map(\.title) }
+        let before = titles()
+        try store.update(task: ids.milk, [.title("Renamed behind its back")])
+        #expect(module.send(.widthChanged(first)) == nil)
+        #expect(titles() == before, "the width it has")
+        #expect(module.send(.widthChanged(second)) == nil)
+        #expect(titles() == before, "a new width")
+        let tomorrow = deviceDay(day(1))
+        #expect(module.send(.dayChanged(tomorrow)) == nil)
+        #expect(titles() != before, "control: a new day rereads, so the test can tell")
+        try store.update(task: ids.milk, [.title("Buy milk")])
     }
 }
 

@@ -50,7 +50,8 @@ public struct TaskRowStyle: Equatable, Sendable {
     public let ground: DesignSystem.Color?
 
     /// Whether the meta line stands on the title's line, after the title, `titleToMeta` from it, the title keeping to
-    /// one line and the items not wrapping (`Mac.dc.html`, the row), and not under it, where it wraps (`Phone.dc.html`).
+    /// one line and the items not wrapping (`Mac.dc.html`, the row), and not under it, where it wraps
+    /// (`Phone.dc.html`).
     public let metaTrailing: Bool
 
     /// The colour under the row while the pointer is over it, and nil where there is no pointer to be: the phone's,

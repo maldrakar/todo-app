@@ -65,21 +65,19 @@ extension TaskList {
 
     // MARK: - Adding a task
 
-    /// The floating "+" and the pane's glass one: a new task at the top of the block it adds to, by what that block's rule asks (spec section 4;
-    /// the controller's ruling on #176, 2026-11-05). The card that was open closes first, which can change which block
-    /// that is, and a close the store refused stops the add, so that its sentence stands; the card is closed, so a
-    /// second tap adds.
-    func addFromFloatingButton() {
-        // Whichever "+" the layout draws, floating or in the pane's capsule: a list that takes no task has neither.
-        let model = self.model
-        guard model.addTask != nil || model.glassAddTask != nil else { return }
+    /// The "+", the phone's floating one and the pane's glass one, which send the same action: a new task at the top of
+    /// the block it adds to, by what that block's rule asks (spec section 4; the controller's ruling on #176,
+    /// 2026-11-05). A list that takes no task has neither "+", the target being the one condition that decides both.
+    /// The card that was open closes first, which can change which block that is, and a close the store refused stops
+    /// the add, so that its sentence stands; the card is closed, so a second tap adds.
+    func addFromButton() {
+        func target() -> (edit: TaskEdit, view: TaskView)? {
+            TaskList.floatingTarget(in: state.pageBlocks, of: state.snapshot, head: state.head, today: state.day.day)
+        }
+        guard target() != nil else { return }
         state.problem = nil
         closeCard()
-        guard state.problem == nil else { return }
-        let target = TaskList.floatingTarget(
-            in: state.pageBlocks, of: state.snapshot, head: state.head, today: state.day.day
-        )
-        guard let target else { return }
+        guard state.problem == nil, let target = target() else { return }
         addTask(target.edit, at: .start, onTopOf: target.view)
     }
 

@@ -12,14 +12,14 @@ extension TaskList.Metrics {
     private typealias Tile = DesignSystem.Color.Components.Tile
 
     /// The pane's list: the content 780 wide at most, centred, 62 under the top, 48 in at its sides and 140 above its
-    /// foot, with no fade under the buttons; the row of buttons 52 high, 14 in at its sides, 8 apart, the back button a
-    /// 34 circle with its chevron 19 set 1 left of centre, and the capsule 34 high, rounded as far as it goes, padded 3,
-    /// with its "+" 17 and its "…" 18 in 30 by 28 items on either side of a 1 by 16 divider; the header's tile 40
-    /// across, rounded 11, its glyph 24, the title 12 after it and the subtitle 6 under it and 52 in; the tag bar 10
-    /// under it, 40 in and 12 past the content's end, its chips 6 apart in a row padded 12 with 12 more after the last,
-    /// fading in over 12 and out over 24, a chip 26 high, a capsule, padded 8 and 10, its hash 12 and 5 before its
-    /// title, in a 32 tap area; a block's header 34 high, 14 under what stands above, 2 above its rows and 4 in,
-    /// padded 9 6 0, rounded 7, 8 between its title and its date, over the line's 1 pt rule, its chevron 15 in a 30
+    /// foot, under a fade of the paper 60 high, solid to 33; the row of buttons 52 high, 14 in at its sides, 8 apart,
+    /// the back button a 34 circle with its chevron 19 set 1 left of centre, and the capsule 34 high, rounded as far as
+    /// it goes, padded 3, with its "+" 17 and its "…" 18 in 30 by 28 items on either side of a 1 by 16 divider; the
+    /// header's tile 40 across, rounded 11, its glyph 24, the title 12 after it and the subtitle 6 under it and 52 in;
+    /// the tag bar 10 under it, 40 in and 12 past the content's end, its chips 6 apart in a row padded 12 with 12 more
+    /// after the last, fading in over 12 and out over 24, a chip 26 high, a capsule, padded 8 and 10, its hash 12 and 5
+    /// before its title, in a 32 tap area; a block's header 34 high, 14 under what stands above, 2 above its rows and 4
+    /// in, padded 9 6 0, rounded 7, 8 between its title and its date, over the line's 1 pt rule, its chevron 15 in a 30
     /// hit; "+ Add task" 32 high, rounded 8, padded 4 and 12, its plus 15 in a 32 cell; the Done strip's capsule 30
     /// high and 22 under what stands above, 6 in, its glyph 16 and 9 in, its chevron 13 and 12 short of its end, 7 on
     /// either side of its label, its rows 6 under it, coming in from nothing, .94 of their size about an eighth along
@@ -137,26 +137,30 @@ extension TaskList.Metrics {
     )
 
     /// The pane's screen (Task 9's table, Pane; `Mac.dc.html`, the nav row and the scroller): the buttons' row 52 high
-    /// and 14 in from the pane's sides, 8 apart, with no fade under it, the content 62 under the top and ending 140
-    /// above the foot, all of it on the paper; the list's content is `contentMaxWidth` at most and `contentHorizontalPadding`
-    /// in, and the board's the pane's width, its own paddings standing instead.
+    /// and 14 in from the pane's sides, 8 apart, under a fade (`paneFade`), the content 62 under the top and ending
+    /// 140 above the foot, all of it on the paper; the list's content is `contentMaxWidth` at most and
+    /// `contentHorizontalPadding` in, and the board's the pane's width, its own paddings standing instead.
     private static func paneStyle(contentHorizontalPadding: Double, contentMaxWidth: Double?) -> ListScreenStyle {
         ListScreenStyle(
-            edgeInset: 14, fade: nil, contentTop: 62, contentBottom: 140, background: .paper,
+            edgeInset: 14, fade: paneFade, contentTop: 62, contentBottom: 140, background: .paper,
             contentHorizontalPadding: contentHorizontalPadding, contentMaxWidth: contentMaxWidth, barHeight: 52,
             barSpacing: 8,
             capsule: GlassCapsuleStyle(
-                height: 34, cornerRadius: 99, horizontalPadding: 3, surface: .glass,
-                line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised,
+                height: 34, cornerRadius: 99, horizontalPadding: 3,
                 divider: LineStyle(color: .line, width: 1, dash: []), dividerHeight: 16
             )
         )
     }
 
+    /// The pane's fade under the buttons' row, in both layouts (`Mac.dc.html`, the div at the pane's level above the
+    /// list and the board; the controller's ruling R204): 60 high, the paper solid down to 55 % of it, 33, then clear.
+    /// The pane has no safe area, so the depth is measured from its top.
+    private static let paneFade = ListScreenStyle.Fade(color: .paper, height: 60, solidDepth: 33)
+
     /// The pane's glass buttons (Task 9's table, Pane): the back button a 34 circle on the glass with its chevron 19
     /// set 1 left of centre and stroked a little heavier than the phone's, and in the capsule the "+" 17, stroked
-    /// heavier too, and the "…" 18, each in a 30 by 28 item. The items stand on the capsule's glass, whatever their
-    /// own surface says; it repeats the capsule's so that a button drawn alone looks the same.
+    /// heavier too, and the "…" 18, each in a 30 by 28 item. The glass is the three buttons' alike, held here once and
+    /// drawn round the capsule by a platform and not round its items.
     private static let paneGlass = TaskList.Metrics.Glass(
         back: GlassControlStyle(
             iconOffset: -1, diameter: 34, height: 34, surface: .glass,
@@ -303,13 +307,16 @@ extension TaskList.Metrics {
                     entrance: EntranceStyle(
                         opacity: 0.3, scale: 0.98, offset: -3, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
                     ),
-                    subtasksOutdent: 8, titleToNotes: 2, notesToSubtasks: 4, subtaskDraftCircle: paneSubtaskCheck(color),
+                    subtasksOutdent: 8, titleToNotes: 2, notesToSubtasks: 4,
+                    subtaskDraftCircle: paneSubtaskCheck(color),
                     leaving: taskLeaving, titleStrike: isOpen ? nil : .ink3
                 )
             },
             check: { color in paneRowCheck(color, hitWidth: checkHitWidth, hitHeight: 40) },
             subtaskCheck: paneSubtaskCheck,
-            subtask: { isOpen in SubtaskRowStyle(height: 30, strike: isOpen ? nil : .ink3, titleAnimation: .titleFades) },
+            subtask: { isOpen in
+                SubtaskRowStyle(height: 30, strike: isOpen ? nil : .ink3, titleAnimation: .titleFades)
+            },
             titleHeight: 40, titlePadding: 2, expandSize: 16, notesHeight: 20, subtaskFieldHeight: 30,
             addSubtask: TaskList.Metrics.AddRow(
                 style: .init(

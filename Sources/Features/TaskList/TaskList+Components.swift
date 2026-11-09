@@ -270,9 +270,10 @@ extension TaskList {
     }
 
     /// A row's meta line, in the spec's order (spec section 3; canvas, section 5; the controller's ruling on #175,
-    /// 2026-11-04): the deadline of an open task after the flag, red from the day it is due; each tag in the tags' order,
-    /// as "#name", or by its name alone on a capsule where the layout draws one; the subtasks done over all after the subtasks' glyph; and the notes' glyph alone, with no text.
-    /// Every item carries the meta line's gap between a glyph and a text, which stands only where it has both.
+    /// 2026-11-04): the deadline of an open task after the flag, red from the day it is due; each tag in the tags'
+    /// order, as "#name", or by its name alone on a capsule where the layout draws one; the subtasks done over all
+    /// after the subtasks' glyph; and the notes' glyph alone, with no text. Every item carries the meta line's gap
+    /// between a glyph and a text, which stands only where it has both.
     private static func meta(of task: TodoTask, today: Day, tags: TagNames, _ metrics: Metrics.Row) -> [MetaItemModel] {
         func item(
             _ icon: DesignSystem.Icon?, _ text: String?, color: DesignSystem.Color = .ink2,
