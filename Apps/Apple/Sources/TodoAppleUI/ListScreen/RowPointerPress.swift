@@ -4,12 +4,12 @@ import Foundation
 import TaskListFeature
 
 /// A press of the pointer on the content of the list or the board, read as the stages of a lift (`RowLift`) for the
-/// Mac's drag (`RowPointerDrag`), as `RowDragSessions` reads the calls of the system's drag on iOS: the row it began on,
-/// by the frames the rows last reported, among those drawn and on a column only among the cards in sight, since a card
-/// scrolled out of it keeps a frame under its header; and a session of its own, a new one for every press, as each of
-/// the system's drags has. What each move of the pointer means is one step, `phase(at:lift:)`, which knows no platform
-/// (`RowLiftTests`): a press that began on no row lifts nothing at any move, nor does one that began on a row that does
-/// not lift, an open card.
+/// Mac's drag (`RowPointerDrag`), as `RowDragSessions` reads the calls of the system's drag on iOS: the row it began
+/// on, by the frames the rows last reported, among those drawn and on a column only among the cards in sight, since a
+/// card scrolled out of it keeps a frame under its header; and a session of its own, a new one for every press, as each
+/// of the system's drags has. What each move of the pointer means is one step, `phase(at:lift:)`, which knows no
+/// platform (`RowLiftTests`): a press that began on no row lifts nothing at any move, nor does one that began on a row
+/// that does not lift, an open card.
 ///
 /// `RowPointerPress` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
@@ -35,8 +35,8 @@ struct RowPointerPress {
         grab = CGVector(dx: point.x - origin.x, dy: point.y - origin.y)
     }
 
-    /// The stage a move of the pointer to the point is: the press's row lifted where no task is, the lift moved where it
-    /// is the press's, and nothing for a press that began on no row or for another session's lift.
+    /// The stage a move of the pointer to the point is: the press's row lifted where no task is, the lift moved where
+    /// it is the press's, and nothing for a press that began on no row or for another session's lift.
     func phase(at point: CGPoint, lift: RowLift?) -> RowLift.Phase? {
         guard let row else { return nil }
         guard let lift else { return .began(task: row.task, block: row.block, session: session, at: point) }

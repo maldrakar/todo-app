@@ -7,13 +7,13 @@ import TaskListFeature
 /// content's own coordinates, which the rows report their frames in, as the sidebar's drag is (`ListsTree`'s
 /// `pointerDrag(among:)`): a drag of the pointer with its primary button, which starts past SwiftUI's default distance,
 /// so that a click is still the row's tap and a secondary click its menu, lifts the row the press began on, as
-/// `RowPointerPress` reads it, moves the slot as the pointer moves and reports the drop once, on the release, each stage
-/// through `RowLift` as the system's drag's is on iOS; the slot is marked as there, by the line in the block the task
-/// came from and the tint over another. A drag SwiftUI cancels puts the row down with no drop (`pointer`); one that
-/// ended has put it down already, and the cancel after it moves nothing. While it is carried the row stays where it
-/// was, dimmed (`RowDragSource`), and a copy of it, grown to its lift's scale and casting its lift's shadow, follows the
-/// pointer as it was grabbed. Nothing of it has a motion of its own: the mark moves at once, as on iOS, and the copy
-/// where the pointer does, so Reduce Motion changes nothing here.
+/// `RowPointerPress` reads it, moves the slot as the pointer moves and reports the drop once, on the release, each
+/// stage through `RowLift` as the system's drag's is on iOS; the slot is marked as there, by the line in the block the
+/// task came from and the tint over another. A drag SwiftUI cancels puts the row down with no drop (`pointer`); one
+/// that ended has put it down already, and the cancel after it moves nothing. While it is carried the row stays where
+/// it was, dimmed (`RowDragSource`), and a copy of it, grown to its lift's scale and casting its lift's shadow, follows
+/// the pointer as it was grabbed. Nothing of it has a motion of its own: the mark moves at once, as on iOS, and the
+/// copy where the pointer does, so Reduce Motion changes nothing here.
 ///
 /// It scrolls nothing by itself, as the sidebar's does not (the controller's ruling R202): a scroll of the content
 /// under a held pointer, by the wheel or the trackpad, carries the copy with the content until the pointer next moves,
@@ -84,9 +84,9 @@ struct RowPointerDrag: ViewModifier {
     }
 
     /// The lifted task's copy under the pointer, standing as it was grabbed (`RowPointerPress`): the row as iOS's copy
-    /// draws it (`RowDragCopy`), grown to its lift's scale and casting its lift's shadow, over the content and taking no
-    /// pointer. One switch over the kinds of a row, both drawn and none by `default` (`docs/style.md`, "Views"): an open
-    /// card is never lifted, so its case draws nothing.
+    /// draws it (`RowDragCopy`), grown to its lift's scale and casting its lift's shadow, over the content and taking
+    /// no pointer. One switch over the kinds of a row, both drawn and none by `default` (`docs/style.md`, "Views"): an
+    /// open card is never lifted, so its case draws nothing.
     @ViewBuilder private var copy: some View {
         if let lift, let pointer, let press, let row = lift.row(among: blocks) {
             switch row {

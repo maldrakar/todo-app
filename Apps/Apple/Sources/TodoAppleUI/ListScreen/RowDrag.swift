@@ -11,8 +11,8 @@ import UniformTypeIdentifiers
 /// where its model gives it a menu and a lift, which the module gives together: a still press opens the menu, and a
 /// move after the press drags. While it is lifted the row it was dragged from dims to its lift's opacity on the lift's
 /// motion; the dragged copy is the system's, on the lift's background and corners. Delete in the menu sends what
-/// `delete` does, on its way out. The watch has no such menu. On the Mac the menu is the secondary click's, and the drag
-/// is the pointer's, on the content (`RowPointerDrag`), which dims the row as the system's drag does.
+/// `delete` does, on its way out. The watch has no such menu. On the Mac the menu is the secondary click's, and the
+/// drag is the pointer's, on the content (`RowPointerDrag`), which dims the row as the system's drag does.
 struct RowDragSource: ViewModifier {
     private let task: TaskRowModel<TaskList.UserAction>
     private let row: BlockRowID
