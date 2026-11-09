@@ -24,9 +24,9 @@ import TaskListFeature
 /// `EdgeSwipeBack`, which would take that edge. On the Mac the way back is the toolbar's own, as on every screen pushed
 /// there, and the pane draws no glass back (the owner, 2026-11-09): hiding the bar's back there hid it on every screen
 /// pushed over the list too, a task's full screen included, which had no way back but the sidebar, and kept, it stood
-/// beside a glass one (macOS 26.7.1, 2026-11-09). That back is the stack's pop and not the list's action, so a list it
-/// drops does not close its card by the rule of every close, as the phone's edge swipe does not (#195, widened to the
-/// Mac). The sidebar opens any list at the column, under nothing.
+/// beside a glass one (macOS 26.7.1, 2026-11-09). That back is the stack's pop and not the list's action, and a list it
+/// drops closes what it has open as on every drop, the phone's edge swipe's among them (ADR-0009, amendment of
+/// 2026-11-10). The sidebar opens any list at the column, under nothing.
 ///
 /// The row's gestures are the phone's, wired the same way (`ListSurface`), and the platform decides which are there:
 /// on the iPad the system's drag and menu and the swipe (spike #174, y1); on the Mac a click on a row opens its card,
