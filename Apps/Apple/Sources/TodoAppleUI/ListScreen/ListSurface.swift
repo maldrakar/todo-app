@@ -56,12 +56,12 @@ struct ListSurface<Buttons: ViewModifier>: View {
         content
             .contentShape(.rect)
             .onTapGesture { sendClosingSwipe(.backgroundTapped) }
-            // The content goes down under the home indicator, whichever its layout, for the drop (`RowDropTarget`) and
-            // so that the board's columns end above the screen's bottom and not the safe area's (`.board`'s padding),
-            // or above a sentence's strip, which stands under the content and not over it (`stripUnder`, #193);
-            // and here, outside the shape above, which ends a hit where it ends: inside it, a drop's point left the
-            // target at the safe area's foot (the iOS 26.3 simulator, 2026-11-07). The keyboard still shortens it, its
-            // region not ignored.
+            // The content goes down under the home indicator, whichever its layout, while no sentence's strip stands
+            // under it, and ends at the strip's top while one does (`stripUnder`, #193): for the drop (`RowDropTarget`)
+            // and so that the board's columns end above the screen's bottom or the strip and not the safe area's
+            // (`.board`'s padding); and here, outside the shape above, which ends a hit where it ends: inside it, a
+            // drop's point left the target at the safe area's foot (the iOS 26.3 simulator, 2026-11-07). The keyboard
+            // still shortens it, its region not ignored.
             .ignoresSafeArea(.container, edges: .bottom)
             .modifier(BottomInsetReader(inset: $bottomInset))
             .overlay { floatingButton }
@@ -95,7 +95,8 @@ struct ListSurface<Buttons: ViewModifier>: View {
     }
 
     /// The list: everything scrolls, under the glass bar, from under the safe area's top, and down to the screen's
-    /// foot, what it holds ending as far above what the safe area covers there as its style says.
+    /// foot, or to the top of a sentence's strip under it, what it holds ending as far above what the safe area covers
+    /// there, or above the strip, as its style says.
     private func list(_ blocks: [TaskList.Model.Block]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {

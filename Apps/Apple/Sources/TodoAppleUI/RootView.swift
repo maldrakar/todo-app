@@ -81,10 +81,11 @@ struct RootView: View {
     /// `detailOnly` on the iPad in portrait, where it hid the sidebar (the iOS 26.3 simulator), and on the Mac, whose
     /// toolbar button had hidden the sidebar; on the Mac with its sidebar shown the sentence stood under the sidebar's
     /// rows alone, and it moved between the rows and the pane as the button hid and showed the sidebar. On each screen
-    /// and not on the stack, whose inset reached its root screen alone: on 2026-10-24 it stood mid-pane right under the
-    /// placeholder on the iPad (the iOS 26.3 simulator) and on macOS 26.7.1, and a task pushed on the iPad had none
-    /// (#110). Whether the column is hidden is read by a view of its own on each screen, `HiddenSidebarStrip`, so that
-    /// a press of the sidebar's button redraws the strip and not this tree (#133).
+    /// and not on the stack, as #110 put it when an inset over the stack reached its root screen alone: on 2026-10-24
+    /// it stood mid-pane right under the placeholder on the iPad (the iOS 26.3 simulator) and on macOS 26.7.1, and a
+    /// task pushed on the iPad had none (#110). Laid under each screen since #193, and not inset over it
+    /// (`stripUnder`). Whether the column is hidden is read by a view of its own on each screen, `HiddenSidebarStrip`,
+    /// so that a press of the sidebar's button redraws the strip and not this tree (#133).
     private func splitView(column: StackElementID?, path: [StackElementID]) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
@@ -227,10 +228,11 @@ struct RootView: View {
         })
     }
 
-    /// A sentence across the width of what it is drawn under, the pane or the window, on a material so that the rows
-    /// scrolling under the pane's strip do not show through, and the window's, which no row reaches, looks the same:
-    /// the regular one, since the bar's is unavailable on watchOS and a condition here would be about the look alone
-    /// (typechecked for macOS 14, iOS 17 and watchOS 10 on 2026-10-18).
+    /// A sentence across the width of what it is drawn under, a screen or the window, on a material: the regular one,
+    /// since the bar's is unavailable on watchOS and a condition here would be about the look alone (typechecked for
+    /// macOS 14, iOS 17 and watchOS 10 on 2026-10-18). The material was chosen while the sidebar's strip was inset over
+    /// the screens, so that the rows scrolling under it did not show through; laid under them since #193
+    /// (`stripUnder`), no row reaches either strip, and the material stays the look of both.
     private func sentenceStrip(_ sentence: String) -> some View {
         Text(sentence)
             .padding()
