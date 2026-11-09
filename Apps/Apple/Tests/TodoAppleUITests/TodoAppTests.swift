@@ -6,6 +6,7 @@ import SwiftUI
 import AppFeature
 import DeviceFile
 import FeatureModule
+import TaskListFeature
 import TaskViewListFeature
 @testable import TodoAppleUI
 import TodoCore
@@ -299,6 +300,66 @@ import TodoCore
     }
 }
 
+/// What the pane sends reaches the list it draws through the window's host, wrapped as the root view wraps the column's
+/// screen (list screen plan, Task 9): a wide window's list has the capsule's "+" and no floating one; the "+" opens a
+/// new task's card, and Esc, which the pane sends on the Mac, closes it and takes the task with nothing in it away; a
+/// click on a row opens its card, and Esc closes it; and Delete in the row's menu, the Mac's right click, puts the task
+/// in the Trash.
+@Test @MainActor func thePanesControlsReachItsListThroughTheHost() throws {
+    try withFreshDatabase { database in
+        do {
+            let store = try Store.open(path: database, device: Store.newDeviceID(), now: Store.systemNow)
+            try store.createTask(NewTask(title: "Pay rent"))
+        }
+        let app = try TodoApp.launch(environment: ["TODO_DB": database])
+        let host = try app.makeWindow(path: nil, width: .wide, day: testDay, capabilities: mac).host
+        guard case .wide(let column?, _) = host.model.layout else {
+            Issue.record("the Inbox's list stands in the wide window's column; this is the setup")
+            return
+        }
+        let send = { (action: TaskList.UserAction) in host.send(.screen(column, .list(action))) }
+        let pane = { () -> TaskList.Model? in
+            guard case .list(let list)? = host.model.screens[column] else { return nil }
+            return list
+        }
+        let first = { () -> TaskList.Model.Row? in
+            guard case .list(let blocks)? = pane()?.layout else { return nil }
+            return blocks.first?.rows.first
+        }
+        #expect(pane()?.addTask == nil, "no floating \"+\" in the pane")
+        #expect(pane()?.style.capsule != nil)
+        let add = try #require(pane()?.glassAddTask, "the capsule's \"+\"")
+        send(add.action)
+        guard case .card(_, let card)? = first() else {
+            Issue.record("the \"+\" opened a new task's card first; the first row is \(String(describing: first()))")
+            return
+        }
+        #expect(card.title.text.isEmpty)
+        send(.escapeKeyPressed)
+        #expect(listTitles(host.model) == ["Pay rent"], "Esc closed the card, and the task with nothing in it went")
+        guard case .task(let id, let row)? = first() else {
+            Issue.record("Pay rent stands as a row, and the first row is \(String(describing: first()))")
+            return
+        }
+        send(row.tap)
+        guard case .card(id, _)? = first() else {
+            Issue.record("a click opened Pay rent's card, and the first row is \(String(describing: first()))")
+            return
+        }
+        send(.escapeKeyPressed)
+        guard case .task(_, let closed)? = first() else {
+            Issue.record("Esc closed Pay rent's card, and the first row is \(String(describing: first()))")
+            return
+        }
+        let delete = try #require(
+            closed.menu?.sections.flatMap(\.items).first { $0.action == .deleteMenuItemChosen(id) },
+            "the row's menu holds Delete"
+        )
+        send(delete.action)
+        #expect(listTitles(host.model) == [], "Delete put Pay rent in the Trash")
+    }
+}
+
 /// The device's day a window's view reports goes to that window's host alone, through its world entrance, as the width
 /// does (list screen spec, section 8): of two windows on Today made the day before a task is due, the one told the new
 /// day lists the task, its route as it was, and the other stays on the day it was made on.
@@ -341,8 +402,8 @@ import TodoCore
 }
 
 /// `Day` is a date of the Gregorian calendar, so a device on another calendar, Buddhist, Japanese, Hebrew or Islamic,
-/// has its day read in the Gregorian calendar in its own time zone: the day and the start a Gregorian device in the same
-/// zone has, and not the other calendar's year or month, which `Day` would take for another date.
+/// has its day read in the Gregorian calendar in its own time zone: the day and the start a Gregorian device in the
+/// same zone has, and not the other calendar's year or month, which `Day` would take for another date.
 @Test func aDeviceDayIsGregorianWhateverTheDevicesCalendar() throws {
     let now = Date(timeIntervalSince1970: 1_793_476_800)
     let gregorian = DeviceDay(at: now, in: try calendar(.gregorian, in: "Asia/Tokyo"))

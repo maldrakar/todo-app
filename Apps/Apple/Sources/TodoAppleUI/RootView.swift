@@ -92,7 +92,7 @@ struct RootView: View {
             NavigationStack(path: stackPath(path)) {
                 Group {
                     if let column {
-                        wideScreen(column)
+                        wideScreen(column, showsBack: false)
                     } else {
                         Text("Nothing to show")
                             .foregroundStyle(.secondary)
@@ -105,7 +105,7 @@ struct RootView: View {
                     HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
                 }
                 .navigationDestination(for: StackElementID.self) { id in
-                    wideScreen(id)
+                    wideScreen(id, showsBack: true)
                         .safeAreaInset(edge: .bottom) {
                             HiddenSidebarStrip(columnVisibility: $columnVisibility, strip: sidebarSentence)
                         }
@@ -167,7 +167,7 @@ struct RootView: View {
     /// sliding away (the iOS 26.3 simulator, 2026-10-25, #126).
     ///
     /// How a list is drawn is the tree's that the stack stands in, which hands it here: the narrow tree's is the list
-    /// screen, and the wide tree's its plain list until the pane arrives (list screen plan, Task 9).
+    /// screen, and the wide tree's the pane (list screen plan, Tasks 8 and 9).
     @ViewBuilder private func screen(
         _ id: StackElementID, @ViewBuilder list: (TaskList.Model) -> some View
     ) -> some View {
@@ -181,12 +181,13 @@ struct RootView: View {
         }
     }
 
-    /// A screen of the wide tree's stack. Its list carries the Quick Entry button on its toolbar, and the task pushed
-    /// over it carries none (the owner, 2026-10-20).
-    private func wideScreen(_ id: StackElementID) -> some View {
+    /// A screen of the wide tree's stack, a list drawn as the pane, with its glass back where the tree says: none for
+    /// the column's list, the sidebar being the base and the column never popped, and one for a list pushed over it.
+    /// The pane carries no Quick Entry button, its capsule's "+" adding in place as the phone's floating "+" does;
+    /// quick entry stays the sidebar's "+", ⌘N and the placeholder's button (the controller's ruling R197 on #178).
+    private func wideScreen(_ id: StackElementID, showsBack: Bool) -> some View {
         screen(id) { list in
-            TaskListView(model: list) { host.send(.screen(id, .list($0))) }
-                .toolbar { quickEntryButton }
+            ListPane(model: list, send: { host.send(.screen(id, .list($0))) }, showsBack: showsBack)
         }
     }
 
@@ -233,10 +234,10 @@ struct RootView: View {
             .background(.regularMaterial)
     }
 
-    /// The toolbar's quick entry button, on the list or on the placeholder drawn when no list stands, and not on the
-    /// task pushed over the list, which has none (the owner, 2026-10-20). Not on the split view: there it stood on the
-    /// Mac's toolbar and on no screen of iPhone's collapsed stack, where each screen has a bar of its own (2026-10-18,
-    /// the iOS 26.3 simulator).
+    /// The toolbar's quick entry button, on the placeholder drawn when no list stands, and not on the task pushed over
+    /// the list, which has none (the owner, 2026-10-20), nor on the pane, whose capsule has its "+" (R197). Not on the
+    /// split view: there it stood on the Mac's toolbar and on no screen of iPhone's collapsed stack, where each screen
+    /// has a bar of its own (2026-10-18, the iOS 26.3 simulator).
     private var quickEntryButton: some View {
         Button("Quick Entry", systemImage: "plus") { host.send(.quickEntryButtonTapped) }
     }
