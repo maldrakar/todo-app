@@ -145,12 +145,12 @@ private struct RowDropDelegate: DropDelegate {
 #endif
 
 /// A `ScrollView` of the list or the board as the target of the system's drag (spike #174, y1): on the scroll view, its
-/// margins included, and not on its content, and with the screen's content going down under the home indicator
-/// (`ListScreen`), since a release in that inset cancelled. The system scrolls the scroll views under the drag, so it
-/// has no display link. A board that snaps comes to rest on a column when the lift ends. On the Mac the drag is the
-/// pointer's, on the content and not its scroll view (`RowPointerDrag`), and the scroll view is only the space the
-/// content's place is read in and how large it is, which say what of the content is in sight, where a drop can land;
-/// the watch has neither.
+/// margins included, and not on its content, and with the screen's content going down under the home indicator while no
+/// sentence's strip stands under it (`ListSurface`), since a release in that inset cancelled. The system scrolls the
+/// scroll views under the drag, so it has no display link. A board that snaps comes to rest on a column when the lift
+/// ends. On the Mac the drag is the pointer's, on the content and not its scroll view (`RowPointerDrag`), and the
+/// scroll view is only the space the content's place is read in and how large it is, which say what of the content is
+/// in sight, where a drop can land; the watch has neither.
 struct RowDropTarget: ViewModifier {
     private let blocks: [TaskList.Model.Block]
     @Binding private var lift: RowLift?
