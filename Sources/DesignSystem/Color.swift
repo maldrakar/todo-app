@@ -85,6 +85,10 @@ extension DesignSystem {
         /// light and white at 8 % in the dark.
         public static let fresh = Color(light: accentShade.withOpacity(0.12), dark: .white.withOpacity(0.08))
 
+        /// Under a row the pointer is over (`Mac.dc.html`, `--hover`): the ink at 5 % in the light and white at 5 % in the
+        /// dark.
+        public static let hover = Color(light: ink.light.withOpacity(0.05), dark: .white.withOpacity(0.05))
+
         /// What a field shows while it holds nothing (`Phone.dc.html`, `input::placeholder`): the second ink at 80 %.
         public static let placeholder = Color(light: ink2.light.withOpacity(0.8), dark: ink2.dark.withOpacity(0.8))
 

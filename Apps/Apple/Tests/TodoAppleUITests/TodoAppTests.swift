@@ -271,8 +271,8 @@ import TodoCore
 }
 
 /// The width class a window's view reports goes to that window's host alone, through its world entrance, as a link
-/// does (navigation state spec, section 4): the window made narrow is laid out wide once told so, its screens and its
-/// route as they were, and the other window stays narrow.
+/// does (navigation state spec, section 4): the window made narrow is laid out wide once told so, its screens kept and
+/// its route as it was, its list at the pane's numbers, and the other window stays narrow.
 @Test @MainActor func theWindowsWidthReachesItsHost() throws {
     try withFreshDatabase { database in
         let app = try TodoApp.launch(environment: ["TODO_DB": database])
@@ -286,7 +286,14 @@ import TodoCore
         }
         widened.widthChanged(.wide)
         #expect(widened.host.model.layout == .wide(column: list, path: []))
-        #expect(widened.host.model.screens == before.screens)
+        #expect(Set(widened.host.model.screens.keys) == Set(before.screens.keys), "the same screens stand")
+        guard case .list(let phone)? = before.screens[list], case .list(let pane)? = widened.host.model.screens[list]
+        else {
+            Issue.record("the Inbox's list stands before and after the width moved")
+            return
+        }
+        #expect(phone.style.contentMaxWidth == nil)
+        #expect(pane.style.contentMaxWidth == 780, "the list draws the pane's numbers once the window is wide")
         #expect(widened.host.route.path == defaultWindow)
         #expect(other.model == otherBefore)
     }

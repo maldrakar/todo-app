@@ -9,7 +9,12 @@ public struct GlassControlStyle: Equatable, Sendable {
     /// looks centred, and "…" sits at 0.
     public let iconOffset: Double
 
+    /// How wide the button is across: a circle's diameter, or an item of the Mac's capsule's width.
     public let diameter: Double
+
+    /// How high the button is: the same as `diameter` for a circle, and 28 against 30 across for an item of the Mac's
+    /// capsule (`GlassCapsuleStyle`).
+    public let height: Double
     public let surface: DesignSystem.Color
 
     /// The hairline round the button, whose width is how thick it is.
@@ -20,12 +25,14 @@ public struct GlassControlStyle: Equatable, Sendable {
     public init(
         iconOffset: Double,
         diameter: Double,
+        height: Double,
         surface: DesignSystem.Color,
         line: LineStyle,
         shadow: DesignSystem.Shadow
     ) {
         self.iconOffset = iconOffset
         self.diameter = diameter
+        self.height = height
         self.surface = surface
         self.line = line
         self.shadow = shadow

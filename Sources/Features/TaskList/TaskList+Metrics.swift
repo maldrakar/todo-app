@@ -1,12 +1,15 @@
 // Sources/Features/TaskList/TaskList+Metrics.swift
 import DesignSystem
 import DesignSystemComponents
+import FeatureModule
 
 extension TaskList {
     /// The numbers the screen's components are drawn with in one layout, in points, and the colours and motions that go
-    /// with them, picked once by the layout (`of(_:)`), so that no builder branches on it: the phone's list (`phone`)
-    /// and the phone's board (`phoneColumns`), which share the header, the tag bar, the empty state and the floating
-    /// "+" and differ in their blocks, their "+ Add list" and the Done strip, which only the list has. A component's
+    /// with them, picked once by the layout and the window's width (`of(_:in:)`), so that no builder branches on
+    /// either: the phone's list (`phone`) and the phone's board (`phoneColumns`), which share the header, the tag bar,
+    /// the empty state and the floating "+" and differ in their blocks, their "+ Add list" and the Done strip, which
+    /// only the list has, and the Mac pane's two (`pane` and `paneColumns`, in `TaskList+PaneMetrics.swift`), which are
+    /// the same shapes at the Mac's numbers, with a glass "+" in the place of the floating one. A component's
     /// values are its style, `CheckStyle` for `CheckModel` and so on (`DesignSystemComponents`), declared here once per
     /// layout and handed to its model whole; an entry that depends on the row is a function of what it depends on, the
     /// list's colour or whether the task is open, which a builder calls for that row's instance; a struct of this
@@ -47,6 +50,10 @@ extension TaskList {
             let title: DesignSystem.Font
             let metaIconSize: Double
             let metaIconSpacing: Double
+
+            /// The capsule a tag stands on in the meta line, written without its hash, and nil where the tag is written
+            /// out as "#home" (`MetaItemStyle.Capsule`).
+            let tagCapsule: MetaItemStyle.Capsule?
             let swipe: SwipeStyle?
             let indicator: (@Sendable (Tile) -> DropIndicatorStyle)?
             let dropStyle: (@Sendable (Tile) -> BlockDropStyle)?
@@ -99,12 +106,22 @@ extension TaskList {
             let glyphSize: Double
         }
 
-        /// The glass buttons over the content: the back button's numbers and glyph and "…"'s.
+        /// The glass "+" of the Mac's capsule: the item's numbers and its plus.
+        struct GlassAdd {
+            let style: GlassControlStyle
+            let glyphSize: Double
+            let glyphWeight: DesignSystem.Font.Weight
+        }
+
+        /// The glass buttons over the content: the back button's numbers, glyph and the glyph's weight, "…"'s, and the
+        /// "+" beside it where the screen has one in place of the floating one.
         struct Glass {
             let back: GlassControlStyle
             let backGlyphSize: Double
+            let backGlyphWeight: DesignSystem.Font.Weight
             let more: GlassControlStyle
             let moreGlyphSize: Double
+            let add: GlassAdd?
         }
 
         /// The empty state: its numbers and its tile.
@@ -148,13 +165,18 @@ extension TaskList {
         let empty: Empty
         let blocks: Blocks
         let addList: AddRow
-        let floatingButton: FloatingButton
 
-        /// The numbers of the layout.
-        static func of(_ layout: Model.Layout.Kind) -> Metrics {
-            switch layout {
-            case .list: phone
-            case .columns: phoneColumns
+        /// The floating "+", and nil where the glass one stands in the bar (`glass.add`): a screen has exactly one.
+        let floatingButton: FloatingButton?
+
+        /// The numbers of the layout in a window of the width: one of four tables, none by default, so that a layout
+        /// or a width added stops this compiling until it has its numbers.
+        static func of(_ layout: Model.Layout.Kind, in width: WindowWidth) -> Metrics {
+            switch (width, layout) {
+            case (.narrow, .list): phone
+            case (.narrow, .columns): phoneColumns
+            case (.wide, .list): pane
+            case (.wide, .columns): paneColumns
             }
         }
 
@@ -233,7 +255,8 @@ extension TaskList {
                     .init(
                         width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
                         cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill,
-                        cardBackground: .surface, cardShadow: .resting, dropRingWidth: 2, dropTint: color.dropTint,
+                        cardBackground: .surface, cardShadow: .resting, cardHoverShadow: nil,
+                        dropRingWidth: 2, dropTint: color.dropTint,
                         dropRing: color.check.fill, dropAnimation: .dropHighlights
                     )
                 },
@@ -249,17 +272,17 @@ extension TaskList {
                             titleTrailing: 4, leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
                             strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 13) : nil, fresh: nil,
                             landingScale: isFresh ? 1.05 : nil, landingAnimation: .drop, titleAnimation: .titleFades,
-                            leaving: taskLeaving, ground: nil
+                            leaving: taskLeaving, ground: nil, metaTrailing: false, hover: nil
                         )
                     },
                     check: { color in
                         checkStyle(
                             diameter: 22, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 42,
-                            color: color
+                            hitHeight: 44, color: color
                         )
                     },
-                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, swipe: nil, indicator: nil,
-                    dropStyle: nil
+                    title: .nestedRowTitle, metaIconSize: 13, metaIconSpacing: 3, tagCapsule: nil, swipe: nil,
+                    indicator: nil, dropStyle: nil
                 ),
                 openCard: Card(
                     style: { color, isOpen in
@@ -298,31 +321,31 @@ extension TaskList {
 
         /// How every check of the phone pops (`Phone.dc.html`, `cbPop`): down to .8 by 35 % of its motion, up to 1.14
         /// by 70 %.
-        private static let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
+        static let checkPop = CheckStyle.Pop(dipScale: 0.8, dipAt: 0.35, peakScale: 1.14, peakAt: 0.7)
 
         /// The tick of every check of the phone, `M6.5 12.5l3.5 3.5 7.5-8` in the canvas's 24-unit box, its ends and
         /// its corner round (`Phone.dc.html`, `.cb`, its `stroke-linecap` and `stroke-linejoin`).
-        private static let checkMark = CheckStyle.Mark(
+        static let checkMark = CheckStyle.Mark(
             box: 24, points: [.init(x: 6.5, y: 12.5), .init(x: 10, y: 16), .init(x: 17.5, y: 8)], isRound: true
         )
 
         /// How a phone's row, a column's card or an open card leaves as its task is completed (`Phone.dc.html`,
         /// `.tt-done` and `.row-leave`): its title in ink 2 and struck in ink 3, sinking 12 as it fades on the row's
         /// motion, and on the same motion with no wait where it was deleted.
-        private static let taskLeaving = TaskLeavingStyle(
+        static let taskLeaving = TaskLeavingStyle(
             titleColor: .ink2, strike: .ink3, offset: 12, animation: .rowLeaves,
             reducedAnimation: .rowLeavesWithNoMotion, deleteAnimation: .rowDeleted
         )
 
-        /// A check of the phone at its own size, in a hit 44 high and as wide as it says, in the colour given, on the
-        /// motions, the pop and the tick every check has.
-        private static func checkStyle(
+        /// A check at its own size, in a hit as high and as wide as it says, in the colour given, on the motions, the pop
+        /// and the tick every check has.
+        static func checkStyle(
             diameter: Double, ringWidth: Double, markSize: Double, markStrokeWidth: Double, hitWidth: Double,
-            color: Tile
+            hitHeight: Double, color: Tile
         ) -> CheckStyle {
             CheckStyle(
                 diameter: diameter, ringWidth: ringWidth, markSize: markSize, markStrokeWidth: markStrokeWidth,
-                hitWidth: hitWidth, hitHeight: 44, animation: .check, fillAnimation: .checkFills,
+                hitWidth: hitWidth, hitHeight: hitHeight, animation: .check, fillAnimation: .checkFills,
                 markAnimation: .checkMarkDraws, pop: checkPop, mark: checkMark, colors: color.check
             )
         }
@@ -331,14 +354,18 @@ extension TaskList {
         /// in a 44 hit (Task 8's table, Row).
         private static func phoneCheck(_ color: Tile) -> CheckStyle {
             checkStyle(
-                diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, color: color
+                diameter: 24, ringWidth: 1.75, markSize: 15, markStrokeWidth: 1.75, hitWidth: 44, hitHeight: 44,
+                color: color
             )
         }
 
         /// A subtask's check in the open card: 18 across with a 1.5 ring and the 12 pt mark in a 40 by 44 hit (Task 8's
         /// table, Card), the canvas's 2.8 in its 24-unit box stroked 1.4 at that size (`CheckStyle.markStrokeWidth`).
         private static func phoneSubtaskCheck(_ color: Tile) -> CheckStyle {
-            checkStyle(diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, color: color)
+            checkStyle(
+                diameter: 18, ringWidth: 1.5, markSize: 12, markStrokeWidth: 1.4, hitWidth: 40, hitHeight: 44,
+                color: color
+            )
         }
 
         /// A subtask in the phone's open card, 44 high and struck in ink 3 where it is no longer open (Task 8's table,
@@ -360,15 +387,19 @@ extension TaskList {
                     titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
                     strike: isOpen ? nil : .ink3, lift: lifts ? taskLift(cornerRadius: 14) : nil,
                     fresh: isFresh ? .fresh : nil, landingScale: nil, landingAnimation: .fresh,
-                    titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper
+                    titleAnimation: .titleFades, leaving: taskLeaving, ground: .paper, metaTrailing: false, hover: nil
                 )
             },
-            check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3,
-            swipe: .init(
-                threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
-                buttonCornerRadius: 12, background: .red, animation: .swipe
-            ),
+            check: phoneCheck, title: .rowTitle, metaIconSize: 13, metaIconSpacing: 3, tagCapsule: nil, swipe: swipe,
             indicator: phoneDropMark, dropStyle: phoneBlockDrop
+        )
+
+        /// A row's swipe (Task 8's table, Swipe), the phone's and the iPad's, which has the Mac's pane and the phone's
+        /// gestures: dragged 40 leftward it stays moved 88, over a Delete 78 wide, 3 in from its top and bottom and 10
+        /// from its end, rounded 12.
+        static let swipe = SwipeStyle(
+            threshold: 40, shift: -88, buttonWidth: 78, buttonVerticalInset: 3, buttonTrailingInset: 10,
+            buttonCornerRadius: 12, background: .red, animation: .swipe
         )
 
         /// The phone's open card (Task 8's table, Card; `Phone.dc.html`, the open card): 6 10 10 from what stands round
@@ -395,7 +426,7 @@ extension TaskList {
 
         /// How an open card comes in (`Phone.dc.html`, `xIn`): from .3 opaque, .97 of its size and 4 above where it
         /// rests, over the card's motion.
-        private static let cardEntrance = EntranceStyle(
+        static let cardEntrance = EntranceStyle(
             opacity: 0.3, scale: 0.97, offset: -4, anchorX: 0.5, anchorY: 0.5, animation: .cardOpens
         )
 
@@ -424,7 +455,7 @@ extension TaskList {
         /// row 14 and a card its own 13, which the table gives the card no other number for: grown to 1.03 on the
         /// surface and casting the lifted shadow, and dimmed to .35 where it is dragged from, as the system's copy of
         /// it moves (the controller's ruling on #177, 2026-11-07).
-        private static func taskLift(cornerRadius: Double) -> TaskLiftStyle {
+        static func taskLift(cornerRadius: Double) -> TaskLiftStyle {
             TaskLiftStyle(
                 scale: 1.03, opacity: 0.35, cornerRadius: cornerRadius, background: .surface, shadow: .lifted,
                 dimAnimation: .dropHighlights
@@ -459,15 +490,15 @@ extension TaskList {
         /// across set 2 left of centre, "…" 22.
         private static let phoneGlass = Glass(
             back: GlassControlStyle(
-                iconOffset: -2, diameter: 44, surface: .glass,
+                iconOffset: -2, diameter: 44, height: 44, surface: .glass,
                 line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
             ),
-            backGlyphSize: 24,
+            backGlyphSize: 24, backGlyphWeight: .regular,
             more: GlassControlStyle(
-                iconOffset: 0, diameter: 44, surface: .glass,
+                iconOffset: 0, diameter: 44, height: 44, surface: .glass,
                 line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
             ),
-            moreGlyphSize: 22
+            moreGlyphSize: 22, add: nil
         )
 
         /// The phone's screen (Task 8's table, Glass buttons; `Phone.dc.html`, the buttons' row and the scroller): the
@@ -476,7 +507,10 @@ extension TaskList {
         /// safe area's bottom, the canvas's 150 less the home indicator's 34; on the board the fade is `nil`, its
         /// buttons standing in the flow; all of it on the paper.
         private static func phoneStyle(fade: ListScreenStyle.Fade?) -> ListScreenStyle {
-            ListScreenStyle(edgeInset: 14, fade: fade, contentTop: 56, contentBottom: 116, background: .paper)
+            ListScreenStyle(
+                edgeInset: 14, fade: fade, contentTop: 56, contentBottom: 116, background: .paper,
+                contentHorizontalPadding: 0, contentMaxWidth: nil, barHeight: 44, barSpacing: 0, capsule: nil
+            )
         }
 
         /// The list's fade (see `phoneStyle`); the board has none.

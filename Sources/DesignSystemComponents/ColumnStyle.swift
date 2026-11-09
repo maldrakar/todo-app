@@ -17,6 +17,9 @@ public struct ColumnStyle: Equatable, Sendable {
     public let cardBackground: DesignSystem.Color
     public let cardShadow: DesignSystem.Shadow
 
+    /// What a card casts while the pointer is over it, and nil where there is no pointer to be: the phone's.
+    public let cardHoverShadow: DesignSystem.Shadow?
+
     /// How thick the ring is inside the column's edge while a card is dragged over it.
     public let dropRingWidth: Double
 
@@ -39,6 +42,7 @@ public struct ColumnStyle: Equatable, Sendable {
         fill: DesignSystem.Color,
         cardBackground: DesignSystem.Color,
         cardShadow: DesignSystem.Shadow,
+        cardHoverShadow: DesignSystem.Shadow?,
         dropRingWidth: Double,
         dropTint: DesignSystem.Color,
         dropRing: DesignSystem.Color,
@@ -53,6 +57,7 @@ public struct ColumnStyle: Equatable, Sendable {
         self.fill = fill
         self.cardBackground = cardBackground
         self.cardShadow = cardShadow
+        self.cardHoverShadow = cardHoverShadow
         self.dropRingWidth = dropRingWidth
         self.dropTint = dropTint
         self.dropRing = dropRing

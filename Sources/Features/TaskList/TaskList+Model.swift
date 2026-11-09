@@ -20,6 +20,10 @@ extension TaskList {
         /// The glass button at the top right, the label of `showAs`, which it puts up.
         public let more: GlassButtonLabelModel
 
+        /// The glass "+" in the capsule beside "…", nil where the "+" floats (`addTask`) and where no task can be added
+        /// (spec section 4). A screen has one of the two or none, and both send the same action.
+        public let glassAddTask: GlassButtonModel<UserAction>?
+
         /// How the screen itself stands: what it stands on, how the glass buttons and their fade stand over the
         /// content, and where the content starts and ends under them.
         public let style: ListScreenStyle
@@ -48,7 +52,8 @@ extension TaskList {
         /// controller's ruling on #176, 2026-11-05).
         public let doneRows: [Row]
 
-        /// The floating "+", nil where no task can be added (spec section 4).
+        /// The floating "+", nil where the "+" stands in the glass capsule (`glassAddTask`) and where no task can be
+        /// added (spec section 4).
         public let addTask: FloatingButtonModel<UserAction>?
 
         /// "+ Add list" after the last block, nil on a group's screen, for a list that draws finished tasks as its

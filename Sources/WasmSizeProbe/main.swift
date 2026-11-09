@@ -250,11 +250,20 @@ private enum WasmSizeProbe {
         let chainRoute = app.route.path
         perform(.action(.wentBack(to: Array(idsOverTheSidebar(in: app.model.layout).prefix(1)))))
         var columns = "no list"
+        var wide = "no list"
         if let outer = idsOverTheSidebar(in: app.model.layout).first {
             perform(.action(.screen(outer, .list(.tagChipTapped(errandTag)))))
             perform(.action(.screen(outer, .list(.blockChevronTapped(.list(house))))))
             perform(.action(.screen(outer, .list(.showAsChosen(.columns)))))
             columns = listLine(of: app.model.screens[outer])
+            // The window widened and narrowed again: the pane's numbers for the board and for the list, read through
+            // the same line, and the phone's back.
+            perform(.widthChanged(.wide))
+            wide = listLine(of: app.model.screens[outer])
+            perform(.action(.screen(outer, .list(.showAsChosen(.list)))))
+            wide += "; " + listLine(of: app.model.screens[outer])
+            perform(.widthChanged(.narrow))
+            perform(.action(.screen(outer, .list(.showAsChosen(.columns)))))
             perform(.action(.screen(outer, .list(.showAsChosen(.list)))))
             perform(.action(.screen(outer, .list(.blockTitleTapped(.list(house))))))
         }
@@ -362,7 +371,7 @@ private enum WasmSizeProbe {
         print("bar \(bar); in edit mode \(editBar); without edit mode \(barLine(of: withoutEditMode.model))")
         print("asked \(asked ?? "nothing"); drag \(drag), narrow \(narrowDrag)")
         print("route \(app.route.path), filed \(filed?.title ?? "none") and pushed \(opened) at \(taskRoute), \(label(root.layout, screens: root.screens)), quick entry \(drafted.isEmpty ? "empty" : drafted) then \(root.quickEntry == nil ? "closed" : "open")")
-        print("chain at \(chainRoute): \(chain.joined(separator: " under ")); columns \(columns); then \(pushedInside)")
+        print("chain at \(chainRoute): \(chain.joined(separator: " under ")); columns \(columns); wide \(wide); then \(pushedInside)")
         print("group at \(groupRoute): \(group); the next day \(nextDay)")
         print("edits \(edits)")
         print("window \(window), refused \(refusal == .notAnID("inbox"))")
@@ -594,10 +603,15 @@ private enum WasmSizeProbe {
             + "\(list.back.label.style.iconOffset), "
             + "\(list.more.accessibilityLabel) \(list.more.icon.style.size), \(list.showAs.heading ?? "no heading") "
             + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
-            + "on \(bar.background.light.red)"
+            + "on \(bar.background.light.red), row \(bar.barHeight)/\(bar.barSpacing), content "
+            + "\(bar.contentHorizontalPadding)/\(bar.contentMaxWidth ?? 0), "
+            + (bar.capsule.map { "capsule \($0.height)/\($0.dividerHeight)" } ?? "no capsule")
         let empty = list.empty.map { "empty: \($0.title.text), \($0.style.bottomMargin) above what follows" } ?? "not empty"
         let plus = list.addTask.map { "\($0.accessibilityLabel) \($0.style.trailingMargin)/\($0.style.bottomMargin)" } ?? "no floating button"
-        return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(glass), \(empty), \(plus)"
+        let glassPlus = list.glassAddTask.map {
+            "glass \($0.label.accessibilityLabel) \($0.label.style.diameter)x\($0.label.style.height)"
+        } ?? "no glass plus"
+        return "\(header), \(chips), \(shape), first \(first), disabled \(disabled), \(glass), \(empty), \(plus), \(glassPlus)"
     }
 
     /// The open card of a list standing in the window's stack as a line, every part a view draws, and "no card" when none

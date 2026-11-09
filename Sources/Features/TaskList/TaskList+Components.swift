@@ -270,17 +270,20 @@ extension TaskList {
     }
 
     /// A row's meta line, in the spec's order (spec section 3; canvas, section 5; the controller's ruling on #175,
-    /// 2026-11-04): the deadline of an open task after the flag, red from the day it is due; each tag as "#name" in the
-    /// tags' order; the subtasks done over all after the subtasks' glyph; and the notes' glyph alone, with no text.
+    /// 2026-11-04): the deadline of an open task after the flag, red from the day it is due; each tag in the tags' order,
+    /// as "#name", or by its name alone on a capsule where the layout draws one; the subtasks done over all after the subtasks' glyph; and the notes' glyph alone, with no text.
     /// Every item carries the meta line's gap between a glyph and a text, which stands only where it has both.
     private static func meta(of task: TodoTask, today: Day, tags: TagNames, _ metrics: Metrics.Row) -> [MetaItemModel] {
-        func item(_ icon: DesignSystem.Icon?, _ text: String?, color: DesignSystem.Color = .ink2) -> MetaItemModel {
+        func item(
+            _ icon: DesignSystem.Icon?, _ text: String?, color: DesignSystem.Color = .ink2,
+            capsule: MetaItemStyle.Capsule? = nil
+        ) -> MetaItemModel {
             MetaItemModel(
                 icon: icon.map {
                     IconModel(icon: $0, style: IconStyle(size: metrics.metaIconSize, weight: .regular, color: color))
                 },
                 text: text.map { TextModel(text: $0, style: TextStyle(font: .meta, color: color)) },
-                style: MetaItemStyle(spacing: metrics.metaIconSpacing, capsule: nil)
+                style: MetaItemStyle(spacing: metrics.metaIconSpacing, capsule: capsule)
             )
         }
         var items: [MetaItemModel] = []
@@ -288,7 +291,9 @@ extension TaskList {
             let color: DesignSystem.Color = isDue(deadline, today: today) ? .red : .ink2
             items.append(item(.flag, dueText(deadline, today: today), color: color))
         }
-        items += tags.titles(of: task.tags).map { item(nil, "#\($0)") }
+        items += tags.titles(of: task.tags).map {
+            item(nil, metrics.tagCapsule == nil ? "#\($0)" : $0, capsule: metrics.tagCapsule)
+        }
         if task.subtasks > 0 { items.append(item(.list, "\(task.subtasksDone)/\(task.subtasks)")) }
         if task.hasNotes { items.append(item(.note, nil)) }
         return items
@@ -319,7 +324,8 @@ extension TaskList {
         GlassButtonModel(
             label: GlassButtonLabelModel(
                 icon: IconModel(
-                    icon: .chevronLeft, style: IconStyle(size: metrics.backGlyphSize, weight: .regular, color: .ink)
+                    icon: .chevronLeft,
+                    style: IconStyle(size: metrics.backGlyphSize, weight: metrics.backGlyphWeight, color: .ink)
                 ),
                 style: metrics.back, accessibilityLabel: "Back"
             ),

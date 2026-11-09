@@ -602,7 +602,7 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     let store = try makeStore()
     #expect(throws: StoreError.self) { try list(screen(.deadline(1), of: upcoming), in: store) }
     do {
-        _ = try TaskList(store: store, route: screen(.day(1), of: inbox), day: testDay)
+        _ = try TaskList(store: store, route: screen(.day(1), of: inbox), day: testDay, width: .narrow)
         Issue.record("the Inbox groups by nothing")
     } catch {
         guard case .invalid = error else { Issue.record("refused with \(error)"); return }

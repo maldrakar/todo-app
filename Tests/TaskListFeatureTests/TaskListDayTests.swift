@@ -26,7 +26,7 @@ import TodoCore
     ]
     for (today, long) in cases {
         let model = try TaskList(
-            store: store, route: .init(head: .init(view: BuiltInTaskViews.today)), day: deviceDay(today)
+            store: store, route: .init(head: .init(view: BuiltInTaskViews.today)), day: deviceDay(today), width: .narrow
         ).model
         #expect(model.header.subtitle?.text == long)
     }
@@ -40,7 +40,7 @@ import TodoCore
     let byDay = try store.createView(NewTaskView(title: "By day", filter: .status([.open]), sort: [SortKey(.when)], groupBy: .whenDay))
     let offsets = [-8, -1, 0, 1, 2, 3, 4, 5, 6, 7, 30, 120]
     for offset in offsets { try store.createTask(NewTask(title: "On \(offset)", when: day(offset))) }
-    let headings = blocks(of: try TaskList(store: store, route: .init(head: .init(view: byDay)), day: testDay).model)
+    let headings = blocks(of: try TaskList(store: store, route: .init(head: .init(view: byDay)), day: testDay, width: .narrow).model)
         .map { [$0.header?.title.text, $0.header?.subtitle?.text] }
     #expect(headings == [
         ["Tuesday", "Sep 2"], ["Tuesday", "Sep 9"], ["Today", "Wed, Sep 10"], ["Tomorrow", "Thu, Sep 11"],
@@ -60,7 +60,7 @@ import TodoCore
         (21, "Due Oct 1"), (113, "Due Jan 1"),
     ]
     for (offset, _) in cases { try store.createTask(NewTask(title: "Due \(offset)", deadline: day(offset))) }
-    let rows = try #require(blocks(of: try TaskList(store: store, route: .init(head: .init(view: BuiltInTaskViews.inbox)), day: testDay).model).first).rows
+    let rows = try #require(blocks(of: try TaskList(store: store, route: .init(head: .init(view: BuiltInTaskViews.inbox)), day: testDay, width: .narrow).model).first).rows
     #expect(rows.map { row($0).meta.first?.text?.text } == cases.map(\.1))
 }
 
@@ -92,7 +92,7 @@ import TodoCore
         (byStatus, .status(.canceled), "Canceled", "By status"),
     ]
     for (view, group, title, subtitle) in cases {
-        let header = try TaskList(store: store, route: .init(head: .init(view: view, group: group)), day: testDay).model.header
+        let header = try TaskList(store: store, route: .init(head: .init(view: view, group: group)), day: testDay, width: .narrow).model.header
         #expect([header.title.text, header.subtitle?.text] == [title, subtitle], "\(group)")
     }
 }
@@ -118,7 +118,7 @@ import TodoCore
         write(past, "when_day", .min), write(past, "deadline_day", .min),
         write(future, "when_day", .max), write(future, "deadline_day", .max),
     ])
-    let module = try TaskList(store: store, route: .init(head: .init(view: byDay)), day: testDay)
+    let module = try TaskList(store: store, route: .init(head: .init(view: byDay)), day: testDay, width: .narrow)
     let model = module.model
     #expect(blocks(of: model).compactMap(\.header).count == 2)
     #expect(blocks(of: model).flatMap(\.rows).map { row($0).meta.first?.text?.text.hasPrefix("Overdue") } == [true, false])

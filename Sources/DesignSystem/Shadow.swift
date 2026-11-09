@@ -28,5 +28,9 @@ extension DesignSystem {
         /// What a card at rest in a column casts: 6 %, 1 and 1, the canvas's `0 1px 2px rgba(0,0,0,.06)` under it
         /// (`Phone.dc.html`, `.card`), its 2 px blur halved into the platform's radius, as Sketch hands a blur to iOS.
         public static let resting = Shadow(opacity: 0.06, radius: 1, y: 1)
+
+        /// What a card in a column casts while the pointer is over it: 8 %, 5 and 3, the canvas's `0 3px 10px
+        /// rgba(0,0,0,.08)` (`Mac.dc.html`, `.card:hover`), its 10 px blur halved into the platform's radius.
+        public static let hovered = Shadow(opacity: 0.08, radius: 5, y: 3)
     }
 }

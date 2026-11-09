@@ -46,6 +46,19 @@ extension TaskList {
         )
     }
 
+    /// The glass "+" of the Mac pane's capsule: a plus in ink on the glass, sending what the floating one does.
+    static func glassAddTask(_ metrics: Metrics.GlassAdd) -> GlassButtonModel<UserAction> {
+        GlassButtonModel(
+            label: GlassButtonLabelModel(
+                icon: IconModel(
+                    icon: .plus, style: IconStyle(size: metrics.glyphSize, weight: metrics.glyphWeight, color: .ink)
+                ),
+                style: metrics.style, accessibilityLabel: newTaskTitle
+            ),
+            action: .addTaskButtonTapped
+        )
+    }
+
     /// The Done strip's capsule (spec section 3; the controller's ruling on #176, 2026-11-05): the check in a circle in
     /// the list's glyph colour, "Done today · N" on every list, and the chevron, turned half round while it is open,
     /// saying what a tap will do.

@@ -61,7 +61,7 @@ private func phoneRow(
             titleTrailing: 4, leading: 8, trailing: 12, minimumHeight: 44, cornerRadius: 12,
             strike: isOpen ? nil : .ink3, lift: deletes ? rowLift : nil, fresh: isFresh ? .fresh : nil,
             landingScale: nil, landingAnimation: .fresh, titleAnimation: .titleFades, leaving: taskLeaving,
-            ground: .paper
+            ground: .paper, metaTrailing: false, hover: nil
         ),
         swipe: deletes ? SwipeModel(
             style: .init(
@@ -278,7 +278,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         GlassButtonLabelModel(
             icon: IconModel(icon: icon, style: IconStyle(size: size, weight: .regular, color: .ink)),
             style: GlassControlStyle(
-                iconOffset: offset, diameter: 44, surface: .glass,
+                iconOffset: offset, diameter: 44, height: 44, surface: .glass,
                 line: LineStyle(color: .glassLine, width: 0.5, dash: []), shadow: .raised
             ),
             accessibilityLabel: label
@@ -295,7 +295,8 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         )
         #expect(model.more == button(.ellipsis, size: 22, offset: 0, "More"))
         let style = ListScreenStyle(
-            edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56, contentBottom: 116, background: .paper
+            edgeInset: 14, fade: layout == .list ? fade : nil, contentTop: 56, contentBottom: 116, background: .paper,
+            contentHorizontalPadding: 0, contentMaxWidth: nil, barHeight: 44, barSpacing: 0, capsule: nil
         )
         #expect(model.style == style, "the fade is the list's alone; the board's circles stand in the flow")
     }
@@ -363,7 +364,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
         style: .init(
             width: 296, cornerRadius: 18, cardSpacing: 8, padding: 8, cardCornerRadius: 13,
             cardRing: LineStyle(color: .glassLine, width: 0.5, dash: []), fill: .fill, cardBackground: .surface,
-            cardShadow: .resting, dropRingWidth: 2, dropTint: Tile.rose.dropTint,
+            cardShadow: .resting, cardHoverShadow: nil, dropRingWidth: 2, dropTint: Tile.rose.dropTint,
             dropRing: Tile.rose.check.fill, dropAnimation: .dropHighlights
         ),
         isDropTarget: true
@@ -383,7 +384,7 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
             titleToMeta: 3, metaSpacing: 10, metaLineSpacing: 3, verticalPadding: 11, titleLeading: 2, titleTrailing: 4,
             leading: 0, trailing: 12, minimumHeight: 44, cornerRadius: 13,
             strike: nil, lift: cardLift, fresh: nil, landingScale: nil, landingAnimation: .drop,
-            titleAnimation: .titleFades, leaving: taskLeaving, ground: nil
+            titleAnimation: .titleFades, leaving: taskLeaving, ground: nil, metaTrailing: false, hover: nil
         ),
         swipe: nil,
         tap: .rowTapped(id), menu: deleteMenu(id)

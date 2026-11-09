@@ -65,12 +65,14 @@ extension TaskList {
 
     // MARK: - Adding a task
 
-    /// The floating "+": a new task at the top of the block it adds to, by what that block's rule asks (spec section 4;
+    /// The floating "+" and the pane's glass one: a new task at the top of the block it adds to, by what that block's rule asks (spec section 4;
     /// the controller's ruling on #176, 2026-11-05). The card that was open closes first, which can change which block
     /// that is, and a close the store refused stops the add, so that its sentence stands; the card is closed, so a
     /// second tap adds.
     func addFromFloatingButton() {
-        guard model.addTask != nil else { return }
+        // Whichever "+" the layout draws, floating or in the pane's capsule: a list that takes no task has neither.
+        let model = self.model
+        guard model.addTask != nil || model.glassAddTask != nil else { return }
         state.problem = nil
         closeCard()
         guard state.problem == nil else { return }
