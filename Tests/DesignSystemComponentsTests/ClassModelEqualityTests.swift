@@ -196,8 +196,7 @@ private func check(isChecked: Bool = false) -> CheckModel<Action> {
             animation: .check, fillAnimation: .checkFills, markAnimation: .checkMarkDraws, pop: checkPop,
             mark: checkMark, colors: DesignSystem.Color.Components.Tile.blue.check
         ),
-        isChecked: isChecked,
-        accessibilityLabel: "Complete", action: .first
+        isChecked: isChecked, accessibilityLabel: "Complete", action: .first
     )
 }
 
@@ -260,8 +259,9 @@ private let addSubtask = AddRowModel<Action>(
     icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .medium, color: .ink2)),
     title: TextModel(text: "Add subtask", style: TextStyle(font: .notes, color: .ink2)),
     style: .init(
-        iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 0, topPadding: 0, leadingPadding: 0,
-        trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: nil
+        iconCellWidth: 40, spacing: 0, height: 44, width: nil, fills: false, cornerRadius: 0, topPadding: 0,
+        leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
+        hover: nil
     ),
     action: .first
 )
@@ -325,7 +325,7 @@ private func card(
             icon: IconModel(icon: .plus, style: IconStyle(size: 14, weight: .medium, color: .ink2)),
             title: TextModel(text: "Add subtask", style: TextStyle(font: .notes, color: .ink2)),
             style: .init(
-                iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0,
+                iconCellWidth: 30, spacing: 0, height: 30, width: nil, fills: false, cornerRadius: 7, topPadding: 0,
                 leadingPadding: 0, trailingPadding: 0, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
                 trailingMargin: 0, hover: nil
             ),
@@ -350,7 +350,8 @@ private let chevron = AccessoryModel<Action>.Chevron(
 
 private let blockHeaderStyle = BlockHeaderStyle(
     titleToSubtitle: 8, rule: stroke, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2, leadingMargin: 12,
-    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44, hover: nil
+    topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44, titleFills: true,
+    hover: nil
 )
 
 private func blockHeader(
@@ -375,7 +376,7 @@ private func blockHeader(
         "style": blockHeader(style: .init(
             titleToSubtitle: 8, rule: nil, height: 44, topMargin: 6, trailingMargin: 6, bottomMargin: 2,
             leadingMargin: 12, topPadding: 13, horizontalPadding: 8, bottomPadding: 0, cornerRadius: 0, foldHitSide: 44,
-            hover: nil
+            titleFills: true, hover: nil
         )),
         "titleTapped": blockHeader(titleTapped: .second),
     ])
@@ -384,8 +385,9 @@ private func blockHeader(
 private let plus = IconModel(icon: .plus, style: IconStyle(size: 18, weight: .regular, color: .ink2))
 
 private let addRowStyle = AddRowStyle(
-    iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
-    trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12, hover: nil
+    iconCellWidth: 44, spacing: 0, height: 40, width: nil, fills: false, cornerRadius: 12, topPadding: 0,
+    leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8, trailingMargin: 12,
+    hover: nil
 )
 
 private func addRow(
@@ -401,8 +403,9 @@ private func addRow(
         "icon": addRow(icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .regular, color: .ink2))),
         "title": addRow(title: TextModel(text: "Add list", style: TextStyle(font: .barLabel, color: .ink2))),
         "style": addRow(style: .init(
-            iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0, leadingPadding: 0,
-            trailingPadding: 12, dash: line, rule: line, topMargin: 0, leadingMargin: 8, trailingMargin: 12, hover: nil
+            iconCellWidth: 44, spacing: 0, height: 40, width: nil, fills: false, cornerRadius: 12, topPadding: 0,
+            leadingPadding: 0, trailingPadding: 12, dash: line, rule: line, topMargin: 0, leadingMargin: 8,
+            trailingMargin: 12, hover: nil
         )),
         "action": addRow(action: .second),
     ])
@@ -437,8 +440,7 @@ private func doneStrip(
 @Test func aDoneStripModelComparesEveryProperty() {
     expectEveryPropertyCompared({ doneStrip() }, [
         "icon": doneStrip(icon: IconModel(
-            icon: .checkCircle,
-            style: IconStyle(size: 18, weight: .regular, color: .ink2)
+            icon: .checkCircle, style: IconStyle(size: 18, weight: .regular, color: .ink2)
         )),
         "label": doneStrip(label: TextModel(text: "Done today · 3", style: TextStyle(font: .barLabel, color: .ink2))),
         "chevron": doneStrip(rotation: 180),

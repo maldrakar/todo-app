@@ -109,15 +109,15 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let house = try scene.block(.list(scene.house))
     let header = try #require(house.header)
     #expect(header.style == BlockHeaderStyle(
-        titleToSubtitle: 8, rule: rule, height: 34, topMargin: 14, trailingMargin: 0, bottomMargin: 2,
-        leadingMargin: 4, topPadding: 9, horizontalPadding: 6, bottomPadding: 0, cornerRadius: 7, foldHitSide: 30,
+        titleToSubtitle: 8, rule: rule, height: 34, topMargin: 14, trailingMargin: 0, bottomMargin: 2, leadingMargin: 4,
+        topPadding: 9, horizontalPadding: 6, bottomPadding: 0, cornerRadius: 7, foldHitSide: 30, titleFills: true,
         hover: hoverTint(7)
     ))
     #expect(header.fold?.icon.style.size == 15)
     let addTask = try #require(house.addTask)
     #expect(addTask.style == AddRowStyle(
-        iconCellWidth: 32, spacing: 0, height: 32, width: nil, cornerRadius: 8, topPadding: 0, leadingPadding: 4,
-        trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
+        iconCellWidth: 32, spacing: 0, height: 32, width: nil, fills: false, cornerRadius: 8, topPadding: 0,
+        leadingPadding: 4, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
         hover: hoverTint(8)
     ))
     #expect(addTask.icon.style.size == 15)
@@ -129,8 +129,9 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
 
     let addList = try #require(model.addList)
     #expect(addList.style == AddRowStyle(
-        iconCellWidth: 32, spacing: 0, height: 36, width: nil, cornerRadius: 9, topPadding: 4, leadingPadding: 0,
-        trailingPadding: 12, dash: nil, rule: rule, topMargin: 10, leadingMargin: 4, trailingMargin: 0, hover: nil
+        iconCellWidth: 32, spacing: 0, height: 36, width: nil, fills: false, cornerRadius: 9, topPadding: 4,
+        leadingPadding: 0, trailingPadding: 12, dash: nil, rule: rule, topMargin: 10, leadingMargin: 4,
+        trailingMargin: 0, hover: nil
     ))
     #expect(addList.icon.style.size == 15)
 
@@ -217,9 +218,9 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let check = subtask.check.style
     #expect([check.diameter, check.ringWidth, check.markSize, check.hitWidth, check.hitHeight] == [15, 1.5, 10, 30, 30])
     #expect(card.addSubtask.style == AddRowStyle(
-        iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0, leadingPadding: 0,
-        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8, trailingMargin: 0,
-        hover: hoverTint(7)
+        iconCellWidth: 30, spacing: 0, height: 30, width: nil, fills: false, cornerRadius: 7, topPadding: 0,
+        leadingPadding: 0, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8,
+        trailingMargin: 0, hover: hoverTint(7)
     ))
     #expect(card.addSubtask.icon.style.size == 14)
     let pill = try #require(card.pills.first)
@@ -253,9 +254,10 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(style.cardHover == ColumnStyle.CardHover(shadow: .hovered, animation: .hoverShadows))
     #expect(style.dropRingWidth == 2)
     #expect(column.header.style == BlockHeaderStyle(
-        titleToSubtitle: 8, rule: nil, height: 36, topMargin: 0, trailingMargin: 0, bottomMargin: 0, leadingMargin: 0,
-        topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 0, foldHitSide: nil, hover: hoverTint(7)
-    ))
+        titleToSubtitle: 8, rule: nil, height: 31, topMargin: 5, trailingMargin: 0, bottomMargin: 0, leadingMargin: 6,
+        topPadding: 6, horizontalPadding: 6, bottomPadding: 4, cornerRadius: 0, foldHitSide: nil, titleFills: false,
+        hover: hoverTint(7)
+    ), "its title fits its words, padded 6 6 4, 5 under the column's top and 6 in: the words 11 down and 12 in")
     let block = try scene.block(.list(scene.house))
     guard case .task(_, let card)? = block.rows.first else {
         Issue.record("the column's first card is a task's")
@@ -275,10 +277,10 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     #expect(card.meta.compactMap(\.icon).allSatisfy { $0.style.size == 12 })
     let addTask = try #require(block.addTask)
     #expect(addTask.style == AddRowStyle(
-        iconCellWidth: 15, spacing: 6, height: 32, width: nil, cornerRadius: 9, topPadding: 0, leadingPadding: 10,
-        trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0,
-        hover: hoverTint(9)
-    ))
+        iconCellWidth: 15, spacing: 6, height: 32, width: nil, fills: true, cornerRadius: 9, topPadding: 0,
+        leadingPadding: 10, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
+        trailingMargin: 0, hover: hoverTint(9)
+    ), "a column's \"+ Add task\" fills its column")
     #expect(addTask.icon.style.size == 15)
 
     scene.module.tap(.rowTapped(scene.milk))
@@ -344,7 +346,7 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
             "row": row.style.hover, "header": house.header?.style.hover, "add task": house.addTask?.style.hover,
             "add subtask": card.addSubtask.style.hover, "expand": card.style.expandHover,
             "strip": model.done?.style.hover, "chip": model.tagBar?.chips.first?.style.hover,
-            "more": model.more.style.hover, "back": model.back.label.style.hover,
+            "more": model.showAs.label.style.hover, "back": model.back.label.style.hover,
             "add list": model.addList?.style.hover,
         ]
     }
@@ -386,4 +388,41 @@ private func lift(_ radius: Double) -> TaskLiftStyle {
     let phone = try list(scene.projects, in: scene.store)
     #expect(try tints(phone).compactMapValues { $0 }.isEmpty, "the phone has no pointer")
     #expect(phone.model.addTask != nil && phone.model.glassAddTask == nil)
+}
+
+/// A row that adds fits its glyph and its title, as both canvases draw "+ Add task" in a block, "Add subtask" and "+
+/// Add list", and fills what it stands in only as a column's "+ Add task", which its column stretches (`Mac.dc.html`,
+/// :359, :332 and :471; `Phone.dc.html`, :362, :328, :376 and :488); the phone's fit as they did before the pane, its
+/// column's among them; and a block header's title fills its header beside the chevron, a column's fitting its words
+/// (`Mac.dc.html`, :301 and :414) (the controller's ruling R215 and the review's minor 1).
+@Test func aRowThatAddsFitsItsWordsAndOnlyAColumnsFillsIt() throws {
+    let scene = try Scene()
+    scene.module.tap(.rowTapped(scene.milk))
+    let house = try scene.block(.list(scene.house))
+    #expect(house.addTask?.style.fills == false)
+    #expect(scene.model.addList?.style.fills == false)
+    #expect(try #require(openCard(in: scene.model)).card.addSubtask.style.fills == false)
+    #expect(house.header?.style.titleFills == true)
+    scene.module.tap(.backgroundTapped)
+    scene.module.tap(.showAsChosen(.columns))
+    let column = try scene.block(.list(scene.house))
+    #expect(column.addTask?.style.fills == true)
+    #expect(column.column?.header.style.titleFills == false)
+    guard case .columns(let board) = scene.model.layout else {
+        Issue.record("the list stands as columns")
+        return
+    }
+    #expect(board.addList?.style.fills == false)
+
+    let phone = try list(scene.projects, in: scene.store)
+    let phoneColumn = try #require(blocks(of: phone.model).first { $0.id == .list(scene.house) })
+    #expect(phoneColumn.addTask?.style.fills == false, "the phone's tap areas are what they were")
+    #expect(phoneColumn.column?.header.style.titleFills == true)
+    phone.tap(.showAsChosen(.list))
+    phone.tap(.rowTapped(scene.milk))
+    let phoneBlock = try #require(blocks(of: phone.model).first { $0.id == .list(scene.house) })
+    #expect(phoneBlock.addTask?.style.fills == false)
+    #expect(phone.model.addList?.style.fills == false)
+    #expect(try #require(openCard(in: phone.model)).card.addSubtask.style.fills == false)
+    #expect(phoneBlock.header?.style.titleFills == true)
 }

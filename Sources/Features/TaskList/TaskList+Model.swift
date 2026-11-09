@@ -17,9 +17,6 @@ extension TaskList {
         /// The glass button that goes back, over the content at the top left.
         public let back: GlassButtonModel<UserAction>
 
-        /// The glass button at the top right, the label of `showAs`, which it puts up.
-        public let more: GlassButtonLabelModel
-
         /// The glass "+" in the capsule beside "…", nil where the "+" floats (`addTask`) and where no task can be added
         /// (spec section 4). A screen has one of the two or none, and both send the same action.
         public let glassAddTask: GlassButtonModel<UserAction>?
@@ -34,9 +31,9 @@ extension TaskList {
         /// The blocks, as a list or as the board's columns.
         public let layout: Layout
 
-        /// The menu `more` puts up, Show as: List, and Columns, disabled with its reason where there is nothing to show
-        /// as columns, the layout the list is shown as checked (spec section 5).
-        public let showAs: MenuModel<UserAction>
+        /// "…" at the top right and the menu it puts up, Show as: List, and Columns, disabled with its reason where
+        /// there is nothing to show as columns, the layout the list is shown as checked (spec section 5).
+        public let showAs: GlassMenuButtonModel<UserAction>
 
         /// What the screen shows when no block has a row, after the tag bar's filter, and the list has no lists inside,
         /// and nil otherwise (canvas, the empty state).

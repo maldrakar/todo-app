@@ -34,12 +34,12 @@ extension TaskList.Metrics {
             header: .init(
                 titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 34, topMargin: 14,
                 trailingMargin: 0, bottomMargin: 2, leadingMargin: 4, topPadding: 9, horizontalPadding: 6,
-                bottomPadding: 0, cornerRadius: 7, foldHitSide: 30, hover: paneHover(7)
+                bottomPadding: 0, cornerRadius: 7, foldHitSide: 30, titleFills: true, hover: paneHover(7)
             ),
             chevronSize: 15, row: paneRow, card: paneCard,
             addTask: TaskList.Metrics.AddRow(
                 style: .init(
-                    iconCellWidth: 32, spacing: 0, height: 32, width: nil, cornerRadius: 8, topPadding: 0,
+                    iconCellWidth: 32, spacing: 0, height: 32, width: nil, fills: false, cornerRadius: 8, topPadding: 0,
                     leadingPadding: 4, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
                     trailingMargin: 0, hover: paneHover(8)
                 ),
@@ -59,7 +59,7 @@ extension TaskList.Metrics {
         ),
         addList: TaskList.Metrics.AddRow(
             style: .init(
-                iconCellWidth: 32, spacing: 0, height: 36, width: nil, cornerRadius: 9, topPadding: 4,
+                iconCellWidth: 32, spacing: 0, height: 36, width: nil, fills: false, cornerRadius: 9, topPadding: 4,
                 leadingPadding: 0, trailingPadding: 12, dash: nil, rule: LineStyle(color: .line, width: 1, dash: []),
                 topMargin: 10, leadingMargin: 4, trailingMargin: 0, hover: nil
             ),
@@ -71,17 +71,19 @@ extension TaskList.Metrics {
     /// The pane's board, which the pane shares the header, the tag bar, the empty state and the glass buttons with the
     /// list for, the header padded 28 in and 14 above the columns, and the buttons standing over it: 12 between
     /// columns, 24 in at its sides and at its bottom, 12 more after its last column, scrolling freely; a column 288
-    /// wide and rounded 14, its header padded 11 12 7 (the column's own 6 stand under the 1 left to the header's
-    /// bottom) and tinted under the pointer within corners of 7 (`Mac.dc.html`, the column title's `.mc-tap`), its
-    /// cards 6 apart and 6 in, each rounded 10 with a 0.5 hairline and the resting shadow, a hover shadow of 8 % with a
-    /// blur of 10 dropped 3 over 0.15 s; a card's check 18 across with a 1.5 ring and the 12 pt mark in a 34 by 36
-    /// hit, its title callout-sized, 9 above and below it and 10 short of its end, the meta 3 under it in the phone's
-    /// order, a tag written out as "#name" (`Mac.dc.html`, :460-463), its items 9 apart and its lines 2, its glyphs 12
-    /// and 3 before their text, at least 36 high; its open card in the card, its
-    /// check in a 34 by 40 hit, its body 36 in and 12 short of its end and bottom; "+ Add task" 32 high, rounded 9,
-    /// padded 10, the plus 15 and 6 before its title. The table gives "+ Add list" nothing: a column 200 wide edged in
-    /// a 1.5 dashed line, as rounded as a column, 44 high, padded 14, the plus 15 and 8 before its title, the phone's
-    /// at the pane's scale. The table gives the column's header no height: 36, its padding and a line of its title.
+    /// wide and rounded 14, its header's words 11 down and 12 in, on a title that fits them, padded 6 6 4 and standing
+    /// 5 under the column's top and 6 in, tinted under the pointer within corners of 7 (`Mac.dc.html`, the column
+    /// title's `.mc-tap`, `margin: -6px -6px -4px`, in `.bcol-h`'s 11 12 7; the review's minor 1), its cards 6 apart
+    /// and 6 in, each rounded 10 with a 0.5 hairline and the resting shadow, a hover shadow of 8 % with a blur of 10
+    /// dropped 3 over 0.15 s; a card's check 18 across with a 1.5 ring and the 12 pt mark in a 34 by 36 hit, its title
+    /// callout-sized, 9 above and below it and 10 short of its end, the meta 3 under it in the phone's order, a tag
+    /// written out as "#name" (`Mac.dc.html`, :460-463), its items 9 apart and its lines 2, its glyphs 12 and 3 before
+    /// their text, at least 36 high; its open card in the card, its check in a 34 by 40 hit, its body 36 in and 12
+    /// short of its end and bottom; "+ Add task" 32 high, rounded 9, padded 10, the plus 15 and 6 before its title,
+    /// filling its column as `.bcol-b`'s flex column stretches it (the controller's ruling R215). The table gives "+
+    /// Add list" nothing: a column 200 wide edged in a 1.5 dashed line, as rounded as a column, 44 high, padded 14, the
+    /// plus 15 and 8 before its title, the phone's at the pane's scale. The table gives the column's header no height:
+    /// 36 with the 5 above its title, its padding and a line of its title.
     static let paneColumns = TaskList.Metrics(
         style: paneStyle(contentHorizontalPadding: 0, contentMaxWidth: nil), glass: paneGlass,
         header: paneHeader(horizontalPadding: 28, bottomMargin: 14), tagBar: paneTagBar, empty: paneEmpty,
@@ -97,9 +99,9 @@ extension TaskList.Metrics {
                 )
             },
             header: .init(
-                titleToSubtitle: 8, rule: nil, height: 36, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
-                leadingMargin: 0, topPadding: 11, horizontalPadding: 12, bottomPadding: 1, cornerRadius: 0,
-                foldHitSide: nil, hover: paneHover(7)
+                titleToSubtitle: 8, rule: nil, height: 31, topMargin: 5, trailingMargin: 0, bottomMargin: 0,
+                leadingMargin: 6, topPadding: 6, horizontalPadding: 6, bottomPadding: 4, cornerRadius: 0,
+                foldHitSide: nil, titleFills: false, hover: paneHover(7)
             ),
             card: TaskList.Metrics.Row(
                 style: { isOpen, lifts, isFresh in
@@ -121,7 +123,7 @@ extension TaskList.Metrics {
             ),
             addTask: TaskList.Metrics.AddRow(
                 style: .init(
-                    iconCellWidth: 15, spacing: 6, height: 32, width: nil, cornerRadius: 9, topPadding: 0,
+                    iconCellWidth: 15, spacing: 6, height: 32, width: nil, fills: true, cornerRadius: 9, topPadding: 0,
                     leadingPadding: 10, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
                     trailingMargin: 0, hover: paneHover(9)
                 ),
@@ -130,7 +132,7 @@ extension TaskList.Metrics {
         )),
         addList: TaskList.Metrics.AddRow(
             style: .init(
-                iconCellWidth: 15, spacing: 8, height: 44, width: 200, cornerRadius: 14, topPadding: 0,
+                iconCellWidth: 15, spacing: 8, height: 44, width: 200, fills: false, cornerRadius: 14, topPadding: 0,
                 leadingPadding: 14, trailingPadding: 14, dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]),
                 rule: nil, topMargin: 0, leadingMargin: 0, trailingMargin: 0, hover: nil
             ),
@@ -180,8 +182,7 @@ extension TaskList.Metrics {
             iconOffset: -1, diameter: 34, height: 34, glass: paneGlassUnder, hover: nil
         ),
         backGlyphSize: 19, backGlyphWeight: .medium,
-        more: paneCapsuleItem,
-        moreGlyphSize: 18,
+        more: paneCapsuleItem, moreGlyphSize: 18,
         add: TaskList.Metrics.GlassAdd(style: paneCapsuleItem, glyphSize: 17, glyphWeight: .medium)
     )
 
@@ -335,14 +336,13 @@ extension TaskList.Metrics {
                 )
             },
             check: { color in paneRowCheck(color, hitWidth: checkHitWidth, hitHeight: 40) },
-            subtaskCheck: paneSubtaskCheck,
-            subtask: { isOpen in
+            subtaskCheck: paneSubtaskCheck, subtask: { isOpen in
                 SubtaskRowStyle(height: 30, strike: isOpen ? nil : .ink3, titleAnimation: .titleFades)
             },
             titleHeight: 40, titlePadding: 2, expandSize: 16, notesHeight: 20, subtaskFieldHeight: 30,
             addSubtask: TaskList.Metrics.AddRow(
                 style: .init(
-                    iconCellWidth: 30, spacing: 0, height: 30, width: nil, cornerRadius: 7, topPadding: 0,
+                    iconCellWidth: 30, spacing: 0, height: 30, width: nil, fills: false, cornerRadius: 7, topPadding: 0,
                     leadingPadding: 0, trailingPadding: 10, dash: nil, rule: nil, topMargin: 0, leadingMargin: -8,
                     trailingMargin: 0, hover: paneHover(7)
                 ),

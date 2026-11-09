@@ -208,14 +208,14 @@ extension TaskList {
                 header: .init(
                     titleToSubtitle: 8, rule: LineStyle(color: .line, width: 1, dash: []), height: 44, topMargin: 6,
                     trailingMargin: 6, bottomMargin: 2, leadingMargin: 12, topPadding: 13, horizontalPadding: 8,
-                    bottomPadding: 0, cornerRadius: 0, foldHitSide: 44, hover: nil
+                    bottomPadding: 0, cornerRadius: 0, foldHitSide: 44, titleFills: true, hover: nil
                 ),
                 chevronSize: 18, row: phoneRow, card: phoneCard,
                 addTask: AddRow(
                     style: .init(
-                        iconCellWidth: 44, spacing: 0, height: 40, width: nil, cornerRadius: 12, topPadding: 0,
-                        leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 8,
-                        trailingMargin: 12, hover: nil
+                        iconCellWidth: 44, spacing: 0, height: 40, width: nil, fills: false, cornerRadius: 12,
+                        topPadding: 0, leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0,
+                        leadingMargin: 8, trailingMargin: 12, hover: nil
                     ),
                     iconSize: 18, font: .addRow
                 ),
@@ -233,8 +233,8 @@ extension TaskList {
             ),
             addList: AddRow(
                 style: .init(
-                    iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 4,
-                    leadingPadding: 0, trailingPadding: 12, dash: nil,
+                    iconCellWidth: 40, spacing: 0, height: 44, width: nil, fills: false, cornerRadius: 12,
+                    topPadding: 4, leadingPadding: 0, trailingPadding: 12, dash: nil,
                     rule: LineStyle(color: .line, width: 1, dash: []), topMargin: 10, leadingMargin: 12,
                     trailingMargin: 6, hover: nil
                 ),
@@ -273,7 +273,7 @@ extension TaskList {
                 header: .init(
                     titleToSubtitle: 8, rule: nil, height: 44, topMargin: 0, trailingMargin: 0, bottomMargin: 0,
                     leadingMargin: 0, topPadding: 13, horizontalPadding: 14, bottomPadding: 9, cornerRadius: 0,
-                    foldHitSide: nil, hover: nil
+                    foldHitSide: nil, titleFills: true, hover: nil
                 ),
                 card: Row(
                     style: { isOpen, lifts, isFresh in
@@ -310,19 +310,19 @@ extension TaskList {
                 ),
                 addTask: AddRow(
                     style: .init(
-                        iconCellWidth: 18, spacing: 6, height: 44, width: nil, cornerRadius: 13, topPadding: 0,
-                        leadingPadding: 11, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: 0,
-                        trailingMargin: 0, hover: nil
+                        iconCellWidth: 18, spacing: 6, height: 44, width: nil, fills: false, cornerRadius: 13,
+                        topPadding: 0, leadingPadding: 11, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0,
+                        leadingMargin: 0, trailingMargin: 0, hover: nil
                     ),
                     iconSize: 18, font: .addRow
                 )
             )),
             addList: AddRow(
                 style: .init(
-                    iconCellWidth: 18, spacing: 8, height: 52, width: 200, cornerRadius: 18, topPadding: 0,
-                    leadingPadding: 16, trailingPadding: 16,
-                    dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0,
-                    leadingMargin: 0, trailingMargin: 0, hover: nil
+                    iconCellWidth: 18, spacing: 8, height: 52, width: 200, fills: false, cornerRadius: 18,
+                    topPadding: 0, leadingPadding: 16, trailingPadding: 16,
+                    dash: LineStyle(color: .line, width: 1.5, dash: [5, 4]), rule: nil, topMargin: 0, leadingMargin: 0,
+                    trailingMargin: 0, hover: nil
                 ),
                 iconSize: 18, font: .barLabel
             ),
@@ -449,7 +449,7 @@ extension TaskList {
         /// of its end, rounded 12.
         private static let phoneAddSubtask = AddRow(
             style: .init(
-                iconCellWidth: 40, spacing: 0, height: 44, width: nil, cornerRadius: 12, topPadding: 0,
+                iconCellWidth: 40, spacing: 0, height: 44, width: nil, fills: false, cornerRadius: 12, topPadding: 0,
                 leadingPadding: 0, trailingPadding: 12, dash: nil, rule: nil, topMargin: 0, leadingMargin: -12,
                 trailingMargin: 0, hover: nil
             ),

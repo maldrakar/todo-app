@@ -63,11 +63,11 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(model.back.label.style == GlassControlStyle(
         iconOffset: -1, diameter: 34, height: 34, glass: glass, hover: nil
     ), "the back button stands alone, on its glass, and the canvas does not tint it")
-    #expect(model.more.style.glass == nil, "the capsule's items draw none")
+    #expect(model.showAs.label.style.glass == nil, "the capsule's items draw none")
     #expect(model.back.label.icon.style == IconStyle(size: 19, weight: .medium, color: .ink))
-    #expect(model.more.icon.style == IconStyle(size: 18, weight: .regular, color: .ink))
-    #expect(model.more.style.diameter == 30)
-    #expect(model.more.style.height == 28)
+    #expect(model.showAs.label.icon.style == IconStyle(size: 18, weight: .regular, color: .ink))
+    #expect(model.showAs.label.style.diameter == 30)
+    #expect(model.showAs.label.style.height == 28)
     #expect(model.glassAddTask == GlassButtonModel(
         label: GlassButtonLabelModel(
             icon: IconModel(icon: .plus, style: IconStyle(size: 17, weight: .medium, color: .ink)),
@@ -128,7 +128,7 @@ private func seeded(_ store: Store) throws -> (milk: TaskID, tag: TagID) {
     #expect(model.glassAddTask == nil)
     #expect(model.back.label.icon.style == IconStyle(size: 24, weight: .regular, color: .ink))
     #expect(model.back.label.style.height == 44)
-    #expect(model.more.style.height == 44)
+    #expect(model.showAs.label.style.height == 44)
     module.tap(.showAsChosen(.columns))
     #expect(try #require(columns(of: module.model)).snaps)
     #expect(module.model.addTask != nil)

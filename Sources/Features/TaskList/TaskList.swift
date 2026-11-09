@@ -1,4 +1,5 @@
 // Sources/Features/TaskList/TaskList.swift
+import DesignSystemComponents
 import FeatureModule
 import TaskScreenFeature
 import TodoCore
@@ -276,7 +277,7 @@ public final class TaskList: Routable {
             // An item is checked against the model: Columns disabled moves nothing (spec section 5). The choice is the
             // device's, kept per list (ADR-0010), and a group's screen keeps none, its one layout being the list's. The
             // sentence stays, as for a fold.
-            guard model.showAs.sections.flatMap(\.items).contains(where: {
+            guard model.showAs.menu.sections.flatMap(\.items).contains(where: {
                 $0.action == .showAsChosen(layout) && !$0.isDisabled
             }), layout != state.layout else { return nil }
             // A write that fails is not said, as a fold's is not: the layout stays on screen until the next list made
@@ -554,14 +555,15 @@ public final class TaskList: Routable {
             return Model(
                 header: TaskList.header(heading, color: color, icon: icon, metrics.header),
                 back: TaskList.back(metrics.glass),
-                more: TaskList.more(metrics.glass),
                 glassAddTask: addsTask ? metrics.glass.add.map { TaskList.glassAddTask($0) } : nil,
                 style: metrics.style,
                 tagBar: TaskList.tagBar(chips, picked: picked, color: color, metrics.tagBar),
                 layout: TaskList.layout(
                     shown, title: title, folded: folded, addList: addList, context, metrics.blocks
                 ),
-                showAs: TaskList.showAs(current: shape, canBoard: canBoard),
+                showAs: GlassMenuButtonModel(
+                    label: TaskList.more(metrics.glass), menu: TaskList.showAs(current: shape, canBoard: canBoard)
+                ),
                 empty: empty,
                 done: done.strip,
                 doneRows: done.rows,

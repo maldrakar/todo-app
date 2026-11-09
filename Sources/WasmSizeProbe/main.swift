@@ -605,14 +605,15 @@ private enum WasmSizeProbe {
                 "a card on \(card.title.text)"
             }
         } ?? "no row"
-        let disabled = list.showAs.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)
-        let checked = list.showAs.sections.flatMap(\.items).filter(\.isChecked).map(\.title)
+        let disabled = list.showAs.menu.sections.flatMap(\.items).filter(\.isDisabled).map(\.title)
+        let checked = list.showAs.menu.sections.flatMap(\.items).filter(\.isChecked).map(\.title)
         let bar = list.style
         let fade = bar.fade.map { "fade \($0.color.light.red) \($0.height)/\($0.solidDepth)" } ?? "no fade"
         let glass = "\(list.back.label.accessibilityLabel) \(list.back.label.style.diameter) at "
             + "\(list.back.label.style.iconOffset), "
-            + "\(list.more.accessibilityLabel) \(list.more.icon.style.size) "
-            + "tinting \(list.more.style.hover?.cornerRadius ?? 0), \(list.showAs.heading ?? "no heading") "
+            + "\(list.showAs.label.accessibilityLabel) \(list.showAs.label.icon.style.size) "
+            + "tinting \(list.showAs.label.style.hover?.cornerRadius ?? 0), "
+            + "\(list.showAs.menu.heading ?? "no heading") "
             + "\(checked), bar \(bar.edgeInset)/\(bar.contentTop)/\(bar.contentBottom), \(fade), "
             + "on \(bar.background.light.red), content "
             + "\(bar.contentHorizontalPadding)/\(bar.contentMaxWidth ?? 0), "

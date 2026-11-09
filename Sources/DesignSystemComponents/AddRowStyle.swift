@@ -7,9 +7,14 @@ public struct AddRowStyle: Equatable, Sendable {
     public let spacing: Double
     public let height: Double
 
-    /// How wide the row is, and nil for a row as wide as what it stands in: "+ Add list" stands as a column of its own
-    /// on the board.
+    /// How wide the row is, and nil for a row as wide as `fills` says: "+ Add list" stands as a column of its own on
+    /// the board.
     public let width: Double?
+
+    /// Whether a row with no width fills the width it stands in, as a column's "+ Add task" fills its column, or fits
+    /// its glyph and its title, as every other row that adds does in both canvases, so that a tap beside it is the
+    /// screen's.
+    public let fills: Bool
 
     public let cornerRadius: Double
     public let topPadding: Double
@@ -36,6 +41,7 @@ public struct AddRowStyle: Equatable, Sendable {
         spacing: Double,
         height: Double,
         width: Double?,
+        fills: Bool,
         cornerRadius: Double,
         topPadding: Double,
         leadingPadding: Double,
@@ -51,6 +57,7 @@ public struct AddRowStyle: Equatable, Sendable {
         self.spacing = spacing
         self.height = height
         self.width = width
+        self.fills = fills
         self.cornerRadius = cornerRadius
         self.topPadding = topPadding
         self.leadingPadding = leadingPadding
