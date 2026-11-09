@@ -451,3 +451,22 @@ private func doneStrip(
         "action": doneStrip(action: .second),
     ])
 }
+
+private let glassControlStyle = GlassControlStyle(
+    iconOffset: 0, diameter: 30, height: 28, glass: nil,
+    hover: HoverStyle(color: .hover, cornerRadius: 14, animation: .hoverTints)
+)
+
+private func glassLabel(
+    icon: IconModel = plus, style: GlassControlStyle = glassControlStyle, accessibilityLabel: String = "More"
+) -> GlassButtonLabelModel {
+    GlassButtonLabelModel(icon: icon, style: style, accessibilityLabel: accessibilityLabel)
+}
+
+@Test func aGlassButtonLabelModelComparesEveryProperty() {
+    expectEveryPropertyCompared({ glassLabel() }, [
+        "icon": glassLabel(icon: IconModel(icon: .ellipsis, style: IconStyle(size: 18, weight: .regular, color: .ink))),
+        "style": glassLabel(style: GlassControlStyle(iconOffset: 0, diameter: 30, height: 28, glass: nil, hover: nil)),
+        "accessibilityLabel": glassLabel(accessibilityLabel: "New task"),
+    ])
+}
