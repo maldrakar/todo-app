@@ -2,12 +2,14 @@
 import DesignSystemComponents
 import SwiftUI
 
-/// A task's row as its model describes it (`TaskRowModel`; `Phone.dc.html`, the list screen's row), and a card of a
-/// column, which the column stands on its card's look (`BlockRow`): its check, and beside it its title and meta line as
-/// the button that opens it, every size, colour, font and word the model's. Each sends the action its model holds, and
-/// what follows is the module's: a tap beside the check sends its `tap`.
+/// A task's row as its model describes it (`TaskRowModel`; `Phone.dc.html`, the list screen's row; `Mac.dc.html`, the
+/// pane's row), and a card of a column, which the column stands on its card's look (`BlockRow`): its check, and beside
+/// it its title and meta line as the button that opens it, every size, colour, font and word the model's, the meta
+/// under the title or after it on its line as its style says. Each sends the action its model holds, and what follows
+/// is the module's: a tap beside the check sends its `tap`, which a click is on the Mac.
 ///
-/// A tap on an open row's check takes the row away as `CompletingTask` says.
+/// A tap on an open row's check takes the row away as `CompletingTask` says. While the pointer is over the row it is
+/// tinted where its style gives the tint, which only the view can know.
 ///
 /// The drag, the menu, the swipe and the fresh fade wrap this view from outside (`BlockRow`).
 struct TaskRowView<Action: Equatable & Sendable>: View {
@@ -15,6 +17,9 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
     private let send: (Action) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Whether the pointer is over the row.
+    @State private var isHovered = false
 
     init(_ model: TaskRowModel<Action>, send: @escaping (Action) -> Void) {
         self.model = model
@@ -31,17 +36,41 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
             .padding(.leading, model.style.leading)
             .padding(.trailing, model.style.trailing)
             .frame(minHeight: model.style.minimumHeight, alignment: .top)
+            .background {
+                if let hover = model.style.hover {
+                    RoundedRectangle(cornerRadius: model.style.cornerRadius, style: .circular)
+                        .fill(Color(hover))
+                        .opacity(isHovered ? 1 : 0)
+                }
+            }
         }
+        #if !os(watchOS)
+        // The watch has no pointer, nor the modifier.
+        .onHover { isHovered = $0 }
+        #endif
     }
 
-    /// The title and the meta line under it, the whole width the check leaves a place to tap.
+    /// The title and the meta line, the whole width the check leaves a place to tap: on the title's line after it,
+    /// the title on one line and cut short before the items, which keep their size; or under it, wrapping.
     private func titleAndMeta(isCompleting: Bool) -> some View {
-        VStack(alignment: .leading, spacing: model.style.titleToMeta) {
-            title(isCompleting: isCompleting)
-            if !model.meta.isEmpty {
-                WrappingRow(spacing: model.style.metaSpacing, lineSpacing: model.style.metaLineSpacing) {
-                    ForEach(model.meta.indices, id: \.self) { index in
-                        metaItem(model.meta[index])
+        Group {
+            if model.style.metaTrailing {
+                HStack(spacing: model.style.titleToMeta) {
+                    title(isCompleting: isCompleting)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if !model.meta.isEmpty {
+                        HStack(spacing: model.style.metaSpacing) { meta }
+                            .fixedSize()
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: model.style.titleToMeta) {
+                    title(isCompleting: isCompleting)
+                    if !model.meta.isEmpty {
+                        WrappingRow(spacing: model.style.metaSpacing, lineSpacing: model.style.metaLineSpacing) {
+                            meta
+                        }
                     }
                 }
             }
@@ -67,15 +96,33 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
             }
     }
 
-    /// One item of the meta line: its glyph, its text, or both its spacing apart.
-    private func metaItem(_ item: MetaItemModel) -> some View {
-        HStack(spacing: item.style.spacing) {
+    /// The meta line's items, in their order.
+    private var meta: some View {
+        ForEach(model.meta.indices, id: \.self) { index in
+            metaItem(model.meta[index])
+        }
+    }
+
+    /// One item of the meta line: its glyph, its text, or both its spacing apart, on its capsule where it has one.
+    @ViewBuilder private func metaItem(_ item: MetaItemModel) -> some View {
+        let face = HStack(spacing: item.style.spacing) {
             if let icon = item.icon {
                 Icon(icon)
             }
             if let text = item.text {
                 Text(text)
             }
+        }
+        if let capsule = item.style.capsule {
+            face
+                .padding(.leading, capsule.leadingPadding)
+                .padding(.trailing, capsule.trailingPadding)
+                .frame(height: capsule.height)
+                .background(
+                    Color(capsule.background), in: .rect(cornerRadius: capsule.cornerRadius, style: .circular)
+                )
+        } else {
+            face
         }
     }
 }
