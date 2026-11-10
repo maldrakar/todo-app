@@ -1,8 +1,10 @@
 # Spec: Navigation state the view only reads
 
-- Status: Approved 2026-10-22 (revision 3)
+- Status: Approved 2026-10-22 (revision 3); amended 2026-11-10 (#195)
 - Owner review: https://claude.ai/artifact/U3wtm2JcKqC9QEZe3p3mJv
 - Issue: #117
+
+> Amended 2026-11-10 (#195), on the owner's decision in chat: every screen the stack lets go, by Back or by its opener's slot, hears first that it goes, top down, and closes what it has open, and one let go in answer to a change the store committed hears nothing (sections 2, 3 and 8; ADR-0009, amendment of 2026-11-10).
 
 Written for the owner. The bar is readability: modules and their contracts in prose, types only where the design depends on them. Every type defined outside this document gets a one-line reminder at its first mention and an entry in the glossary at the end. Names in `code` that do not exist yet are working names, settled by a compiler probe in the plan, as the navigation spec did for `Seat`.
 
@@ -57,7 +59,7 @@ After every event the stack walks up from the base and compares each slot with w
 - an empty slot: everything above is dropped;
 - a modal: everything above is dropped, and the flow presents the declared screen (section 5).
 
-This is the seat's rule walked along the stack. The new screen is made before the old one is let go, so a screen that cannot be made leaves what was open. Its opener is told that it could not be opened, why, and what stays open, and takes that back as its slot. So "The task is gone." stays the list's sentence, under its rows, as it is today.
+This is the seat's rule walked along the stack. The new screen is made before the old one is let go, so a screen that cannot be made leaves what was open. Its opener is told that it could not be opened, why, and what stays open, and takes that back as its slot. So "The task is gone." stays the list's sentence, under its rows, as it is today. Every screen let go, by any of these and by Back, hears first that it goes, top down, and closes what it has open, and what it answers reaches nobody; in an event that is a change the store committed it hears nothing, since no module writes in answer to one (ADR-0009, amendment of 2026-11-10).
 
 **A slot written again is a new declaration.** The walk compares heads, so a slot written with the head it already holds keeps the screen above. That screen still gets the declared route, once, as the seat hands a kept child its route today, and reconciles its own slot to it. This is how a click on the view already highlighted returns to its list and closes the task open in it, as the owner set on 2026-10-16 and two tests hold. Between two writes the screen above owns its own slot, and the stack never hands it an old declaration again. The slot therefore tells a new write from an old one even when the value is the same; how it does is the plan's (the engineer's call).
 
@@ -86,7 +88,7 @@ flowchart LR
 
 ### 3. Back and links stay one road each
 
-**Back.** SwiftUI draws the back button and handles it itself, and it never tells the view that the button was tapped. There are three ways back: the button, the swipe from the edge, and the menu a long press on the button opens, which can go back several screens at once. Each ends the same way: SwiftUI writes a shorter path into the binding, and that write is all the view learns. So the view does not say "Back was tapped"; it says where the person went back to, by passing on what SwiftUI wrote, whole, as one action of the window: `.wentBack(to:)`, named for the gesture as ADR-0006 names actions. In a narrow window with the path `[#1 list, #2 task]`, a tap on "‹ Inbox" or a swipe sends `.wentBack(to: [#1])`, and choosing "Views" in the long-press menu sends `.wentBack(to: [])`. The flow finds the screen now on top, the list or the sidebar, and tells it that what was over it was closed. That screen empties its slot, and the stack drops the rest. A screen cannot keep a slot the person closed, since the screen is already gone from the display (the engineer's call). On iPhone, Back from the list to the views empties the sidebar's slot, and the highlight goes with it: the rule of #107, now with no action of its own (`listBackButtonTapped` goes).
+**Back.** SwiftUI draws the back button and handles it itself, and it never tells the view that the button was tapped. There are three ways back: the button, the swipe from the edge, and the menu a long press on the button opens, which can go back several screens at once. Each ends the same way: SwiftUI writes a shorter path into the binding, and that write is all the view learns. So the view does not say "Back was tapped"; it says where the person went back to, by passing on what SwiftUI wrote, whole, as one action of the window: `.wentBack(to:)`, named for the gesture as ADR-0006 names actions. In a narrow window with the path `[#1 list, #2 task]`, a tap on "‹ Inbox" or a swipe sends `.wentBack(to: [#1])`, and choosing "Views" in the long-press menu sends `.wentBack(to: [])`. The flow finds the screen now on top, the list or the sidebar, and drops the screens over it, each of which hears first that it goes, top down, and closes what it has open, a list its card and a new list's name as its own back button does (ADR-0009, amendment of 2026-11-10). Then the flow tells the screen now on top that what was over it was closed, and that screen empties its slot. A screen cannot keep a slot the person closed, since the screen is already gone from the display (the engineer's call). On iPhone, Back from the list to the views empties the sidebar's slot, and the highlight goes with it: the rule of #107, now with no action of its own (`listBackButtonTapped` goes).
 
 **A pop the model drove.** SwiftUI may write the path back after the module has already shortened it, for a task deleted under its screen. The stack keeps only a prefix it holds, by id, so such a write and any id it never gave move nothing.
 
@@ -196,7 +198,7 @@ sequenceDiagram
   V->>V: SwiftUI pushes the task
 ```
 
-**Back twice, narrow window.** SwiftUI writes `[#1]`; the view sends `.wentBack(to: [#1])`. The flow tells #1 that what was over it was closed; the list empties its slot; the stack drops #2. The text is `/view/<v>`. The second Back writes `[]`; the sidebar is told; it empties its slot, and the highlight goes; the stack drops #1. The text is `/`, and a relaunch opens the Inbox, as a new window does.
+**Back twice, narrow window.** SwiftUI writes `[#1]`; the view sends `.wentBack(to: [#1])`. #2 hears that it goes and closes what it has open, and the stack drops it; then the flow tells #1 that what was over it was closed, and the list empties its slot. The text is `/view/<v>`. The second Back writes `[]`; #1 hears that it goes, closes its card and a new list's name, and the stack drops it; then the sidebar is told, it empties its slot, and the highlight goes. The text is `/`, and a relaunch opens the Inbox, as a new window does.
 
 **A task deleted while its screen is open, wide window.** The host delivers `.changed`; the stack hands it to every element, base first. #2 finds its task gone and answers that it asks to be closed; the stack hands that answer to #1, which empties its slot; the walk drops #2. The shape is `wide(column: #1, path: [])`, SwiftUI pops, and the write it may make afterwards names a prefix the stack holds, so it moves nothing.
 

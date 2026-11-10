@@ -142,7 +142,8 @@ extension AppModule {
         /// A notice of the stack, in each module's own terms: `.declared` reaches a kept screen as its `.route`, and
         /// the rest as the events of the same names, a list hearing the answer of the task screen or of a list over it
         /// as its own `Route.Tail.Answer` and what still stands over it as its `Route.Tail`. The task screen declares
-        /// nothing, so nothing stands over it to answer it, be gone from over it or be refused it.
+        /// nothing, so nothing stands over it to answer it, be gone from over it or be refused it, and has no field of
+        /// its own, so being dropped closes nothing in it.
         func take(_ notice: StackNotice<Screen>) -> Output? {
             switch (self, notice) {
             case (.list(let list), .created): list.send(.created).map(Output.list)
@@ -154,11 +155,12 @@ extension AppModule {
             case (.list(let list), .uncovered): list.send(.uncovered).map(Output.list)
             case (.list(let list), .notOpened(let error, let stillOpen)):
                 list.send(.notOpened(error, stillOpen: stillOpen?.tail)).map(Output.list)
+            case (.list(let list), .dropped): list.send(.dropped).map(Output.list)
             case (.task(let task), .created): task.send(.created).map(Output.task)
             case (.task(let task), .declared(.task(let route))): task.send(.route(route)).map(Output.task)
             case (.list, .declared(.task)), (.task, .declared(.list)):
                 nil
-            case (.task, .destinationAnswered), (.task, .uncovered), (.task, .notOpened):
+            case (.task, .destinationAnswered), (.task, .uncovered), (.task, .notOpened), (.task, .dropped):
                 nil
             }
         }
@@ -181,12 +183,35 @@ extension AppModule {
             case .destinationAnswered(.list(let output)): base.send(.destinationAnswered(output))
             case .uncovered: base.send(.uncovered)
             case .notOpened(let error, let stillOpen): base.send(.notOpened(error, stillOpen: stillOpen?.list))
-            case .created, .declared, .destinationAnswered(.task): nil
+            case .created, .declared, .dropped, .destinationAnswered(.task): nil
             }
         }
 
         static func route(of base: TaskViewList, over above: Route?) -> TaskViewList.Route {
             TaskViewList.Route(list: above?.list)
+        }
+
+        /// A change the store committed is the one event of the sidebar's that is. The sidebar keeps its destination on
+        /// a change, so the walk after it lets nothing go and this decides nothing today: the protocol asks for the
+        /// base's events too, so that a sidebar that learns to empty its destination on a change lets the list go
+        /// unheard, writing nothing in answer to it (ADR-0009, amendment of 2026-11-10).
+        static func isChange(_ event: TaskViewList.Event) -> Bool {
+            switch event {
+            case .changed: true
+            case .action, .created, .route, .destinationAnswered, .uncovered, .notOpened, .widthChanged, .dayChanged:
+                false
+            }
+        }
+
+        /// A change the store committed is the one event of a screen's that is, so that a screen the walk after it lets
+        /// go writes nothing in answer to it (ADR-0009, amendment of 2026-11-10): a list a change deleted, or a group's
+        /// screen whose group a change took, asks to be closed and goes unheard, and it and every screen standing over
+        /// it lose what was typed in them and not yet written, which the owner accepted.
+        static func isChange(_ event: Event) -> Bool {
+            switch event {
+            case .changed: true
+            case .action, .dayChanged, .widthChanged: false
+            }
         }
     }
 }

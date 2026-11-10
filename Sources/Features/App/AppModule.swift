@@ -244,9 +244,10 @@ public final class AppModule: Routable {
             // Read against the layout the root has as the write arrives, the one the view bound unless the width moved
             // in between, which no write crossed in the probes of 2026-10-24, so that in a wide window the column goes
             // before it and no write can pop the column (navigation state spec, section 4). The stack drops what was
-            // over the screen now on top and tells that screen, which empties its destination (section 3). A path it
-            // does not hold as a shorter prefix moves nothing, which is where SwiftUI's write after a pop the model
-            // drove lands, in either layout. The root's sentence stays, since the way back is a gesture on the screens.
+            // over the screen now on top, each screen hearing it first and closing what it has open, and tells that
+            // screen, which empties its destination (section 3; ADR-0009, amendment of 2026-11-10). A path it does not
+            // hold as a shorter prefix moves nothing, which is where SwiftUI's write after a pop the model drove lands,
+            // in either layout. The root's sentence stays, since the way back is a gesture on the screens.
             return react(to: state.stack.wentBack(to: state.stackPath(wentBackTo: path)))
         case .action(.quickEntry(let action)):
             // Cancel included, which closes quick entry by its own answer. With no quick entry up the empty seat
@@ -263,7 +264,8 @@ public final class AppModule: Routable {
         case .changed(let changes):
             // Every module of the window gets the change and decides for itself whether it reads it, the stack's
             // modules first and quick entry last (navigation state spec, section 8, the third flow). A screen whose
-            // subject is gone asks to be closed, which the walk after it follows. The root reads the store for nothing
+            // subject is gone asks to be closed, which the walk after it follows, letting it go unheard, since a change
+            // is no event a module writes in answer to (`Screen.isChange`). The root reads the store for nothing
             // of its own (spec section 3, ADR-0006, amendment of 2026-10-14), and its sentence stays: a change answers
             // nothing a person was told.
             let output = sendToTheSidebarAndEveryScreen(sidebar: .changed(changes), screens: .changed(changes))

@@ -33,6 +33,10 @@ public struct StackElementID: Hashable, Sendable {
 /// down: its opener takes `.destinationAnswered(output)`, the opener's answer goes to its own opener, and the base's
 /// answers come back out of the call, to the owner (spec section 2, "Answers go to the opener").
 ///
+/// Every screen the stack lets go, by the walk or by the way back, hears `.dropped` first, top down, so that it
+/// closes what it has open, and what it answers goes to nobody; in a call that hands a change the store committed,
+/// which the owner's enum tells (`StackScreen.isChange`), it hears nothing (ADR-0009, amendment of 2026-11-10).
+///
 /// A struct holding classes, like `Seat`: the owner keeps it in a `var` of its own state, and a call that moves
 /// what stands is a mutation of that state, which the owner's model, computed from the state, shows at its next
 /// read (`docs/style.md`, "A module's model is computed from its state").
@@ -104,7 +108,7 @@ public struct ScreenStack<Screen: StackScreen> {
     /// to the event itself before any the walk draws. A window's base answers only a gesture made on it, so it
     /// answers once at most.
     public mutating func send(_ event: Screen.Base.Event) -> Screen.Base.Output? {
-        walk(after: base.send(event))
+        walk(after: base.send(event), inAChange: Screen.isChange(event))
     }
 
     /// Hands an element an event the owner spells, an action its view sent or `.changed`, hands its answer down,
@@ -113,7 +117,7 @@ public struct ScreenStack<Screen: StackScreen> {
     public mutating func send(_ event: Screen.Event, to id: StackElementID) -> Screen.Base.Output? {
         guard let index = elements.firstIndex(where: { $0.id == id }) else { return nil }
         let answer = elements[index].screen.send(event).flatMap { hand(.destinationAnswered($0), to: index) }
-        return walk(after: answer)
+        return walk(after: answer, inAChange: Screen.isChange(event))
     }
 
     /// Takes the way back, which SwiftUI reports only as the shorter path it wrote, whole, from the back button,
@@ -123,19 +127,20 @@ public struct ScreenStack<Screen: StackScreen> {
     ///
     /// It moves only a strict prefix of `path`. An id the stack never gave, a path that is not a prefix, the
     /// same path and a longer one move nothing, so a write SwiftUI makes after a pop the model drove changes
-    /// nothing (spec section 3, "A pop the model drove"). Otherwise it drops everything above the prefix, then
-    /// tells the screen now on top, or the base, `.uncovered`, and walks: the screen cannot keep a destination the
-    /// person closed, since what was over it is already gone. The answer that came down is returned before any
-    /// the walk draws.
+    /// nothing (spec section 3, "A pop the model drove"). Otherwise it drops everything above the prefix, each
+    /// screen hearing `.dropped` as it goes, then tells the screen now on top, or the base, `.uncovered`, and walks:
+    /// the screen cannot keep a destination the person closed, since what was over it is already gone. The answer
+    /// that came down is returned before any the walk draws. A way back is a gesture and never a change.
     public mutating func wentBack(to path: [StackElementID]) -> Screen.Base.Output? {
         guard path.count < elements.count, self.path.starts(with: path) else { return nil }
-        elements.removeSubrange(path.count...)
-        return walk(after: hand(.uncovered, to: path.count))
+        drop(above: path.count, inAChange: false)
+        return walk(after: hand(.uncovered, to: path.count), inAChange: false)
     }
 
     /// The walk after every call the stack takes, whether or not the call moved anything, and after none it
     /// refuses. It returns `answer`, the base's answer the call itself drew, or, when the call drew none, the
-    /// first the walk drew.
+    /// first the walk drew. `isChange` says whether the call hands a change the store committed, which every drop
+    /// the walk makes is told.
     ///
     /// It goes up the openers, passing over each whose write mark it has followed, and follows the first new
     /// write it meets, which it records as followed first. It then starts again from the base, so that a lower
@@ -143,7 +148,7 @@ public struct ScreenStack<Screen: StackScreen> {
     /// over an opener whose write is followed is one comparison. A mark moves only when a screen declares, so
     /// the walk ends once what it hands the screens has them declare nothing new. It is a loop and not a
     /// recursion, so a chain of screens as deep as a link can make costs the call stack nothing.
-    private mutating func walk(after answer: Screen.Base.Output?) -> Screen.Base.Output? {
+    private mutating func walk(after answer: Screen.Base.Output?, inAChange isChange: Bool) -> Screen.Base.Output? {
         var first = answer
         var level = 0
         while level <= elements.count {
@@ -153,7 +158,7 @@ public struct ScreenStack<Screen: StackScreen> {
                 continue
             }
             recordFollowed(at: level)
-            let drawn = follow(destination.declared, at: level)
+            let drawn = follow(destination.declared, at: level, inAChange: isChange)
             first = first ?? drawn
             level = 0
         }
@@ -164,14 +169,15 @@ public struct ScreenStack<Screen: StackScreen> {
     /// write that declares nothing drops everything above the opener, which answers nothing.
     private mutating func follow(
         _ declared: Destination<Screen.Route>.Declared?,
-        at level: Int
+        at level: Int,
+        inAChange isChange: Bool
     ) -> Screen.Base.Output? {
         switch declared {
         case nil:
-            elements.removeSubrange(level...)
+            drop(above: level, inAChange: isChange)
             return nil
         case .pushed(let route)?:
-            return push(route, at: level)
+            return push(route, at: level, inAChange: isChange)
         }
     }
 
@@ -179,10 +185,11 @@ public struct ScreenStack<Screen: StackScreen> {
     /// the base.
     ///
     /// The screen above with the route's head is kept and handed the route. Any other screen is made before
-    /// anything is let go, so that one that cannot be made leaves what stands: the opener is told why and what
-    /// still stands over it, and takes that back as its destination, which the stack records as followed, so
-    /// that the declaration is tried once and the screen over the opener is handed nothing (spec, "Risks").
-    private mutating func push(_ route: Screen.Route, at level: Int) -> Screen.Base.Output? {
+    /// anything is let go, so that one that cannot be made leaves what stands, and nobody hears `.dropped`: the
+    /// opener is told why and what still stands over it, and takes that back as its destination, which the stack
+    /// records as followed, so that the declaration is tried once and the screen over the opener is handed nothing
+    /// (spec, "Risks"). Once it is made, what stood over the opener is let go and the new screen hears `.created`.
+    private mutating func push(_ route: Screen.Route, at level: Int, inAChange isChange: Bool) -> Screen.Base.Output? {
         let above = level < elements.count ? elements[level].screen : nil
         if let above, above.route.head == route.head {
             return hand(.declared(route), to: level + 1)
@@ -195,10 +202,22 @@ public struct ScreenStack<Screen: StackScreen> {
             recordFollowed(at: level)
             return answer
         }
-        elements.removeSubrange(level...)
+        drop(above: level, inAChange: isChange)
         handedOut += 1
         elements.append(Element(id: StackElementID(handedOut), screen: made))
         return hand(.created, to: level + 1)
+    }
+
+    /// Lets go of every screen over the opener at `level`, top down, each handed `.dropped` before it goes, so that it
+    /// closes what it has open, which nothing after this reaches. What it answers is handed to nobody: its opener
+    /// goes with it or is the one that let it go. In a call that hands a change the store committed nothing is
+    /// handed, since a screen closing what it has open writes, and no module writes in answer to a change (ADR-0009,
+    /// amendment of 2026-11-10).
+    private mutating func drop(above level: Int, inAChange isChange: Bool) {
+        while elements.count > level, let top = elements.last {
+            if !isChange { _ = top.screen.take(.dropped) }
+            elements.removeLast()
+        }
     }
 
     /// Hands `notice` to the opener at `level`, and each answer on down, the answer of the opener at one level to

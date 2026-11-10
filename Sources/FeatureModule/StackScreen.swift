@@ -13,9 +13,13 @@
 /// keeps only its reaction to the `Output` of what it opened.
 ///
 /// The flow's base is not a case. It is the owner's typed module, which the owner makes and hands to the stack,
-/// and the stack reaches it through the three static requirements, so that the base's events, model and
-/// answers keep their own types. Swift 6.4 infers neither `Base` nor `Failure` from the requirements that use
+/// and the stack reaches it through the three static requirements that take it, so that the base's events, model
+/// and answers keep their own types. Swift 6.4 infers neither `Base` nor `Failure` from the requirements that use
 /// them, so a conforming enum spells `typealias Base` and `typealias Failure`.
+///
+/// The enum also tells the stack which of the owner's events are a change the store committed, the base's and an
+/// element's, which is all `isChange` decides: the stack lets screens go unheard in a call that hands one
+/// (ADR-0009, amendment of 2026-11-10).
 public protocol StackScreen {
     /// The flow's base, the screen the stack stands on: for a window, the sidebar.
     associatedtype Base: Routable
@@ -57,13 +61,24 @@ public protocol StackScreen {
     /// The base's destination, lifted into this enum's route.
     static func destination(of base: Base) -> Destination<Route>
 
-    /// Hands the base a notice and returns its answer, which goes to the owner. The stack never makes the base
-    /// and never declares it, so the base is handed `.destinationAnswered`, `.uncovered` and `.notOpened`, and never
-    /// `.created` or `.declared`.
+    /// Hands the base a notice and returns its answer, which goes to the owner. The stack never makes the base,
+    /// never declares it and never drops it, so the base is handed `.destinationAnswered`, `.uncovered` and
+    /// `.notOpened`, and never `.created`, `.declared` or `.dropped`.
     static func take(_ notice: StackNotice<Self>, base: Base) -> Base.Output?
 
     /// The base's route over what stands above it, nil when nothing does, which is the flow's route.
     static func route(of base: Base, over above: Route?) -> Base.Event.Route
+
+    /// Whether an event the owner hands the base is a change the store committed: a `switch` over the base's events
+    /// with no `default`, so that an event the base learns to take is decided here. The screens the walk after such
+    /// an event lets go are not handed `.dropped`, since a screen closing what it has open writes, and no module
+    /// writes in answer to a change, which the fan-out of a change to every window rests on (ADR-0009, amendment of
+    /// 2026-11-10).
+    static func isChange(_ event: Base.Event) -> Bool
+
+    /// Whether an event the owner hands an element is a change the store committed, decided and followed as the
+    /// base's is.
+    static func isChange(_ event: Event) -> Bool
 }
 
 /// What the stack tells a screen of its flow, beside the events the owner spells: what the walk did around the
@@ -86,4 +101,11 @@ public enum StackNotice<Screen: StackScreen> {
     /// nothing does, which the screen takes back as its destination, so that the declaration is tried once (spec
     /// section 2, and "Risks").
     case notOpened(Screen.Failure, stillOpen: Screen.Route?)
+    /// The stack lets the screen go, by the way back, by its opener emptying its destination or declaring another
+    /// screen there, or with a screen under it that goes by one of these, and this is the last thing the screen
+    /// hears: it closes what it has open, which nothing after this reaches. What it answers is handed to nobody,
+    /// since its opener goes with it or is the one that let it go. Every screen let go hears it, top down, each
+    /// before it goes, and none in a call that hands a change the store committed, since no module writes in answer
+    /// to one (ADR-0009, amendment of 2026-11-10).
+    case dropped
 }

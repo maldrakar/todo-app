@@ -109,6 +109,12 @@ public final class TaskList: Routable {
         /// section 2).
         case notOpened(StoreError, stillOpen: Route.Tail?)
 
+        /// The window's stack lets the list go, by the way back, by its opener emptying its destination or declaring
+        /// another screen there, or with a screen under it that goes by one of these, and nothing reaches the list
+        /// after this (ADR-0009, amendment of 2026-11-10). The stack hands it in no call that hands a change the store
+        /// committed, since the list writes in answer to it.
+        case dropped
+
         /// The device's day, which the root hands every screen of its window when the window's view reports a new one,
         /// at midnight, in a new time zone or on waking on another day: an event of the world that no view can send
         /// (spec section 8; ADR-0006, amendment of 2026-11-01). Which tasks a list selects, which day each of its
@@ -195,14 +201,11 @@ public final class TaskList: Routable {
         switch event {
         case .action(.backButtonTapped):
             // The person goes back, which the list answers to its opener, and the stack drops it with what stands over
-            // it (the owner's review of #177, 2026-11-08). What is open closes first by the rule of every close, a
-            // list's name being typed and the card, as before "+ Add list": what was typed is written and a new task
-            // with nothing put in it is not left behind, since nothing after this reaches the list, a field's lost
-            // focus among it. A write the store refuses keeps the list, so that its sentence stands, and a second Back
-            // closes it, the card having closed all the same.
+            // it (the owner's review of #177, 2026-11-08). What is open closes here, before the answer, and not when
+            // the stack drops the list, so that a write the store refuses keeps the list and its sentence stands; a
+            // second Back closes it, the card having closed all the same, and the drop that follows finds nothing open.
             state.problem = nil
-            settleListName()
-            closeCard()
+            closeWhatIsOpen()
             guard state.problem == nil else { return nil }
             return .wentBack
         case .action(.rowTapped(let id)): openCard(on: id)
@@ -318,6 +321,16 @@ public final class TaskList: Routable {
             let problem = TaskList.problem(error, declared: state.destination.pushed)
             setDestination(stillOpen)
             state.problem = problem.sentence
+            return nil
+        case .dropped:
+            // The stack lets the list go, by the edge swipe, the Mac's toolbar back, or a task screen's back over it
+            // and that back's long-press menu, or because its opener emptied its destination or declared another
+            // screen there, and nothing reaches it after this, a field's lost focus among it, so what is open closes by
+            // the rule of every close, as on the back button: what was typed is written and a new task with nothing
+            // put in it is not left behind (ADR-0009, amendment of 2026-11-10). A write the store refuses is not said:
+            // there is no screen left to say it on, where the back button keeps the list for its sentence. The stack
+            // hands what a dropped screen answers to nobody, so the list answers nothing.
+            closeWhatIsOpen()
             return nil
         case .changed(let changes):
             do {

@@ -170,8 +170,7 @@ extension TaskList {
         }
         guard offered != nil else { return }
         state.problem = nil
-        settleListName()
-        closeCard()
+        closeWhatIsOpen()
         guard state.problem == nil else { return }
         let title = "New list"
         var made: ViewID?
@@ -198,6 +197,14 @@ extension TaskList {
         let current = state.snapshot.page.sections.first { $0.view?.id == naming.id }?.view?.title
         guard !title.isEmpty, title != current else { return }
         writeAndReread { () throws(StoreError) in try store.update(view: naming.id, [.title(title)]) }
+    }
+
+    /// Closes what is open by the rule of every close, a list's name being typed and then the card: before "+ Add
+    /// list", on the back button, and when the window's stack drops the list. A write the store refuses leaves its
+    /// sentence, which "+ Add list" and the back button stop on.
+    func closeWhatIsOpen() {
+        settleListName()
+        closeCard()
     }
 
     // MARK: - Deleting

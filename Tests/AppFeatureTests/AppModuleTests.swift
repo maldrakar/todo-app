@@ -13,22 +13,10 @@ import TodoCore
 
 private typealias Route = AppModule.Route
 
-private let inbox = BuiltInTaskViews.inbox
-
-/// What iPhone's window offers: no window beside it, and edit mode, which every test not about the platform makes its
-/// root with.
-private let iPhone = WindowCapabilities(opensWindowsBeside: false, hasEditMode: true)
-
 /// The titles of the Inbox as the store holds them, where quick entry files what it creates. The Inbox's filter
 /// reads no day, so the day asked about is a fixed one and not the wall clock.
 private func inboxTitles(of store: Store) throws -> [String] {
     try store.tasks(in: inbox, today: Day(year: 2026, month: 10, day: 16)).map(\.title)
-}
-
-/// A view that lists the tasks carrying one tag, with its tag, so that a test can put a task in it.
-private func taggedView(_ title: String, in store: Store) throws -> (view: ViewID, tag: TagID) {
-    let tag = try store.createTag(title: title.lowercased())
-    return (try store.createView(NewTaskView(title: title, filter: .hasTag(tag))), tag)
 }
 
 /// The model of a sidebar made now on a view in a window of the width, which is what the window's sidebar is compared
@@ -95,17 +83,6 @@ private func groupOn(
 /// The model of a task screen made now on a task, as an element of the window's stack holds it.
 private func taskOn(_ id: TaskID, in store: Store) throws -> AppModule.ScreenModel {
     .task(try TaskScreen(store: store, route: .init(head: id)).model)
-}
-
-/// The ids of the screens standing over the sidebar, bottom up, whichever the layout: narrow, the one path; wide, the
-/// column, when a screen stands there, and the path over it (navigation state spec, section 4). The one place a test
-/// reads the layout for what stands, so that a test of something else holds in either width.
-private func idsOverTheSidebar(in model: AppModule.Model) -> [StackElementID] {
-    switch model.layout {
-    case .narrow(let path): path
-    case .wide(let column?, let path): [column] + path
-    case .wide(nil, let path): path
-    }
 }
 
 /// The models of the screens standing over the sidebar, bottom up, read the way the root view reads them: each id
