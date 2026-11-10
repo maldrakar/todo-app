@@ -337,6 +337,30 @@ private func runOfEachRow(_ runs: ListRuns) -> [BlockRowID: ListRuns.Run.ID] {
     #expect(drawn(unfolded) == [DrawnRun(field: nil, lazy: list.blocks.map { Drawn(whole: $0) })])
 }
 
+/// No two runs are known alike: a start that moved on as its part went, a block folded, still has the id that names
+/// the part, and when the part comes back, the block unfolded, and holds a field again, the run that starts there
+/// takes the id and the start that had moved is dropped.
+@Test func aFieldAtAPartComeBackTakesItsIdFromTheStartThatMovedOn() throws {
+    let list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let start = ListRuns.Run.ID.row(BlockRowID(block: house, task: list.h2))
+    var passes = Passes()
+    list.openCard(on: list.h2)
+    _ = passes.draw(list)
+    list.tapBackground()
+    #expect(passes.draw(list).cuts == [ListRuns.Start(id: start, part: start, next: .header(office))])
+    list.toggleFold(of: house)
+    #expect(passes.draw(list).cuts.map(\.part) == [.header(office)], "moved on to Office's header")
+    list.toggleFold(of: house)
+    #expect(passes.draw(list).cuts.map(\.id) == [start])
+
+    list.openCard(on: list.h2)
+    let open = passes.draw(list)
+    #expect(open.runs.map(\.id) == [.start, start])
+    #expect(open.cuts.map(\.part) == [start], "at H2 again, and none at Office's header")
+}
+
 /// The first run is known by being first, whatever opens and closes below its start, and a field's run by its part,
 /// whatever opens and closes above or below it: a list's name being typed keeps its run's id as a card opens above it
 /// and closes, and the card's run keeps its own as the name settles, the header then heading its run's lazy stack.
