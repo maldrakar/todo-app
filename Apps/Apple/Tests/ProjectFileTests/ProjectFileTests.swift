@@ -46,6 +46,28 @@ import XcodeProjectFormat
     #expect(try target(named: "Todo", in: project).product != nil)
 }
 
+/// Every Swift file of `UITests` is a source of the walks' bundle, and every source of the bundle is one of them: a walk
+/// file added to the directory and not to the project would be neither built, so that CI could not see it, nor run.
+@Test func everyWalkFileIsASourceOfTheUITestBundle() throws {
+    let walks = try #require(
+        try decodedProject().topLevelReferences.lazy.compactMap { reference -> XCSchema.Group? in
+            guard case .group(let group) = reference, group.path.path == "UITests" else { return nil }
+            return group
+        }.first,
+        "no group UITests"
+    )
+    let sources = walks.children.compactMap { child -> String? in
+        guard case .fileReference(let file) = child,
+              file.buildFiles.contains(where: { $0.buildPhase.description == "TodoUITests/compile-sources" })
+        else { return nil }
+        return file.path.path
+    }
+    let files = try FileManager.default
+        .contentsOfDirectory(atPath: packageDirectory.appending(path: "UITests").path(percentEncoded: false))
+        .filter { $0.hasSuffix(".swift") }
+    #expect(Set(sources) == Set(files))
+}
+
 /// No scheme is shared: once one is, Xcode 27.1 takes the UI-test bundle out of the scheme it makes for `Todo`, and
 /// `scripts/ui-walks.sh` finds no walk to run (probed 2026-11-10).
 @Test func theProjectSharesNoScheme() {
