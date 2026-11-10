@@ -73,9 +73,9 @@ struct ListSurface<Buttons: ViewModifier>: View {
             // The list and the board share nothing of their layout: as one gives way to the other, the frames it
             // reported and the starts of the list's runs are forgotten. Here, on the surface, whose change runs before
             // the layout that comes reports its first frame (probed on macOS 26, 2026-11-10: this action, then the
-            // new content's rows' `onGeometryChange`), and only on a change of the shape, never when the screen comes
-            // back from under another.
-            .onChange(of: shape) {
+            // new content's rows' `onGeometryChange`), and only on a change of the layout's kind, never when the screen
+            // comes back from under another.
+            .onChange(of: model.layout.kind) {
                 rowGestures.forgetLayout()
                 cuts.kept = []
             }
@@ -101,15 +101,6 @@ struct ListSurface<Buttons: ViewModifier>: View {
             list(blocks)
         case .columns(let board):
             columns(board)
-        }
-    }
-
-    /// The layout's shape with nothing of what it holds, whose change alone is the list giving way to the board or the
-    /// board to the list; every case named and none by `default`.
-    private var shape: TaskList.Model.Layout.Kind {
-        switch model.layout {
-        case .list: .list
-        case .columns: .columns
         }
     }
 
