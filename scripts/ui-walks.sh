@@ -11,8 +11,8 @@
 #   --runtime     the iOS runtime's id, the newest installed unless given
 #   --record      records the device's screen to walks.mp4, for what a walk cannot assert, such as a tint
 #
-# Xcode 27.1 is the Xcode it runs with, as `xcode-select` or DEVELOPER_DIR names it. Everything the run makes stays in
-# a new directory under TMPDIR, which the run prints: the log, the result bundle, the store of each walk and the video.
+# Xcode 27.1 is the Xcode it runs with, as `xcode-select` or DEVELOPER_DIR names it. What the run keeps is in a new
+# directory under TMPDIR, which the run prints: the log, the result bundle, the store of each walk and the video.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -55,7 +55,9 @@ cleanup() {
     xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
     xcrun simctl delete "$udid" >/dev/null 2>&1 && echo "ui-walks: deleted the device $udid"
   fi
-  echo "ui-walks: everything the run made is in $out"
+  # The builds are half a gigabyte a run and the next run makes its own.
+  rm -rf "$out/build" "$out/cli"
+  echo "ui-walks: what the run keeps is in $out"
   exit "$status"
 }
 trap cleanup EXIT
