@@ -217,6 +217,11 @@ struct LiftedList {
         _ = module.send(.action(.addListTapped))
     }
 
+    /// Adds a task at the top of the block the floating "+" adds to, whose card opens there.
+    func addTaskFromButton() {
+        _ = module.send(.action(.addTaskButtonTapped))
+    }
+
     /// Adds a task at a block's end, by its "+ Add task", whose card opens there.
     func addTask(in id: TaskList.Model.BlockID) {
         _ = module.send(.action(.addTaskRowTapped(in: id)))

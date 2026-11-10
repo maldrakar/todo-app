@@ -6,8 +6,9 @@ import TodoCore
 // The list screen's blocks cut into runs, `ListRuns`: each part that holds a field stands outside the lazy stacks, so
 // that its field is never taken out of the window, at the head of the run whose lazy stack holds the parts after it,
 // the first run holding those before the first cut; a run's start, once made, is kept while its part is drawn, the
-// part heading its run's lazy stack once its field has closed, so that no row changes runs as a field closes; the Done
-// strip's rows leave their lazy stack while one of them holds a field (#196). The blocks are the ones a real `TaskList`
+// part heading its run's lazy stack once its field has closed, so that no row changes runs as a field closes, and a
+// start whose part is gone moves to the part that followed it, so that none changes runs then either; the Done strip's
+// rows leave their lazy stack while one of them holds a field (#196). The blocks are the ones a real `TaskList`
 // draws (`LiftedList`).
 
 /// What a run draws of a block: whether its header, its top mark and its "+ Add task", and its rows, by their tasks.
@@ -52,7 +53,7 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
 /// The runs as the screen draws them, pass after pass: each pass is handed the cuts the pass before it drew, as the
 /// screen keeps them (`ListCuts`).
 private struct Passes {
-    private var kept: Set<ListRuns.Run.ID> = []
+    private var kept: [ListRuns.Start] = []
 
     mutating func draw(_ list: LiftedList) -> ListRuns {
         let runs = ListRuns(list.blocks, doneRows: list.doneRows, cuts: kept)
@@ -213,7 +214,7 @@ private func runOfEachRow(_ runs: ListRuns) -> [BlockRowID: ListRuns.Run.ID] {
                 + blocks.dropFirst().map { Drawn(whole: $0) }
         ),
     ])
-    #expect(closed.cuts == [card])
+    #expect(closed.cuts.map(\.id) == [card])
 }
 
 /// A field opened below a cut, or above it, keeps the cut: the rows between them stay in the run they stood in, and
@@ -243,34 +244,96 @@ private func runOfEachRow(_ runs: ListRuns) -> [BlockRowID: ListRuns.Run.ID] {
     #expect(runOfEachRow(third).filter { $0.key.task != list.a } == rows.filter { $0.key.task != list.a })
 }
 
-/// A cut whose part the list no longer draws is dropped, and its rows join the run before it: a task checked away, and
-/// a block folded, whose rows come back into the run its header stands in.
-@Test func aCutWhosePartIsNoLongerDrawnIsDropped() throws {
+/// A start whose part the list no longer draws moves to the part that followed it, keeping its run's id, and no row
+/// changes runs: the floating "+" makes an empty task, the first row of the first block, which has no header, and a tap
+/// on the background deletes it; the first run stays as it was, holding nothing above, where the rows of a start
+/// dropped joined it, at the far end of a stack that had measured none of them. The start moves again as that part
+/// goes, a row checked away, and a field opened on the part it stands at keeps its id.
+@Test func aStartWhosePartGoesMovesToThePartThatFollowedIt() throws {
     let list = try LiftedList()
     let own = TaskList.Model.BlockID.own(nil)
-    let house = TaskList.Model.BlockID.list(list.house)
-    let checked = ListRuns.Run.ID.row(BlockRowID(block: own, task: list.b))
-    let folded = ListRuns.Run.ID.row(BlockRowID(block: house, task: list.h2))
+    var passes = Passes()
+    list.addTaskFromButton()
+    let new = try #require(list.rowIDs(of: own).first)
+    #expect(list.rowIDs(of: own) == [new, list.a, list.b, list.c, list.d])
+    let start = ListRuns.Run.ID.row(BlockRowID(block: own, task: new))
+    let open = passes.draw(list)
+    #expect(open.runs.map(\.id) == [.start, start])
+
+    list.tapBackground()
+    #expect(list.rowIDs(of: own) == [list.a, list.b, list.c, list.d], "the empty task deleted")
+    let closed = passes.draw(list)
+    let blocks = list.blocks
+    #expect(closed.runs.map(\.id) == [.start, start])
+    #expect(runOfEachRow(closed) == runOfEachRow(open).filter { $0.key.task != new })
+    #expect(drawn(closed) == [
+        DrawnRun(field: nil, lazy: [Drawn(own, header: true, topMark: true, rows: [], add: false)]),
+        DrawnRun(
+            field: nil,
+            lazy: [Drawn(own, header: false, topMark: false, rows: [list.a, list.b, list.c, list.d], add: true)]
+                + blocks.dropFirst().map { Drawn(whole: $0) }
+        ),
+    ])
+
+    list.check(list.a)
+    let checked = passes.draw(list)
+    #expect(checked.runs.map(\.id) == [.start, start], "moved again, to B")
+    #expect(runOfEachRow(checked) == runOfEachRow(closed).filter { $0.key.task != list.a })
+
+    list.openCard(on: list.b)
+    let field = passes.draw(list)
+    #expect(field.runs.map(\.id) == [.start, start], "B's card at the head of the run that stands at B")
+    let card = Drawn(own, header: false, topMark: false, rows: [list.b], add: false)
+    #expect(field.runs.last?.field.map(Drawn.init) == card)
+    #expect(runOfEachRow(field) == runOfEachRow(checked))
+}
+
+/// A start whose part goes while the part that followed it starts a run itself is dropped, and nothing moves: its run
+/// held that part alone.
+@Test func aStartWhosePartGoesBeforeAnotherStartIsDropped() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let first = ListRuns.Run.ID.row(BlockRowID(block: own, task: list.b))
+    let second = ListRuns.Run.ID.row(BlockRowID(block: own, task: list.c))
     var passes = Passes()
     list.openCard(on: list.b)
     _ = passes.draw(list)
-    list.openCard(on: list.h2)
+    list.openCard(on: list.c)
     _ = passes.draw(list)
     list.tapBackground()
-    #expect(passes.draw(list).runs.map(\.id) == [.start, checked, folded])
+    let both = passes.draw(list)
+    #expect(both.runs.map(\.id) == [.start, first, second])
 
     list.check(list.b)
     #expect(list.rowIDs(of: own) == [list.a, list.c, list.d])
-    let afterCheck = passes.draw(list)
-    #expect(afterCheck.runs.map(\.id) == [.start, folded])
-    #expect(runOfEachRow(afterCheck)[BlockRowID(block: own, task: list.c)] == .start)
+    let dropped = passes.draw(list)
+    #expect(dropped.runs.map(\.id) == [.start, second])
+    #expect(runOfEachRow(dropped) == runOfEachRow(both).filter { $0.key.task != list.b })
+}
+
+/// A start whose part and the part that followed it both go is dropped, and its rows join the run before it: a block
+/// folded, whose rows come back into the run its header stands in.
+@Test func aStartWhosePartAndTheNextBothGoIsDropped() throws {
+    let list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let start = ListRuns.Run.ID.row(BlockRowID(block: house, task: list.h1))
+    var passes = Passes()
+    list.openCard(on: list.h1)
+    _ = passes.draw(list)
+    list.tapBackground()
+    let kept = passes.draw(list)
+    #expect(kept.runs.map(\.id) == [.start, start])
+    #expect(runOfEachRow(kept)[BlockRowID(block: office, task: list.o1)] == start)
 
     list.toggleFold(of: house)
-    #expect(passes.draw(list).runs.map(\.id) == [.start])
+    let folded = passes.draw(list)
+    #expect(folded.runs.map(\.id) == [.start])
+    #expect(runOfEachRow(folded)[BlockRowID(block: office, task: list.o1)] == .start)
     list.toggleFold(of: house)
     let unfolded = passes.draw(list)
     #expect(list.rowIDs(of: house) == [list.h1, list.h2])
-    #expect(unfolded.runs.map(\.id) == [.start], "a cut once dropped is not made again")
+    #expect(unfolded.runs.map(\.id) == [.start], "a start once dropped is not made again")
     #expect(drawn(unfolded) == [DrawnRun(field: nil, lazy: list.blocks.map { Drawn(whole: $0) })])
 }
 
