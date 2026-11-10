@@ -219,6 +219,16 @@ struct LiftedList {
         _ = module.send(.action(.addListTapped))
     }
 
+    /// Closes the open card by a tap on what stands behind the controls.
+    func tapBackground() {
+        _ = module.send(.action(.backgroundTapped))
+    }
+
+    /// Settles the name typed into a new list's field, as Return does.
+    func submitListName() {
+        _ = module.send(.action(.listNameFieldSubmitted))
+    }
+
     /// Checks a task, which writes it done.
     func check(_ task: TaskID) {
         _ = module.send(.action(.checkTapped(task)))

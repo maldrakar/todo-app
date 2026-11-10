@@ -167,6 +167,29 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     ])
 }
 
+/// A run is known by the part that holds its field, the last by being last, so that a field keeps its view whatever
+/// opens or closes above or below it: a list's name being typed, with a card opening above it and closing again, and a
+/// card, with a name's field appearing below it and going.
+@Test func aFieldsRunKeepsItsIdWhateverOpensOrClosesAboveOrBelowIt() throws {
+    let list = try LiftedList()
+    let card = ListRuns.Run.ID.row(BlockRowID(block: .own(nil), task: list.b))
+    func ids() -> [ListRuns.Run.ID] { ListRuns(list.blocks, doneRows: []).runs.map(\.id) }
+    #expect(ids() == [.end])
+    list.openCard(on: list.b)
+    #expect(ids() == [card, .end])
+    list.addList()
+    let named = try #require(list.blocks.first { $0.header?.field != nil }?.id)
+    let name = ListRuns.Run.ID.header(named)
+    #expect(ids() == [name, .end], "the card closed by adding a list")
+    list.openCard(on: list.b)
+    #expect(ids() == [card, name, .end], "a card above the name")
+    list.tapBackground()
+    #expect(ids() == [name, .end], "the card above closed")
+    list.openCard(on: list.b)
+    list.submitListName()
+    #expect(ids() == [card, .end], "the name below settled")
+}
+
 /// The Done strip's rows stand in a lazy stack, and outside it while one of them is the open card.
 @Test func theDoneRowsLeaveTheirLazyStackWhileACardIsAmongThem() throws {
     let list = try LiftedList()

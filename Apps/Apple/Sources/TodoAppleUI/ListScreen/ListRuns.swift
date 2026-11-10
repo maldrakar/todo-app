@@ -20,8 +20,17 @@ struct ListRuns {
     /// The parts a lazy stack holds, and the part that holds a field after them, which stands outside it, none for the
     /// last run.
     struct Run: Identifiable {
-        /// Its place among the runs.
-        let id: Int
+        /// What a run is known by: the part that holds its field, a list's header by its block and a row by its block
+        /// and its task, and the last run by being last. Not by its place among the runs: a field that opened or closed
+        /// above another moved that one to the next run or the one before, which made its view anew, and a name being
+        /// typed lost what it held to the next letter (#196).
+        enum ID: Hashable {
+            case header(TaskList.Model.BlockID)
+            case row(BlockRowID)
+            case end
+        }
+
+        let id: ID
         let lazy: [Piece]
         let field: Piece?
     }
@@ -34,8 +43,8 @@ struct ListRuns {
     init(_ blocks: [TaskList.Model.Block], doneRows: [TaskList.Model.Row]) {
         var runs: [Run] = []
         var lazy: [Piece] = []
-        func standAlone(_ field: Piece) {
-            runs.append(Run(id: runs.count, lazy: lazy, field: field))
+        func standAlone(_ field: Piece, as id: Run.ID) {
+            runs.append(Run(id: id, lazy: lazy, field: field))
             lazy = []
         }
         for block in blocks {
@@ -43,14 +52,17 @@ struct ListRuns {
             var topMark = true
             var from = 0
             if block.header?.field != nil {
-                standAlone(Piece(block: block, parts: .init(header: true, topMark: false, rows: 0..<0, add: false)))
+                let itself = BlockView.Parts(header: true, topMark: false, rows: 0..<0, add: false)
+                standAlone(Piece(block: block, parts: itself), as: .header(block.id))
                 header = false
             }
             for row in block.rows.indices where Self.holdsField(block.rows[row]) {
                 let above = BlockView.Parts(header: header, topMark: topMark, rows: from..<row, add: false)
                 lazy.append(Piece(block: block, parts: above))
                 let itself = BlockView.Parts(header: false, topMark: false, rows: row..<row + 1, add: false)
-                standAlone(Piece(block: block, parts: itself))
+                standAlone(
+                    Piece(block: block, parts: itself), as: .row(BlockRowID(block: block.id, task: block.rows[row].id))
+                )
                 header = false
                 topMark = false
                 from = row + 1
@@ -58,7 +70,7 @@ struct ListRuns {
             let rest = BlockView.Parts(header: header, topMark: topMark, rows: from..<block.rows.endIndex, add: true)
             lazy.append(Piece(block: block, parts: rest))
         }
-        runs.append(Run(id: runs.count, lazy: lazy, field: nil))
+        runs.append(Run(id: .end, lazy: lazy, field: nil))
         self.runs = runs
         doneRowsHoldField = doneRows.contains(where: Self.holdsField)
     }

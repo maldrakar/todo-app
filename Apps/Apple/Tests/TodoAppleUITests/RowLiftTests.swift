@@ -461,12 +461,15 @@ import TodoCore
 }
 
 /// A drag finds a list's block by the parts the lazy stack has laid out, its frame being their union: House's header
-/// and first row laid out and nothing below them, a point over them or under them, nearer House than Office, is House.
+/// and first row laid out and nothing below them, a point over them or under them, nearer House than Office, is House,
+/// and so are a point nearer Office than House's header alone and a point nearer the own block than House's row alone.
 @Test func aDragFindsABlockByThePartsLaidOut() throws {
     let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
     let house = TaskList.Model.BlockID.list(list.house)
     let office = TaskList.Model.BlockID.list(list.office)
     var frames = RowLift.Frames()
+    frames.report(.add, of: own, CGRect(x: 0, y: -230, width: 400, height: 80))
     frames.report(.header, of: house, CGRect(x: 0, y: 0, width: 400, height: 44))
     frames.report(.row(list.h1), of: house, CGRect(x: 0, y: 44, width: 400, height: 44))
     let o1 = CGRect(x: 0, y: 444, width: 400, height: 44)
@@ -481,6 +484,10 @@ import TodoCore
     #expect(step.lift?.slot == .into(house), "over its row")
     step = RowLift.after(.changed(CGPoint(x: 200, y: 150)), from: step.lift, among: list.blocks, frames: frames)
     #expect(step.lift?.slot == .into(house), "under its parts laid out")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 230)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "142 from its union, 170 from Office, 186 from its header alone")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: -60)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "60 from its union, 90 from the own block, 104 from its row alone")
     step = RowLift.after(.changed(CGPoint(x: 200, y: 380)), from: step.lift, among: list.blocks, frames: frames)
     #expect(step.lift?.slot?.block == office, "nearer Office")
     step = RowLift.after(.changed(CGPoint(x: 200, y: 150)), from: step.lift, among: list.blocks, frames: frames)
