@@ -36,6 +36,7 @@ struct ColumnView: View {
                 VStack(alignment: .leading, spacing: column.style.cardSpacing) {
                     ForEach(block.rows) { row in
                         BlockRow(row, in: block.id, column: column.style, gestures: gestures, send: send)
+                            .equatable()
                     }
                     if let addTask = block.addTask {
                         AddRowView(addTask, send: send)

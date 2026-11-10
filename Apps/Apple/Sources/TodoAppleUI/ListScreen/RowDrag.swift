@@ -33,7 +33,7 @@ struct RowDragSource: ViewModifier {
 
     func body(content: Content) -> some View {
         if let menu = task.menu, let lift = task.style.lift {
-            let isLifted = gestures.lift?.task == row.task && gestures.lift?.source == row.block
+            let isLifted = gestures.isLifted(row)
             content
                 #if os(iOS)
                 .contentShape(.contextMenuPreview, .rect(cornerRadius: lift.cornerRadius, style: .circular))

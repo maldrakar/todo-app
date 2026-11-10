@@ -9,41 +9,64 @@ import TodoCore
 /// the model, and folding it takes its rows out of it, so this view decides nothing. While a dragged task would land in
 /// it, which only the drag knows, the block's mark of the place opens a gap among its rows where the task was dragged
 /// from it, and where it was dragged from another block the block is tinted, as a column is, with no place marked.
+///
+/// It draws the parts of the block it is given, the whole block or what of it one of the list's runs holds
+/// (`ListRuns`), and has no stack of its own, so that its parts are the lazy stack's children, each laid out only in
+/// sight (#196). Each part is the screen's width and reports its frame, whose union is the block's
+/// (`RowLift.Frames.report`), and the tint is drawn over the content at that union (`BlockDropTints`).
 struct BlockView: View {
     private let block: TaskList.Model.Block
+    private let parts: Parts
     private let gestures: RowGestures
     private let send: (TaskList.UserAction) -> Void
 
-    init(_ block: TaskList.Model.Block, gestures: RowGestures, send: @escaping (TaskList.UserAction) -> Void) {
+    /// What of a block a view draws: its header, the mark at its top, a range of its rows, each with the mark after
+    /// it, and its "+ Add task", each where the block has it.
+    struct Parts {
+        let header: Bool
+        let topMark: Bool
+        let rows: Range<Int>
+        let add: Bool
+    }
+
+    init(
+        _ block: TaskList.Model.Block, parts: Parts, gestures: RowGestures,
+        send: @escaping (TaskList.UserAction) -> Void
+    ) {
         self.block = block
+        self.parts = parts
         self.gestures = gestures
         self.send = send
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let header = block.header {
-                BlockHeaderView(header, send: send)
-            }
+        if parts.header, let header = block.header {
+            BlockHeaderView(header, send: send)
+                .blockPart(.header, of: block.id, to: gestures.dragState)
+        }
+        if parts.topMark {
             mark(after: nil)
-            ForEach(block.rows) { row in
-                BlockRow(row, in: block.id, gestures: gestures, send: send)
-                mark(after: row.id)
-            }
-            if let addTask = block.addTask {
-                AddRowView(addTask, send: send)
-            }
         }
-        // The screen's width, whatever it holds: a block with no header and no rows, its "+ Add task" alone, was only
-        // as wide as that row, its tint a pill round it and its frame a drop's nearest block for none of the screen's
-        // right side.
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay {
-            if let style = block.dropStyle {
-                BlockDropTint(style, isOn: gestures.lift?.slot == .into(block.id))
-            }
+        // Each row by its block and its task, which the lazy stack keys its children by: by its task alone, a task
+        // dropped into another block, or drawn in two, was one child in both places and drew as it stood before.
+        ForEach(block.rows[parts.rows].map { Item(block: block.id, row: $0) }) { item in
+            BlockRow(item.row, in: block.id, gestures: gestures, send: send)
+                .equatable()
+                .blockPart(.row(item.row.id), of: block.id, to: gestures.dragState)
+            mark(after: item.row.id)
         }
-        .reportsLiftFrame(\.blocks, block.id, to: gestures.dragState)
+        if parts.add, let addTask = block.addTask {
+            AddRowView(addTask, send: send)
+                .blockPart(.add, of: block.id, to: gestures.dragState)
+        }
+    }
+
+    /// A row of the block as the lazy stack's child, by its block and its task (`BlockRowID`).
+    private struct Item: Identifiable {
+        let block: TaskList.Model.BlockID
+        let row: TaskList.Model.Row
+
+        var id: BlockRowID { BlockRowID(block: block, task: row.id) }
     }
 
     /// The mark, where the lift's slot stands after this row, nil for the block's top, from the rows' leading edge. It
@@ -56,32 +79,83 @@ struct BlockView: View {
     }
 }
 
-/// The tint of a block a task dragged from another block would land in, and the ring inside its edge, as a column's
-/// (`ColumnView`), in from the screen's sides as its style says. Over the block and not under it, since its rows stand
-/// on the paper, which would hide it, and the tint lets them show through; it takes no touch. On its motion, or at once
-/// where a person asked for less motion.
-private struct BlockDropTint: View {
-    private let style: BlockDropStyle
-    private let isOn: Bool
+/// The tints of the list's blocks a task dragged from another block would land in, over the content, each at the
+/// union of the frames its block's parts last reported (`RowLift.Frames.report`), since the parts stand in a lazy
+/// stack with no view of the block round them, and the one the slot names at that union as the drag lays its block
+/// out, the auto-scroll's parts among them (`BlockTintFrame`). It takes no touch.
+struct BlockDropTints: View {
+    private let blocks: [TaskList.Model.Block]
+    private let gestures: RowGestures
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(_ style: BlockDropStyle, isOn: Bool) {
-        self.style = style
-        self.isOn = isOn
+    init(_ blocks: [TaskList.Model.Block], gestures: RowGestures) {
+        self.blocks = blocks
+        self.gestures = gestures
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .circular)
-        ZStack {
-            shape.fill(Color(style.tint))
-            shape.strokeBorder(Color(style.ring), lineWidth: style.ringWidth)
+        ZStack(alignment: .topLeading) {
+            ForEach(blocks) { block in
+                if let style = block.dropStyle {
+                    BlockDropTint(style, of: block.id, gestures: gestures)
+                }
+            }
         }
-        .padding(.horizontal, style.inset)
-        .opacity(isOn ? 1 : 0)
-        .animation(reduceMotion ? nil : Animation(style.animation), value: isOn)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        .onChange(of: gestures.lift?.slot, initial: true) { _, slot in gestures.dragState.watch(slot) }
+    }
+}
+
+extension View {
+    /// A part of a list's block, the screen's width whatever it holds, reporting its frame among its block's
+    /// (`RowDragState.report`): a block of "+ Add task" alone was only as wide as that row, its tint a pill round it
+    /// and its frame a drop's nearest block for none of the screen's right side.
+    @MainActor
+    fileprivate func blockPart(
+        _ part: RowLift.Frames.BlockPart, of block: TaskList.Model.BlockID, to dragState: RowDragState
+    ) -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowLift.contentSpace)) } action: { frame in
+                dragState.report(part, of: block, frame)
+            }
+    }
+}
+
+/// The tint of a block a task dragged from another block would land in, and the ring inside its edge, as a column's
+/// (`ColumnView`), in from the screen's sides as its style says, at its block's frame: the one the drag follows while
+/// the slot names it, which this view alone observes, and otherwise the one last reported, where it fades. Over the
+/// block and not under it, since its rows stand on the paper, which would hide it, and the tint lets them show through;
+/// it takes no touch. On its motion, or at once where a person asked for less motion.
+private struct BlockDropTint: View {
+    private let style: BlockDropStyle
+    private let block: TaskList.Model.BlockID
+    private let gestures: RowGestures
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(_ style: BlockDropStyle, of block: TaskList.Model.BlockID, gestures: RowGestures) {
+        self.style = style
+        self.block = block
+        self.gestures = gestures
+    }
+
+    var body: some View {
+        let dragState = gestures.dragState
+        if let frame = dragState.tint.frame(of: block) ?? dragState.frames.blocks[block] {
+            let isOn = gestures.lift?.slot == .into(block)
+            let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .circular)
+            ZStack {
+                shape.fill(Color(style.tint))
+                shape.strokeBorder(Color(style.ring), lineWidth: style.ringWidth)
+            }
+            .padding(.horizontal, style.inset)
+            .opacity(isOn ? 1 : 0)
+            .animation(reduceMotion ? nil : Animation(style.animation), value: isOn)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .frame(width: frame.width, height: frame.height)
+            .offset(x: frame.minX, y: frame.minY)
+        }
     }
 }
 
@@ -130,7 +204,9 @@ struct BlockRow: View {
     var body: some View {
         switch row {
         case .task(let id, let task):
+            // The face skips its body where only the lift changed the row.
             let face = TaskRowView(task, send: sendFromRow(task))
+            .equatable()
             .modifier(ColumnCardSurface(column: column))
             .modifier(ColumnCardRing(column: column))
             .modifier(TaskLanding(task.style))
@@ -224,5 +300,23 @@ struct BlockRow: View {
                 content
             }
         }
+    }
+}
+
+/// A row is drawn from its row, its block, its column's look and whether the drag has lifted it, with its screen's drag
+/// and swipe, and a row none of them changed skips its body: a change to one row ran every row's body, twice (#196).
+/// Its `send` and its gestures' Delete are left out, since whichever pass made them they reach the same screen's one
+/// `send`, and SwiftUI would compare them by identity, which every pass changes; and so is the row swiped aside, which
+/// `SwipeToDelete` reads where it is drawn. On the main actor, since the gestures' Delete is not `Sendable`.
+extension BlockRow: @MainActor Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.row == rhs.row && lhs.block == rhs.block && lhs.column == rhs.column && lhs.isLifted == rhs.isLifted
+            && lhs.gestures?.dragState === rhs.gestures?.dragState && lhs.gestures?.swipe === rhs.gestures?.swipe
+    }
+
+    /// Whether the drag has lifted this row, which a row of the strip never is.
+    private var isLifted: Bool {
+        guard let block, let gestures else { return false }
+        return gestures.isLifted(BlockRowID(block: block, task: row.id))
     }
 }

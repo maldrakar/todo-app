@@ -75,6 +75,16 @@ extension TaskList {
             public enum Kind: String, Codable, Equatable, Sendable {
                 case list, columns
             }
+
+            /// Which kind of layout this is, with nothing of what it holds: what changes as the list gives way to the
+            /// board or the board to the list, and nothing else does, which a view watches to forget what the other
+            /// kind laid out (#196).
+            public var kind: Kind {
+                switch self {
+                case .list: .list
+                case .columns: .columns
+                }
+            }
         }
 
         /// The blocks as the board's columns, each with its column's look, `spacing` apart, the board

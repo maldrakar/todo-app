@@ -14,9 +14,12 @@ import TaskListFeature
 /// (`docs/style.md`, "Views"). Where the glass buttons stand is its screen's, over the content on the phone and in the
 /// window's bar in the pane, which `buttons` puts there, handed what a control of the content sends.
 ///
-/// The content is a `VStack` in a `ScrollView`, not a `List`, which moves a row up and down a flat list and takes the
-/// row's look, and not a `LazyVStack`, which dropped a field scrolled out of sight and lost its focus with it (spike
-/// #145; `ListsTree`).
+/// The content is a `ScrollView`, not a `List`, which moves a row up and down a flat list and takes the row's look. In
+/// it the blocks and the Done strip's rows stand in lazy stacks, which lay out only the rows in sight, where a plain
+/// stack laid out every row at opening (#196), around each part that holds a field, an open card or a list's name being
+/// typed, which stands outside them, laid out wherever it is: a lazy stack took a field scrolled out of sight out of
+/// the window, and its focus with it (spike #145; `ListsTree`; `ListRuns`). A stack begun at such a part stays begun
+/// there once its field has closed, for as long as the list is shown, so that closing a card moves no row (`ListCuts`).
 ///
 /// A tap on what stands behind the controls is one action, `backgroundTapped`, which closes an open card: a gesture on
 /// the content takes every tap no control of it took, the header's words and the room under the rows among them, and a
@@ -41,6 +44,9 @@ struct ListSurface<Buttons: ViewModifier>: View {
     /// What the surface keeps of its rows' gestures.
     private var rowGestures = ListScreenGestures()
 
+    /// The parts at which the list's runs have started, kept while the list is shown (`ListCuts`).
+    @State private var cuts = ListCuts()
+
     /// The surface of the list, with its screen's glass buttons, which `buttons` stands where the screen has them,
     /// handed the send of a control of the content, which closes a row a swipe left open, for its "+".
     init(
@@ -64,6 +70,15 @@ struct ListSurface<Buttons: ViewModifier>: View {
             // still shortens it, its region not ignored.
             .ignoresSafeArea(.container, edges: .bottom)
             .modifier(BottomInsetReader(inset: $bottomInset))
+            // The list and the board share nothing of their layout: as one gives way to the other, the frames it
+            // reported and the starts of the list's runs are forgotten. Here, on the surface, whose change runs before
+            // the layout that comes reports its first frame (probed on macOS 26, 2026-11-10: this action, then the
+            // new content's rows' `onGeometryChange`), and only on a change of the layout's kind, never when the screen
+            // comes back from under another.
+            .onChange(of: model.layout.kind) {
+                rowGestures.forgetLayout()
+                cuts.kept = []
+            }
             .overlay { floatingButton }
             .stripUnder { sentence }
             .overlay(alignment: .top) {
@@ -78,7 +93,8 @@ struct ListSurface<Buttons: ViewModifier>: View {
             .navigationTitle(model.header.title.text)
     }
 
-    /// The one switch over the layout's shapes, every case drawn and none by `default` (`docs/style.md`, "Views").
+    /// The switch over the layout's shapes that picks the container, every case drawn and none by `default`
+    /// (`docs/style.md`, "Views").
     @ViewBuilder private var content: some View {
         switch model.layout {
         case .list(let blocks):
@@ -98,40 +114,84 @@ struct ListSurface<Buttons: ViewModifier>: View {
     /// foot, or to the top of a sentence's strip under it, what it holds ending as far above what the safe area covers
     /// there, or above the strip, as its style says.
     private func list(_ blocks: [TaskList.Model.Block]) -> some View {
-        ScrollView {
+        let runs = ListRuns(blocks, doneRows: model.doneRows, cuts: cuts.kept)
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
-                ForEach(blocks) { block in
-                    BlockView(block, gestures: rowGestures.forRows(delete: send), send: sendClosingSwipe)
-                }
-                if let empty = model.empty {
-                    EmptyScreenView(empty)
-                }
-                if let addList = model.addList {
-                    AddRowView(addList, send: sendClosingSwipe)
-                }
-                if let done = model.done {
-                    DoneStripView(done, send: sendClosingSwipe)
-                    if !model.doneRows.isEmpty {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(model.doneRows) { row in
-                                BlockRow(row, send: sendClosingSwipe)
-                            }
-                        }
-                        .modifier(Entrance(done.style.rowsEntrance))
-                        .padding(.top, done.style.capsuleToRows)
+                ForEach(runs.runs) { run in
+                    if let field = run.field {
+                        blockView(field)
+                    }
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(run.lazy) { piece in blockView(piece) }
                     }
                 }
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    tail
+                }
+                doneRows(holdingField: runs.doneRowsHoldField)
             }
             .padding(.top, model.style.contentTop)
             .padding(.bottom, model.style.contentBottom + bottomInset)
             .modifier(ContentWidth(model.style))
+            .overlay(alignment: .topLeading) {
+                BlockDropTints(blocks, gestures: rowGestures.forRows(delete: send))
+            }
             .modifier(rowGestures.listContent(blocks, send: send))
         }
         .scrollIndicators(.hidden)
         .modifier(rowGestures.dropTarget(blocks, settleInset: nil, send: send))
         // A row left open is not open when the list comes back, from the board or from a screen over it.
         .onDisappear { rowGestures.closeSwipe() }
+        // Each block's frame the union of the parts it draws now.
+        .onChange(of: blocks, initial: true) { rowGestures.forgetParts(notDrawnBy: blocks) }
+        // The starts this pass drew are kept for the next, after it.
+        .onChange(of: runs.cuts, initial: true) { _, drawn in cuts.kept = drawn }
+    }
+
+    /// What a run holds of a block.
+    private func blockView(_ piece: ListRuns.Piece) -> some View {
+        BlockView(piece.block, parts: piece.parts, gestures: rowGestures.forRows(delete: send), send: sendClosingSwipe)
+    }
+
+    /// What follows the blocks in a lazy stack: the empty state, "+ Add list" and the Done strip.
+    @ViewBuilder private var tail: some View {
+        if let empty = model.empty {
+            EmptyScreenView(empty)
+        }
+        if let addList = model.addList {
+            AddRowView(addList, send: sendClosingSwipe)
+        }
+        if let done = model.done {
+            DoneStripView(done, send: sendClosingSwipe)
+        }
+    }
+
+    /// The Done strip's rows while it is open, coming in as it opens: in a lazy stack, and out of it while one of them
+    /// holds a field, as a block's parts are (`ListRuns`). Their group stands outside the lazy stacks, so that leaving
+    /// the window does not play its entrance again.
+    @ViewBuilder private func doneRows(holdingField: Bool) -> some View {
+        if let done = model.done, !model.doneRows.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                if holdingField {
+                    doneRowViews
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        doneRowViews
+                    }
+                }
+            }
+            .modifier(Entrance(done.style.rowsEntrance))
+            .padding(.top, done.style.capsuleToRows)
+        }
+    }
+
+    /// The Done strip's rows, each a row of the strip.
+    private var doneRowViews: some View {
+        ForEach(model.doneRows) { row in
+            BlockRow(row, send: sendClosingSwipe)
+                .equatable()
+        }
     }
 
     /// The board: the header stays under the circles, and the board takes the rest of the screen. The canvas draws no

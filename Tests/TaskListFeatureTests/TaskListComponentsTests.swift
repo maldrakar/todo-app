@@ -330,6 +330,18 @@ private func deleteMenu(_ id: TaskID) -> MenuModel<Action> {
     #expect(upcoming.model.showAs.menu == showAs(current: .columns, canBoard: true), "the choice moves the check")
 }
 
+/// The layout says which kind it is with nothing of what it holds, which a view watches to know the list gave way to
+/// the board or the board to the list (#196): a list shown as a list is the one, and shown as columns the other.
+@Test func theLayoutSaysItsKind() throws {
+    let store = try makeStore()
+    let upcoming = try list(BuiltInTaskViews.upcoming, in: store)
+    #expect(upcoming.model.layout.kind == .list)
+    upcoming.tap(.showAsChosen(.columns))
+    #expect(upcoming.model.layout.kind == .columns)
+    upcoming.tap(.showAsChosen(.list))
+    #expect(upcoming.model.layout.kind == .list)
+}
+
 /// A column and its cards carry the board's numbers: the board 10 between columns, 16 in at its sides and 24 at its
 /// bottom, snapping; a column 296 wide, rounded 18 on the fill, its cards 8 apart and 8 in, each rounded 13 on the
 /// surface with a 0.5 hairline of the glass line and the resting shadow; its header 44 high, padded 13 14 9, with no

@@ -27,6 +27,16 @@ struct ListScreenGestures: DynamicProperty {
         swipe.close()
     }
 
+    /// Forgets the frames of the parts the list's blocks no longer draw (`RowDragState.forgetParts(notDrawnBy:)`).
+    func forgetParts(notDrawnBy blocks: [TaskList.Model.Block]) {
+        dragState.forgetParts(notDrawnBy: blocks)
+    }
+
+    /// Forgets every frame the layout that is gone reported (`RowDragState.forgetLayout`).
+    func forgetLayout() {
+        dragState.forgetLayout()
+    }
+
     /// The scroll view as the system's drag's target over the blocks drawn.
     func dropTarget(
         _ blocks: [TaskList.Model.Block], settleInset: CGFloat?, send: @escaping (TaskList.UserAction) -> Void

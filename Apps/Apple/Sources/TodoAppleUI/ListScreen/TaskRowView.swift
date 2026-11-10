@@ -113,3 +113,12 @@ struct TaskRowView<Action: Equatable & Sendable>: View {
         }
     }
 }
+
+/// A task's row is drawn from its model alone, and a row whose model did not change skips its body (#196). Its `send`
+/// is left out, since whichever pass made it, it reaches the same screen's one `send`, and SwiftUI would compare it by
+/// identity, which every pass changes.
+extension TaskRowView: Equatable {
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.model == rhs.model
+    }
+}

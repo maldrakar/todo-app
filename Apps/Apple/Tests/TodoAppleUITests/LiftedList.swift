@@ -26,6 +26,8 @@ struct LiftedList {
 
     private var scrolled: [TaskList.Model.BlockID: CGFloat] = [:]
     private var areasLeft: [TaskList.Model.BlockID: CGRect] = [:]
+    private var rowsNotLaidOut: Set<BlockRowID> = []
+    private var rowsLeft: [BlockRowID: CGRect] = [:]
     private let module: TaskList
     private let layout: Layout
 
@@ -96,9 +98,7 @@ struct LiftedList {
         )
         let list = CGSize(width: 2 * layout.blockX + layout.blockWidth, height: 1_000)
         viewport = CGRect(origin: .zero, size: columns ? board : list)
-        if columns {
-            _ = module.send(.action(.showAsChosen(.columns)))
-        }
+        if columns { showAs(.columns) }
     }
 
     /// The blocks the model draws, whichever its layout, read over the layout's shapes as the screen reads them.
@@ -131,7 +131,10 @@ struct LiftedList {
             if lift?.slot == .place(block.id, after: nil) { y += layout.gap }
             for row in block.rows {
                 let id = BlockRowID(block: block.id, task: row.id)
-                frames.rows[id] = CGRect(x: layout.blockX, y: y, width: layout.blockWidth, height: layout.row)
+                if !rowsNotLaidOut.contains(id) {
+                    frames.rows[id] = rowsLeft[id]
+                        ?? CGRect(x: layout.blockX, y: y, width: layout.blockWidth, height: layout.row)
+                }
                 y += layout.row
                 if lift?.slot == .place(block.id, after: row.id) { y += layout.gap }
             }
@@ -166,6 +169,17 @@ struct LiftedList {
     /// frame of anything that has left does.
     mutating func leaveColumnArea(of id: TaskList.Model.BlockID, _ area: CGRect) { areasLeft[id] = area }
 
+    /// A row of the list a lazy stack has not laid out, which has reported no frame.
+    mutating func leaveNotLaidOut(_ task: TaskID, in id: TaskList.Model.BlockID) {
+        rowsNotLaidOut.insert(BlockRowID(block: id, task: task))
+    }
+
+    /// A row of the list out of sight, whose frame stays where it was last laid out, as a frame of anything that has
+    /// left does.
+    mutating func leaveFrame(of task: TaskID, in id: TaskList.Model.BlockID, at frame: CGRect) {
+        rowsLeft[BlockRowID(block: id, task: task)] = frame
+    }
+
     /// A column's cards scrolled up by so much.
     mutating func scrollColumn(_ id: TaskList.Model.BlockID, by offset: CGFloat) { scrolled[id] = offset }
 
@@ -197,6 +211,49 @@ struct LiftedList {
     func openCard(on task: TaskID) {
         _ = module.send(.action(.rowTapped(task)))
     }
+
+    /// Adds a list inside, whose name's field stands in its block's header.
+    func addList() {
+        _ = module.send(.action(.addListTapped))
+    }
+
+    /// Adds a task at the top of the block the floating "+" adds to, whose card opens there.
+    func addTaskFromButton() {
+        _ = module.send(.action(.addTaskButtonTapped))
+    }
+
+    /// Adds a task at a block's end, by its "+ Add task", whose card opens there.
+    func addTask(in id: TaskList.Model.BlockID) {
+        _ = module.send(.action(.addTaskRowTapped(in: id)))
+    }
+
+    /// Shows the list as Show as says, the list or the board.
+    func showAs(_ kind: TaskList.Model.Layout.Kind) {
+        _ = module.send(.action(.showAsChosen(kind)))
+    }
+
+    /// Closes the open card by a tap on what stands behind the controls.
+    func tapBackground() {
+        _ = module.send(.action(.backgroundTapped))
+    }
+
+    /// Settles the name typed into a new list's field, as Return does.
+    func submitListName() {
+        _ = module.send(.action(.listNameFieldSubmitted))
+    }
+
+    /// Checks a task, which writes it done.
+    func check(_ task: TaskID) {
+        _ = module.send(.action(.checkTapped(task)))
+    }
+
+    /// Opens or closes the Done strip.
+    func toggleDoneStrip() {
+        _ = module.send(.action(.doneStripTapped))
+    }
+
+    /// The rows under the Done strip, none while it is closed.
+    var doneRows: [TaskList.Model.Row] { module.model.doneRows }
 
     /// A call of the drop's delegate, in a session, handed on as the screen's delegate hands it, where it means a
     /// stage.

@@ -160,6 +160,81 @@ import TodoCore
     #expect(list.lift?.slot == .place(own, after: list.a), "above the area")
 }
 
+/// A block's upper rows a lazy stack never laid out, after a jump and not a finger's scroll, have reported no frame,
+/// and the slot is still read by the rows at the point: after the row whose middle is nearest above it, and before
+/// the one nearest below it, after the row before that one in the block, laid out or not.
+@Test func aBlockWhoseUpperRowsWereNeverLaidOutPlacesByTheRowsAtThePoint() throws {
+    var list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    list.leaveNotLaidOut(list.a, in: own)
+    list.leaveNotLaidOut(list.b, in: own)
+    list.press(.began(task: list.d, block: own, session: "first", at: list.centre(of: list.d, in: own)))
+    list.press(.changed(list.lowerHalf(of: list.c, in: own)))
+    #expect(list.lift?.slot == .place(own, after: list.c))
+    list.press(.changed(list.upperHalf(of: list.c, in: own)))
+    #expect(list.lift?.slot == .place(own, after: list.b), "before C, after B though B has no frame")
+    list.press(.ended)
+    #expect(list.drops == [.rowDropped(list.d, from: own, in: own, after: list.b)])
+    list.sendDrops()
+    #expect(list.problem == nil)
+    #expect(list.rowIDs(of: own) == [list.a, list.b, list.d, list.c])
+}
+
+/// A later row out of sight keeps the frame it was last laid out at, which a change above it may have left far from
+/// where it now stands: far above the point, it does not take the slot from the rows at the point.
+@Test func aRowsFrameLeftOutOfSightDoesNotTakeTheSlot() throws {
+    var list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    list.leaveFrame(of: list.d, in: own, at: CGRect(x: 0, y: -2_000, width: 400, height: 44))
+    list.press(.began(task: list.a, block: own, session: "first", at: list.centre(of: list.a, in: own)))
+    list.press(.changed(list.lowerHalf(of: list.c, in: own)))
+    #expect(list.lift?.slot == .place(own, after: list.c))
+    list.press(.changed(list.upperHalf(of: list.b, in: own)))
+    #expect(list.lift?.slot == .place(own, after: nil), "before B, the block's top, A being lifted")
+}
+
+/// A layout that is gone leaves no frame behind: a card of the board and a row of the list are one row to the frames,
+/// so back from Columns a row the list's lazy stack has not laid out kept its card's frame, and one near the point took
+/// the slot from the rows under the finger. The frames forget everything as the layout's shape changes, the parts of
+/// an earlier list and the tint's frame among it, and the slot is read by the rows the list has laid out alone.
+@MainActor @Test func aLayoutThatIsGoneLeavesNoFrameForTheNextToRead() throws {
+    var list = try LiftedList(columns: true)
+    let own = TaskList.Model.BlockID.own(nil)
+    let house = TaskList.Model.BlockID.list(list.house)
+    list.scrollColumn(own, by: 210)
+    let dragState = RowDragState()
+    dragState.report(.add, of: own, CGRect(x: 0, y: 900, width: 400, height: 40))
+    let board = list.frames
+    dragState.frames.rows = board.rows
+    dragState.frames.blocks = board.blocks
+    dragState.frames.columns = board.columns
+    dragState.watch(.into(house))
+    #expect(dragState.frames.rows[BlockRowID(block: own, task: list.d)]?.midY == 68, "D's card, under the finger")
+    #expect(dragState.tint.frame(of: house) == board.blocks[house])
+
+    list.showAs(.list)
+    dragState.forgetLayout()
+    #expect(dragState.frames.rows.isEmpty)
+    #expect(dragState.frames.blocks.isEmpty)
+    #expect(dragState.frames.columns.isEmpty)
+    #expect(dragState.tint.frame(of: house) == nil)
+
+    list.leaveNotLaidOut(list.c, in: own)
+    list.leaveNotLaidOut(list.d, in: own)
+    for (row, frame) in list.frames.rows where row.block == own {
+        dragState.frames.rows[row] = frame
+        dragState.report(.row(row.task), of: own, frame)
+    }
+    #expect(dragState.frames.blocks[own] == CGRect(x: 0, y: 0, width: 400, height: 88), "A and B, the rows laid out")
+    let blocks = list.blocks
+    let lifted = RowLift.after(
+        .began(task: list.a, block: own, session: "first", at: CGPoint(x: 200, y: 22)), from: nil, among: blocks,
+        frames: dragState.frames
+    ).lift
+    let moved = RowLift.after(.changed(CGPoint(x: 200, y: 77)), from: lifted, among: blocks, frames: dragState.frames)
+    #expect(moved.lift?.slot == .place(own, after: list.b), "B's lower half, and not after D by its card's frame")
+}
+
 /// On the board the point picks the column under it, the nearest in a gap or a margin, whatever its height, a column
 /// that takes no drop offering none; another column itself, and in its own a place among the cards in sight: a card
 /// scrolled out of its column keeps a frame, under the column's header, and is never the one under the finger.
@@ -363,6 +438,103 @@ import TodoCore
     list.hear(.moved(list.centre(of: list.b, in: own)), session: session, in: sessions)
     list.hear(.moved(list.centre(of: list.b, in: own)), session: press, in: sessions)
     #expect(list.lift == nil)
+}
+
+// MARK: - A list's block's frame
+
+/// A list's block stands in a lazy stack as its parts, its header, each row and its "+ Add task", each of which reports
+/// its frame: the block's frame is the union of its parts' last frames, a part reported again replacing its old one.
+@Test func aBlocksFrameIsTheUnionOfItsParts() {
+    var frames = RowLift.Frames()
+    let own = TaskList.Model.BlockID.own(nil)
+    let task = TaskID()
+    frames.report(.header, of: own, CGRect(x: 0, y: 100, width: 400, height: 44))
+    frames.report(.row(task), of: own, CGRect(x: 0, y: 1_000, width: 400, height: 44))
+    #expect(frames.blocks[own] == CGRect(x: 0, y: 100, width: 400, height: 944))
+    frames.report(.row(task), of: own, CGRect(x: 0, y: 144, width: 400, height: 44))
+    #expect(frames.blocks[own] == CGRect(x: 0, y: 100, width: 400, height: 88), "the row's old frame replaced")
+    frames.report(.add, of: own, CGRect(x: 0, y: 188, width: 400, height: 40))
+    #expect(frames.blocks[own] == CGRect(x: 0, y: 100, width: 400, height: 128))
+    frames.report(.header, of: .list(ViewID()), CGRect(x: 0, y: 228, width: 400, height: 44))
+    #expect(frames.blocks[own] == CGRect(x: 0, y: 100, width: 400, height: 128), "another block's parts its own")
+}
+
+/// The parts a block no longer draws are forgotten, its frame being the union of those it draws: folded, its rows and
+/// its "+ Add task" go, which stood over the blocks under it and would have taken their drops; a row dropped into
+/// another block goes from the one it left. A block that reported no part has no frame, whatever a board left, and a
+/// block no longer drawn has neither parts nor frame.
+@Test func aBlocksFrameForgetsThePartsItNoLongerDraws() throws {
+    var list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let header = CGRect(x: 0, y: 100, width: 400, height: 44)
+    var frames = RowLift.Frames()
+    frames.report(.header, of: house, header)
+    frames.report(.row(list.h1), of: house, CGRect(x: 0, y: 144, width: 400, height: 44))
+    frames.report(.row(list.h2), of: house, CGRect(x: 0, y: 188, width: 400, height: 44))
+    frames.report(.add, of: house, CGRect(x: 0, y: 232, width: 400, height: 40))
+    frames.report(.row(list.o1), of: office, CGRect(x: 0, y: 316, width: 400, height: 44))
+    let empty = TaskList.Model.BlockID.list(list.empty)
+    frames.blocks[empty] = CGRect(x: 918, y: 0, width: 296, height: 344)
+    frames.forgetParts(notDrawnBy: list.blocks)
+    #expect(frames.blocks[house] == CGRect(x: 0, y: 100, width: 400, height: 172), "all of them drawn")
+    #expect(frames.blocks[empty] == nil, "its column's frame")
+
+    list.press(.began(task: list.h2, block: house, session: "first", at: list.centre(of: list.h2, in: house)))
+    list.press(.changed(list.top(of: office)))
+    list.press(.ended)
+    list.sendDrops()
+    #expect(list.problem == nil)
+    frames.forgetParts(notDrawnBy: list.blocks)
+    frames.report(.add, of: house, CGRect(x: 0, y: 188, width: 400, height: 40))
+    #expect(frames.blocks[house] == CGRect(x: 0, y: 100, width: 400, height: 128), "H2's frame gone with it")
+
+    list.toggleFold(of: house)
+    frames.forgetParts(notDrawnBy: list.blocks)
+    #expect(frames.blocks[house] == header)
+    #expect(frames.blocks[office] == CGRect(x: 0, y: 316, width: 400, height: 44))
+
+    let gone = TaskList.Model.BlockID.list(ViewID())
+    frames.report(.header, of: gone, header)
+    frames.forgetParts(notDrawnBy: list.blocks)
+    #expect(frames.blocks[gone] == nil)
+    frames.report(.row(list.e1), of: gone, CGRect(x: 0, y: 400, width: 400, height: 44))
+    #expect(frames.blocks[gone] == CGRect(x: 0, y: 400, width: 400, height: 44), "its header forgotten")
+}
+
+/// A drag finds a list's block by the parts the lazy stack has laid out, its frame being their union: House's header
+/// and first row laid out and nothing below them, a point over them or under them, nearer House than Office, is House,
+/// and so are a point nearer Office than House's header alone and a point nearer the own block than House's row alone.
+@Test func aDragFindsABlockByThePartsLaidOut() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    var frames = RowLift.Frames()
+    frames.report(.add, of: own, CGRect(x: 0, y: -230, width: 400, height: 80))
+    frames.report(.header, of: house, CGRect(x: 0, y: 0, width: 400, height: 44))
+    frames.report(.row(list.h1), of: house, CGRect(x: 0, y: 44, width: 400, height: 44))
+    let o1 = CGRect(x: 0, y: 444, width: 400, height: 44)
+    frames.report(.header, of: office, CGRect(x: 0, y: 400, width: 400, height: 44))
+    frames.report(.row(list.o1), of: office, o1)
+    frames.rows[BlockRowID(block: office, task: list.o1)] = o1
+    var step = RowLift.after(
+        .began(task: list.o1, block: office, session: "first", at: CGPoint(x: o1.midX, y: o1.midY)), from: nil,
+        among: list.blocks, frames: frames
+    )
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 60)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "over its row")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 150)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "under its parts laid out")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 230)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "142 from its union, 170 from Office, 186 from its header alone")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: -60)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "60 from its union, 90 from the own block, 104 from its row alone")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 380)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot?.block == office, "nearer Office")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 150)), from: step.lift, among: list.blocks, frames: frames)
+    step = RowLift.after(.ended, from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.drop == .rowDropped(list.o1, from: office, in: house, after: nil))
 }
 
 /// The mark's line ends at the right of the block it stands in, measured from the block's own leading edge, where the
