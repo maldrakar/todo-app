@@ -81,8 +81,8 @@ struct BlockView: View {
 
 /// The tints of the list's blocks a task dragged from another block would land in, over the content, each at the
 /// union of the frames its block's parts last reported (`RowLift.Frames.report`), since the parts stand in a lazy
-/// stack with no view of the block round them. It reads the frames when the lift changes, which draws it again, and
-/// takes no touch.
+/// stack with no view of the block round them, and the one the slot names at that union as the drag lays its block
+/// out, the auto-scroll's parts among them (`BlockTintFrame`). It takes no touch.
 struct BlockDropTints: View {
     private let blocks: [TaskList.Model.Block]
     private let gestures: RowGestures
@@ -95,21 +95,22 @@ struct BlockDropTints: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             ForEach(blocks) { block in
-                if let style = block.dropStyle, let frame = gestures.dragState.frames.blocks[block.id] {
-                    BlockDropTint(style, isOn: gestures.lift?.slot == .into(block.id))
-                        .frame(width: frame.width, height: frame.height)
-                        .offset(x: frame.minX, y: frame.minY)
+                if let style = block.dropStyle {
+                    BlockDropTint(style, of: block.id, gestures: gestures)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .allowsHitTesting(false)
+        .onChange(of: gestures.lift?.slot, initial: true) { _, slot in
+            gestures.dragState.tint.watch(slot, in: gestures.dragState.frames)
+        }
     }
 }
 
 extension View {
     /// A part of a list's block, the screen's width whatever it holds, reporting its frame among its block's
-    /// (`RowLift.Frames.report`): a block of "+ Add task" alone was only as wide as that row, its tint a pill round it
+    /// (`RowDragState.report`): a block of "+ Add task" alone was only as wide as that row, its tint a pill round it
     /// and its frame a drop's nearest block for none of the screen's right side.
     @MainActor
     fileprivate func blockPart(
@@ -117,37 +118,46 @@ extension View {
     ) -> some View {
         frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowLift.contentSpace)) } action: { frame in
-                dragState.frames.report(part, of: block, frame)
+                dragState.report(part, of: block, frame)
             }
     }
 }
 
 /// The tint of a block a task dragged from another block would land in, and the ring inside its edge, as a column's
-/// (`ColumnView`), in from the screen's sides as its style says. Over the block and not under it, since its rows stand
-/// on the paper, which would hide it, and the tint lets them show through; it takes no touch. On its motion, or at once
-/// where a person asked for less motion.
+/// (`ColumnView`), in from the screen's sides as its style says, at its block's frame: the one the drag follows while
+/// the slot names it, which this view alone observes, and otherwise the one last reported, where it fades. Over the
+/// block and not under it, since its rows stand on the paper, which would hide it, and the tint lets them show through;
+/// it takes no touch. On its motion, or at once where a person asked for less motion.
 private struct BlockDropTint: View {
     private let style: BlockDropStyle
-    private let isOn: Bool
+    private let block: TaskList.Model.BlockID
+    private let gestures: RowGestures
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(_ style: BlockDropStyle, isOn: Bool) {
+    init(_ style: BlockDropStyle, of block: TaskList.Model.BlockID, gestures: RowGestures) {
         self.style = style
-        self.isOn = isOn
+        self.block = block
+        self.gestures = gestures
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .circular)
-        ZStack {
-            shape.fill(Color(style.tint))
-            shape.strokeBorder(Color(style.ring), lineWidth: style.ringWidth)
+        let dragState = gestures.dragState
+        if let frame = dragState.tint.frame(of: block) ?? dragState.frames.blocks[block] {
+            let isOn = gestures.lift?.slot == .into(block)
+            let shape = RoundedRectangle(cornerRadius: style.cornerRadius, style: .circular)
+            ZStack {
+                shape.fill(Color(style.tint))
+                shape.strokeBorder(Color(style.ring), lineWidth: style.ringWidth)
+            }
+            .padding(.horizontal, style.inset)
+            .opacity(isOn ? 1 : 0)
+            .animation(reduceMotion ? nil : Animation(style.animation), value: isOn)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .frame(width: frame.width, height: frame.height)
+            .offset(x: frame.minX, y: frame.minY)
         }
-        .padding(.horizontal, style.inset)
-        .opacity(isOn ? 1 : 0)
-        .animation(reduceMotion ? nil : Animation(style.animation), value: isOn)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 

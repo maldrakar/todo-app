@@ -24,9 +24,9 @@ struct RowGestures {
     }
 }
 
-/// What a drag and a swipe read of the layout and of the drag under way, and draw nothing from. Kept in a class that
-/// nothing observes and held in the screen's state, so that a layout that reports frames does not draw the screen again
-/// (spike #145).
+/// What a drag and a swipe read of the layout and of the drag under way, and draw nothing from but the tint of the
+/// block a drag would land in (`tint`). Kept in a class that nothing observes, that tint's frame apart, and held in the
+/// screen's state, so that a layout that reports frames does not draw the screen again (spike #145).
 ///
 /// `RowDragState` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
@@ -35,6 +35,23 @@ final class RowDragState {
     /// The frames the screen's rows, blocks and columns last reported, each as it changed, and kept for one that has
     /// left: what reads them reads those drawn.
     var frames = RowLift.Frames()
+
+    /// The frame the tint of the block a drag would land in stands at, which only the tints observe.
+    let tint = BlockTintFrame()
+
+    /// Keeps the frame a part of a list's block reported (`RowLift.Frames.report`), and the tint's where it moved its
+    /// block's.
+    func report(_ part: RowLift.Frames.BlockPart, of block: TaskList.Model.BlockID, _ frame: CGRect) {
+        frames.report(part, of: block, frame)
+        tint.follow(frames)
+    }
+
+    /// Forgets the parts the list's blocks no longer draw (`RowLift.Frames.forgetParts(notDrawnBy:)`), and moves the
+    /// tint's frame where it moved its block's.
+    func forgetParts(notDrawnBy blocks: [TaskList.Model.Block]) {
+        frames.forgetParts(notDrawnBy: blocks)
+        tint.follow(frames)
+    }
 
     // iOS alone: only there does a system drag stand on the screen, and these are UIKit's.
     #if os(iOS)
@@ -87,6 +104,42 @@ final class RowDragState {
         CGRect(origin: CGPoint(x: -contentOrigin.x, y: -contentOrigin.y), size: viewportSize)
     }
     #endif
+}
+
+/// The frame the tint of the block a drag would land in stands at (`BlockDropTints`): while the slot names a block
+/// other than the one the task was dragged from, that block's frame, the union of its parts, which grows as the lazy
+/// stack lays them out during the drag, the auto-scroll's among them, as the block's own overlay covered it when the
+/// block was one view. The one part of the drag's state anything observes, and only the tints: it changes only where
+/// that block's frame does, so a report of any other part, or of one that leaves the frame as it was, draws nothing
+/// (#196).
+///
+/// `BlockTintFrame` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
+/// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-10).
+@MainActor @Observable
+final class BlockTintFrame {
+    /// The block the slot names, nil while it names none or a place in the block dragged from, which is not tinted.
+    private var block: TaskList.Model.BlockID?
+
+    /// That block's frame as the frames last had it.
+    private var blockFrame: CGRect?
+
+    /// The block's frame while it is the one tinted, and nil for any other, whose reader observes only which one is.
+    func frame(of block: TaskList.Model.BlockID) -> CGRect? {
+        self.block == block ? blockFrame : nil
+    }
+
+    /// Watches the block the slot names, among the frames reported.
+    func watch(_ slot: RowLift.Slot?, in frames: RowLift.Frames) {
+        let block: TaskList.Model.BlockID? = if case .into(let target)? = slot { target } else { nil }
+        if self.block != block { self.block = block }
+        follow(frames)
+    }
+
+    /// Follows the frame of the block watched, set only where it changed.
+    func follow(_ frames: RowLift.Frames) {
+        let frame = block.flatMap { frames.blocks[$0] }
+        if blockFrame != frame { blockFrame = frame }
+    }
 }
 
 extension RowLift {

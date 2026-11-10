@@ -121,7 +121,7 @@ private let second = BlockRowID(block: .own(nil), task: TaskID())
 // MARK: - The screen's one swipe
 
 /// Whether an observation fired, which its closure, sendable, sets.
-private final class Flag: @unchecked Sendable {
+final class Flag: @unchecked Sendable {
     var isSet = false
 }
 
