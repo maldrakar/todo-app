@@ -17,6 +17,11 @@ struct RowGestures {
     let dragState: RowDragState
     let swipe: ScreenSwipe
     let delete: (TaskList.UserAction) -> Void
+
+    /// Whether the drag has lifted the row, the one fact of the lift a row draws.
+    func isLifted(_ row: BlockRowID) -> Bool {
+        lift?.task == row.task && lift?.source == row.block
+    }
 }
 
 /// What a drag and a swipe read of the layout and of the drag under way, and draw nothing from. Kept in a class that

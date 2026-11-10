@@ -116,6 +116,7 @@ struct ListSurface<Buttons: ViewModifier>: View {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(model.doneRows) { row in
                                 BlockRow(row, send: sendClosingSwipe)
+                                    .equatable()
                             }
                         }
                         .modifier(Entrance(done.style.rowsEntrance))

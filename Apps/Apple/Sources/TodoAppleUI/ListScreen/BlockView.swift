@@ -28,6 +28,7 @@ struct BlockView: View {
             mark(after: nil)
             ForEach(block.rows) { row in
                 BlockRow(row, in: block.id, gestures: gestures, send: send)
+                    .equatable()
                 mark(after: row.id)
             }
             if let addTask = block.addTask {
@@ -130,7 +131,9 @@ struct BlockRow: View {
     var body: some View {
         switch row {
         case .task(let id, let task):
+            // The face skips its body where only the lift changed the row.
             let face = TaskRowView(task, send: sendFromRow(task))
+            .equatable()
             .modifier(ColumnCardSurface(column: column))
             .modifier(ColumnCardRing(column: column))
             .modifier(TaskLanding(task.style))
@@ -224,5 +227,23 @@ struct BlockRow: View {
                 content
             }
         }
+    }
+}
+
+/// A row is drawn from its row, its block, its column's look and whether the drag has lifted it, with its screen's drag
+/// and swipe, and a row none of them changed skips its body: a change to one row ran every row's body, twice (#196).
+/// Its `send` and its gestures' Delete are left out, since whichever pass made them they reach the same screen's one
+/// `send`, and SwiftUI would compare them by identity, which every pass changes; and so is the row swiped aside, which
+/// `SwipeToDelete` reads where it is drawn. On the main actor, since the gestures' Delete is not `Sendable`.
+extension BlockRow: @MainActor Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.row == rhs.row && lhs.block == rhs.block && lhs.column == rhs.column && lhs.isLifted == rhs.isLifted
+            && lhs.gestures?.dragState === rhs.gestures?.dragState && lhs.gestures?.swipe === rhs.gestures?.swipe
+    }
+
+    /// Whether the drag has lifted this row, which a row of the strip never is.
+    private var isLifted: Bool {
+        guard let block, let gestures else { return false }
+        return gestures.isLifted(BlockRowID(block: block, task: row.id))
     }
 }
