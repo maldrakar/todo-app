@@ -18,7 +18,9 @@ class Walk: XCTestCase {
     /// The store this walk's app opens, a copy of the seeded one; nil when the walk was skipped.
     private var store: URL?
 
-    override func setUp() async throws {
+    /// Synchronous, as are the overrides of every walk class: an assertion that fails in an `async` setUp, with
+    /// `continueAfterFailure` off, left its tearDown hanging until the run's time allowance ended it (2026-11-11).
+    override func setUpWithError() throws {
         continueAfterFailure = false
         guard let seeded = ProcessInfo.processInfo.environment["WALK_STORE"] else {
             throw XCTSkip("The walks run through scripts/ui-walks.sh, which seeds the store they walk over.")
@@ -31,7 +33,7 @@ class Walk: XCTestCase {
     }
 
     /// XCTest tears down a walk it skipped too, and a skipped walk touched nothing.
-    override func tearDown() async throws {
+    override func tearDownWithError() throws {
         guard store != nil else { return }
         app.terminate()
         XCUIDevice.shared.orientation = .portrait

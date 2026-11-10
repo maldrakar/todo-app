@@ -3,8 +3,8 @@ import XCTest
 /// A column's card carried within its column and across the board, and the board's own scroll under it. Every walk
 /// starts on Project shown as Columns: its own column first, then Core, Design, Ops, Docs, Either and Weekly.
 final class ColumnWalks: Walk {
-    override func setUp() async throws {
-        try await super.setUp()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         openProject()
         setColumns()
     }
