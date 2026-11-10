@@ -94,10 +94,12 @@ only=()
 for walk in ${walks[@]+"${walks[@]}"}; do only+=("-only-testing:TodoUITests/$walk"); done
 echo "ui-walks: walking ${walks[*]:-every walk}"
 status=0
-# A failure keeps its screenshot in the result bundle; the device's logs it would add are 400 MB a run.
+# A failure keeps its screenshot in the result bundle; the device's logs it would add are 400 MB a run. A walk that
+# runs ten minutes, four times the longest, has hung, and fails rather than holding the run for ever.
 TEST_RUNNER_WALK_STORE="$out/store/todo.sqlite" xcodebuild test-without-building -xctestrun "$xctestrun" \
   -destination "platform=iOS Simulator,id=$udid" ${only[@]+"${only[@]}"} -resultBundlePath "$out/walks.xcresult" \
-  -collect-test-diagnostics never >"$out/walks.log" 2>&1 || status=$?
+  -collect-test-diagnostics never -test-timeouts-enabled YES -default-test-execution-time-allowance 600 \
+  >"$out/walks.log" 2>&1 || status=$?
 grep -E "^Test Case .*(passed|failed|skipped)|: error: " "$out/walks.log" | sed -E 's/^Test Case //' || true
 echo "ui-walks: $(grep -cE "^Test Case .* passed" "$out/walks.log" || true) passed," \
   "$(grep -cE "^Test Case .* failed" "$out/walks.log" || true) failed; the log is $out/walks.log," \
