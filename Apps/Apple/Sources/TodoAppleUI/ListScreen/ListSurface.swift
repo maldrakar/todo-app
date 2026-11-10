@@ -18,7 +18,8 @@ import TaskListFeature
 /// it the blocks and the Done strip's rows stand in lazy stacks, which lay out only the rows in sight, where a plain
 /// stack laid out every row at opening (#196), around each part that holds a field, an open card or a list's name being
 /// typed, which stands outside them, laid out wherever it is: a lazy stack took a field scrolled out of sight out of
-/// the window, and its focus with it (spike #145; `ListsTree`; `ListRuns`).
+/// the window, and its focus with it (spike #145; `ListsTree`; `ListRuns`). A stack begun at such a part stays begun
+/// there once its field has closed, for as long as the list is shown, so that closing a card moves no row (`ListCuts`).
 ///
 /// A tap on what stands behind the controls is one action, `backgroundTapped`, which closes an open card: a gesture on
 /// the content takes every tap no control of it took, the header's words and the room under the rows among them, and a
@@ -43,6 +44,9 @@ struct ListSurface<Buttons: ViewModifier>: View {
     /// What the surface keeps of its rows' gestures.
     private var rowGestures = ListScreenGestures()
 
+    /// The parts at which the list's runs have started, kept while the list is shown (`ListCuts`).
+    @State private var cuts = ListCuts()
+
     /// The surface of the list, with its screen's glass buttons, which `buttons` stands where the screen has them,
     /// handed the send of a control of the content, which closes a row a swipe left open, for its "+".
     init(
@@ -66,6 +70,15 @@ struct ListSurface<Buttons: ViewModifier>: View {
             // still shortens it, its region not ignored.
             .ignoresSafeArea(.container, edges: .bottom)
             .modifier(BottomInsetReader(inset: $bottomInset))
+            // The list and the board share nothing of their layout: as one gives way to the other, the frames it
+            // reported and the starts of the list's runs are forgotten. Here, on the surface, whose change runs before
+            // the layout that comes reports its first frame (probed on macOS 26, 2026-11-10: this action, then the
+            // new content's rows' `onGeometryChange`), and only on a change of the shape, never when the screen comes
+            // back from under another.
+            .onChange(of: shape) {
+                rowGestures.forgetLayout()
+                cuts.kept = []
+            }
             .overlay { floatingButton }
             .stripUnder { sentence }
             .overlay(alignment: .top) {
@@ -80,13 +93,23 @@ struct ListSurface<Buttons: ViewModifier>: View {
             .navigationTitle(model.header.title.text)
     }
 
-    /// The one switch over the layout's shapes, every case drawn and none by `default` (`docs/style.md`, "Views").
+    /// The switch over the layout's shapes that picks the container, every case drawn and none by `default`
+    /// (`docs/style.md`, "Views").
     @ViewBuilder private var content: some View {
         switch model.layout {
         case .list(let blocks):
             list(blocks)
         case .columns(let board):
             columns(board)
+        }
+    }
+
+    /// The layout's shape with nothing of what it holds, whose change alone is the list giving way to the board or the
+    /// board to the list; every case named and none by `default`.
+    private var shape: TaskList.Model.Layout.Kind {
+        switch model.layout {
+        case .list: .list
+        case .columns: .columns
         }
     }
 
@@ -100,7 +123,7 @@ struct ListSurface<Buttons: ViewModifier>: View {
     /// foot, or to the top of a sentence's strip under it, what it holds ending as far above what the safe area covers
     /// there, or above the strip, as its style says.
     private func list(_ blocks: [TaskList.Model.Block]) -> some View {
-        let runs = ListRuns(blocks, doneRows: model.doneRows)
+        let runs = ListRuns(blocks, doneRows: model.doneRows, cuts: cuts.kept)
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
@@ -129,8 +152,10 @@ struct ListSurface<Buttons: ViewModifier>: View {
         .modifier(rowGestures.dropTarget(blocks, settleInset: nil, send: send))
         // A row left open is not open when the list comes back, from the board or from a screen over it.
         .onDisappear { rowGestures.closeSwipe() }
-        // Each block's frame the union of the parts it draws now, and no column's the board left, the list come back.
+        // Each block's frame the union of the parts it draws now.
         .onChange(of: blocks, initial: true) { rowGestures.forgetParts(notDrawnBy: blocks) }
+        // The starts this pass drew are kept for the next, after it.
+        .onChange(of: runs.cuts, initial: true) { _, drawn in cuts.kept = drawn }
     }
 
     /// What a run holds of a block.

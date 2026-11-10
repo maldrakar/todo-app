@@ -3,10 +3,12 @@ import Testing
 @testable import TodoAppleUI
 import TodoCore
 
-// The list screen's blocks cut at every part that holds a field, `ListRuns`: each part that holds a field stands
-// outside the lazy stacks, so that its field is never taken out of the window, at the head of the run whose lazy stack
-// holds the parts after it, the first run holding those before the first field; the Done strip's rows leave their lazy
-// stack while one of them holds a field (#196). The blocks are the ones a real `TaskList` draws (`LiftedList`).
+// The list screen's blocks cut into runs, `ListRuns`: each part that holds a field stands outside the lazy stacks, so
+// that its field is never taken out of the window, at the head of the run whose lazy stack holds the parts after it,
+// the first run holding those before the first cut; a run's start, once made, is kept while its part is drawn, the
+// part heading its run's lazy stack once its field has closed, so that no row changes runs as a field closes; the Done
+// strip's rows leave their lazy stack while one of them holds a field (#196). The blocks are the ones a real `TaskList`
+// draws (`LiftedList`).
 
 /// What a run draws of a block: whether its header, its top mark and its "+ Add task", and its rows, by their tasks.
 private struct Drawn: Equatable {
@@ -47,10 +49,35 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     runs.runs.map { run in DrawnRun(field: run.field.map(Drawn.init), lazy: run.lazy.map(Drawn.init)) }
 }
 
+/// The runs as the screen draws them, pass after pass: each pass is handed the cuts the pass before it drew, as the
+/// screen keeps them (`ListCuts`).
+private struct Passes {
+    private var kept: Set<ListRuns.Run.ID> = []
+
+    mutating func draw(_ list: LiftedList) -> ListRuns {
+        let runs = ListRuns(list.blocks, doneRows: list.doneRows, cuts: kept)
+        kept = runs.cuts
+        return runs
+    }
+}
+
+/// The run each row stands in, the part at a run's head and the rows of its lazy stack alike.
+private func runOfEachRow(_ runs: ListRuns) -> [BlockRowID: ListRuns.Run.ID] {
+    var found: [BlockRowID: ListRuns.Run.ID] = [:]
+    for run in runs.runs {
+        for piece in [run.field].compactMap(\.self) + run.lazy {
+            for row in piece.block.rows[piece.parts.rows] {
+                found[BlockRowID(block: piece.block.id, task: row.id)] = run.id
+            }
+        }
+    }
+    return found
+}
+
 /// With no field open the blocks stand whole in the first run's lazy stack.
 @Test func withNoFieldTheBlocksStandInOneLazyRun() throws {
     let list = try LiftedList()
-    let runs = ListRuns(list.blocks, doneRows: [])
+    let runs = ListRuns(list.blocks, doneRows: [], cuts: [])
     #expect(drawn(runs) == [DrawnRun(field: nil, lazy: list.blocks.map { Drawn(whole: $0) })])
     #expect(!runs.doneRowsHoldField)
 }
@@ -67,7 +94,7 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     let blocks = list.blocks
     #expect(blocks.map(\.id).prefix(2) == [own, house])
 
-    #expect(drawn(ListRuns(blocks, doneRows: [])) == [
+    #expect(drawn(ListRuns(blocks, doneRows: [], cuts: [])) == [
         DrawnRun(
             field: nil,
             lazy: [Drawn(whole: blocks[0]), Drawn(house, header: true, topMark: true, rows: [list.h1], add: false)]
@@ -90,7 +117,7 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     #expect(blocks.first?.id == own)
     #expect(blocks.first?.header == nil)
 
-    #expect(drawn(ListRuns(blocks, doneRows: [])) == [
+    #expect(drawn(ListRuns(blocks, doneRows: [], cuts: [])) == [
         DrawnRun(field: nil, lazy: [Drawn(own, header: true, topMark: true, rows: [], add: false)]),
         DrawnRun(
             field: Drawn(own, header: false, topMark: false, rows: [list.a], add: false),
@@ -111,7 +138,7 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     let blocks = list.blocks
     #expect(blocks.map(\.id).dropFirst().prefix(2) == [house, office])
 
-    #expect(drawn(ListRuns(blocks, doneRows: [])) == [
+    #expect(drawn(ListRuns(blocks, doneRows: [], cuts: [])) == [
         DrawnRun(
             field: nil,
             lazy: [
@@ -147,7 +174,7 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     #expect(named > 1)
     #expect(blocks.first?.id == own)
 
-    #expect(drawn(ListRuns(blocks, doneRows: [])) == [
+    #expect(drawn(ListRuns(blocks, doneRows: [], cuts: [])) == [
         DrawnRun(field: nil, lazy: [Drawn(own, header: true, topMark: true, rows: [list.a], add: false)]),
         DrawnRun(
             field: Drawn(own, header: false, topMark: false, rows: [list.b], add: false),
@@ -162,30 +189,146 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     ])
 }
 
-/// A run is known by the part that holds the field at its head, and the first, which has none, by being first: a field
-/// keeps its view whatever opens or closes above or below it, and the first run, which holds the rows above the first
-/// field, keeps its view whatever opens or closes below its start. A list's name being typed keeps its run's id as a
-/// card opens above it and closes again; a card opened above a name's field keeps its run's id as the name then goes.
-@Test func aFieldsRunKeepsItsIdWhateverOpensOrClosesAboveOrBelowIt() throws {
+/// A run's start, once made, is kept: as its field closes the part heads its run's lazy stack, a plain row now, the
+/// run keeps its id, and every row stands in the run it stood in, so that none is made anew out of sight.
+@Test func aFieldsRunKeepsItsIdAndItsRowsAsTheFieldCloses() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let card = ListRuns.Run.ID.row(BlockRowID(block: own, task: list.b))
+    var passes = Passes()
+    list.openCard(on: list.b)
+    let open = passes.draw(list)
+    #expect(open.runs.map(\.id) == [.start, card])
+    list.tapBackground()
+    let closed = passes.draw(list)
+    let blocks = list.blocks
+
+    #expect(closed.runs.map(\.id) == [.start, card])
+    #expect(runOfEachRow(closed) == runOfEachRow(open))
+    #expect(drawn(closed) == [
+        DrawnRun(field: nil, lazy: [Drawn(own, header: true, topMark: true, rows: [list.a], add: false)]),
+        DrawnRun(
+            field: nil,
+            lazy: [Drawn(own, header: false, topMark: false, rows: [list.b, list.c, list.d], add: true)]
+                + blocks.dropFirst().map { Drawn(whole: $0) }
+        ),
+    ])
+    #expect(closed.cuts == [card])
+}
+
+/// A field opened below a cut, or above it, keeps the cut: the rows between them stay in the run they stood in, and
+/// only the rows from the new field down start a run.
+@Test func aFieldOpenedBelowOrAboveACutKeepsIt() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let first = ListRuns.Run.ID.row(BlockRowID(block: own, task: list.b))
+    let below = ListRuns.Run.ID.row(BlockRowID(block: house, task: list.h1))
+    let above = ListRuns.Run.ID.row(BlockRowID(block: own, task: list.a))
+    var passes = Passes()
+    list.openCard(on: list.b)
+    _ = passes.draw(list)
+    list.openCard(on: list.h1)
+    let second = passes.draw(list)
+    #expect(second.runs.map(\.id) == [.start, first, below])
+    let rows = runOfEachRow(second)
+    #expect(rows[BlockRowID(block: own, task: list.a)] == .start)
+    #expect([list.b, list.c, list.d].map { rows[BlockRowID(block: own, task: $0)] } == [first, first, first])
+    #expect([list.h1, list.h2].map { rows[BlockRowID(block: house, task: $0)] } == [below, below])
+    #expect(second.runs.map { $0.field != nil } == [false, false, true], "only the open card stands outside")
+
+    list.openCard(on: list.a)
+    let third = passes.draw(list)
+    #expect(third.runs.map(\.id) == [.start, above, first, below])
+    #expect(runOfEachRow(third).filter { $0.key.task != list.a } == rows.filter { $0.key.task != list.a })
+}
+
+/// A cut whose part the list no longer draws is dropped, and its rows join the run before it: a task checked away, and
+/// a block folded, whose rows come back into the run its header stands in.
+@Test func aCutWhosePartIsNoLongerDrawnIsDropped() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let checked = ListRuns.Run.ID.row(BlockRowID(block: own, task: list.b))
+    let folded = ListRuns.Run.ID.row(BlockRowID(block: house, task: list.h2))
+    var passes = Passes()
+    list.openCard(on: list.b)
+    _ = passes.draw(list)
+    list.openCard(on: list.h2)
+    _ = passes.draw(list)
+    list.tapBackground()
+    #expect(passes.draw(list).runs.map(\.id) == [.start, checked, folded])
+
+    list.check(list.b)
+    #expect(list.rowIDs(of: own) == [list.a, list.c, list.d])
+    let afterCheck = passes.draw(list)
+    #expect(afterCheck.runs.map(\.id) == [.start, folded])
+    #expect(runOfEachRow(afterCheck)[BlockRowID(block: own, task: list.c)] == .start)
+
+    list.toggleFold(of: house)
+    #expect(passes.draw(list).runs.map(\.id) == [.start])
+    list.toggleFold(of: house)
+    let unfolded = passes.draw(list)
+    #expect(list.rowIDs(of: house) == [list.h1, list.h2])
+    #expect(unfolded.runs.map(\.id) == [.start], "a cut once dropped is not made again")
+    #expect(drawn(unfolded) == [DrawnRun(field: nil, lazy: list.blocks.map { Drawn(whole: $0) })])
+}
+
+/// The first run is known by being first, whatever opens and closes below its start, and a field's run by its part,
+/// whatever opens and closes above or below it: a list's name being typed keeps its run's id as a card opens above it
+/// and closes, and the card's run keeps its own as the name settles, the header then heading its run's lazy stack.
+@Test func theFirstRunAndAFieldsRunKeepTheirIdsWhateverOpensOrCloses() throws {
     let list = try LiftedList()
     let card = ListRuns.Run.ID.row(BlockRowID(block: .own(nil), task: list.b))
-    func ids() -> [ListRuns.Run.ID] { ListRuns(list.blocks, doneRows: []).runs.map(\.id) }
+    var passes = Passes()
+    func ids() -> [ListRuns.Run.ID] { passes.draw(list).runs.map(\.id) }
     #expect(ids() == [.start])
     list.openCard(on: list.b)
     #expect(ids() == [.start, card], "a card below the first run's start")
     list.addList()
     let named = try #require(list.blocks.first { $0.header?.field != nil }?.id)
     let name = ListRuns.Run.ID.header(named)
-    #expect(ids() == [.start, name], "the card closed by adding a list")
+    #expect(ids() == [.start, card, name], "the card closed by adding a list, its cut kept")
     list.openCard(on: list.b)
-    #expect(ids() == [.start, card, name], "a card above the name")
+    #expect(ids() == [.start, card, name], "the card open again above the name")
     list.tapBackground()
-    #expect(ids() == [.start, name], "the card above closed")
-    list.openCard(on: list.b)
+    #expect(ids() == [.start, card, name], "the card above closed")
     list.submitListName()
-    #expect(ids() == [.start, card], "the name below settled")
-    list.tapBackground()
-    #expect(ids() == [.start], "the card closed")
+    let settled = passes.draw(list)
+    #expect(settled.runs.map(\.id) == [.start, card, name], "the name settled")
+    #expect(settled.runs.map { $0.field == nil } == [true, true, true], "no field is left")
+    #expect(settled.runs.last?.lazy.first.map(Drawn.init) == list.block(named).map { Drawn(whole: $0) })
+}
+
+/// A list's name being typed and a card open in that same list, "+ Add task" tapped under the name: its block falls
+/// into three runs, its header alone at the head of one, the mark at its rows' top in that run's lazy stack, and the
+/// card at the head of the next, with the block's "+ Add task" after it.
+@Test func aHeadersFieldAndACardInItsOwnBlockEachStandAlone() throws {
+    let list = try LiftedList()
+    list.addList()
+    let named = try #require(list.blocks.firstIndex { $0.header?.field != nil })
+    let id = list.blocks[named].id
+    list.addTask(in: id)
+    let blocks = list.blocks
+    let block = blocks[named]
+    #expect(block.header?.field != nil, "the name is still being typed")
+    let new = try #require(block.rows.first?.id)
+    #expect(block.rows.count == 1)
+
+    let runs = ListRuns(blocks, doneRows: [], cuts: [])
+    #expect(runs.runs.map(\.id) == [.start, .header(id), .row(BlockRowID(block: id, task: new))])
+    #expect(drawn(runs) == [
+        DrawnRun(field: nil, lazy: blocks[..<named].map { Drawn(whole: $0) }),
+        DrawnRun(
+            field: Drawn(id, header: true, topMark: false, rows: [], add: false),
+            lazy: [Drawn(id, header: false, topMark: true, rows: [], add: false)]
+        ),
+        DrawnRun(
+            field: Drawn(id, header: false, topMark: false, rows: [new], add: false),
+            lazy: [Drawn(id, header: false, topMark: false, rows: [], add: true)]
+                + blocks.suffix(from: named + 1).map { Drawn(whole: $0) }
+        ),
+    ])
 }
 
 /// The Done strip's rows stand in a lazy stack, and outside it while one of them is the open card.
@@ -194,8 +337,8 @@ private func drawn(_ runs: ListRuns) -> [DrawnRun] {
     list.check(list.a)
     list.toggleDoneStrip()
     #expect(list.doneRows.map(\.id) == [list.a])
-    #expect(!ListRuns(list.blocks, doneRows: list.doneRows).doneRowsHoldField)
+    #expect(!ListRuns(list.blocks, doneRows: list.doneRows, cuts: []).doneRowsHoldField)
     list.openCard(on: list.a)
     #expect(list.doneRows.map(\.id) == [list.a])
-    #expect(ListRuns(list.blocks, doneRows: list.doneRows).doneRowsHoldField)
+    #expect(ListRuns(list.blocks, doneRows: list.doneRows, cuts: []).doneRowsHoldField)
 }

@@ -193,6 +193,48 @@ import TodoCore
     #expect(list.lift?.slot == .place(own, after: nil), "before B, the block's top, A being lifted")
 }
 
+/// A layout that is gone leaves no frame behind: a card of the board and a row of the list are one row to the frames,
+/// so back from Columns a row the list's lazy stack has not laid out kept its card's frame, and one near the point took
+/// the slot from the rows under the finger. The frames forget everything as the layout's shape changes, the parts of
+/// an earlier list and the tint's frame among it, and the slot is read by the rows the list has laid out alone.
+@MainActor @Test func aLayoutThatIsGoneLeavesNoFrameForTheNextToRead() throws {
+    var list = try LiftedList(columns: true)
+    let own = TaskList.Model.BlockID.own(nil)
+    let house = TaskList.Model.BlockID.list(list.house)
+    list.scrollColumn(own, by: 210)
+    let dragState = RowDragState()
+    dragState.report(.add, of: own, CGRect(x: 0, y: 900, width: 400, height: 40))
+    let board = list.frames
+    dragState.frames.rows = board.rows
+    dragState.frames.blocks = board.blocks
+    dragState.frames.columns = board.columns
+    dragState.watch(.into(house))
+    #expect(dragState.frames.rows[BlockRowID(block: own, task: list.d)]?.midY == 68, "D's card, under the finger")
+    #expect(dragState.tint.frame(of: house) == board.blocks[house])
+
+    list.showAs(.list)
+    dragState.forgetLayout()
+    #expect(dragState.frames.rows.isEmpty)
+    #expect(dragState.frames.blocks.isEmpty)
+    #expect(dragState.frames.columns.isEmpty)
+    #expect(dragState.tint.frame(of: house) == nil)
+
+    list.leaveNotLaidOut(list.c, in: own)
+    list.leaveNotLaidOut(list.d, in: own)
+    for (row, frame) in list.frames.rows where row.block == own {
+        dragState.frames.rows[row] = frame
+        dragState.report(.row(row.task), of: own, frame)
+    }
+    #expect(dragState.frames.blocks[own] == CGRect(x: 0, y: 0, width: 400, height: 88), "A and B, the rows laid out")
+    let blocks = list.blocks
+    let lifted = RowLift.after(
+        .began(task: list.a, block: own, session: "first", at: CGPoint(x: 200, y: 22)), from: nil, among: blocks,
+        frames: dragState.frames
+    ).lift
+    let moved = RowLift.after(.changed(CGPoint(x: 200, y: 77)), from: lifted, among: blocks, frames: dragState.frames)
+    #expect(moved.lift?.slot == .place(own, after: list.b), "B's lower half, and not after D by its card's frame")
+}
+
 /// On the board the point picks the column under it, the nearest in a gap or a margin, whatever its height, a column
 /// that takes no drop offering none; another column itself, and in its own a place among the cards in sight: a card
 /// scrolled out of its column keeps a frame, under the column's header, and is never the one under the finger.

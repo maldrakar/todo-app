@@ -32,8 +32,10 @@ struct RowGestures {
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 @MainActor
 final class RowDragState {
-    /// The frames the screen's rows, blocks and columns last reported, each as it changed, and kept for one that has
-    /// left: what reads them reads those drawn.
+    /// The frames the rows, blocks and columns of the layout shown last reported, each as it changed, and kept for one
+    /// that has left: what reads them reads those drawn. A row, a column and its cards' area write theirs here
+    /// (`reportsLiftFrame`); a part of a list's block goes through `report`, `forgetParts` and `forgetLayout` below and
+    /// never straight into the frames, which would leave the tint's frame behind.
     var frames = RowLift.Frames()
 
     /// The frame the tint of the block a drag would land in stands at, which only the tints observe.
@@ -53,8 +55,17 @@ final class RowDragState {
         tint.follow(frames)
     }
 
-    /// Has the tint watch the block the slot names, at its frame as reported so far. With `report` and `forgetParts`
-    /// the one way the tint's frame is set, so that it is set from the frames it follows.
+    /// Forgets every frame, the layout that reported them gone, and the tint's with them: a card of the board and a
+    /// row of the list are one row to the frames (`BlockRowID`), and a list's lazy stack reports only the rows it lays
+    /// out, so a row not yet laid out kept its card's frame, or the one an earlier list left it, which a drag and a
+    /// swipe then read as its own (#196).
+    func forgetLayout() {
+        frames = RowLift.Frames()
+        tint.follow(frames)
+    }
+
+    /// Has the tint watch the block the slot names, at its frame as reported so far. With `report`, `forgetParts` and
+    /// `forgetLayout` the one way the tint's frame is set, so that it is set from the frames it follows.
     func watch(_ slot: RowLift.Slot?) {
         tint.watch(slot, in: frames)
     }
@@ -141,7 +152,8 @@ final class BlockTintFrame {
         follow(frames)
     }
 
-    /// Follows the frame of the block watched, set only where it changed (`RowDragState.report`, `forgetParts`).
+    /// Follows the frame of the block watched, set only where it changed (`RowDragState.report`, `forgetParts`,
+    /// `forgetLayout`).
     fileprivate func follow(_ frames: RowLift.Frames) {
         let frame = block.flatMap { frames.blocks[$0] }
         if blockFrame != frame { blockFrame = frame }

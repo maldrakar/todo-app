@@ -98,9 +98,7 @@ struct LiftedList {
         )
         let list = CGSize(width: 2 * layout.blockX + layout.blockWidth, height: 1_000)
         viewport = CGRect(origin: .zero, size: columns ? board : list)
-        if columns {
-            _ = module.send(.action(.showAsChosen(.columns)))
-        }
+        if columns { showAs(.columns) }
     }
 
     /// The blocks the model draws, whichever its layout, read over the layout's shapes as the screen reads them.
@@ -217,6 +215,16 @@ struct LiftedList {
     /// Adds a list inside, whose name's field stands in its block's header.
     func addList() {
         _ = module.send(.action(.addListTapped))
+    }
+
+    /// Adds a task at a block's end, by its "+ Add task", whose card opens there.
+    func addTask(in id: TaskList.Model.BlockID) {
+        _ = module.send(.action(.addTaskRowTapped(in: id)))
+    }
+
+    /// Shows the list as Show as says, the list or the board.
+    func showAs(_ kind: TaskList.Model.Layout.Kind) {
+        _ = module.send(.action(.showAsChosen(kind)))
     }
 
     /// Closes the open card by a tap on what stands behind the controls.
