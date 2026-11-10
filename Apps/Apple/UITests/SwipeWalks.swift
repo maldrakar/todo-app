@@ -46,9 +46,10 @@ final class SwipeWalks: Walk {
         settle()
         XCTAssertFalse(delete(of: "Bravo today").exists, "another row's swipe left the first open")
         XCTAssertTrue(delete(of: "Charlie today").exists, "another row's swipe did not open it")
-        at(row("Delta today"))
-            .press(forDuration: 0.02, thenDragTo: at(row("Alpha today")), withVelocity: 600, thenHoldForDuration: 0.05)
-        settle(0.8)
+        let y = charlie.frame.minY
+        scrollSlowly(from: 0.7, to: 0.6)
+        XCTAssertLessThan(charlie.frame.minY, y, "the drag up did not scroll the list")
+        XCTAssertTrue(charlie.isHittable, "the scroll took Charlie off the screen, where its Delete cannot be read")
         XCTAssertFalse(delete(of: "Charlie today").exists, "a scroll left the row open")
     }
 
@@ -80,9 +81,7 @@ final class SwipeWalks: Walk {
         settle(0.8)
         let quick = row("Alpha today").frame.minY
         XCTAssertLessThan(quick, y, "a quick drag up from a row did not scroll")
-        screen(0.5, 0.8)
-            .press(forDuration: 0.02, thenDragTo: screen(0.5, 0.6), withVelocity: 60, thenHoldForDuration: 0.02)
-        settle(0.8)
+        scrollSlowly(from: 0.8, to: 0.6)
         XCTAssertLessThan(row("Alpha today").frame.minY, quick, "a slow drag up from a row did not scroll")
     }
 
@@ -102,8 +101,8 @@ final class SwipeWalks: Walk {
         )
     }
 
-    /// A tap on a check while another row stands swiped open closes that row and completes the task, and a plain tap
-    /// after it still opens a card.
+    /// A tap on a check while another row stands swiped open closes that row and completes the task, which the Done
+    /// strip counts, and a plain tap after it still opens a card.
     func testCompleteWhileARowStandsSwiped() {
         open("/view/" + Self.today)
         row("Bravo today").swipeLeft()
@@ -111,9 +110,10 @@ final class SwipeWalks: Walk {
         app.buttons["Complete: Charlie today"].firstMatch.tap()
         settle(2)
         XCTAssertFalse(delete(of: "Bravo today").exists, "the open row stayed open through another's check")
-        XCTAssertFalse(row("Charlie today").exists, "Charlie was not completed")
-        row("Delta today").tap()
-        XCTAssertTrue(titleField("Delta today").waitForExistence(timeout: 2), "a tap after the check opened no card")
+        XCTAssertFalse(row("Charlie today").exists, "Charlie's row stayed after its check")
+        openCard("Delta today")
+        let strip = doneStrip()
+        XCTAssertTrue(strip.label.hasPrefix("Done today · 3"), "the strip reads \(strip.label): Charlie was not completed")
     }
 
     /// A slow drag of a row sideways by `dx`, let go where it ends.

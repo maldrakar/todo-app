@@ -33,15 +33,10 @@ final class CompletingWalks: Walk {
         }
         XCTAssertEqual(rows("Both one").count, 2, "Both one is not drawn in Design and in Ops")
         checks.firstMatch.tap()
-        settle(2)
-        XCTAssertEqual(rows("Both one").count, 0, "a row of Both one stayed after its check")
+        XCTAssertTrue(row("Both one").waitForNonExistence(timeout: 5), "a row of Both one stayed after its check")
         relaunch()
         openProject()
-        for _ in 0..<6 where !row("Ops one").exists {
-            app.swipeUp()
-            settle()
-        }
-        XCTAssertTrue(row("Ops one").exists, "Ops' block did not come into sight")
+        scroll(to: row("Ops one"), "Ops' block")
         XCTAssertEqual(rows("Both one").count, 0, "the store did not keep Both one done")
     }
 
@@ -74,9 +69,8 @@ final class CompletingWalks: Walk {
     /// asserted: XCUITest waits for the app to be idle before each reading, so only the end of the motion is read.
     func testCompleteAnOpenCardWithTheKeyboardUp() {
         open("/view/" + Self.today)
-        row("Alpha today").tap()
+        openCard("Alpha today")
         let title = titleField("Alpha today")
-        XCTAssertTrue(title.waitForExistence(timeout: 2), "Alpha's card did not open")
         title.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 2), "a tap on the title brought no keyboard")
         app.buttons["Complete: Alpha today"].firstMatch.tap()
@@ -107,31 +101,6 @@ final class CompletingWalks: Walk {
     /// The card of "Review the list screen spec", in Upcoming on tomorrow, opened by a tap on its row.
     private func openSpec() {
         open("/view/" + Self.upcoming)
-        row("Review the list screen spec").tap()
-        XCTAssertTrue(
-            titleField("Review the list screen spec").waitForExistence(timeout: 2), "the spec's card did not open"
-        )
-    }
-
-    /// The Done strip's capsule, "Done today · N", at the end of the list.
-    private func doneStrip() -> XCUIElement {
-        let strip = row("Done today")
-        for _ in 0..<5 where !(strip.exists && strip.isHittable) {
-            app.swipeUp()
-            settle()
-        }
-        XCTAssertTrue(strip.exists && strip.isHittable, "the Done strip did not come into sight")
-        return strip
-    }
-
-    /// The list scrolled to its end, where Today's last rows and the Done strip stand.
-    private func scrollToTheEnd() {
-        for _ in 0..<4 { app.swipeUp() }
-        settle()
-    }
-
-    /// Every row of a task, one per block that draws it.
-    private func rows(_ title: String) -> [XCUIElement] {
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).allElementsBoundByIndex
+        openCard("Review the list screen spec")
     }
 }

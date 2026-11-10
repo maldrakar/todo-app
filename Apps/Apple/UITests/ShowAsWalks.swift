@@ -75,11 +75,12 @@ final class ShowAsWalks: Walk {
         XCTAssertEqual(order(rows), landed, "the store did not keep the order")
     }
 
-    /// A slow drag of the list from one height of the screen to another, given as fractions of the screen's.
-    private func scrollSlowly(from top: CGFloat, to end: CGFloat) {
-        screen(0.5, top)
-            .press(forDuration: 0.02, thenDragTo: screen(0.5, end), withVelocity: 60, thenHoldForDuration: 0.02)
-        settle(0.8)
+    /// Show as › List from the screen's "…".
+    private func setList() {
+        app.buttons["More"].firstMatch.tap()
+        settle(0.5)
+        app.buttons["List"].firstMatch.tap()
+        settle(1)
     }
 
     /// Show as opened from the screen's "…": its List and Columns.

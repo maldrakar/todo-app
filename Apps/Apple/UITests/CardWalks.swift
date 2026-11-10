@@ -6,10 +6,7 @@ final class CardWalks: Walk {
     /// what the store keeps.
     func testCardTitleAndSubtasks() {
         open("/view/" + Self.today)
-        openCard("Delta today")
-        titleField("Delta today").coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 2), "a tap on the title brought no keyboard")
-        app.typeText(" soon")
+        typeAtTheEnd(of: "Delta today", " soon")
         app.buttons["Add subtask"].firstMatch.tap()
         settle(1)
         app.typeText("First sub\n")
@@ -32,6 +29,7 @@ final class CardWalks: Walk {
         settle(1)
         app.typeText("Sub one\n")
         settle(1)
+        XCTAssertTrue(emptySubtaskField.exists, "a subtask's Return opened no next field, the fields read \(fieldValues)")
         XCTAssertGreaterThan(app.keyboards.count, 0, "the keyboard went down after a subtask's Return")
         app.typeText("Sub two\n")
         settle(1)
@@ -73,6 +71,10 @@ final class CardWalks: Walk {
         )
         open("/view/" + Self.upcoming)
         scroll(to: row("At the list end"), "the task the last + Add task wrote")
+        XCTAssertEqual(
+            order(["Day +6 task 9", "At the list end"]), ["Day +6 task 9", "At the list end"],
+            "the last + Add task wrote no task after the list's last row"
+        )
     }
 
     /// A task added at the list's end and given two lines of notes in its card: the row is there, and the notes read
@@ -115,11 +117,8 @@ final class CardWalks: Walk {
     /// A new list's name field takes its text selected, so a name typed replaces "New list", in the store too.
     func testListNameReplacesNewList() {
         open("/view/" + Self.today)
-        let add = app.buttons["Add list"].firstMatch
-        scroll(to: add, "Add list")
-        add.tap()
-        settle(1)
-        app.typeText("Named\n")
+        addList(named: "Named")
+        app.typeText("\n")
         settle(1)
         XCTAssertTrue(row("Named").exists, "the new list is not named Named")
         XCTAssertFalse(row("New listNamed").exists, "the name was typed after New list")
@@ -154,7 +153,7 @@ final class CardWalks: Walk {
         openCard("Charlie today")
         app.buttons["Add subtask"].firstMatch.tap()
         settle(1)
-        let field = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Subtask")).firstMatch
+        let field = emptySubtaskField
         var left: [String] = []
         for _ in 0..<12 {
             app.typeText("q\n")
@@ -214,7 +213,7 @@ final class CardWalks: Walk {
     }
 
     /// A new task left empty is taken back by Return: its card closes and no untitled row is left, on the screen or in
-    /// the store, read by its check, since the floating "+" reads "New task" too.
+    /// the store.
     func testEmptyNewTaskReturn() {
         open("/view/" + Self.today)
         app.buttons["New task"].firstMatch.tap()
@@ -222,11 +221,11 @@ final class CardWalks: Walk {
         app.typeText("\n")
         settle(1)
         XCTAssertEqual(app.textFields.count, 0, "the empty new task's card stayed open")
-        XCTAssertFalse(app.buttons["Complete: New task"].exists, "an untitled row was left")
+        XCTAssertEqual(untitledRows, 0, "an untitled row was left")
         relaunch()
         open("/view/" + Self.today)
         XCTAssertTrue(row("Alpha today").waitForExistence(timeout: 2), "Today did not open again")
-        XCTAssertFalse(app.buttons["Complete: New task"].exists, "the store kept an untitled task")
+        XCTAssertEqual(untitledRows, 0, "the store kept an untitled task")
     }
 
     /// A day's block in Upcoming folded by its chevron hides its rows, and unfolded shows them again.
@@ -250,10 +249,7 @@ final class CardWalks: Walk {
         add.tap()
         settle(1)
         scroll(to: row("Filler 14"), "Filler 14")
-        openCard("Filler 14")
-        titleField("Filler 14").coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
-        settle(1)
-        app.typeText("X")
+        typeAtTheEnd(of: "Filler 14", "X")
         XCTAssertEqual(titleField("Filler 14").value as? String, "Filler 14X", "the title after a letter")
         app.typeText("\n")
         relaunch()
@@ -263,25 +259,15 @@ final class CardWalks: Walk {
 
     // MARK: - Helpers
 
-    /// A task's card, opened by a tap on its row.
-    private func openCard(_ title: String) {
-        row(title).tap()
-        XCTAssertTrue(titleField(title).waitForExistence(timeout: 2), "the card of \(title) did not open")
+    /// The open card's field for a new subtask, empty, by its placeholder, which an empty field reads as its value too.
+    private var emptySubtaskField: XCUIElement {
+        app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Subtask")).firstMatch
     }
 
     /// The subtasks given that the open card shows, from the top, by their checks.
     private func subtasks(_ titles: [String]) -> [String] {
         let check = { (title: String) in self.app.buttons["Complete: " + title].firstMatch }
         return titles.filter { check($0).exists }.sorted { check($0).frame.minY < check($1).frame.minY }
-    }
-
-    /// The list scrolled up until an element, called `name` in a failure, is in sight.
-    private func scroll(to element: XCUIElement, _ name: String) {
-        for _ in 0..<6 where !(element.exists && element.isHittable) {
-            app.swipeUp()
-            settle(0.5)
-        }
-        XCTAssertTrue(element.exists && element.isHittable, "\(name) did not come into sight")
     }
 
     /// The open card's notes, by the start of what they hold: a field with text in it reads no placeholder, by which

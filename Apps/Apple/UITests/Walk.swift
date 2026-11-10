@@ -5,8 +5,8 @@ import XCTest
 /// Lists screen. A walk asserts what can be read from outside the app: an order of rows by their frames, an element
 /// and its label or value, a title that is still there when the app is launched again over the same store.
 ///
-/// Without the seeded store, as when Xcode's Test action runs the target, every walk is skipped: it would otherwise
-/// edit the store of the simulator it runs on.
+/// Without the seeded store, as when Xcode's Test action runs the target, every walk is skipped and the simulator it
+/// runs on is left alone: a walk would otherwise edit that simulator's store.
 @MainActor
 class Walk: XCTestCase {
     /// Today's view, one of the five every store starts with.
@@ -14,20 +14,15 @@ class Walk: XCTestCase {
     /// Upcoming's view.
     static let upcoming = "00000000-0000-4000-8000-000000000003"
 
-    private(set) var app = XCUIApplication()
-    /// The seeded list Project's id, which no screen shows and a link to one of Project's groups names; `seed.sh`
-    /// prints it and the script hands it over.
-    private(set) var projectID = ""
-    /// The store this walk's app opens, a copy of the seeded one.
+    let app = XCUIApplication()
+    /// The store this walk's app opens, a copy of the seeded one; nil when the walk was skipped.
     private var store: URL?
 
     override func setUp() async throws {
         continueAfterFailure = false
-        let environment = ProcessInfo.processInfo.environment
-        guard let seeded = environment["WALK_STORE"], let project = environment["WALK_PROJECT"] else {
+        guard let seeded = ProcessInfo.processInfo.environment["WALK_STORE"] else {
             throw XCTSkip("The walks run through scripts/ui-walks.sh, which seeds the store they walk over.")
         }
-        projectID = project
         store = try copy(of: URL(filePath: seeded))
         XCUIDevice.shared.appearance = .light
         XCUIDevice.shared.orientation = .portrait
@@ -35,7 +30,9 @@ class Walk: XCTestCase {
         toRoot()
     }
 
+    /// XCTest tears down a walk it skipped too, and a skipped walk touched nothing.
     override func tearDown() async throws {
+        guard store != nil else { return }
         app.terminate()
         XCUIDevice.shared.orientation = .portrait
         XCUIDevice.shared.appearance = .light
@@ -88,14 +85,20 @@ class Walk: XCTestCase {
     /// is gone opened Inbox, and the stack of the window before it, a typed title with it, was let go untold
     /// (2026-11-10).
     func open(_ route: String) {
-        XCUIDevice.shared.system.open(URL(string: "todo://" + route)!)
+        guard let link = URL(string: "todo://" + route) else { return XCTFail("todo://\(route) is not a link") }
+        XCUIDevice.shared.system.open(link)
         settle(1)
+    }
+
+    /// Whether the Lists screen is on top: its "Inbox", and no glass back.
+    var isRoot: Bool {
+        app.staticTexts["Inbox"].exists && !app.buttons["Back"].exists
     }
 
     /// Back to the Lists screen, by the Back buttons of the screens over it.
     private func toRoot() {
         for _ in 0..<5 {
-            if app.staticTexts["Inbox"].exists && !app.buttons["Back"].exists { return }
+            if isRoot { return }
             if app.buttons["Back"].exists {
                 app.buttons["Back"].firstMatch.tap()
             } else if app.navigationBars.buttons.count > 0 {
@@ -103,7 +106,7 @@ class Walk: XCTestCase {
             }
             settle(0.8)
         }
-        XCTAssertTrue(app.staticTexts["Inbox"].exists, "the Lists screen did not show")
+        XCTAssertTrue(isRoot, "the Lists screen did not show")
     }
 
     /// The seeded list "Project", opened from the Lists screen.
@@ -113,26 +116,87 @@ class Walk: XCTestCase {
         settle(1)
     }
 
-    /// Show as › Columns from the screen's "…".
-    func setColumns() {
+    /// Show as › Columns from the screen's "…" on Project, the list the walks show as columns, and the board asserted.
+    func setColumns(file: StaticString = #filePath, line: UInt = #line) {
         app.buttons["More"].firstMatch.tap()
         settle(0.5)
         app.buttons["Columns"].firstMatch.tap()
         settle(1)
+        assertProjectShowsColumns(file: file, line: line)
     }
 
-    /// Show as › List from the screen's "…".
-    func setList() {
-        app.buttons["More"].firstMatch.tap()
-        settle(0.5)
-        app.buttons["List"].firstMatch.tap()
+    /// Asserts that Project is drawn as a board: Core's and Design's titles stand side by side, as columns, and not one
+    /// under the other, as blocks, where a card and a row read alike.
+    func assertProjectShowsColumns(file: StaticString = #filePath, line: UInt = #line) {
+        let core = header("Core")
+        let design = header("Design")
+        XCTAssertTrue(core.exists && design.exists, "Core's or Design's title is not drawn", file: file, line: line)
+        XCTAssertGreaterThan(
+            design.frame.minX - core.frame.minX, 100,
+            "Project is not shown as columns: Core's and Design's titles stand at x \(core.frame.minX) and "
+                + "\(design.frame.minX)",
+            file: file, line: line
+        )
+    }
+
+    /// A task's card, opened by a tap on its row.
+    func openCard(_ title: String, file: StaticString = #filePath, line: UInt = #line) {
+        row(title).tap()
+        XCTAssertTrue(
+            titleField(title).waitForExistence(timeout: 2), "the card of \(title) did not open", file: file, line: line
+        )
+    }
+
+    /// A card opened on `title`, `letters` typed at the end of its title, with no Return.
+    func typeAtTheEnd(of title: String, _ letters: String, file: StaticString = #filePath, line: UInt = #line) {
+        openCard(title, file: file, line: line)
+        titleField(title).coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+        settle(1)
+        app.typeText(letters)
+        settle()
+        XCTAssertTrue(
+            titleField(title + letters).exists, "the title reads what was typed, the fields read \(fieldValues)",
+            file: file, line: line
+        )
+    }
+
+    /// "+ Add list" at the end of the list, and `name` typed in the new list's field, with no Return.
+    func addList(named name: String, file: StaticString = #filePath, line: UInt = #line) {
+        let add = app.buttons["Add list"].firstMatch
+        scroll(to: add, "Add list", file: file, line: line)
+        add.tap()
+        settle(1.2)
+        app.typeText(name)
+        settle()
+        XCTAssertTrue(
+            fieldValues.contains(name), "the new list's field reads what was typed, the fields read \(fieldValues)",
+            file: file, line: line
+        )
+    }
+
+    /// The list scrolled up until an element, called `name` in a failure, is in sight.
+    func scroll(to element: XCUIElement, _ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<6 where !(element.exists && element.isHittable) {
+            app.swipeUp()
+            settle(0.5)
+        }
+        XCTAssertTrue(element.exists && element.isHittable, "\(name) did not come into sight", file: file, line: line)
+    }
+
+    /// The list scrolled to its end, by fast swipes up.
+    func scrollToTheEnd() {
+        for _ in 0..<4 {
+            app.swipeUp(velocity: .fast)
+        }
         settle(1)
     }
 
-    /// The system's swipe from the screen's left edge, at a height given as a fraction of the screen's.
-    func edgeSwipe(y: CGFloat = 0.5) {
-        screen(0.003, y).press(forDuration: 0.1, thenDragTo: screen(0.8, y), withVelocity: .slow, thenHoldForDuration: 0.1)
-        settle(1.2)
+    /// A slow drag of the list from one height of the screen to another, given as fractions of the screen's, which
+    /// ends still, so that the list does not coast.
+    func scrollSlowly(from start: CGFloat, to end: CGFloat) {
+        screen(0.5, start)
+            .press(forDuration: 0.02, thenDragTo: screen(0.5, end), withVelocity: 60, thenHoldForDuration: 0.02)
+        settle(0.8)
     }
 
     // MARK: - What is on the screen
@@ -147,9 +211,29 @@ class Walk: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).firstMatch
     }
 
+    /// Every row of a task, one per block that draws it, from the top of the screen.
+    func rows(_ title: String) -> [XCUIElement] {
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", title)).allElementsBoundByIndex
+            .sorted { $0.frame.minY < $1.frame.minY }
+    }
+
     /// The titles given, of the rows that exist, from the top of the screen.
     func order(_ titles: [String]) -> [String] {
         titles.filter { row($0).exists }.sorted { row($0).frame.minY < row($1).frame.minY }
+    }
+
+    /// The rows of tasks with no title, which read "New task", their placeholder, and stand as wide as the list: the
+    /// floating "+", which reads so too, is 48 points across. #195's walks were red on this count before its fix.
+    var untitledRows: Int {
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "New task")).allElementsBoundByIndex
+            .filter { $0.frame.width > 200 }.count
+    }
+
+    /// The Done strip's capsule, "Done today · N", at the end of the list, scrolled into sight.
+    func doneStrip(file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
+        let strip = row("Done today")
+        scroll(to: strip, "the Done strip", file: file, line: line)
+        return strip
     }
 
     /// A row's swipe's Delete.
@@ -169,10 +253,17 @@ class Walk: XCTestCase {
         app.textFields.matching(NSPredicate(format: "value BEGINSWITH %@", prefix)).firstMatch
     }
 
-    /// The open card's notes, a text field or a text view by its placeholder.
+    /// The open card's notes while they are empty, a text field or a text view by its placeholder: a field with text
+    /// in it reads no placeholder, and `fieldValues` reads it then.
     var notesField: XCUIElement {
         let field = app.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Notes")).firstMatch
         return field.exists ? field : app.textViews.matching(NSPredicate(format: "placeholderValue == %@", "Notes")).firstMatch
+    }
+
+    /// The values of the text fields and text views on the screen.
+    var fieldValues: [String] {
+        (app.textFields.allElementsBoundByIndex + app.textViews.allElementsBoundByIndex)
+            .map { $0.value as? String ?? "" }
     }
 
     // MARK: - Gestures

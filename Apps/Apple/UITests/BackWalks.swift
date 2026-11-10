@@ -59,7 +59,7 @@ final class BackWalks: Walk {
         XCTAssertTrue(isRoot, "the swipe went back to the Lists screen")
         relaunch()
         openProject()
-        XCTAssertEqual(emptyTaskRows, 0, "the store kept no task with no title")
+        XCTAssertEqual(untitledRows, 0, "the store kept no task with no title")
     }
 
     /// "+ Add list", a name typed with no Return, then the swipe back: the list is named what was typed.
@@ -70,7 +70,7 @@ final class BackWalks: Walk {
         XCTAssertTrue(isRoot, "the swipe went back to the Lists screen")
         relaunch()
         openProject()
-        toTheEnd()
+        scrollToTheEnd()
         XCTAssertTrue(app.buttons["Fresh"].exists || app.staticTexts["Fresh"].exists, "the store kept the list's name")
     }
 
@@ -109,7 +109,7 @@ final class BackWalks: Walk {
         relaunch()
         openProject()
         openCore()
-        XCTAssertEqual(emptyTaskRows, 0, "the store kept no task with no title in Core")
+        XCTAssertEqual(untitledRows, 0, "the store kept no task with no title in Core")
     }
 
     /// A link while Core over Project has a card with a title typed: the link's list replaces Project and Core in the
@@ -146,7 +146,7 @@ final class BackWalks: Walk {
         relaunch()
         openProject()
         XCTAssertTrue(row("Own twoxyz").exists, "the store kept the typed title")
-        XCTAssertEqual(emptyTaskRows, 0, "the store kept no task with no title")
+        XCTAssertEqual(untitledRows, 0, "the store kept no task with no title")
     }
 
     /// "+ Add list", a name typed with no Return, then the glass back: the list is named what was typed.
@@ -158,7 +158,7 @@ final class BackWalks: Walk {
         XCTAssertTrue(isRoot, "the glass back went to the Lists screen")
         relaunch()
         openProject()
-        toTheEnd()
+        scrollToTheEnd()
         XCTAssertTrue(app.buttons["Fresh"].exists || app.staticTexts["Fresh"].exists, "the store kept the list's name")
         XCTAssertFalse(app.buttons["New list"].exists || app.staticTexts["New list"].exists, "no list is left unnamed")
     }
@@ -382,7 +382,7 @@ final class BackWalks: Walk {
     // MARK: - Turned sideways
 
     /// An iPhone wide enough sideways for the pane, a Pro Max, turned with a card open: wide, Today is the pane, with
-    /// no glass back and the card still open, and the split view folds the sidebar away; upright again, Today still
+    /// no glass back and the card still open; upright again, Today still
     /// stands over the Lists screen and a card opens. Skipped on an iPhone that stays narrow sideways;
     /// `scripts/ui-walks.sh --device "iPhone 17 Pro Max" BackWalks/testTurnedWideAndBack` runs it.
     func testTurnedWideAndBack() throws {
@@ -420,28 +420,15 @@ final class BackWalks: Walk {
     /// A height for the swipe from the edge above the keyboard a card's field puts up, as a fraction of the screen's.
     private static let aboveTheKeyboard: CGFloat = 0.35
 
-
-    /// Whether the Lists screen is on top: its "Inbox", and no glass back.
-    private var isRoot: Bool {
-        app.staticTexts["Inbox"].exists && !app.buttons["Back"].exists
+    /// The system's swipe from the screen's left edge, at a height given as a fraction of the screen's.
+    private func edgeSwipe(y: CGFloat = 0.5) {
+        screen(0.003, y).press(forDuration: 0.1, thenDragTo: screen(0.8, y), withVelocity: .slow, thenHoldForDuration: 0.1)
+        settle(1.2)
     }
 
     /// Whether a list stands over the Lists screen: its glass back, which no other screen has, waited for.
     private var isListOpen: Bool {
         app.buttons["Back"].waitForExistence(timeout: 2)
-    }
-
-    /// The values of the text fields and text views on the screen.
-    private var fieldValues: [String] {
-        (app.textFields.allElementsBoundByIndex + app.textViews.allElementsBoundByIndex)
-            .map { $0.value as? String ?? "" }
-    }
-
-    /// The rows of tasks with no title, which read "New task", their placeholder, and stand as wide as the list: the
-    /// floating "+", which reads so too, is 48 points across.
-    private var emptyTaskRows: Int {
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "New task")).allElementsBoundByIndex
-            .filter { $0.frame.width > 200 }.count
     }
 
     /// The labels of the rows and buttons left selected.
@@ -455,40 +442,6 @@ final class BackWalks: Walk {
         XCTAssertTrue(core.exists, "Project shows Core's block title")
         core.tap()
         settle(1.2)
-    }
-
-    /// A card opened on `title`, `letters` typed at the end of its title, with no Return.
-    private func typeAtTheEnd(of title: String, _ letters: String) {
-        row(title).tap()
-        let field = titleField(title)
-        XCTAssertTrue(field.waitForExistence(timeout: 2), "\(title)'s card shows its title field")
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
-        settle(1)
-        app.typeText(letters)
-        settle()
-        XCTAssertTrue(titleField(title + letters).exists,
-                      "the title reads what was typed, the fields read \(fieldValues)")
-    }
-
-    /// The list scrolled to its end, by fast swipes up.
-    private func toTheEnd() {
-        for _ in 0..<4 {
-            app.swipeUp(velocity: .fast)
-        }
-        settle(1)
-    }
-
-    /// "+ Add list" at the end of the list, and `name` typed in the new list's field, with no Return.
-    private func addList(named name: String) {
-        toTheEnd()
-        let add = app.buttons["Add list"].firstMatch
-        XCTAssertTrue(add.exists, "the list ends with Add list")
-        add.tap()
-        settle(1.2)
-        app.typeText(name)
-        settle()
-        XCTAssertTrue(fieldValues.contains(name),
-                      "the new list's field reads what was typed, the fields read \(fieldValues)")
     }
 
     /// The full name of the weekday `days` after today, as a day's block in Upcoming is titled past tomorrow.

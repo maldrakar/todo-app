@@ -65,7 +65,7 @@ final class DropWalks: Walk {
     func testATaskTwoBlocksDraw() {
         openProject()
         scroll(header("Design"), toY: 140)
-        let before = bothOnes()
+        let before = rows("Both one")
         XCTAssertEqual(before.count, 2, "Both one is drawn in Design and in Ops")
         assertStands(before[0], in: "Design", above: "Ops", "the first Both one")
         assertStands(before[1], in: "Ops", above: "Docs", "the second Both one")
@@ -135,8 +135,7 @@ final class DropWalks: Walk {
     /// drag.
     func testLiftWithTheKeyboardUp() {
         open("/view/" + Self.today)
-        row("Echo today").tap()
-        XCTAssertTrue(titleField("Echo today").waitForExistence(timeout: 3), "a tap on Echo today opened no card")
+        openCard("Echo today")
         titleField("Echo today").tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3), "the keyboard is not up before the lift")
         drag(at(row("Alpha today")), to: at(row("Charlie today"), dy: 12))
@@ -199,12 +198,6 @@ final class DropWalks: Walk {
     // MARK: - Reading Project
 
 
-    /// Both one's two rows, from the top of the screen.
-    private func bothOnes() -> [XCUIElement] {
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Both one")).allElementsBoundByIndex
-            .sorted { $0.frame.minY < $1.frame.minY }
-    }
-
     /// The topmost "Add task" row, which ends the first block.
     private func topAddTask() -> XCUIElement {
         app.buttons.matching(identifier: "Add task").allElementsBoundByIndex.min { $0.frame.minY < $1.frame.minY }
@@ -232,10 +225,10 @@ final class DropWalks: Walk {
 
     /// Asserts that Both one stands once in Ops and once in Docs, and no longer in Design.
     private func assertInOpsAndDocs(_ when: String, file: StaticString = #filePath, line: UInt = #line) {
-        let rows = bothOnes()
-        XCTAssertEqual(rows.count, 2, "\(when): Both one is not drawn twice", file: file, line: line)
-        assertStands(rows[0], in: "Ops", above: "Docs", "\(when), the first Both one", file: file, line: line)
-        assertStands(rows[1], in: "Docs", above: "Either", "\(when), the second Both one", file: file, line: line)
+        let both = rows("Both one")
+        XCTAssertEqual(both.count, 2, "\(when): Both one is not drawn twice", file: file, line: line)
+        assertStands(both[0], in: "Ops", above: "Docs", "\(when), the first Both one", file: file, line: line)
+        assertStands(both[1], in: "Docs", above: "Either", "\(when), the second Both one", file: file, line: line)
     }
 
     /// Asserts that a row stands in Project's own block, above its "Add task" row and so above Core's header.

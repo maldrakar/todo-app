@@ -62,8 +62,8 @@ final class StripWalks: Walk {
 
     /// Project's own strip lies under its columns, which end as far above it as above the screen's bottom: a link to a
     /// group of Project by a tag it does not group by.
-    func testColumnsEndAboveTheOwnStrip() {
-        checkColumns(over: Self.ownSentence, link: "/view/" + projectID + "/tag/" + Self.randomID)
+    func testColumnsEndAboveTheOwnStrip() throws {
+        checkColumns(over: Self.ownSentence, link: "/view/" + (try projectID) + "/tag/" + Self.randomID)
     }
 
     // MARK: - What a strip says
@@ -78,6 +78,14 @@ final class StripWalks: Walk {
 
     // MARK: - Helpers
 
+
+    /// The seeded list Project's id, which no screen shows and a link to one of Project's groups names: `seed.sh`
+    /// prints it and the script hands it over.
+    private var projectID: String {
+        get throws {
+            try XCTUnwrap(ProcessInfo.processInfo.environment["WALK_PROJECT"], "the script handed over no Project id")
+        }
+    }
 
     /// A fresh id that names nothing in the store.
     private static var randomID: String { UUID().uuidString.lowercased() }

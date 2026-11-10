@@ -20,6 +20,7 @@ final class ColumnWalks: Walk {
         assertSameColumn("Own one", as: "Core 1", "Own one held over Core")
         relaunch()
         openProject()
+        assertProjectShowsColumns()
         assertSameColumn("Own two", as: "Core 1", "Own two in the store")
         assertSameColumn("Own one", as: "Core 1", "Own one in the store")
     }
@@ -38,6 +39,7 @@ final class ColumnWalks: Walk {
         )
         relaunch()
         openProject()
+        assertProjectShowsColumns()
         assertSameColumn("Own two", as: "Design one", "Own two in the store")
     }
 
@@ -53,6 +55,7 @@ final class ColumnWalks: Walk {
         assertSameColumn("Own two", as: "Wk one", "Own two let go past the last column")
         relaunch()
         openProject()
+        assertProjectShowsColumns()
         assertSameColumn("Own two", as: "Wk one", "Own two in the store")
     }
 
@@ -84,6 +87,7 @@ final class ColumnWalks: Walk {
         XCTAssertEqual(order(["Core 12", "Core 3"]), ["Core 12", "Core 3"], "Core 3 let go at the foot")
         relaunch()
         openProject()
+        assertProjectShowsColumns()
         XCTAssertEqual(order(["Core 12", "Core 3"]), ["Core 12", "Core 3"], "the store kept Core's order")
     }
 

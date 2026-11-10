@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
     --device) device=$2; shift 2 ;;
     --runtime) runtime=$2; shift 2 ;;
     --record) record=1; shift ;;
-    -h | --help) sed -n '2,16p' "$0" | cut -c3-; exit 0 ;;
+    -h | --help) sed -n '2,15p' "$0" | cut -c3-; exit 0 ;;
     -*) echo "ui-walks: unknown option $1" >&2; exit 2 ;;
     *) walks+=("$1"); shift ;;
   esac
@@ -46,14 +46,25 @@ fi
 
 tmp=${TMPDIR:-/tmp}
 out=$(mktemp -d "${tmp%/}/ui-walks.XXXXXX")
+name="ui-walks-$$"
 udid=""
 recorder=""
 cleanup() {
   status=$?
+  # A second Ctrl-C would end the cleanup before the device is deleted.
+  trap '' INT TERM
   if [ -n "$recorder" ]; then kill -INT "$recorder" 2>/dev/null || true; wait "$recorder" 2>/dev/null || true; fi
+  # A Ctrl-C during `simctl create` can leave a device that `udid` never got: it is found by its name.
+  if [ -z "$udid" ]; then
+    udid=$(xcrun simctl list devices | sed -nE "s/^ *$name \(([0-9A-F-]{36})\).*/\1/p" | head -1) || true
+  fi
   if [ -n "$udid" ]; then
     xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
-    xcrun simctl delete "$udid" >/dev/null 2>&1 && echo "ui-walks: deleted the device $udid"
+    if xcrun simctl delete "$udid" >/dev/null 2>&1; then
+      echo "ui-walks: deleted the device $udid"
+    else
+      echo "ui-walks: could not delete the device $udid; \`xcrun simctl delete $udid\` does" >&2
+    fi
   fi
   # The builds are half a gigabyte a run and the next run makes its own.
   rm -rf "$out/build" "$out/cli"
@@ -63,7 +74,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-udid=$(xcrun simctl create "ui-walks-$$" "$device" "$runtime")
+udid=$(xcrun simctl create "$name" "$device" "$runtime")
 echo "ui-walks: a new $device on $runtime, $udid"
 xcrun simctl boot "$udid"
 xcrun simctl bootstatus "$udid" -b >/dev/null
@@ -101,7 +112,13 @@ TEST_RUNNER_WALK_STORE="$out/store/todo.sqlite" TEST_RUNNER_WALK_PROJECT="$proje
   -collect-test-diagnostics never -test-timeouts-enabled YES -default-test-execution-time-allowance 600 \
   >"$out/walks.log" 2>&1 || status=$?
 grep -E "^Test Case .*(passed|failed|skipped)|: error: " "$out/walks.log" | sed -E 's/^Test Case //' || true
-echo "ui-walks: $(grep -cE "^Test Case .* passed" "$out/walks.log" || true) passed," \
-  "$(grep -cE "^Test Case .* failed" "$out/walks.log" || true) failed; the log is $out/walks.log," \
-  "the results $out/walks.xcresult"
+passed=$(grep -cE "^Test Case .* passed" "$out/walks.log" || true)
+failed=$(grep -cE "^Test Case .* failed" "$out/walks.log" || true)
+skipped=$(grep -cE "^Test Case .* skipped" "$out/walks.log" || true)
+echo "ui-walks: $passed passed, $failed failed, $skipped skipped; the log is $out/walks.log, the results" \
+  "$out/walks.xcresult"
+if [ "$status" -eq 0 ] && [ $((passed + failed + skipped)) -eq 0 ]; then
+  echo "ui-walks: no walk ran; is each name a class of Apps/Apple/UITests or a class and one of its walks?" >&2
+  status=1
+fi
 exit "$status"

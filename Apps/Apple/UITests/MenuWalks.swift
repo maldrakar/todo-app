@@ -51,9 +51,8 @@ final class MenuWalks: Walk {
     func testOpenCardIsNotLifted() {
         open("/view/" + Self.today)
         let titles = ["Alpha today", "Charlie today", "Delta today"]
-        row("Bravo today").tap()
+        openCard("Bravo today")
         let field = titleField("Bravo today")
-        XCTAssertTrue(field.waitForExistence(timeout: 2), "Bravo's card did not open")
         onScreen(field).press(forDuration: 1.2)
         settle()
         XCTAssertFalse(app.buttons["Delete"].exists, "a still hold in the card's field opened the row's menu")
