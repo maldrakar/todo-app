@@ -102,9 +102,7 @@ struct BlockDropTints: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .allowsHitTesting(false)
-        .onChange(of: gestures.lift?.slot, initial: true) { _, slot in
-            gestures.dragState.tint.watch(slot, in: gestures.dragState.frames)
-        }
+        .onChange(of: gestures.lift?.slot, initial: true) { _, slot in gestures.dragState.watch(slot) }
     }
 }
 

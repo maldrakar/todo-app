@@ -53,6 +53,12 @@ final class RowDragState {
         tint.follow(frames)
     }
 
+    /// Has the tint watch the block the slot names, at its frame as reported so far. With `report` and `forgetParts`
+    /// the one way the tint's frame is set, so that it is set from the frames it follows.
+    func watch(_ slot: RowLift.Slot?) {
+        tint.watch(slot, in: frames)
+    }
+
     // iOS alone: only there does a system drag stand on the screen, and these are UIKit's.
     #if os(iOS)
     /// The drags `onDrag` has begun.
@@ -128,15 +134,15 @@ final class BlockTintFrame {
         self.block == block ? blockFrame : nil
     }
 
-    /// Watches the block the slot names, among the frames reported.
-    func watch(_ slot: RowLift.Slot?, in frames: RowLift.Frames) {
+    /// Watches the block the slot names, among the frames reported (`RowDragState.watch`).
+    fileprivate func watch(_ slot: RowLift.Slot?, in frames: RowLift.Frames) {
         let block: TaskList.Model.BlockID? = if case .into(let target)? = slot { target } else { nil }
         if self.block != block { self.block = block }
         follow(frames)
     }
 
-    /// Follows the frame of the block watched, set only where it changed.
-    func follow(_ frames: RowLift.Frames) {
+    /// Follows the frame of the block watched, set only where it changed (`RowDragState.report`, `forgetParts`).
+    fileprivate func follow(_ frames: RowLift.Frames) {
         let frame = block.flatMap { frames.blocks[$0] }
         if blockFrame != frame { blockFrame = frame }
     }

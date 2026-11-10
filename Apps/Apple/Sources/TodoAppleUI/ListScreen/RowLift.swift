@@ -85,9 +85,12 @@ struct RowLift: Equatable {
         /// Forgets the parts the list's blocks no longer draw, a row that left its block and a block's rows and "+ Add
         /// task" folded away, and makes each block's frame the union of those it draws, and none where it reported
         /// none, whatever a board left: a folded block kept its rows' frames, which stood over the blocks under it and
-        /// took their drops and their tint (#196). A block no longer drawn keeps what it reported, as a row that left
-        /// does.
+        /// took their drops and their tint (#196). A block no longer drawn has neither parts nor frame, so that what
+        /// is kept is never more than the list draws.
         mutating func forgetParts(notDrawnBy drawn: [TaskList.Model.Block]) {
+            let ids = Set(drawn.map(\.id))
+            parts = parts.filter { ids.contains($0.key) }
+            blocks = blocks.filter { ids.contains($0.key) }
             for block in drawn {
                 let rows = Set(block.rows.map(\.id))
                 let kept = parts[block.id]?.filter { part, _ in

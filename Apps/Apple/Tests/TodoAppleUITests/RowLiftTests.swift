@@ -420,7 +420,7 @@ import TodoCore
 /// The parts a block no longer draws are forgotten, its frame being the union of those it draws: folded, its rows and
 /// its "+ Add task" go, which stood over the blocks under it and would have taken their drops; a row dropped into
 /// another block goes from the one it left. A block that reported no part has no frame, whatever a board left, and a
-/// block no longer drawn keeps what it reported, as a row that left does.
+/// block no longer drawn has neither parts nor frame.
 @Test func aBlocksFrameForgetsThePartsItNoLongerDraws() throws {
     var list = try LiftedList()
     let house = TaskList.Model.BlockID.list(list.house)
@@ -455,7 +455,37 @@ import TodoCore
     let gone = TaskList.Model.BlockID.list(ViewID())
     frames.report(.header, of: gone, header)
     frames.forgetParts(notDrawnBy: list.blocks)
-    #expect(frames.blocks[gone] == header)
+    #expect(frames.blocks[gone] == nil)
+    frames.report(.row(list.e1), of: gone, CGRect(x: 0, y: 400, width: 400, height: 44))
+    #expect(frames.blocks[gone] == CGRect(x: 0, y: 400, width: 400, height: 44), "its header forgotten")
+}
+
+/// A drag finds a list's block by the parts the lazy stack has laid out, its frame being their union: House's header
+/// and first row laid out and nothing below them, a point over them or under them, nearer House than Office, is House.
+@Test func aDragFindsABlockByThePartsLaidOut() throws {
+    let list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    var frames = RowLift.Frames()
+    frames.report(.header, of: house, CGRect(x: 0, y: 0, width: 400, height: 44))
+    frames.report(.row(list.h1), of: house, CGRect(x: 0, y: 44, width: 400, height: 44))
+    let o1 = CGRect(x: 0, y: 444, width: 400, height: 44)
+    frames.report(.header, of: office, CGRect(x: 0, y: 400, width: 400, height: 44))
+    frames.report(.row(list.o1), of: office, o1)
+    frames.rows[BlockRowID(block: office, task: list.o1)] = o1
+    var step = RowLift.after(
+        .began(task: list.o1, block: office, session: "first", at: CGPoint(x: o1.midX, y: o1.midY)), from: nil,
+        among: list.blocks, frames: frames
+    )
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 60)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "over its row")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 150)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot == .into(house), "under its parts laid out")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 380)), from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.lift?.slot?.block == office, "nearer Office")
+    step = RowLift.after(.changed(CGPoint(x: 200, y: 150)), from: step.lift, among: list.blocks, frames: frames)
+    step = RowLift.after(.ended, from: step.lift, among: list.blocks, frames: frames)
+    #expect(step.drop == .rowDropped(list.o1, from: office, in: house, after: nil))
 }
 
 /// The mark's line ends at the right of the block it stands in, measured from the block's own leading edge, where the

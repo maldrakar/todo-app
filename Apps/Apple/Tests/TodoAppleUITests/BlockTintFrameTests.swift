@@ -28,10 +28,10 @@ import TodoCore
     let header = CGRect(x: 0, y: 100, width: 400, height: 44)
     let dragState = RowDragState()
     dragState.report(.header, of: house, header)
-    dragState.tint.watch(nil, in: dragState.frames)
+    dragState.watch(nil)
     #expect(dragState.tint.frame(of: house) == nil, "no lift")
 
-    dragState.tint.watch(.into(house), in: dragState.frames)
+    dragState.watch(.into(house))
     #expect(dragState.tint.frame(of: house) == header)
     #expect(dragState.tint.frame(of: office) == nil, "another block")
     dragState.report(.row(list.h1), of: house, CGRect(x: 0, y: 900, width: 400, height: 44))
@@ -40,7 +40,7 @@ import TodoCore
     dragState.forgetParts(notDrawnBy: list.blocks)
     #expect(dragState.tint.frame(of: house) == header, "its rows folded away")
 
-    dragState.tint.watch(.place(house, after: nil), in: dragState.frames)
+    dragState.watch(.place(house, after: nil))
     #expect(dragState.tint.frame(of: house) == nil, "a place in it")
 }
 
@@ -55,7 +55,7 @@ import TodoCore
     let tint = dragState.tint
     dragState.report(.header, of: house, CGRect(x: 0, y: 100, width: 400, height: 44))
     dragState.report(.row(list.h1), of: house, row)
-    tint.watch(.into(house), in: dragState.frames)
+    dragState.watch(.into(house))
 
     #expect(!invalidates(tint, of: house) { dragState.report(.row(list.h1), of: house, row) }, "where it stood")
     #expect(!invalidates(tint, of: house) {
@@ -65,7 +65,7 @@ import TodoCore
         dragState.report(.row(list.h2), of: house, CGRect(x: 0, y: 188, width: 400, height: 44))
     }, "a row laid out")
 
-    tint.watch(.place(house, after: nil), in: dragState.frames)
+    dragState.watch(.place(house, after: nil))
     #expect(!invalidates(tint, of: house) {
         dragState.report(.add, of: house, CGRect(x: 0, y: 232, width: 400, height: 40))
     }, "no tint drawn")

@@ -219,6 +219,19 @@ struct LiftedList {
         _ = module.send(.action(.addListTapped))
     }
 
+    /// Checks a task, which writes it done.
+    func check(_ task: TaskID) {
+        _ = module.send(.action(.checkTapped(task)))
+    }
+
+    /// Opens or closes the Done strip.
+    func toggleDoneStrip() {
+        _ = module.send(.action(.doneStripTapped))
+    }
+
+    /// The rows under the Done strip, none while it is closed.
+    var doneRows: [TaskList.Model.Row] { module.model.doneRows }
+
     /// A call of the drop's delegate, in a session, handed on as the screen's delegate hands it, where it means a
     /// stage.
     mutating func hear(_ call: RowDragSessions.Call, session: String?, in sessions: RowDragSessions) {
