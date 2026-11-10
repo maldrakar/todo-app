@@ -126,6 +126,11 @@ value a peer wrote is as arbitrary as one a person typed.
   leaves, it draws from another instance of the model (`CompletingTask`).
   The one closure beside `send` makes the action for typed text, which a
   model cannot hold (#163). (PR #194)
+- **A view is `Equatable` only where a count of its bodies showed the
+  need.** Its `==` then compares everything it draws from and none of
+  its closures: its closures reach its screen's one `send` whichever pass
+  made them, and SwiftUI would compare them by identity, which changes
+  every pass. (Owner, 2026-11-10, #196)
 - **A view reports the width of its window and decides nothing by
   it.** It hands the width class, narrow or wide, to the host's
   entrance for events of the world, as it hands a link, and draws the
@@ -135,20 +140,21 @@ value a peer wrote is as arbitrary as one a person typed.
 - **A view may switch over three enums of its model, four of its
   components' models and styles, and no others.** The shape of its
   layout; the screens of a stack, in one place per stack, to pick a view
-  per case; and the kind of a row, to pick the row to draw. Of a
-  component: what a control stands on, `ControlFillStyle`; what stands
-  on a bar, `BarModel.Item`; what stands at a row's right,
-  `AccessoryModel`; and how a drag marks where a row would land,
-  `DragStyle.Look`. It is
+  per case; and the kind of a row, to pick the row to draw and whether it
+  stands outside the lazy stack. Of a component: what a control stands
+  on, `ControlFillStyle`; what stands on a bar, `BarModel.Item`; what
+  stands at a row's right, `AccessoryModel`; and how a drag marks where a
+  row would land, `DragStyle.Look`. It is
   dispatch and not a condition over data: every case is drawn, with no
   `default`, so a screen added to a stack and not drawn stops the view
   compiling. (Navigation state spec, sections 4 and 6, #117; ADR-0006,
   amendments of 2026-10-22 and 2026-10-25; the row's kind is the
-  owner's call on the Lists screen spec, #138; the components' enums
-  are the Lists screen plan's Task 8, #161, as the owner's review of
-  #163 shaped them, and ADR-0007, amendment of 2026-10-30; `FillModel`,
-  which was `ButtonLabelModel.Fill`, and `DragModel.Look` are its Task
-  9, #149)
+  owner's call on the Lists screen spec, #138, and whether it stands
+  outside the lazy stack the owner's ruling of 2026-11-10, #196; the
+  components' enums are the Lists screen plan's Task 8, #161, as the
+  owner's review of #163 shaped them, and ADR-0007, amendment of
+  2026-10-30; `FillModel`, which was `ButtonLabelModel.Fill`, and
+  `DragModel.Look` are its Task 9, #149)
 
 ## In a review thread
 
