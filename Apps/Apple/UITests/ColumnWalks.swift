@@ -89,10 +89,6 @@ final class ColumnWalks: Walk {
 
     // MARK: - Reading the board
 
-    /// A column's header, by its list's name.
-    private func header(_ list: String) -> XCUIElement {
-        app.buttons[list].firstMatch
-    }
 
     /// Asserts that two cards stand in one column: the same left edge, within a point.
     private func assertSameColumn(

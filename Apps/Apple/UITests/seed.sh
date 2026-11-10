@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The store the walks walk over, written through the command-line tool. Every walk starts from a copy of it.
 # usage: seed.sh <todo> <store>    <todo> is the built `todo` tool, <store> a path where no store is yet.
+# It prints the id of the list Project, which no screen shows and a walk's link to one of its groups names.
 #
 # Days are counted from the Mac's today, the simulator's too, so a run that crosses midnight walks a store seeded the
 # day before. Tag ids are read with `sqlite3`, since the tool prints none and a filter names a tag by its id; nothing
@@ -46,7 +47,7 @@ task "Either one" --tag either1 >/dev/null
 task "Wk one" --when "$(day +1)" --tag wk >/dev/null
 task "Wk two" --when "$(day +2)" --tag wk >/dev/null
 task "Wk three" --when "$(day +2)" --tag wk >/dev/null
-"$todo" view add "Project" --filter "$(has proj)" >/dev/null
+project=$("$todo" view add "Project" --filter "$(has proj)" | grep -oE '[0-9a-f-]{36}')
 "$todo" view add "Core" --parent Project --filter "$(has core)" >/dev/null
 "$todo" view add "Design" --parent Project --filter "$(has design2)" >/dev/null
 "$todo" view add "Ops" --parent Project --filter "$(has ops)" >/dev/null
@@ -59,3 +60,5 @@ task "Wk three" --when "$(day +2)" --tag wk >/dev/null
 
 # Another root list, for the Lists screen's own drag.
 "$todo" view add "Spare" >/dev/null
+
+echo "$project"

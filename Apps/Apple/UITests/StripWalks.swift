@@ -1,4 +1,3 @@
-import SQLite3
 import XCTest
 
 /// The sentence strip at the screen's foot laid under the floating "+" and the columns, never over them (#193): the
@@ -23,28 +22,28 @@ final class StripWalks: Walk {
 
     /// With no strip, the "+" stands its margin above the screen's bottom, and a tap at its centre opens a new task.
     func testPlusWithNoStrip() {
-        follow("/view/" + Self.today)
+        open("/view/" + Self.today)
         checkPlus(over: nil)
     }
 
     /// The window's strip, for a link that does not read, lies under the "+", which stands its margin above it.
     func testPlusAboveTheRootStrip() {
-        follow("/view/" + Self.today)
-        follow("view/" + Self.today)
+        open("/view/" + Self.today)
+        open("view/" + Self.today)
         checkPlus(over: Self.rootSentence)
     }
 
     /// The sidebar's strip, for a link to a list that is gone, lies under the "+", which stands its margin above it.
     func testPlusAboveTheSidebarStrip() {
-        follow("/view/" + Self.today)
-        follow(Self.goneList)
+        open("/view/" + Self.today)
+        open(Self.goneList)
         checkPlus(over: Self.sidebarSentence)
     }
 
     /// The list's own strip, for a link to a group it is not grouped by, lies under the "+", which stands its margin
     /// above it.
     func testPlusAboveTheOwnStrip() {
-        follow("/view/" + Self.today + "/tag/" + Self.randomID)
+        open("/view/" + Self.today + "/tag/" + Self.randomID)
         checkPlus(over: Self.ownSentence)
     }
 
@@ -61,18 +60,17 @@ final class StripWalks: Walk {
         checkColumns(over: Self.sidebarSentence, link: Self.goneList)
     }
 
-    /// Project's own strip lies under its columns, which end as far above it as above the screen's bottom. The link
-    /// to a group of Project names Project's id, which no screen shows, so it is read from the store.
-    func testColumnsEndAboveTheOwnStrip() throws {
-        let project = try projectID()
-        checkColumns(over: Self.ownSentence, link: "/view/" + project + "/tag/" + Self.randomID)
+    /// Project's own strip lies under its columns, which end as far above it as above the screen's bottom: a link to a
+    /// group of Project by a tag it does not group by.
+    func testColumnsEndAboveTheOwnStrip() {
+        checkColumns(over: Self.ownSentence, link: "/view/" + projectID + "/tag/" + Self.randomID)
     }
 
     // MARK: - What a strip says
 
     /// A link to a task that is gone opens its list, which says so at its foot.
     func testLinkToAGoneTaskSaysSo() {
-        follow("/view/" + Self.today + "/task/" + Self.randomID)
+        open("/view/" + Self.today + "/task/" + Self.randomID)
         XCTAssertTrue(app.staticTexts["The task is gone."].waitForExistence(timeout: 3), "Today says the task is gone")
         XCTAssertTrue(topmost("Today").exists, "the link opened Today")
         XCTAssertTrue(app.buttons["Back"].exists, "Today is on top, with no task screen over it")
@@ -80,14 +78,6 @@ final class StripWalks: Walk {
 
     // MARK: - Helpers
 
-    /// A link followed through the system, as one from another app is, which hands it to the window on screen. On the
-    /// iOS 26.3 simulator `XCUIApplication.open(_:)`, which `Walk.open` calls, gave every link a new window instead: a
-    /// link that does not read or names a list that is gone opened it on Inbox, and a link to a list let the stack of
-    /// the window before it go untold (2026-11-10).
-    private func follow(_ route: String) {
-        XCUIDevice.shared.system.open(URL(string: "todo://" + route)!)
-        settle(1)
-    }
 
     /// A fresh id that names nothing in the store.
     private static var randomID: String { UUID().uuidString.lowercased() }
@@ -153,7 +143,7 @@ final class StripWalks: Walk {
         scrollCoreToItsEnd()
         XCTAssertTrue(lastCore.exists, "Core 12 shows")
         let gap = screenBottom - lastCore.frame.maxY
-        follow(link)
+        open(link)
         XCTAssertTrue(topmost("Project").exists, "Project is still open after the link")
         scrollCoreToItsEnd()
         guard let top = stripTop(sentence) else { return XCTFail("no strip says \"\(sentence)\"") }
@@ -161,39 +151,4 @@ final class StripWalks: Walk {
                        "Core's last card ends as far above the strip as it ended above the screen's bottom")
     }
 
-    /// The seeded list Project's id, read from the seeded store, which every walk's store is a copy of: no screen shows
-    /// a list's id, and a link to one of Project's groups names it. The store is opened as immutable, which reads it
-    /// with no lock and no shared memory beside it, as a read-only connection to a store in WAL mode cannot; that
-    /// reads the file alone, which holds everything once the tool that seeded it has closed it and left no log.
-    private func projectID() throws -> String {
-        let path = try XCTUnwrap(ProcessInfo.processInfo.environment["WALK_STORE"], "the seeded store's path")
-        guard !FileManager.default.fileExists(atPath: path + "-wal") else {
-            throw ProjectNotRead(reason: "the seeded store has a write-ahead log, which an immutable read would miss")
-        }
-        var components = URLComponents()
-        components.scheme = "file"
-        components.path = path
-        components.queryItems = [URLQueryItem(name: "immutable", value: "1")]
-        let uri = try XCTUnwrap(components.string, "the seeded store's URI")
-        var store: OpaquePointer?
-        var statement: OpaquePointer?
-        defer {
-            sqlite3_finalize(statement)
-            sqlite3_close(store)
-        }
-        guard sqlite3_open_v2(uri, &store, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK,
-              sqlite3_prepare_v2(store, "SELECT lower(id) FROM views WHERE title = 'Project'", -1, &statement, nil)
-                == SQLITE_OK,
-              sqlite3_step(statement) == SQLITE_ROW,
-              let id = sqlite3_column_text(statement, 0)
-        else {
-            throw ProjectNotRead(reason: String(cString: sqlite3_errmsg(store)))
-        }
-        return String(cString: id)
-    }
-
-    /// Project's id could not be read from the seeded store, for the reason SQLite gave.
-    private struct ProjectNotRead: Error {
-        let reason: String
-    }
 }

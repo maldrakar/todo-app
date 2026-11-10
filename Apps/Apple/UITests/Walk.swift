@@ -15,14 +15,19 @@ class Walk: XCTestCase {
     static let upcoming = "00000000-0000-4000-8000-000000000003"
 
     private(set) var app = XCUIApplication()
+    /// The seeded list Project's id, which no screen shows and a link to one of Project's groups names; `seed.sh`
+    /// prints it and the script hands it over.
+    private(set) var projectID = ""
     /// The store this walk's app opens, a copy of the seeded one.
     private var store: URL?
 
     override func setUp() async throws {
         continueAfterFailure = false
-        guard let seeded = ProcessInfo.processInfo.environment["WALK_STORE"] else {
+        let environment = ProcessInfo.processInfo.environment
+        guard let seeded = environment["WALK_STORE"], let project = environment["WALK_PROJECT"] else {
             throw XCTSkip("The walks run through scripts/ui-walks.sh, which seeds the store they walk over.")
         }
+        projectID = project
         store = try copy(of: URL(filePath: seeded))
         XCUIDevice.shared.appearance = .light
         XCUIDevice.shared.orientation = .portrait
@@ -38,15 +43,16 @@ class Walk: XCTestCase {
 
     // MARK: - The app
 
-    /// Launches the app over this walk's store. A second call, after `app.terminate()`, reads back what the first
-    /// launch wrote.
-    func launch() {
+    /// Launches the app over this walk's store.
+    private func launch() {
         app.launchEnvironment["TODO_DB"] = store?.path(percentEncoded: false)
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 20), "the app did not come to the front")
     }
 
-    /// The app terminated and launched again over the same store, back on the Lists screen.
+    /// The app terminated and launched again over the same store, back on the Lists screen, which reads back what was
+    /// written. Text still in a field is not written: the app is ended, not sent away, so a walk submits a field or
+    /// leaves it first.
     func relaunch() {
         app.terminate()
         launch()
@@ -76,14 +82,18 @@ class Walk: XCTestCase {
 
     // MARK: - Getting around
 
-    /// Opens a route of the app by its link, `todo://` and the route: `/view/<id>`, `/view/<id>/task/<id>`.
+    /// Follows a link to a route of the app, `todo://` and the route: `/view/<id>`, `/view/<id>/task/<id>`. It goes
+    /// through the system, as a link from another app does, which hands it to the window on screen: on the iOS 26.3
+    /// simulator `XCUIApplication.open(_:)` gave every link a new window instead, so that a link that names a list that
+    /// is gone opened Inbox, and the stack of the window before it, a typed title with it, was let go untold
+    /// (2026-11-10).
     func open(_ route: String) {
-        app.open(URL(string: "todo://" + route)!)
+        XCUIDevice.shared.system.open(URL(string: "todo://" + route)!)
         settle(1)
     }
 
     /// Back to the Lists screen, by the Back buttons of the screens over it.
-    func toRoot() {
+    private func toRoot() {
         for _ in 0..<5 {
             if app.staticTexts["Inbox"].exists && !app.buttons["Back"].exists { return }
             if app.buttons["Back"].exists {
@@ -126,6 +136,11 @@ class Walk: XCTestCase {
     }
 
     // MARK: - What is on the screen
+
+    /// A block's header on a list, or a column's on a board, by its list's name.
+    func header(_ list: String) -> XCUIElement {
+        app.buttons[list].firstMatch
+    }
 
     /// A task's row or a column's card, by the start of its title.
     func row(_ title: String) -> XCUIElement {

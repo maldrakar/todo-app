@@ -118,7 +118,7 @@ final class BackWalks: Walk {
         openProject()
         openCore()
         typeAtTheEnd(of: "Core 2", "lnk")
-        follow("/view/" + Self.upcoming)
+        open("/view/" + Self.upcoming)
         XCTAssertTrue(topmost("Upcoming").waitForExistence(timeout: 2), "the link opened Upcoming")
         XCTAssertEqual(app.textFields.count, 0, "no field is left open")
         relaunch()
@@ -420,13 +420,6 @@ final class BackWalks: Walk {
     /// A height for the swipe from the edge above the keyboard a card's field puts up, as a fraction of the screen's.
     private static let aboveTheKeyboard: CGFloat = 0.35
 
-    /// A link followed through the system, as one from another app is, which hands it to the window on screen. On the
-    /// iOS 26.3 simulator `XCUIApplication.open(_:)`, which `Walk.open` calls, gave every link a new window instead,
-    /// and the stack of the window before it, Core's typed title with it, went untold (2026-11-10).
-    private func follow(_ route: String) {
-        XCUIDevice.shared.system.open(URL(string: "todo://" + route)!)
-        settle(1)
-    }
 
     /// Whether the Lists screen is on top: its "Inbox", and no glass back.
     private var isRoot: Bool {

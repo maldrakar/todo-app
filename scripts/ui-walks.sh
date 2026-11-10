@@ -83,7 +83,7 @@ xcodebuild build-for-testing -project Apps/Apple/Todo.xcodeproj -scheme Todo \
 xctestrun=$(ls "$out"/build/Build/Products/*.xctestrun | head -1)
 
 mkdir "$out/store"
-Apps/Apple/UITests/seed.sh "$cli/todo" "$out/store/todo.sqlite"
+project=$(Apps/Apple/UITests/seed.sh "$cli/todo" "$out/store/todo.sqlite")
 
 if [ -n "$record" ]; then
   xcrun simctl io "$udid" recordVideo --codec h264 --force "$out/walks.mp4" 2>/dev/null &
@@ -96,7 +96,7 @@ echo "ui-walks: walking ${walks[*]:-every walk}"
 status=0
 # A failure keeps its screenshot in the result bundle; the device's logs it would add are 400 MB a run. A walk that
 # runs ten minutes, four times the longest, has hung, and fails rather than holding the run for ever.
-TEST_RUNNER_WALK_STORE="$out/store/todo.sqlite" xcodebuild test-without-building -xctestrun "$xctestrun" \
+TEST_RUNNER_WALK_STORE="$out/store/todo.sqlite" TEST_RUNNER_WALK_PROJECT="$project" xcodebuild test-without-building -xctestrun "$xctestrun" \
   -destination "platform=iOS Simulator,id=$udid" ${only[@]+"${only[@]}"} -resultBundlePath "$out/walks.xcresult" \
   -collect-test-diagnostics never -test-timeouts-enabled YES -default-test-execution-time-allowance 600 \
   >"$out/walks.log" 2>&1 || status=$?
