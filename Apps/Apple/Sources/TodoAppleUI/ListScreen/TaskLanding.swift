@@ -8,7 +8,8 @@ import SwiftUI
 /// column's card springs from its `landingScale` to its size, whichever is not nil, when it turns not nil or the row
 /// appears with it. It plays once: a value that stays set plays no second time, and the motion runs out as it began
 /// though the module clears the value at the next action, so it is this view's own. Where a person asked for less
-/// motion it does not play.
+/// motion it does not play. A list's row scrolled far out of sight and back before that action is made anew by its
+/// lazy stack, and plays it again, which the owner accepted (#196, 2026-11-10).
 ///
 /// `TaskLanding` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).

@@ -57,12 +57,54 @@ struct RowLift: Equatable {
     }
 
     /// What the screen's rows, blocks and columns last reported, in the content's own coordinates, which a drag finds
-    /// its place by: each row's frame, each block's or column's, and the part of each column its cards are seen
-    /// through.
+    /// its place by: each row's frame, each block's or column's, a list's block's the union of its parts' (`report`),
+    /// and the part of each column its cards are seen through.
     struct Frames {
         var rows: [BlockRowID: CGRect] = [:]
         var blocks: [TaskList.Model.BlockID: CGRect] = [:]
         var columns: [TaskList.Model.BlockID: CGRect] = [:]
+
+        /// A part of a list's block, which stands in the list's lazy stack on its own, with no view of the block round
+        /// it (`ListSurface`): the block's header, a row by its task, or its "+ Add task".
+        enum BlockPart: Hashable {
+            case header
+            case row(TaskID)
+            case add
+        }
+
+        /// The frames the parts of each list's block last reported, a part out of sight keeping its own.
+        private var parts: [TaskList.Model.BlockID: [BlockPart: CGRect]] = [:]
+
+        /// Keeps the frame a part of a list's block reported, in place of the one it reported before, and makes the
+        /// block's frame the union of its parts'.
+        mutating func report(_ part: BlockPart, of block: TaskList.Model.BlockID, _ frame: CGRect) {
+            parts[block, default: [:]][part] = frame
+            blocks[block] = Self.union(of: parts[block])
+        }
+
+        /// Forgets the parts the list's blocks no longer draw, a row that left its block and a block's rows and "+ Add
+        /// task" folded away, and makes each block's frame the union of those it draws, and none where it reported
+        /// none, whatever a board left: a folded block kept its rows' frames, which stood over the blocks under it and
+        /// took their drops and their tint (#196). A block no longer drawn keeps what it reported, as a row that left
+        /// does.
+        mutating func forgetParts(notDrawnBy drawn: [TaskList.Model.Block]) {
+            for block in drawn {
+                let rows = Set(block.rows.map(\.id))
+                let kept = parts[block.id]?.filter { part, _ in
+                    switch part {
+                    case .header: block.header != nil
+                    case .row(let task): rows.contains(task)
+                    case .add: block.addTask != nil
+                    }
+                }
+                parts[block.id] = kept
+                blocks[block.id] = Self.union(of: kept)
+            }
+        }
+
+        private static func union(of parts: [BlockPart: CGRect]?) -> CGRect? {
+            parts?.values.reduce(nil) { union, frame in union?.union(frame) ?? frame }
+        }
 
         /// Where the mark's line ends in a block, from the block's own leading edge, where the mark is drawn: the
         /// block's width, and nothing before the block has reported. Its right edge in the content is not it, since a
@@ -150,7 +192,11 @@ struct RowLift: Equatable {
 
     /// The row a task let go at the height stands after, among the rest of its own block, above a column's cards in
     /// sight its top and below them its end. A list's block is no column, though a board it was shown as left its area
-    /// in the frames.
+    /// in the frames. Otherwise it is read by the row whose middle is nearest the height among those with a frame:
+    /// after that row where its middle is at or above the height, and else after the row before it, framed or not, or
+    /// at the top before the first. Not by the rows from the top down to the height, since in a lazy stack a block's
+    /// upper rows may never have been laid out, after a jump and not a finger's scroll, and a row out of sight keeps a
+    /// frame a change above it may have left far from where it stands (#196).
     private static func place(
         at y: CGFloat, among rows: [TaskID], of block: TaskList.Model.Block, frames: Frames
     ) -> TaskID? {
@@ -158,9 +204,12 @@ struct RowLift: Equatable {
             if y < area.minY { return nil }
             if y >= area.maxY { return rows.last }
         }
-        return rows.prefix { row in
-            frames.rows[BlockRowID(block: block.id, task: row)].map { $0.midY <= y } ?? false
-        }.last
+        let framed = rows.indices.compactMap { index in
+            frames.rows[BlockRowID(block: block.id, task: rows[index])].map { (index: index, middle: $0.midY) }
+        }
+        guard let nearest = framed.min(by: { abs($0.middle - y) < abs($1.middle - y) }) else { return nil }
+        if nearest.middle <= y { return rows[nearest.index] }
+        return nearest.index > 0 ? rows[nearest.index - 1] : nil
     }
 
     /// The drag's one report, on release, and nil where there is no slot.

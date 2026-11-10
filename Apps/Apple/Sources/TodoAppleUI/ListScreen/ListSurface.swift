@@ -14,9 +14,11 @@ import TaskListFeature
 /// (`docs/style.md`, "Views"). Where the glass buttons stand is its screen's, over the content on the phone and in the
 /// window's bar in the pane, which `buttons` puts there, handed what a control of the content sends.
 ///
-/// The content is a `VStack` in a `ScrollView`, not a `List`, which moves a row up and down a flat list and takes the
-/// row's look, and not a `LazyVStack`, which dropped a field scrolled out of sight and lost its focus with it (spike
-/// #145; `ListsTree`).
+/// The content is a `ScrollView`, not a `List`, which moves a row up and down a flat list and takes the row's look. In
+/// it the blocks stand in lazy stacks, which lay out only the rows in sight, where a plain stack laid out every row at
+/// opening (#196), around the one part that holds a field, an open card or a list's name being typed, which stands
+/// outside them, laid out wherever it is: a lazy stack took a field scrolled out of sight out of the window, and its
+/// focus with it (spike #145; `ListsTree`; `ListRuns`).
 ///
 /// A tap on what stands behind the controls is one action, `backgroundTapped`, which closes an open card: a gesture on
 /// the content takes every tap no control of it took, the header's words and the room under the rows among them, and a
@@ -98,41 +100,65 @@ struct ListSurface<Buttons: ViewModifier>: View {
     /// foot, or to the top of a sentence's strip under it, what it holds ending as far above what the safe area covers
     /// there, or above the strip, as its style says.
     private func list(_ blocks: [TaskList.Model.Block]) -> some View {
-        ScrollView {
+        let runs = ListRuns(blocks)
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header
-                ForEach(blocks) { block in
-                    BlockView(block, gestures: rowGestures.forRows(delete: send), send: sendClosingSwipe)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    header
+                    pieces(runs.before)
                 }
-                if let empty = model.empty {
-                    EmptyScreenView(empty)
-                }
-                if let addList = model.addList {
-                    AddRowView(addList, send: sendClosingSwipe)
-                }
-                if let done = model.done {
-                    DoneStripView(done, send: sendClosingSwipe)
-                    if !model.doneRows.isEmpty {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(model.doneRows) { row in
-                                BlockRow(row, send: sendClosingSwipe)
-                                    .equatable()
-                            }
-                        }
-                        .modifier(Entrance(done.style.rowsEntrance))
-                        .padding(.top, done.style.capsuleToRows)
-                    }
+                pieces(runs.field)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    pieces(runs.after)
+                    tail
                 }
             }
             .padding(.top, model.style.contentTop)
             .padding(.bottom, model.style.contentBottom + bottomInset)
             .modifier(ContentWidth(model.style))
+            .overlay(alignment: .topLeading) {
+                BlockDropTints(blocks, gestures: rowGestures.forRows(delete: send))
+            }
             .modifier(rowGestures.listContent(blocks, send: send))
         }
         .scrollIndicators(.hidden)
         .modifier(rowGestures.dropTarget(blocks, settleInset: nil, send: send))
         // A row left open is not open when the list comes back, from the board or from a screen over it.
         .onDisappear { rowGestures.closeSwipe() }
+        // Each block's frame the union of the parts it draws now, and no column's the board left, the list come back.
+        .onChange(of: blocks, initial: true) { rowGestures.forgetParts(notDrawnBy: blocks) }
+    }
+
+    /// What a run holds of the blocks, each block's parts by its block.
+    private func pieces(_ pieces: [ListRuns.Piece]) -> some View {
+        ForEach(pieces) { piece in
+            BlockView(
+                piece.block, parts: piece.parts, gestures: rowGestures.forRows(delete: send), send: sendClosingSwipe
+            )
+        }
+    }
+
+    /// What follows the blocks: the empty state, "+ Add list", and the Done strip with its rows.
+    @ViewBuilder private var tail: some View {
+        if let empty = model.empty {
+            EmptyScreenView(empty)
+        }
+        if let addList = model.addList {
+            AddRowView(addList, send: sendClosingSwipe)
+        }
+        if let done = model.done {
+            DoneStripView(done, send: sendClosingSwipe)
+            if !model.doneRows.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(model.doneRows) { row in
+                        BlockRow(row, send: sendClosingSwipe)
+                            .equatable()
+                    }
+                }
+                .modifier(Entrance(done.style.rowsEntrance))
+                .padding(.top, done.style.capsuleToRows)
+            }
+        }
     }
 
     /// The board: the header stays under the circles, and the board takes the rest of the screen. The canvas draws no
@@ -221,6 +247,66 @@ struct ListSurface<Buttons: ViewModifier>: View {
         if let problem = model.problem {
             Text(problem)
                 .listsSentence(on: model.style.background)
+        }
+    }
+}
+
+/// The list's blocks cut at the first part that holds a field, a row that holds one or a block's header whose list's
+/// name is being typed: the parts before it, which stand in a lazy stack, the part itself, which stands outside, and
+/// the parts after it, which stand in another lazy stack (`ListSurface`). With no field open every block stands before
+/// it. Internal and not private for its tests alone (`ListRunsTests`).
+struct ListRuns {
+    /// A block and what of it a run holds, by the block.
+    struct Piece: Identifiable {
+        let block: TaskList.Model.Block
+        let parts: BlockView.Parts
+
+        var id: TaskList.Model.BlockID { block.id }
+    }
+
+    let before: [Piece]
+
+    /// The part that holds a field, alone, and none while no part holds one.
+    let field: [Piece]
+
+    let after: [Piece]
+
+    init(_ blocks: [TaskList.Model.Block]) {
+        var before: [Piece] = []
+        var field: [Piece] = []
+        var after: [Piece] = []
+        for block in blocks {
+            let rows = block.rows.indices
+            let whole = BlockView.Parts(header: true, topMark: true, rows: rows, add: true)
+            if !field.isEmpty {
+                after.append(Piece(block: block, parts: whole))
+            } else if block.header?.field != nil {
+                let header = BlockView.Parts(header: true, topMark: false, rows: 0..<0, add: false)
+                let rest = BlockView.Parts(header: false, topMark: true, rows: rows, add: true)
+                field = [Piece(block: block, parts: header)]
+                after.append(Piece(block: block, parts: rest))
+            } else if let row = block.rows.firstIndex(where: Self.holdsField) {
+                let above = BlockView.Parts(header: true, topMark: true, rows: 0..<row, add: false)
+                let itself = BlockView.Parts(header: false, topMark: false, rows: row..<row + 1, add: false)
+                let below = BlockView.Parts(header: false, topMark: false, rows: row + 1..<rows.endIndex, add: true)
+                before.append(Piece(block: block, parts: above))
+                field = [Piece(block: block, parts: itself)]
+                after.append(Piece(block: block, parts: below))
+            } else {
+                before.append(Piece(block: block, parts: whole))
+            }
+        }
+        self.before = before
+        self.field = field
+        self.after = after
+    }
+
+    /// Whether a row holds a field, by its kind, every kind deciding with no `default`, so that a kind added later
+    /// decides too (`docs/style.md`, "Views").
+    private static func holdsField(_ row: TaskList.Model.Row) -> Bool {
+        switch row {
+        case .task: false
+        case .card: true
         }
     }
 }

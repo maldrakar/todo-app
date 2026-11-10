@@ -9,42 +9,64 @@ import TodoCore
 /// the model, and folding it takes its rows out of it, so this view decides nothing. While a dragged task would land in
 /// it, which only the drag knows, the block's mark of the place opens a gap among its rows where the task was dragged
 /// from it, and where it was dragged from another block the block is tinted, as a column is, with no place marked.
+///
+/// It draws the parts of the block it is given, the whole block or what of it one of the list's runs holds
+/// (`ListRuns`), and has no stack of its own, so that its parts are the lazy stack's children, each laid out only in
+/// sight (#196). Each part is the screen's width and reports its frame, whose union is the block's
+/// (`RowLift.Frames.report`), and the tint is drawn over the content at that union (`BlockDropTints`).
 struct BlockView: View {
     private let block: TaskList.Model.Block
+    private let parts: Parts
     private let gestures: RowGestures
     private let send: (TaskList.UserAction) -> Void
 
-    init(_ block: TaskList.Model.Block, gestures: RowGestures, send: @escaping (TaskList.UserAction) -> Void) {
+    /// What of a block a view draws: its header, the mark at its top, a range of its rows, each with the mark after
+    /// it, and its "+ Add task", each where the block has it.
+    struct Parts {
+        let header: Bool
+        let topMark: Bool
+        let rows: Range<Int>
+        let add: Bool
+    }
+
+    init(
+        _ block: TaskList.Model.Block, parts: Parts, gestures: RowGestures,
+        send: @escaping (TaskList.UserAction) -> Void
+    ) {
         self.block = block
+        self.parts = parts
         self.gestures = gestures
         self.send = send
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let header = block.header {
-                BlockHeaderView(header, send: send)
-            }
+        if parts.header, let header = block.header {
+            BlockHeaderView(header, send: send)
+                .blockPart(.header, of: block.id, to: gestures.dragState)
+        }
+        if parts.topMark {
             mark(after: nil)
-            ForEach(block.rows) { row in
-                BlockRow(row, in: block.id, gestures: gestures, send: send)
-                    .equatable()
-                mark(after: row.id)
-            }
-            if let addTask = block.addTask {
-                AddRowView(addTask, send: send)
-            }
         }
-        // The screen's width, whatever it holds: a block with no header and no rows, its "+ Add task" alone, was only
-        // as wide as that row, its tint a pill round it and its frame a drop's nearest block for none of the screen's
-        // right side.
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay {
-            if let style = block.dropStyle {
-                BlockDropTint(style, isOn: gestures.lift?.slot == .into(block.id))
-            }
+        // Each row by its block and its task, which the lazy stack keys its children by: by its task alone, a task
+        // dropped into another block, or drawn in two, was one child in both places and drew as it stood before.
+        ForEach(block.rows[parts.rows].map { Item(block: block.id, row: $0) }) { item in
+            BlockRow(item.row, in: block.id, gestures: gestures, send: send)
+                .equatable()
+                .blockPart(.row(item.row.id), of: block.id, to: gestures.dragState)
+            mark(after: item.row.id)
         }
-        .reportsLiftFrame(\.blocks, block.id, to: gestures.dragState)
+        if parts.add, let addTask = block.addTask {
+            AddRowView(addTask, send: send)
+                .blockPart(.add, of: block.id, to: gestures.dragState)
+        }
+    }
+
+    /// A row of the block as the lazy stack's child, by its block and its task (`BlockRowID`).
+    private struct Item: Identifiable {
+        let block: TaskList.Model.BlockID
+        let row: TaskList.Model.Row
+
+        var id: BlockRowID { BlockRowID(block: block, task: row.id) }
     }
 
     /// The mark, where the lift's slot stands after this row, nil for the block's top, from the rows' leading edge. It
@@ -54,6 +76,49 @@ struct BlockView: View {
             DropIndicator(indicator, from: 0, visibleRight: gestures.dragState.frames.lineEnd(in: block.id))
                 .accessibilityHidden(true)
         }
+    }
+}
+
+/// The tints of the list's blocks a task dragged from another block would land in, over the content, each at the
+/// union of the frames its block's parts last reported (`RowLift.Frames.report`), since the parts stand in a lazy
+/// stack with no view of the block round them. It reads the frames when the lift changes, which draws it again, and
+/// takes no touch.
+struct BlockDropTints: View {
+    private let blocks: [TaskList.Model.Block]
+    private let gestures: RowGestures
+
+    init(_ blocks: [TaskList.Model.Block], gestures: RowGestures) {
+        self.blocks = blocks
+        self.gestures = gestures
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(blocks) { block in
+                if let style = block.dropStyle, let frame = gestures.dragState.frames.blocks[block.id] {
+                    BlockDropTint(style, isOn: gestures.lift?.slot == .into(block.id))
+                        .frame(width: frame.width, height: frame.height)
+                        .offset(x: frame.minX, y: frame.minY)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(false)
+    }
+}
+
+extension View {
+    /// A part of a list's block, the screen's width whatever it holds, reporting its frame among its block's
+    /// (`RowLift.Frames.report`): a block of "+ Add task" alone was only as wide as that row, its tint a pill round it
+    /// and its frame a drop's nearest block for none of the screen's right side.
+    @MainActor
+    fileprivate func blockPart(
+        _ part: RowLift.Frames.BlockPart, of block: TaskList.Model.BlockID, to dragState: RowDragState
+    ) -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowLift.contentSpace)) } action: { frame in
+                dragState.frames.report(part, of: block, frame)
+            }
     }
 }
 
