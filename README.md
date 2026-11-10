@@ -261,7 +261,7 @@ what can be read from outside the app: an order of rows by their frames, an elem
 there after the app is launched again. What it cannot read, a drag's tint or its drop line, it names in its comment,
 and `--record` films the device's screen for a person to look at. The run prints each walk's result and the directory
 that keeps its log, its result bundle with a screenshot of every failure, each walk's store and the film. It runs
-with Xcode 27.1, as `xcode-select` or `DEVELOPER_DIR` names it; a run of every walk takes about WALK_MINUTES minutes.
+with Xcode 27.1, as `xcode-select` or `DEVELOPER_DIR` names it; a run of every walk takes about half an hour.
 
 A pull request that changes the list screen runs the walks before it opens (`docs/process.md`, section 6). Xcode's
 Test action on the scheme `Todo` skips every walk, since only the script seeds the store they walk over, and CI
