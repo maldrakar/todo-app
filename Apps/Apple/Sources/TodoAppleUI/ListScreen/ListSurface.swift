@@ -105,11 +105,11 @@ struct ListSurface<Buttons: ViewModifier>: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 ForEach(runs.runs) { run in
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(run.lazy) { piece in blockView(piece) }
-                    }
                     if let field = run.field {
                         blockView(field)
+                    }
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(run.lazy) { piece in blockView(piece) }
                     }
                 }
                 LazyVStack(alignment: .leading, spacing: 0) {
