@@ -1,7 +1,8 @@
 import XCTest
 
-/// A column's card carried within its column and across the board, and the board's own scroll under it. Every walk
-/// starts on Project shown as Columns: its own column first, then Core, Design, Ops, Docs, Either and Weekly.
+/// A column's card carried within its column, across the board and over a column that takes none, and the board's own
+/// scroll under it. Every walk starts on Project shown as Columns: its own column first, then Core, Design, Ops, Docs,
+/// Either and Weekly.
 final class ColumnWalks: Walk {
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -91,8 +92,49 @@ final class ColumnWalks: Walk {
         XCTAssertEqual(order(["Core 12", "Core 3"]), ["Core 12", "Core 3"], "the store kept Core's order")
     }
 
+    /// A card let go over a column that takes no drop stays in its own, and the store keeps it there: Docs one over
+    /// Either, whose rule, "either1" or "home", is a rule of alternatives that no one edit of a task satisfies
+    /// (`docs/specs/list-screen.md`, section 6). Either draws no slot and no tint, which the accessibility tree does
+    /// not hold; `scripts/ui-walks.sh --record` records them for a person.
+    func testDropOverAColumnThatTakesNone() {
+        let margin = header("Project").frame.minX
+        board(to: "Docs", margin: margin)
+        let docs = row("Docs one").frame.minX
+        let release = screen(0.8, 0.5)
+        XCTAssertGreaterThan(release.screenPoint.x, row("Docs one").frame.maxX, "the release is not past Docs's cards")
+        drag(at(row("Docs one")), to: release, hold: 1)
+        assertOnlyInDocs(at: docs, "Docs one let go over Either")
+        relaunch()
+        openProject()
+        assertProjectShowsColumns()
+        board(to: "Docs", margin: margin)
+        assertOnlyInDocs(at: docs, "Docs one in the store")
+    }
+
     // MARK: - Reading the board
 
+    /// The board swiped a column at a time until `column`'s title stands at `margin`, where the first column's stood.
+    private func board(to column: String, margin: CGFloat, file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<8 {
+            let title = header(column)
+            let offset = title.exists ? title.frame.minX - margin : .infinity
+            if abs(offset) <= 1 { return }
+            offset > 0 ? app.swipeLeft() : app.swipeRight()
+            settle(1)
+        }
+        XCTFail("the board did not come to rest on \(column)", file: file, line: line)
+    }
+
+    /// Asserts that Docs one is drawn once, at `x`, where it stood in Docs's column: a drop Either took would have
+    /// moved it into Either, or drawn it there too.
+    private func assertOnlyInDocs(at x: CGFloat, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(
+            rows("Docs one").count, 1, "\(what): it is drawn in more than one column", file: file, line: line
+        )
+        XCTAssertEqual(
+            row("Docs one").frame.minX, x, accuracy: 1, "\(what): it left Docs's column", file: file, line: line
+        )
+    }
 
     /// Asserts that two cards stand in one column: the same left edge, within a point.
     private func assertSameColumn(
