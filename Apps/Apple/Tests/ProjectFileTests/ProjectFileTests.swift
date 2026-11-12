@@ -12,12 +12,16 @@ import XcodeProjectFormat
     _ = try decodedProject()
 }
 
-/// The shell is one app target and nothing more, its code the library's: an application for iPhone and iPad, the
-/// package it links is this one, at the project's own directory, and the product it links is `TodoAppleUI`.
-@Test func theProjectHasOneApplicationTargetOverTheLibrary() throws {
+/// The shell is two targets: the app and the walks that drive it (ADR-0008, amended 2026-11-10).
+@Test func theProjectHasTheApplicationAndItsUITestBundle() throws {
+    #expect(try decodedProject().targets.map(\.name) == ["Todo", "TodoUITests"])
+}
+
+/// The app's code is the library's: an application for iPhone and iPad, the package it links is this one, at the
+/// project's own directory, and the product it links is `TodoAppleUI`.
+@Test func theApplicationTargetLinksTheLibrary() throws {
     let project = try decodedProject()
-    #expect(project.targets.map(\.name) == ["Todo"])
-    let target = try #require(project.targets.first).commonProperties
+    let target = try target(named: "Todo", in: project)
     #expect(target.productTypeID == XCSchema.ProductTypeID(productTypeID: "com.apple.product-type.application"))
     #expect(target.buildSettings["SDKROOT"] == .string("iphoneos"))
     #expect(target.buildSettings["PRODUCT_BUNDLE_IDENTIFIER"] == .string("dev.maldrakar.todo"))
@@ -26,11 +30,55 @@ import XcodeProjectFormat
     #expect(target.packageProductTargetMembers.map(\.packageProduct.productName) == ["TodoAppleUI"])
 }
 
+/// The walks are a UI-test bundle hosted by the app and launching it, each target naming its product, which is what
+/// lets the scheme `Todo` test them: with no host or no dependency the scheme has no test action, with no products
+/// it finds no test bundle, and with no `TEST_TARGET_NAME` the walks have no app to launch (probed 2026-11-10,
+/// Xcode 27.1).
+@Test func theUITestBundleDrivesTheApplication() throws {
+    let project = try decodedProject()
+    let walks = try target(named: "TodoUITests", in: project)
+    let app = XCSchema.LocalTargetReference(targetName: "Todo")
+    #expect(walks.productTypeID == XCSchema.ProductTypeID(productTypeID: "com.apple.product-type.bundle.ui-testing"))
+    #expect(walks.testHostTarget == app)
+    #expect(walks.dependencies == [.localTarget(app, [])])
+    #expect(walks.buildSettings["TEST_TARGET_NAME"] == .string("Todo"))
+    #expect(walks.product != nil)
+    #expect(try target(named: "Todo", in: project).product != nil)
+}
+
+/// Every Swift file of `UITests` is a source of the walks' bundle, and every source of the bundle is one of them: a walk
+/// file added to the directory and not to the project would be neither built, so that CI could not see it, nor run.
+@Test func everyWalkFileIsASourceOfTheUITestBundle() throws {
+    let walks = try #require(
+        try decodedProject().topLevelReferences.lazy.compactMap { reference -> XCSchema.Group? in
+            guard case .group(let group) = reference, group.path.path == "UITests" else { return nil }
+            return group
+        }.first,
+        "no group UITests"
+    )
+    let sources = walks.children.compactMap { child -> String? in
+        guard case .fileReference(let file) = child,
+              file.buildFiles.contains(where: { $0.buildPhase.description == "TodoUITests/compile-sources" })
+        else { return nil }
+        return file.path.path
+    }
+    let files = try FileManager.default
+        .contentsOfDirectory(atPath: packageDirectory.appending(path: "UITests").path(percentEncoded: false))
+        .filter { $0.hasSuffix(".swift") }
+    #expect(Set(sources) == Set(files))
+}
+
+/// No scheme is shared: once one is, Xcode 27.1 takes the UI-test bundle out of the scheme it makes for `Todo`, and
+/// `scripts/ui-walks.sh` finds no walk to run (probed 2026-11-10).
+@Test func theProjectSharesNoScheme() {
+    let schemes = packageDirectory.appending(path: "Todo.xcodeproj/xcshareddata/xcschemes")
+    #expect(!FileManager.default.fileExists(atPath: schemes.path(percentEncoded: false)))
+}
+
 /// The Info.plist the target names, read where the target finds it, registers the `todo` scheme a link arrives by and
 /// allows the iPad more than one scene (`docs/specs/navigation.md`, sections 7 and 9).
 @Test func theInfoPlistRegistersTheSchemeAndMultipleScenes() throws {
-    let project = try decodedProject()
-    let target = try #require(project.targets.first).commonProperties
+    let target = try target(named: "Todo", in: decodedProject())
     guard case .string(let path) = try #require(target.buildSettings["INFOPLIST_FILE"]) else {
         Issue.record("INFOPLIST_FILE is not a single path")
         return
@@ -67,6 +115,10 @@ private func projectFile() throws -> Data {
 
 private func decodedProject() throws -> XCSchema.Project {
     try XCSchema.Project(jsonRepresentation: projectFile())
+}
+
+private func target(named name: String, in project: XCSchema.Project) throws -> XCSchema.CommonTargetProperties {
+    try #require(project.targets.first { $0.name == name }, "no target \(name)").commonProperties
 }
 
 /// The two keys of the Info.plist the tests read, under the names the plist spells; a key that is missing or of

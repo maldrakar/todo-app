@@ -23,11 +23,36 @@
       ],
     },
     { "path": "Todo.xcconfig" },
+    {
+      "kind": "group",
+      "path": "UITests",
+      "children": [
+        { "path": "seed.sh" },
+        { "path": "Walk.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "DropWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "ColumnWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "SwipeWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "MenuWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "CompletingWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "CardWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "ShowAsWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "BackWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+        { "path": "StripWalks.swift", "target-membership": [ "TodoUITests/compile-sources" ] },
+      ],
+    }, {
+      "kind": "group",
+      "name": "Products",
+      "children": [
+        { "path": "<PRODUCTS>/Todo.app", "type": "wrapper.application" },
+        { "path": "<PRODUCTS>/TodoUITests.xctest", "type": "wrapper.cfbundle" },
+      ],
+    },
   ],
   "targets": [
     {
       "name": "Todo",
       "id": "Todo",
+      "product": "Products/Todo.app",
       "product-type": "application",
       "specialized-configurations": [
         { "name": "Debug", "file": "Todo.xcconfig" },
@@ -53,6 +78,31 @@
         "SDKROOT": "iphoneos",
         "SWIFT_VERSION": "6.0",
         "TARGETED_DEVICE_FAMILY": "1,2",
+      },
+    }, {
+      "name": "TodoUITests",
+      "id": "TodoUITests",
+      "product": "Products/TodoUITests.xctest",
+      "product-type": "bundle.ui-testing",
+      "test-host-target": "Todo",
+      "dependencies": [
+        "Todo",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+      ],
+      "build-settings": {
+        "ALWAYS_SEARCH_USER_PATHS": "NO",
+        "CODE_SIGN_STYLE": "Automatic",
+        "GENERATE_INFOPLIST_FILE": "YES",
+        "IPHONEOS_DEPLOYMENT_TARGET": "17.0",
+        "PRODUCT_BUNDLE_IDENTIFIER": "dev.maldrakar.todo.uitests",
+        "PRODUCT_NAME": "TodoUITests",
+        "SDKROOT": "iphoneos",
+        "SWIFT_VERSION": "6.0",
+        "TARGETED_DEVICE_FAMILY": "1,2",
+        "TEST_TARGET_NAME": "Todo",
       },
     },
   ],

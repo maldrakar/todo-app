@@ -241,6 +241,32 @@ cd Apps/Apple
 swift run xcprojformatter --update Todo.xcodeproj
 ```
 
+### Walking the list screen
+
+The list screen's walks are XCUITest walks over the real app: a drop within a block, into another block, into a column
+and across columns, the swipe and its Delete, the still hold's menu, completing, the card's fields, Show as, going
+back with a card open, and the sentence strip under the floating "+". They are `TodoUITests`, the second target of
+`Todo.xcodeproj`, with their sources and their seed in `Apps/Apple/UITests`, and one script runs them:
+
+```sh
+scripts/ui-walks.sh                                   # every walk, on a new iPhone 17
+scripts/ui-walks.sh DropWalks SwipeWalks/testSwipeRules
+scripts/ui-walks.sh --device "iPhone 17 Pro Max" --record BackWalks
+```
+
+The script creates a simulator device of its own, so it never touches one that is running, builds the `todo` tool and
+the app with its walks, seeds a store through the tool, runs the walks named or all of them, and deletes the device
+on every exit, a failure or Ctrl-C included. Each walk launches the app over a fresh copy of that store and asserts
+what can be read from outside the app: an order of rows by their frames, an element and its label, a title still
+there after the app is launched again. What it cannot read, a drag's tint or its drop line, it names in its comment,
+and `--record` films the device's screen for a person to look at. The run prints each walk's result and the directory
+that keeps its log, its result bundle with a screenshot of every failure, each walk's store and the film. It runs
+with Xcode 27.1, as `xcode-select` or `DEVELOPER_DIR` names it; a run of every walk takes about half an hour.
+
+A pull request that changes the list screen runs the walks before it opens (`docs/process.md`, section 6). Xcode's
+Test action on the scheme `Todo` skips every walk, since only the script seeds the store they walk over, and CI
+builds the walks but runs none.
+
 ## Continuous integration
 
 Every pull request runs two jobs. The first, on Linux, runs build, the suite on the host, the same suite on
@@ -272,7 +298,8 @@ against the iOS and watchOS SDKs, builds and tests `Apps/Apple` with the pinned 
 package and `Apps/Apple` with Xcode's toolchain too. Those two builds stay because Apple accepts store
 builds from Xcode's toolchain, and because they are what shows that, from Xcode 27 on, the pinned toolchain and
 Xcode's are one version (ADR-0008). Its last step builds the iPhone and iPad app from `Apps/Apple/Todo.xcodeproj`
-for the simulator, unsigned, with the `xcodebuild` command "Running on iPhone and iPad" gives and the derived data
-under the runner's temporary directory. The job runs on every pull request, because GitHub-hosted runners cost
+for the simulator, unsigned, with the `xcodebuild` command "Running on iPhone and iPad" gives, as
+`build-for-testing` so that the list screen's walks are built with it though none runs, and the derived data under
+the runner's temporary directory. The job runs on every pull request, because GitHub-hosted runners cost
 nothing on a public repository. If the repository goes private again, the job goes back to `main` and on demand,
 because macOS minutes cost tenfold there.

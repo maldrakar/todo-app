@@ -153,9 +153,11 @@ jobs:
 
       # The command `README.md` gives, with the derived data under `$RUNNER_TEMP`, outside the checkout, as the scratch
       # paths above: the one step that builds the Xcode project, which the Apple package's tests decode and do not
-      # build. The version first, so that the log names the Xcode that built.
-      - name: Build the iPhone app for the simulator
+      # build. `build-for-testing` builds the list screen's walks with the app, so that one that no longer compiles
+      # fails here; none runs, they are run by hand (`scripts/ui-walks.sh`). The version first, so that the log names
+      # the Xcode that built.
+      - name: Build the iPhone app and its walks for the simulator
         run: |
           set -eu
           xcodebuild -version
-          xcodebuild -project Apps/Apple/Todo.xcodeproj -scheme Todo -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath "$RUNNER_TEMP/xcode-ios" CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -project Apps/Apple/Todo.xcodeproj -scheme Todo -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath "$RUNNER_TEMP/xcode-ios" CODE_SIGNING_ALLOWED=NO build-for-testing

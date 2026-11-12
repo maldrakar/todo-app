@@ -149,7 +149,9 @@ flowchart LR
    pass by a second agent over the finished diff, pointed at the same
    three documents and asked to justify every finding with a line and a
    failure scenario. A finding is confirmed by a failing test before the
-   code changes.
+   code changes. A change to the list screen also runs its walks,
+   `scripts/ui-walks.sh` (`README.md`, "Walking the list screen"), and
+   the PR says which ran and how they ended.
 4. **Pull request.** Follows the PR template: what changed, how it was
    verified, `Closes #N`. The title uses Conventional Commits with a
    scope, for example `feat(core): add task repository`. Scopes: `core`,
@@ -336,7 +338,9 @@ both packages with Xcode's toolchain too. Those builds stay because
 Apple accepts store builds from Xcode's toolchain, and because they are
 what shows that, from Xcode 27 on, the pinned toolchain and Xcode's are
 one version (ADR-0008). Its last step builds the iPhone and iPad app
-from the Xcode project for the simulator, unsigned.
+from the Xcode project for the simulator, unsigned, together with the
+list screen's walks, which CI builds and never runs: they are run by
+hand (section 6).
 
 Constraint: the macOS job runs on pull requests only while the
 repository is public. The repository was made public on 2026-10-24, when
