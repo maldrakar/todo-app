@@ -68,7 +68,11 @@ struct TaskLanding: ViewModifier {
         guard !hasLanded else { return }
         hasLanded = true
         guard !reduceMotion, landing == nil else { return }
-        landing = Landing(color: style.fresh, scale: style.landingScale, animation: style.landingAnimation)
+        // At its start at once, whatever motion set the style: a drop is sent on the slot's motion (`RowLift.step`),
+        // which would otherwise fade the colour in and grow the card on it before the motion began.
+        withTransaction(Transaction(animation: nil)) {
+            landing = Landing(color: style.fresh, scale: style.landingScale, animation: style.landingAnimation)
+        }
     }
 
     private func play(_ animation: DesignSystem.Animation) {

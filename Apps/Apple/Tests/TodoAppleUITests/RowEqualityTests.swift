@@ -33,11 +33,12 @@ private enum RowEqualityTestError: Error {
     case notATask
 }
 
-/// What a screen's gestures stand at, with the lift given and a Delete made anew, as every pass makes it.
+/// What a screen's gestures stand at, with the lift and the row a copy settles onto given and a Delete made anew, as
+/// every pass makes it.
 @MainActor private func screenGestures(
-    lift: RowLift? = nil, dragState: RowDragState, swipe: ScreenSwipe
+    lift: RowLift? = nil, settling: BlockRowID? = nil, dragState: RowDragState, swipe: ScreenSwipe
 ) -> RowGestures {
-    RowGestures(lift: lift, dragState: dragState, swipe: swipe, delete: { _ in })
+    RowGestures(lift: lift, settling: settling, dragState: dragState, swipe: swipe, delete: { _ in })
 }
 
 /// A row of a block as a pass of its block draws it, with a `send` made anew.
@@ -112,6 +113,23 @@ private enum RowEqualityTestError: Error {
     #expect(drawn(b, in: own, none) == drawn(b, in: own, atFirst), "another row lifted")
     #expect(drawn(b, in: own, atFirst) == drawn(b, in: own, atNext), "another row's slot moved")
     #expect(drawn(a, in: house, none) == drawn(a, in: house, atFirst), "the task lifted from another block")
+}
+
+/// The row a dropped copy settles onto is drawn by that row alone, hidden under the copy: it is another row while the
+/// copy settles, and every other row stays equal, the same task's row in another block among them (#211).
+@Test @MainActor func aCopySettlingChangesTheRowItSettlesOntoAlone() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let a = try row(list.a, of: list)
+    let b = try row(list.b, of: list)
+    let dragState = RowDragState()
+    let swipe = ScreenSwipe()
+    let none = screenGestures(dragState: dragState, swipe: swipe)
+    let settling = screenGestures(settling: BlockRowID(block: own, task: list.a), dragState: dragState, swipe: swipe)
+    #expect(drawn(a, in: own, none) != drawn(a, in: own, settling))
+    #expect(drawn(b, in: own, none) == drawn(b, in: own, settling), "another row settles")
+    #expect(drawn(a, in: house, none) == drawn(a, in: house, settling), "the task settles in another block")
 }
 
 /// A row is drawn with its screen's drag and swipe, one instance of each for the screen's life: another instance is

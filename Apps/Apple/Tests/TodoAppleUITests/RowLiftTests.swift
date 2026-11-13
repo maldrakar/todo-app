@@ -16,8 +16,8 @@ import TodoCore
 // it, House (a tag) with H1 and H2, Office (a tag) with O1 and O2, Empty (a tag) with nothing, and Either (a rule of
 // alternatives) with E1, which takes no drop.
 
-/// The first stage of a drag holds what `onDrag` said it carries, and offers the task's own place until the finger
-/// moves.
+/// The first stage of a drag holds what the drag's item said it carries, and offers the task's own place until the
+/// finger moves.
 @Test func aLiftHoldsTheTaskAndBlockItWasDraggedFrom() throws {
     var list = try LiftedList()
     let house = TaskList.Model.BlockID.list(list.house)
@@ -366,8 +366,8 @@ import TodoCore
 
 // MARK: - The drag's session
 
-/// A second finger pressing another row during a drag asks `onDrag` again, which begins a session of its own: the first
-/// finger's drag goes on with its own task, the second's calls move nothing, and the release drops the task it lifted.
+/// A second finger pressing another row during a drag begins a drag and a session of its own: the first finger's drag
+/// goes on with its own task, the second's calls move nothing, and the release drops the task it lifted.
 @Test func aSecondPressDuringADragLeavesItsTask() throws {
     var list = try LiftedList()
     let own = TaskList.Model.BlockID.own(nil)
@@ -406,8 +406,8 @@ import TodoCore
     #expect(list.drops.isEmpty)
 }
 
-/// Its session outlives a lift that ended with no release: a drag that left the scroll view, or went quiet, lifts again
-/// at its next call and can still drop, since its session is what rescues the drop.
+/// Its session outlives a lift that ended with no release: a drag that left the scroll view, or whose lift was put down
+/// otherwise, lifts again at its next call and can still drop, since its session is what rescues the drop.
 @Test func aSessionOutlivesALiftThatEndedWithNoRelease() throws {
     var list = try LiftedList()
     let own = TaskList.Model.BlockID.own(nil)

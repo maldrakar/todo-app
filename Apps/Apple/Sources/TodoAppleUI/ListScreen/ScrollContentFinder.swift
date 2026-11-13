@@ -1,13 +1,14 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/ScrollContentFinder.swift
-// iOS alone: the recognizer and the conversion are UIKit's, which the Mac's drag, another task's, and the watch do not
-// have.
+// iOS alone: the recognizer, the interactions and the scroll view are UIKit's, which the Mac's drag, its pointer's, and
+// the watch do not have.
 #if os(iOS)
 import DesignSystemComponents
 import SwiftUI
 import UIKit
 
 /// A plain view placed as the background of a scroll view's content, which gives the screen's gestures what only UIKit
-/// can: where a drop's point stands in the content, the scroll view to settle, and, on the list, the row's swipe.
+/// can: the content a drag's points are read in, the scroll view to settle, the system's drag, drop and menu of the
+/// rows on that scroll view (`RowSystemDrag`), and, on the list, the row's swipe.
 ///
 /// The swipe is one `UIPanGestureRecognizer` on the `UIScrollView` behind the `ScrollView` (spike #174, round 1), found
 /// by walking up from this view once it is in a window, as `ListsDragGesture` finds its own. The scroll waits for it to
@@ -20,24 +21,25 @@ import UIKit
 ///
 /// What it holds goes with it: the recognizers leaked per switch of Show as in the spike until they did.
 struct ScrollContentFinder: UIViewRepresentable {
-    private let dragState: RowDragState
+    private let drag: RowSystemDrag.Screen
     private let swipe: ScreenSwipe?
     private let rowAt: (_ point: CGPoint, _ moved: CGFloat) -> (row: BlockRowID, style: SwipeStyle)?
 
-    /// The finder of the board, whose cards have no swipe.
-    init(dragState: RowDragState) {
-        self.dragState = dragState
+    /// The finder of the board, whose cards have no swipe, with what its drag reads and writes of the screen.
+    init(drag: RowSystemDrag.Screen) {
+        self.drag = drag
         swipe = nil
         rowAt = { _, _ in nil }
     }
 
-    /// The finder of the list, whose rows are swiped, each found by `rowAt`.
+    /// The finder of the list, with what its drag reads and writes of the screen, whose rows are swiped, each found by
+    /// `rowAt`.
     init(
-        dragState: RowDragState, swipe: ScreenSwipe,
+        drag: RowSystemDrag.Screen,
         rowAt: @escaping (_ point: CGPoint, _ moved: CGFloat) -> (row: BlockRowID, style: SwipeStyle)?
     ) {
-        self.dragState = dragState
-        self.swipe = swipe
+        self.drag = drag
+        swipe = drag.gestures.swipe
         self.rowAt = rowAt
     }
 
@@ -54,9 +56,10 @@ struct ScrollContentFinder: UIViewRepresentable {
     }
 
     func updateUIView(_ view: FinderView, context: Context) {
-        context.coordinator.dragState = dragState
+        context.coordinator.dragState = drag.gestures.dragState
         context.coordinator.swipe = swipe
         context.coordinator.rowAt = rowAt
+        context.coordinator.systemDrag.update(drag, environment: context.environment)
     }
 
     static func dismantleUIView(_ view: FinderView, coordinator: Coordinator) {
@@ -79,6 +82,7 @@ struct ScrollContentFinder: UIViewRepresentable {
         fileprivate var dragState: RowDragState?
         fileprivate var swipe: ScreenSwipe?
         fileprivate var rowAt: (CGPoint, CGFloat) -> (row: BlockRowID, style: SwipeStyle)? = { _, _ in nil }
+        fileprivate let systemDrag = RowSystemDrag()
         private weak var scrollView: UIScrollView?
 
         /// Where the pan's finger came down, in the content's own coordinates.
@@ -98,6 +102,7 @@ struct ScrollContentFinder: UIViewRepresentable {
         fileprivate func didAppear(in scrollView: UIScrollView) {
             dragState?.content = finder
             dragState?.scrollView = scrollView
+            systemDrag.install(on: scrollView)
             guard self.scrollView !== scrollView else { return }
             removeRecognizers()
             self.scrollView = scrollView
@@ -109,6 +114,7 @@ struct ScrollContentFinder: UIViewRepresentable {
 
         /// Lets go of the scroll view and of what the closures hold, as this view goes.
         fileprivate func uninstall() {
+            systemDrag.uninstall()
             removeRecognizers()
             swipe = nil
             rowAt = { _, _ in nil }

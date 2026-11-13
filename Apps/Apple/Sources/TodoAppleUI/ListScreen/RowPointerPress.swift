@@ -41,7 +41,7 @@ struct RowPointerPress {
     /// The press that began at the point, in the content's own coordinates, among the blocks drawn and the frames they
     /// last reported, in a session of its own.
     private init(at point: CGPoint, among blocks: [TaskList.Model.Block], frames: RowLift.Frames) {
-        let row = Self.row(at: point, among: blocks, frames: frames)
+        let row = frames.row(at: point, among: blocks)
         let frame = row.flatMap { frames.rows[$0] } ?? CGRect(origin: point, size: .zero)
         self.row = row
         session = UUID().uuidString
@@ -91,20 +91,5 @@ struct RowPointerPress {
     /// pointer as the copy grows to its lift's scale.
     var copyAnchor: CGPoint {
         CGPoint(x: size.width > 0 ? grab.dx / size.width : 0.5, y: size.height > 0 ? grab.dy / size.height : 0.5)
-    }
-
-    /// The row whose frame holds the point, among the rows of the blocks drawn, which leaves out those that have left
-    /// and kept their frames; and on a column only where the point is in sight of its cards.
-    private static func row(
-        at point: CGPoint, among blocks: [TaskList.Model.Block], frames: RowLift.Frames
-    ) -> BlockRowID? {
-        for block in blocks {
-            if block.column != nil, let area = frames.columns[block.id], !area.contains(point) { continue }
-            for row in block.rows {
-                let id = BlockRowID(block: block.id, task: row.id)
-                if frames.rows[id]?.contains(point) == true { return id }
-            }
-        }
-        return nil
     }
 }

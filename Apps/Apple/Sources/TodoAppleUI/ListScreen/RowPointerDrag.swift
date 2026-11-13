@@ -1,4 +1,5 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowPointerDrag.swift
+import DesignSystemComponents
 import SwiftUI
 import TaskListFeature
 
@@ -12,8 +13,15 @@ import TaskListFeature
 /// task came from and the tint over another. A drag SwiftUI cancels puts the row down with no drop (`pointer`); one
 /// that ended has put it down already, and the cancel after it moves nothing. While it is carried the row stays where
 /// it was, dimmed (`RowDragSource`), and a copy of it, grown to its lift's scale and casting its lift's shadow, follows
-/// the pointer as it was grabbed. Nothing of it has a motion of its own: the mark moves at once, as on iOS, and the
-/// copy where the pointer does, so Reduce Motion changes nothing here.
+/// the pointer as it was grabbed, with no motion of its own. The mark moves on the slot's motion, as on iOS
+/// (`RowLift.step`).
+///
+/// Let go, the copy settles on the slot's motion, as iOS's does (#211; `RowLift.Settling`): onto the row the task
+/// landed as, or back onto its own where nothing landed, at the place the drop's layout stood it, which that row gives
+/// in the same pass (`SettlingRowBounds`), shrinking to its size and turning into the row as its block draws it
+/// (`RowFace`) while that row stands hidden under it; or, where the row is out of sight or not laid out, toward the
+/// edge of what is in sight or into its block's tinted area, fading as it goes. Where a person asked for less motion
+/// the copy goes at once and the mark moves at once.
 ///
 /// Outside the part of the content in sight (`RowDragState.viewport`), the pointer lets go of nothing: the lift is put
 /// down, and comes back when the pointer does (`RowPointerPress`; the controller's ruling R218). So a release over the
@@ -33,8 +41,11 @@ import TaskListFeature
 struct RowPointerDrag: ViewModifier {
     private let blocks: [TaskList.Model.Block]
     @Binding private var lift: RowLift?
+    @Binding private var settling: BlockRowID?
     private let dragState: RowDragState
     private let send: (TaskList.UserAction) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Where the pointer that holds a press stands in the content, from the drag's first move, and nil while none does:
     /// SwiftUI puts it back when the gesture ends, let go or cancelled, which a cancel says by no other means.
@@ -44,21 +55,43 @@ struct RowPointerDrag: ViewModifier {
     /// (`RowPointerPress.after(_:from:lift:among:frames:viewport:)`).
     @State private var press: RowPointerPress?
 
-    /// The drag over a content of the blocks drawn, the lift it moves, what it reads of the layout, and what a drop
-    /// sends.
+    /// The copy let go, from its release to the end of its settling, and nil while none settles.
+    @State private var settle: Settle?
+
+    /// A copy let go: the lift as the release found it, the row it settles onto, the task it draws and its lift, the
+    /// look of the column it settles into, nil for a list's block, and where its top left corner, its size and the
+    /// point it grew about stood as it was let go.
+    private struct Settle {
+        let released: RowLift
+        let row: BlockRowID
+        let task: TaskRowModel<TaskList.UserAction>
+        let style: TaskLiftStyle
+        let column: ColumnStyle?
+        let origin: CGPoint
+        let size: CGSize
+        let anchor: UnitPoint
+    }
+
+    /// The drag over a content of the blocks drawn, the lift and the row a copy settles onto, which it moves, what it
+    /// reads of the layout, and what a drop sends.
     init(
-        _ blocks: [TaskList.Model.Block], lift: Binding<RowLift?>, dragState: RowDragState,
-        send: @escaping (TaskList.UserAction) -> Void
+        _ blocks: [TaskList.Model.Block], lift: Binding<RowLift?>, settling: Binding<BlockRowID?>,
+        dragState: RowDragState, send: @escaping (TaskList.UserAction) -> Void
     ) {
         self.blocks = blocks
         _lift = lift
+        _settling = settling
         self.dragState = dragState
         self.send = send
     }
 
     func body(content: Content) -> some View {
         content
-            .overlay(alignment: .topLeading) { copy }
+            .overlayPreferenceValue(SettlingRowBounds.self, alignment: .topLeading) { bounds in
+                GeometryReader { proxy in
+                    copy(settlingInto: bounds.map { proxy[$0] })
+                }
+            }
             .highPriorityGesture(drag)
             .onChange(of: pointer == nil) { _, isUp in
                 if isUp { step(.cancelled) }
@@ -78,7 +111,7 @@ struct RowPointerDrag: ViewModifier {
         DragGesture(coordinateSpace: .named(RowLift.contentSpace))
             .updating($pointer) { value, pointer, _ in pointer = value.location }
             .onChanged { value in step(.moved(from: value.startLocation, to: value.location)) }
-            .onEnded { _ in step(.released) }
+            .onEnded { value in release(at: value.location) }
     }
 
     /// An event of the drag: the press it leaves, and the stage of the lift it makes, with the lift it leaves and the
@@ -89,35 +122,106 @@ struct RowPointerDrag: ViewModifier {
         )
         press = step.press
         if let phase = step.phase {
-            RowLift.step(phase, of: $lift, among: blocks, frames: dragState.frames, send: send)
+            RowLift.step(
+                phase, of: $lift, among: blocks, frames: dragState.frames, reduceMotion: reduceMotion, send: send
+            )
         }
     }
 
-    /// The lifted task's copy under the pointer, standing as it was grabbed (`RowPointerPress`): the row as iOS's copy
-    /// draws it (`RowDragCopy`), grown to its lift's scale about the grabbed point, so that it stays under the pointer,
-    /// and casting its lift's shadow, over the content and taking no pointer. One switch over the kinds of a row, both
-    /// drawn and none by `default` (`docs/style.md`, "Views"): an open card is never lifted, so its case draws nothing.
-    @ViewBuilder private var copy: some View {
-        if let lift, let pointer, let press, let row = lift.row(among: blocks) {
-            switch row {
-            case .task(_, let task):
-                if let style = task.style.lift {
-                    let origin = press.copyOrigin(at: pointer)
-                    RowDragCopy(
-                        task: task, lift: style, row: BlockRowID(block: lift.source, task: lift.task),
-                        dragState: dragState
-                    )
+    /// The release with the pointer at the point: the drop, and the copy of the press's own lift settling, with the
+    /// row it settles onto hidden, until its motion ends.
+    private func release(at point: CGPoint) {
+        let released = lift
+        let grabbed = press
+        step(.released)
+        guard !reduceMotion, let released, let grabbed, released.session == grabbed.session,
+              case .task(_, let task)? = released.row(among: blocks), let style = task.style.lift,
+              let frame = dragState.frames.rows[BlockRowID(block: released.source, task: released.task)]
+        else { return }
+        let row = BlockRowID(block: released.slot?.block ?? released.source, task: released.task)
+        let column = blocks.first { $0.id == row.block }?.column?.style
+        settling = row
+        withAnimation(Animation(style.slotAnimation), completionCriteria: .logicallyComplete) {
+            settle = Settle(
+                released: released, row: row, task: task, style: style, column: column,
+                origin: grabbed.copyOrigin(at: point), size: frame.size,
+                anchor: UnitPoint(x: grabbed.copyAnchor.x, y: grabbed.copyAnchor.y)
+            )
+        } completion: {
+            if settle?.row == row { settle = nil }
+            if settling == row { settling = nil }
+        }
+    }
+
+    /// Where the copy stands and how it looks: under the pointer while it is carried, grown to its lift's scale about
+    /// the point the press grabbed, on its lift's background and casting its lift's shadow; and settling once let go,
+    /// at the row's place in the drop's layout, given here as the row's bounds where it is laid out.
+    private struct CopyPlace {
+        let task: TaskRowModel<TaskList.UserAction>
+        let style: TaskLiftStyle
+        let column: ColumnStyle?
+        let row: BlockRowID
+        let origin: CGPoint
+        let scale: Double
+        let anchor: UnitPoint
+        let isLifted: Bool
+        let isFading: Bool
+    }
+
+    private func place(settlingInto bounds: CGRect?) -> CopyPlace? {
+        if let settle {
+            var frames = dragState.frames
+            frames.rows[settle.row] = bounds
+            let settling = RowLift.settling(
+                onto: settle.row, among: blocks, frames: frames, inSight: dragState.viewport
+            )
+            let centred = { (point: CGPoint) in
+                CGPoint(x: point.x - settle.size.width / 2, y: point.y - settle.size.height / 2)
+            }
+            let (origin, isLifted, isFading): (CGPoint, Bool, Bool) = switch settling {
+            case .onto(_, let frame)?: (frame.origin, false, false)
+            case .toward(let point)?: (centred(point), true, true)
+            case nil: (settle.origin, true, true)
+            }
+            return CopyPlace(
+                task: settle.task, style: settle.style, column: settle.column,
+                row: BlockRowID(block: settle.released.source, task: settle.released.task), origin: origin,
+                scale: isLifted ? settle.style.scale : 1, anchor: settle.anchor, isLifted: isLifted,
+                isFading: isFading
+            )
+        }
+        guard let lift, let pointer, let press, case .task(_, let task)? = lift.row(among: blocks),
+              let style = task.style.lift
+        else { return nil }
+        let row = BlockRowID(block: lift.source, task: lift.task)
+        return CopyPlace(
+            task: task, style: style, column: blocks.first { $0.id == lift.source }?.column?.style, row: row,
+            origin: press.copyOrigin(at: pointer), scale: style.scale,
+            anchor: UnitPoint(x: press.copyAnchor.x, y: press.copyAnchor.y), isLifted: true, isFading: false
+        )
+    }
+
+    /// The lifted task's copy, carried or settling (`CopyPlace`): the row as iOS's copy draws it (`RowDragCopy`),
+    /// turning on its way into the row as its block draws it (`RowFace`), as wide as the row stood, over the content
+    /// and taking no pointer. An open card is never lifted, so it has none.
+    @ViewBuilder private func copy(settlingInto bounds: CGRect?) -> some View {
+        if let place = place(settlingInto: bounds) {
+            let width = dragState.frames.rows[place.row]?.width ?? settle?.size.width
+            ZStack(alignment: .topLeading) {
+                RowFace(place.task, column: place.column, send: { _ in })
+                    .frame(width: width)
+                    .opacity(place.isLifted ? 0 : 1)
+                RowDragCopy(task: place.task, lift: place.style, row: place.row, dragState: dragState)
                     // One shadow, the copy's outline's, and not one under each of its words.
                     .compositingGroup()
-                    .shadow(style.shadow)
-                    .scaleEffect(style.scale, anchor: UnitPoint(x: press.copyAnchor.x, y: press.copyAnchor.y))
-                    .offset(x: origin.x, y: origin.y)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-                }
-            case .card:
-                EmptyView()
+                    .shadow(place.style.shadow)
+                    .opacity(place.isLifted ? 1 : 0)
             }
+            .scaleEffect(place.scale, anchor: place.anchor)
+            .opacity(place.isFading ? 0 : 1)
+            .offset(x: place.origin.x, y: place.origin.y)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 }
