@@ -266,6 +266,29 @@ private func week(in store: Store) throws -> (week: ViewID, errands: ViewID, err
     #expect(chips(of: try list(inbox, in: store).model) == ["Apple", "apple", "Zebra"])
 }
 
+/// Case is folded in Cyrillic as in Latin, by the key a list sorted by title is ordered by (#45): the two spellings
+/// stand together, the capital first by its characters, and a capital no longer comes ahead of a small letter it
+/// follows in the alphabet.
+@Test func chipsTiedOnTheirCountStandByTitleWhateverItsCaseInCyrillic() throws {
+    let store = try makeStore()
+    for title in ["Яблоко", "апельсин", "Апельсин", "абрикос"] {
+        let tag = try store.createTag(title: title)
+        try store.createTask(NewTask(title: title, tags: [tag]))
+    }
+    #expect(chips(of: try list(inbox, in: store).model) == ["абрикос", "Апельсин", "апельсин", "Яблоко"])
+}
+
+/// A tag spelled with a combining mark stands where a list sorted by title puts the same title: by the bytes of its
+/// key, where `и` and a combining breve come before `ия`, and not by Swift's `<`, which puts that `й` after it.
+@Test func chipsStandWhereAListSortedByTitlePutsTheirTitles() throws {
+    let store = try makeStore()
+    for title in ["ия", "\u{438}\u{306}ка"] {
+        let tag = try store.createTag(title: title)
+        try store.createTask(NewTask(title: title, tags: [tag]))
+    }
+    #expect(chips(of: try list(inbox, in: store).model).firstIndex(of: "ия") == 1)
+}
+
 /// A task two sibling lists both select is drawn in both blocks and counted once on the bar, and a tag on every task is
 /// over the same tasks (the controller's ruling on #175, 2026-11-04).
 @Test func aTaskTwoBlocksSelectCountsOnceOnTheTagBar() throws {

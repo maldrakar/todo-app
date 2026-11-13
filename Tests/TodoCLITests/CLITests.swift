@@ -77,6 +77,14 @@ private func message(of body: () throws -> String) -> String {
     #expect(try run(store, "find nothingatall") == "nothing found")
 }
 
+/// A task's tags print in the order of their names, whatever their case and script, by the key a list sorted by title
+/// is ordered by (#45).
+@Test func printsATasksTagsInTheOrderOfTheirNames() throws {
+    let store = try makeStore()
+    _ = try CLI.run(["add", "Fruit", "--tag", "Zebra", "--tag", "Яблоко", "--tag", "apple", "--tag", "абрикос"], store: store, today: today)
+    #expect(try run(store, "list Inbox").contains("#apple  #Zebra  #абрикос  #Яблоко"))
+}
+
 @Test func namesEveryViewItPrints() throws {
     let store = try makeStore()
     // The five built-in ids agree on everything but the last character, so eight characters name all five

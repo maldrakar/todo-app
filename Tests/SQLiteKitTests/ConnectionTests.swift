@@ -224,3 +224,27 @@ let SQLITE_OK_CODE: Int32 = 0
     #expect(try matches("ОТЧ") == 1)
     #expect(try matches("xyz") == 0)
 }
+
+/// A function defined from Swift takes text and answers text, every byte of it, an embedded NUL and the empty text
+/// included. Anything else in a column declared as text, which another device may have written there, comes back as
+/// it went in rather than as a text the function made up for it.
+@Test func aDefinedFunctionMapsTextAndHandsEverythingElseBack() throws {
+    let db = try Connection.openInMemory()
+    try db.defineFunction("shout") { $0.uppercased() }
+    #expect(try db.rows("SELECT shout('ёлка'), shout(''), shout(?)", [.text("a\u{0}b")]) == [[.text("ЁЛКА"), .text(""), .text("A\u{0}B")]])
+    #expect(try db.rows("SELECT shout(7), shout(1.5), shout(NULL), shout(x'00ff')") == [[.integer(7), .real(1.5), .null, .blob([0, 255])]])
+    #expect(try db.rows("SELECT shout(CAST(x'ff61' AS TEXT))") == [[.text("\u{FFFD}A")]], "bytes that are not UTF-8 are repaired")
+}
+
+/// The function lives on the connection and not in the file, so nothing the file holds may call it: a view, a trigger
+/// or a generated column that did would make the file unreadable to every program that has not defined it, the
+/// `sqlite3` shell and an older app among them.
+@Test func aDefinedFunctionIsRefusedToTheSchema() throws {
+    let db = try Connection.openInMemory()
+    try db.defineFunction("shout") { $0.uppercased() }
+    try db.execute("CREATE TABLE t (x TEXT)")
+    try db.execute("CREATE VIEW v AS SELECT shout(x) AS y FROM t")
+    var caught: SQLiteError?
+    do { _ = try db.rows("SELECT y FROM v") } catch { caught = error }
+    #expect(caught?.message.contains("unsafe use of shout()") == true)
+}

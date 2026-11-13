@@ -42,8 +42,11 @@ enum Format {
         var parts = ["\(box) \(oneLine(task.title))"]
         if let when = task.when { parts.append("when \(when)") }
         if let deadline = task.deadline { parts.append("due \(deadline)") }
-        // By name and not by id: a person reads the names, and two runs of the same command print one order.
-        for name in task.tags.map({ name(of: $0, in: tags) }).sorted() { parts.append("#\(name)") }
+        // By name and not by id: a person reads the names, and two runs of the same command print one order. The
+        // order is the one every title is ordered by, whatever its case (`TitleOrder`), and two names it holds equal
+        // stand by their characters.
+        let names = task.tags.map { name(of: $0, in: tags) }
+        for name in names.sorted(by: { (TitleOrder.key(of: $0), $0) < (TitleOrder.key(of: $1), $1) }) { parts.append("#\(name)") }
         if task.trashed { parts.append("(trashed)") }
         parts.append("(\(short(task.id)))")
         return parts.joined(separator: "  ")

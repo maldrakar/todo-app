@@ -122,7 +122,7 @@ private let today = Day(year: 2026, month: 9, day: 11)
 @Test func orderByPutsEmptyDaysLastAndEndsWithRankAndID() {
     #expect(FilterCompiler.orderBy([]) == "t.rank, t.id")
     #expect(FilterCompiler.orderBy([SortKey(.when)]) == "(t.when_day IS NULL), t.when_day ASC, t.rank, t.id")
-    #expect(FilterCompiler.orderBy([SortKey(.completed, descending: true), SortKey(.title)]) == "(t.completed_at IS NULL), t.completed_at DESC, t.title COLLATE NOCASE ASC, t.rank, t.id")
+    #expect(FilterCompiler.orderBy([SortKey(.completed, descending: true), SortKey(.title)]) == "(t.completed_at IS NULL), t.completed_at DESC, title_key(t.title) ASC, t.rank, t.id")
     #expect(FilterCompiler.orderBy([SortKey(.rank, descending: true)]) == "t.rank DESC, t.id")
 }
 

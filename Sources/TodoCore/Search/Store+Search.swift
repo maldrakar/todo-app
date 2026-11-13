@@ -235,11 +235,9 @@ extension Store {
         }
     }
 
-    /// The best `limit` of those rows, read whole and in the order the titles put them in. The order has to
-    /// be decided before the cut, and it cannot be `ORDER BY ... COLLATE NOCASE` in the statement above:
-    /// `NOCASE` folds the ASCII letters and nothing else, which is all SQLite has without ICU (ADR-0001), so
-    /// a Cyrillic title would sort by its bytes — every capital before every lowercase — and a limit would
-    /// drop the title that comes first in the alphabet a person actually reads.
+    /// The best `limit` of those rows, read whole and in the order the titles put them in. The order is
+    /// decided before the cut, so that a limit keeps the titles that come first in the alphabet a person
+    /// reads, and by the key a list sorted by title is ordered by (`TitleOrder`).
     private func taskHits(_ rows: [TitleRow], limit: Int) throws(StoreError) -> [QuickFindHit] {
         let chosen = Store.byTitle(rows).prefix(limit)
         let byID = try tasksByID(chosen.map(\.id.rawValue))
@@ -268,15 +266,15 @@ extension Store {
         return byID
     }
 
-    /// Alphabetical by title, with the id settling ties, for every kind of hit. `lowercased` folds the case
-    /// of every alphabet the standard library knows, which is what makes one order out of a read in SQL and
-    /// a read in Swift.
+    /// Alphabetical by title, with the id settling ties, for every kind of hit. The key is `TitleOrder`'s,
+    /// the one a list sorted by title asks of SQL, which is what makes one order out of a read in SQL and a
+    /// read in Swift.
     ///
     /// Each title is folded once, before the sort, and not inside the comparison: a trigram that matches
     /// fifty thousand titles is compared some seventeen times per row, and a fold in there is two strings
     /// allocated per comparison — 130 ms of a search that takes 17 ms this way.
     private static func byTitle<Item: Titled>(_ items: [Item]) -> [Item] {
-        items.map { (key: $0.title.lowercased(), id: $0.id.rawValue, item: $0) }
+        items.map { (key: TitleOrder.key(of: $0.title), id: $0.id.rawValue, item: $0) }
             .sorted { ($0.key, $0.id) < ($1.key, $1.id) }
             .map(\.item)
     }
