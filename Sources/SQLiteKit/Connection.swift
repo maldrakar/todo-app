@@ -81,16 +81,18 @@ public final class Connection {
     /// Defines `name(text)` in this connection's SQL as `body`, for every statement prepared on it from now on.
     ///
     /// The function takes one argument. A text goes through `body` and its answer comes back as text, every byte of
-    /// it; anything else, a number, a blob or a null that sits in a column declared as text because another device
-    /// wrote it there, comes back as it went in, since there is no text in it for `body` to read. SQLite is told the
-    /// function is deterministic, so `body` answers the same for the same text, and an `ORDER BY` over it computes
-    /// the key once per row rather than once per comparison.
+    /// it; any other value, a number, a blob or a null, comes back as it went in, since there is no text in it for
+    /// `body` to read. `body` answers the same for the same text, and SQLite is told so (`SQLITE_DETERMINISTIC`), which
+    /// lets it compute a call over a constant once per statement. An `ORDER BY` over the function computes it once
+    /// per row, as the row enters the sort, and not once per comparison.
     ///
     /// The function lives on the connection and not in the file, so the schema may not call it: SQLite refuses it to
     /// a view, a trigger, an index and a generated column (`SQLITE_DIRECTONLY`). A file that called it would fail in
     /// every program that has not defined it, the `sqlite3` shell and an older version of the app among them. That is
     /// a consequence of where the function lives and not a choice of the client's, which is why it is not a parameter.
-    public func defineFunction(_ name: String, _ body: @escaping (String) -> String) throws(SQLiteError) {
+    ///
+    /// `package` and not `public`: the core is its one caller, and this target is in no product.
+    package func defineFunction(_ name: String, _ body: @escaping (String) -> String) throws(SQLiteError) {
         let function = Unmanaged.passRetained(TextFunction(body)).toOpaque()
         // SQLite releases the body through the last argument when the connection closes, when the name is defined
         // again, and when this call fails, so nothing here releases it a second time.

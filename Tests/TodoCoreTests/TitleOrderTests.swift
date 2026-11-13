@@ -25,16 +25,17 @@ private func sortedByTitle(_ store: Store, descending: Bool = false) throws -> [
 }
 
 /// Titles that differ only in case are equal to the order, so the tail that makes it total decides between them as
-/// it decides between equal titles: the rank, then the id.
+/// it decides between equal titles: the rank, then the id. The ranks run against the ids, so that neither the ids
+/// alone nor the titles' bytes give this order.
 @Test func titlesThatDifferOnlyInCaseStandByRankThenID() throws {
     let store = try makeStore()
     let stamp = HLC(millis: 1_000, counter: 0)
     var ops: [JournalOperation] = []
-    for (id, title, rank) in [("c", "АПЕЛЬСИН", "i"), ("b", "Апельсин", "i"), ("a", "апельсин", "h")] {
+    for (id, title, rank) in [("c", "АПЕЛЬСИН", "i"), ("b", "Апельсин", "i"), ("a", "апельсин", "j")] {
         ops += [store.op(.task, id, "title", .text(title), stamp), store.op(.task, id, "rank", .text(rank), stamp)]
     }
     try store.apply(ops)
-    #expect(try sortedByTitle(store) == ["апельсин", "Апельсин", "АПЕЛЬСИН"])
+    #expect(try sortedByTitle(store) == ["Апельсин", "АПЕЛЬСИН", "апельсин"])
 }
 
 /// Tags and views are ordered in Swift and tasks in SQL, and the two orders are one: the same titles come out of
@@ -60,4 +61,32 @@ private func sortedByTitle(_ store: Store, descending: Bool = false) throws -> [
     #expect(tasks == ["apple zzz", "Zebra zzz", "абрикос zzz", "Апельсин zzz", "Банан zzz", "Яблоко zzz", "ёжик zzz", "Ёлка zzz"])
     #expect(tags == tasks)
     #expect(views == tasks)
+}
+
+/// A title spelled with a combining mark, as a name copied from the Finder is, stands in one place in a list sorted by
+/// title and in quick find. SQLite compares the keys by their bytes, where `и` and a combining breve come before
+/// `ия`; Swift's `<` compares the composed form, where that `й` comes after it.
+@Test func aTitleWithACombiningMarkStandsInOnePlaceInSQLAndInSwift() throws {
+    let store = try makeStore()
+    let decomposed = "\u{438}\u{306}ка zzz"
+    for title in ["ия zzz", decomposed, "йод zzz"] {
+        try store.createTask(NewTask(title: title))
+        try store.createTag(title: title)
+        try store.createView(NewTaskView(title: title))
+    }
+    let tasks = try sortedByTitle(store)
+    var tags: [String] = []
+    var views: [String] = []
+    for hit in try store.quickFind("zzz", limit: 100) {
+        switch hit {
+        case .task: break
+        case .tag(let tag): tags.append(tag.title)
+        case .view(let view): views.append(view.title)
+        }
+    }
+    // Swift's `==` reads the two spellings of `й` as one text, so what the three lists are compared on is where
+    // `ия` stands.
+    #expect(tasks.firstIndex(of: "ия zzz") == 1)
+    #expect(tags.firstIndex(of: "ия zzz") == 1)
+    #expect(views.firstIndex(of: "ия zzz") == 1)
 }
