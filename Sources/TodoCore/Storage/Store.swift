@@ -118,7 +118,7 @@ public final class Store {
         // The order of titles lives on the connection and not in the file, so it is defined at every open, before
         // anything reads.
         do {
-            try db.defineFunction(TitleOrder.sqlName) { TitleOrder.key(of: $0).text }
+            try db.defineFunction(TitleOrder.sqlName, TitleOrder.folded)
             _ = try Migrations.run(on: db)
         } catch { throw .sqlite(error) }
         try Store.writeOwnDevice(db, device)
