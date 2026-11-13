@@ -213,7 +213,10 @@ struct BlockRow: View {
                     gestures.sendLeaving(action, row: row, on: task.style.leaving, reduceMotion: reduceMotion)
                 }
                 face
-                    .opacity(isSettling ? 0 : 1)
+                    // Hidden as it is drawn and not to accessibility, which an opacity of 0 took the row out of: a
+                    // walk let go of a card and found no row of it while its copy went back (the iOS 26.3 simulator,
+                    // 2026-11-13).
+                    .visualEffect { [isSettling] face, _ in face.opacity(isSettling ? 0 : 1) }
                     .transaction(value: isSettling) { $0.animation = nil }
                     .modifier(TaskLanding(task.style))
                     .background { task.style.ground.map { Color($0) } }

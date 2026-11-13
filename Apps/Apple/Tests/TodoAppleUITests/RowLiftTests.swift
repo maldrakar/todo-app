@@ -440,6 +440,25 @@ import TodoCore
     #expect(list.lift == nil)
 }
 
+/// A drag's end forgets its own session alone, so that another drag, which may have begun while the system still
+/// settled the first one's copy, keeps its own and can still drop.
+@Test func aDragsEndForgetsItsOwnSessionAlone() throws {
+    var list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    var sessions = RowDragSessions()
+    let first = sessions.begin(BlockRowID(block: own, task: list.a))
+    let second = sessions.begin(BlockRowID(block: own, task: list.b))
+    list.hear(.moved(list.centre(of: list.b, in: own)), session: second, in: sessions)
+    list.hear(.left, session: first, in: sessions)
+    #expect(list.lift?.task == list.b, "the first drag's end puts down no lift of the second")
+    sessions.forget(first)
+    list.hear(.moved(list.lowerHalf(of: list.c, in: own)), session: second, in: sessions)
+    list.hear(.released, session: second, in: sessions)
+    #expect(list.drops == [.rowDropped(list.b, from: own, in: own, after: list.c)])
+    list.hear(.moved(list.centre(of: list.a, in: own)), session: first, in: sessions)
+    #expect(list.lift == nil, "the first drag's session is forgotten")
+}
+
 // MARK: - A list's block's frame
 
 /// A list's block stands in a lazy stack as its parts, its header, each row and its "+ Add task", each of which reports

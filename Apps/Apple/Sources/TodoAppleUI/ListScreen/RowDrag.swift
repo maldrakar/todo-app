@@ -29,11 +29,11 @@ struct RowDragSource: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        if let menu = task.menu, let lift = task.style.lift {
+        if task.menu != nil, let lift = task.style.lift {
             let isLifted = gestures.isLifted(row)
             content
                 #if os(macOS)
-                .contextMenu { MenuItems(menu, send: delete) }
+                .contextMenu { task.menu.map { MenuItems($0, send: delete) } }
                 #endif
                 // The opacity alone: over the whole row, a drop's own end of the lift carried the row to its place on
                 // this motion, over the rows that had already moved (the iOS 26.3 simulator, 2026-11-07).

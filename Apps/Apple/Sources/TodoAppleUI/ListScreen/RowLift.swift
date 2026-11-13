@@ -1,5 +1,6 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowLift.swift
 import CoreGraphics
+import DesignSystemComponents
 import Foundation
 import TaskListFeature
 import TodoCore
@@ -11,6 +12,15 @@ import TodoCore
 struct BlockRowID: Hashable {
     let block: TaskList.Model.BlockID
     let task: TaskID
+
+    /// The model of this task's row where the blocks drawn draw it as a task's row, and nil where they draw it as an
+    /// open card or not at all: one switch over a row's kinds, every case named.
+    func rowModel(among blocks: [TaskList.Model.Block]) -> TaskRowModel<TaskList.UserAction>? {
+        switch blocks.first(where: { $0.id == block })?.rows.first(where: { $0.id == task }) {
+        case .task(_, let model)?: model
+        case .card?, nil: nil
+        }
+    }
 }
 
 /// A task lifted out of a block, by the system's drag on iOS (spike #174, y1), from its first point over the screen's
@@ -115,6 +125,13 @@ struct RowLift: Equatable {
         /// by that inset while a row was carried (the Mac, 2026-11-09).
         func lineEnd(in block: TaskList.Model.BlockID) -> CGFloat {
             blocks[block]?.width ?? 0
+        }
+
+        /// Forgets the row's frame where the blocks drawn do not draw that row: a row keeps the frame it had after it
+        /// has left its block, so that a drop bringing its task back would find it where it stood before it left.
+        mutating func forgetRow(_ row: BlockRowID, notDrawnBy drawn: [TaskList.Model.Block]) {
+            let isDrawn = drawn.first { $0.id == row.block }?.rows.contains { $0.id == row.task } == true
+            if !isDrawn { rows[row] = nil }
         }
 
         /// The row whose frame holds the point, among the rows of the blocks drawn, which leaves out those that have
@@ -246,6 +263,23 @@ struct RowLift: Equatable {
 
         /// Toward the point, where the copy fades as it goes.
         case toward(CGPoint)
+
+        /// Where the top left corner of a copy of the size stands once it has settled: at the row's, or with the
+        /// copy's middle at the point.
+        func origin(forCopyOf size: CGSize) -> CGPoint {
+            switch self {
+            case .onto(_, let frame): frame.origin
+            case .toward(let point): CGPoint(x: point.x - size.width / 2, y: point.y - size.height / 2)
+            }
+        }
+
+        /// Whether the copy settles turned into the row, neither lifted nor fading.
+        var turnsIntoRow: Bool {
+            switch self {
+            case .onto: true
+            case .toward: false
+            }
+        }
     }
 
     /// Where the copy goes, this being the lift as the release found it, among the blocks drawn and the frames their
@@ -290,8 +324,8 @@ struct RowLift: Equatable {
 /// pressing another row begins another session and takes nothing from the first, and another window's drag of the
 /// private type names a session this screen did not begin. What each call of the delegate means is one step,
 /// `phase(for:session:lift:)`, which knows no platform (`RowLiftTests`). A session is no drag until the delegate hears
-/// it, and they are all forgotten at a drop. A session outlives a lift that ended with no release, the drag having left
-/// the scroll view: it may come back.
+/// it; a drag's end forgets its own, and a drop all of them. A session outlives a lift that ended with no release, the
+/// drag having left the scroll view: it may come back.
 ///
 /// `RowDragSessions` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
@@ -314,6 +348,11 @@ struct RowDragSessions {
 
     mutating func forget() {
         rows = [:]
+    }
+
+    /// Forgets the session of a drag that has ended, and no other, which another drag may still be using.
+    mutating func forget(_ session: String) {
+        rows[session] = nil
     }
 
     /// The stage a call of the delegate is, in the session it names, nil for one that moves nothing: a session this

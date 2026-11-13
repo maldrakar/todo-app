@@ -145,3 +145,55 @@ import TodoCore
             == .toward(CGPoint(x: sight.maxX, y: card.midY))
     )
 }
+
+/// A row not laid out whose block is wholly out of sight takes the copy toward the edge of what is in sight nearest the
+/// block.
+@Test func aRowNotLaidOutInABlockOutOfSightTakesTheCopyTowardTheEdgeNearestTheBlock() throws {
+    var list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.h2, block: house, session: "first", at: list.centre(of: list.h2, in: house)))
+    list.press(.changed(list.centre(of: list.o1, in: office)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    list.leaveNotLaidOut(list.h2, in: office)
+    let block = try #require(list.frames.blocks[office])
+    list.scroll(to: block.maxY + 100)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport)
+            == .toward(CGPoint(x: block.midX, y: list.viewport.minY))
+    )
+}
+
+/// A copy settled onto a row stands where the row does, turned into it; one going toward a point stands with its middle
+/// there, still lifted, and fades.
+@Test func aSettledCopyStandsOnItsRowOrWithItsMiddleAtThePoint() {
+    let row = BlockRowID(block: .own(nil), task: TaskID())
+    let frame = CGRect(x: 10, y: 200, width: 380, height: 44)
+    let size = CGSize(width: 380, height: 44)
+    let onto = RowLift.Settling.onto(row, frame)
+    let toward = RowLift.Settling.toward(CGPoint(x: 200, y: 30))
+    #expect(onto.origin(forCopyOf: size) == frame.origin)
+    #expect(onto.turnsIntoRow)
+    #expect(toward.origin(forCopyOf: size) == CGPoint(x: 10, y: 8))
+    #expect(!toward.turnsIntoRow)
+}
+
+/// A row's frame is forgotten where the blocks drawn do not draw that row, which keeps the frame it had before it left
+/// its block, so that a drop bringing the task back does not find it there; a row they draw keeps its frame.
+@Test func aFrameOfARowNotDrawnIsForgotten() throws {
+    let list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    var frames = list.frames
+    let left = BlockRowID(block: office, task: list.h1)
+    let drawn = BlockRowID(block: house, task: list.h1)
+    frames.rows[left] = CGRect(x: 0, y: 500, width: 400, height: 44)
+    let kept = frames.rows[drawn]
+    frames.forgetRow(left, notDrawnBy: list.blocks)
+    frames.forgetRow(drawn, notDrawnBy: list.blocks)
+    #expect(frames.rows[left] == nil)
+    #expect(kept != nil)
+    #expect(frames.rows[drawn] == kept)
+}

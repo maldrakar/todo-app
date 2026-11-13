@@ -138,10 +138,9 @@ final class RowSystemDrag: NSObject {
 
     /// A task's row as the blocks drawn have it, and its frame, nil where either is missing.
     private func drawn(_ row: BlockRowID) -> (task: TaskRowModel<TaskList.UserAction>, frame: CGRect)? {
-        guard let screen, let frame = dragState?.frames.rows[row],
-              case .task(_, let task)? = screen.blocks.first(where: { $0.id == row.block })?.rows
-              .first(where: { $0.id == row.task })
-        else { return nil }
+        guard let screen, let frame = dragState?.frames.rows[row], let task = row.rowModel(among: screen.blocks) else {
+            return nil
+        }
         return (task, frame)
     }
 
@@ -251,6 +250,12 @@ final class RowSystemDrag: NSObject {
         (drop.items.first?.localObject as? Item)?.session
     }
 
+    /// Whether the drop is the drag this screen's lift stands for.
+    private func isLifting(_ session: UIDropSession) -> Bool {
+        guard let lift = screen?.lift.wrappedValue else { return false }
+        return lift.session == self.session(of: session)
+    }
+
     /// Hands a call of the drop to the session it names, where it means a stage, and makes that stage.
     private func hear(_ call: RowDragSessions.Call, _ session: UIDropSession) {
         guard let screen, let dragState,
@@ -350,13 +355,19 @@ extension RowSystemDrag: UIDragInteractionDelegate {
         settle(with: animator, onto: (item.localObject as? Item)?.row)
     }
 
-    /// The drag is over, dropped or not: a lift still standing is put down, and its sessions forgotten.
+    /// The drag is over, dropped or not: its lift, where it still stands, is put down, as when it leaves the scroll
+    /// view, and its session forgotten. Another drag's lift and session stay: one may have begun while the system still
+    /// settled this one's copy, which it does for about a second after the drop (the iOS 26.3 simulator, 2026-11-13).
     func dragInteraction(
         _ interaction: UIDragInteraction, session: UIDragSession, didEndWith operation: UIDropOperation
     ) {
-        if screen?.lift.wrappedValue != nil { step(.cancelled) }
-        dragState?.sessions.forget()
-        impact = nil
+        guard let screen, let dragState, let token = (session.items.first?.localObject as? Item)?.session else {
+            return
+        }
+        if let phase = dragState.sessions.phase(for: .left, session: token, lift: screen.lift.wrappedValue) {
+            step(phase)
+        }
+        dragState.sessions.forget(token)
     }
 }
 
@@ -369,12 +380,13 @@ extension RowSystemDrag: UIDropInteractionDelegate {
         if let point = point(of: session) { hear(.moved(point), session) }
     }
 
+    /// A move for the drag the lift stands for, never `.forbidden`, over a block that takes no drop either: a release
+    /// under it left the lift standing, by what the board showed (the iOS 26.3 simulator, 2026-11-07), and the release
+    /// reports no drop there by itself, having no slot. Any other drag, another window's or a second finger's, is
+    /// cancelled here, so that its copy goes back to its own row.
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
         if let point = point(of: session) { hear(.moved(point), session) }
-        // Never `.forbidden`, over a block that takes no drop either: a release under it left the lift standing, by
-        // what the board showed (the iOS 26.3 simulator, 2026-11-07). The release reports no drop there by itself,
-        // having no slot.
-        return UIDropProposal(operation: .move)
+        return UIDropProposal(operation: isLifting(session) ? .move : .cancel)
     }
 
     func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: UIDropSession) {
@@ -383,18 +395,21 @@ extension RowSystemDrag: UIDropInteractionDelegate {
 
     /// The drop: the slot read at the point let go, the impact played where it lands, the row it settles onto hidden,
     /// the drop sent on the slot's motion and the board settled, and where the copy goes read from the layout the drop
-    /// makes, which laying the window out now gives at once (the iOS 26.3 simulator, 2026-11-13).
+    /// makes, which laying the window out now gives at once (the iOS 26.3 simulator, 2026-11-13). The frame that row
+    /// kept from before it left its block, if it did, is forgotten first, so that a row the drop does not lay out is
+    /// not settled onto where it stood then.
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
         if let point = point(of: session) { hear(.moved(point), session) }
         guard let screen, let dragState, let released = screen.lift.wrappedValue,
-              released.session == self.session(of: session),
+              let phase = dragState.sessions.phase(for: .released, session: self.session(of: session), lift: released),
               let source = source(of: BlockRowID(block: released.source, task: released.task))
         else { return }
         if released.slot != nil { impact?.impactOccurred() }
         let row = BlockRowID(block: released.slot?.block ?? released.source, task: released.task)
+        dragState.frames.forgetRow(row, notDrawnBy: screen.blocks)
         screen.settling.wrappedValue = row
         let before = scrollView?.contentOffset.x ?? 0
-        let shift = step(.ended)
+        let shift = step(phase)
         dragState.sessions.forget()
         scrollView?.window?.layoutIfNeeded()
         // The board's move ahead, as much of it as is still to come: none where it moved at once.

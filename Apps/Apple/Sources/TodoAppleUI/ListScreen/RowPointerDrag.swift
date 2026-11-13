@@ -115,8 +115,9 @@ struct RowPointerDrag: ViewModifier {
     }
 
     /// An event of the drag: the press it leaves, and the stage of the lift it makes, with the lift it leaves and the
-    /// drop it reports.
-    private func step(_ event: RowPointerPress.Event) {
+    /// drop it reports; and that stage.
+    @discardableResult
+    private func step(_ event: RowPointerPress.Event) -> RowLift.Phase? {
         let step = RowPointerPress.after(
             event, from: press, lift: lift, among: blocks, frames: dragState.frames, viewport: dragState.viewport
         )
@@ -126,6 +127,7 @@ struct RowPointerDrag: ViewModifier {
                 phase, of: $lift, among: blocks, frames: dragState.frames, reduceMotion: reduceMotion, send: send
             )
         }
+        return step.phase
     }
 
     /// The release with the pointer at the point: the drop, and the copy of the press's own lift settling, with the
@@ -133,10 +135,10 @@ struct RowPointerDrag: ViewModifier {
     private func release(at point: CGPoint) {
         let released = lift
         let grabbed = press
-        step(.released)
-        guard !reduceMotion, let released, let grabbed, released.session == grabbed.session,
-              case .task(_, let task)? = released.row(among: blocks), let style = task.style.lift,
-              let frame = dragState.frames.rows[BlockRowID(block: released.source, task: released.task)]
+        guard case .ended = step(.released), !reduceMotion, let released, let grabbed else { return }
+        let source = BlockRowID(block: released.source, task: released.task)
+        guard let task = source.rowModel(among: blocks), let style = task.style.lift,
+              let frame = dragState.frames.rows[source]
         else { return }
         let row = BlockRowID(block: released.slot?.block ?? released.source, task: released.task)
         let column = blocks.first { $0.id == row.block }?.column?.style
@@ -175,27 +177,20 @@ struct RowPointerDrag: ViewModifier {
             let settling = RowLift.settling(
                 onto: settle.row, among: blocks, frames: frames, inSight: dragState.viewport
             )
-            let centred = { (point: CGPoint) in
-                CGPoint(x: point.x - settle.size.width / 2, y: point.y - settle.size.height / 2)
-            }
-            let (origin, isLifted, isFading): (CGPoint, Bool, Bool) = switch settling {
-            case .onto(_, let frame)?: (frame.origin, false, false)
-            case .toward(let point)?: (centred(point), true, true)
-            case nil: (settle.origin, true, true)
-            }
+            let turnsIntoRow = settling?.turnsIntoRow ?? false
             return CopyPlace(
                 task: settle.task, style: settle.style, column: settle.column,
-                row: BlockRowID(block: settle.released.source, task: settle.released.task), origin: origin,
-                scale: isLifted ? settle.style.scale : 1, anchor: settle.anchor, isLifted: isLifted,
-                isFading: isFading
+                row: BlockRowID(block: settle.released.source, task: settle.released.task),
+                origin: settling?.origin(forCopyOf: settle.size) ?? settle.origin,
+                scale: turnsIntoRow ? 1 : settle.style.scale, anchor: settle.anchor, isLifted: !turnsIntoRow,
+                isFading: !turnsIntoRow
             )
         }
-        guard let lift, let pointer, let press, case .task(_, let task)? = lift.row(among: blocks),
-              let style = task.style.lift
+        let row = lift.map { BlockRowID(block: $0.source, task: $0.task) }
+        guard let row, let pointer, let press, let task = row.rowModel(among: blocks), let style = task.style.lift
         else { return nil }
-        let row = BlockRowID(block: lift.source, task: lift.task)
         return CopyPlace(
-            task: task, style: style, column: blocks.first { $0.id == lift.source }?.column?.style, row: row,
+            task: task, style: style, column: blocks.first { $0.id == row.block }?.column?.style, row: row,
             origin: press.copyOrigin(at: pointer), scale: style.scale,
             anchor: UnitPoint(x: press.copyAnchor.x, y: press.copyAnchor.y), isLifted: true, isFading: false
         )

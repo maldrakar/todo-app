@@ -125,7 +125,7 @@ final class RowDragState {
     #elseif os(macOS)
     /// How large the scroll view the content stands in is, below the window's bar, and where the content's top left
     /// corner stands in it, as the sidebar reads its own (`ListsTree`'s `viewport` and `contentTop`): the one reported
-    /// by the scroll view (`RowDropTarget`), the other by the content (`RowPointerDrag`).
+    /// by the scroll view (`RowDragViewport`), the other by the content (`RowPointerDrag`).
     var viewportSize = CGSize.zero
     var contentOrigin = CGPoint.zero
 
@@ -209,10 +209,7 @@ extension RowLift {
     /// How the lifted task looks lifted, by its row among the blocks drawn, and nil where that row is drawn no longer
     /// or has no lift.
     private func style(among blocks: [TaskList.Model.Block]) -> TaskLiftStyle? {
-        switch row(among: blocks) {
-        case .task(_, let task)?: task.style.lift
-        case .card?, nil: nil
-        }
+        BlockRowID(block: source, task: task).rowModel(among: blocks)?.style.lift
     }
 }
 
