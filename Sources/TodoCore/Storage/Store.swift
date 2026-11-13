@@ -115,7 +115,12 @@ public final class Store {
         self.db = db
         self.clock = HybridClock(now: now)
         self.deviceID = device
-        do { _ = try Migrations.run(on: db) } catch { throw .sqlite(error) }
+        // The order of titles lives on the connection and not in the file, so it is defined at every open, before
+        // anything reads.
+        do {
+            try db.defineFunction(TitleOrder.sqlName, TitleOrder.key(of:))
+            _ = try Migrations.run(on: db)
+        } catch { throw .sqlite(error) }
         try Store.writeOwnDevice(db, device)
         self.ownDevices = try Store.readOwnDevices(db)
         // The journal holds every stamp this device has issued or seen from another one. Without replaying its

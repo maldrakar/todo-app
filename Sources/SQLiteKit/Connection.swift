@@ -78,6 +78,30 @@ public final class Connection {
         }
     }
 
+    /// Defines `name(text)` in this connection's SQL as `body`, for every statement prepared on it from now on.
+    ///
+    /// The function takes one argument. A text goes through `body` and its answer comes back as text, every byte of
+    /// it; anything else, a number, a blob or a null that sits in a column declared as text because another device
+    /// wrote it there, comes back as it went in, since there is no text in it for `body` to read. SQLite is told the
+    /// function is deterministic, so `body` answers the same for the same text, and an `ORDER BY` over it computes
+    /// the key once per row rather than once per comparison.
+    ///
+    /// The function lives on the connection and not in the file, so the schema may not call it: SQLite refuses it to
+    /// a view, a trigger, an index and a generated column (`SQLITE_DIRECTONLY`). A file that called it would fail in
+    /// every program that has not defined it, the `sqlite3` shell and an older version of the app among them. That is
+    /// a consequence of where the function lives and not a choice of the client's, which is why it is not a parameter.
+    public func defineFunction(_ name: String, _ body: @escaping (String) -> String) throws(SQLiteError) {
+        let function = Unmanaged.passRetained(TextFunction(body)).toOpaque()
+        // SQLite releases the body through the last argument when the connection closes, when the name is defined
+        // again, and when this call fails, so nothing here releases it a second time.
+        let rc = sqlite3_create_function_v2(
+            handle, name, 1, SQLITE_UTF8 | SQLITE_DETERMINISTIC | SQLITE_DIRECTONLY, function,
+            { context, _, arguments in TextFunction.call(context, arguments?[0]) }, nil, nil,
+            { function in function.map { Unmanaged<TextFunction>.fromOpaque($0).release() } }
+        )
+        if rc != SQLITE_OK { throw lastError(code: rc) }
+    }
+
     /// Prepares exactly one statement.
     ///
     /// `sqlite3_prepare_v2` compiles the first statement of the text and hands back the rest, so anything
@@ -186,5 +210,36 @@ public final class Connection {
         // the caller still knows a snapshot was being restored. A connection that throws here is spent and
         // has to be replaced, not retried.
         _ = try rows("SELECT count(*) FROM sqlite_schema")
+    }
+}
+
+/// The body of a function `Connection.defineFunction` defined, which SQLite holds as the function's user data for as
+/// long as the connection keeps the function.
+private final class TextFunction {
+    private let body: (String) -> String
+
+    init(_ body: @escaping (String) -> String) { self.body = body }
+
+    /// One call of the function from SQLite, with its one argument. A text is read whole, interior NULs included,
+    /// because its length is asked for rather than measured with `strlen`, and bytes that are not UTF-8 are repaired
+    /// rather than trusted; the answer is measured the same way and copied by SQLite, in a 64-bit length that no
+    /// answer can overflow.
+    static func call(_ context: OpaquePointer?, _ argument: OpaquePointer?) {
+        guard let context, let argument else { return }
+        guard sqlite3_value_type(argument) == SQLITE_TEXT else { return sqlite3_result_value(context, argument) }
+        // The text before its length: asking for the text can convert it, and the length SQLite then gives is the
+        // length of what was converted.
+        guard let start = sqlite3_value_text(argument) else { return sqlite3_result_error_nomem(context) }
+        let text = String(decoding: UnsafeBufferPointer(start: start, count: Int(sqlite3_value_bytes(argument))), as: UTF8.self)
+        var answer = Unmanaged<TextFunction>.fromOpaque(sqlite3_user_data(context)).takeUnretainedValue().body(text)
+        answer.withUTF8 { bytes in
+            // An empty buffer may have no address, and SQLite reads a null address as a null result, not as "".
+            guard let address = bytes.baseAddress else {
+                return sqlite3_result_text64(context, "", 0, Statement.transient, UInt8(SQLITE_UTF8))
+            }
+            address.withMemoryRebound(to: CChar.self, capacity: bytes.count) {
+                sqlite3_result_text64(context, $0, UInt64(bytes.count), Statement.transient, UInt8(SQLITE_UTF8))
+            }
+        }
     }
 }

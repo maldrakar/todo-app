@@ -150,9 +150,8 @@ enum FilterCompiler {
             case .when: parts += ["(t.when_day IS NULL)", "t.when_day \(direction)"]
             case .deadline: parts += ["(t.deadline_day IS NULL)", "t.deadline_day \(direction)"]
             case .completed: parts += ["(t.completed_at IS NULL)", "t.completed_at \(direction)"]
-            // NOCASE folds ASCII and nothing else, which is all a build without ICU can do (ADR-0001): an
-            // English list ignores case, a Russian one still sorts the capitals first.
-            case .title: parts.append("t.title COLLATE NOCASE \(direction)")
+            // The key every title is ordered by, computed once per row the read selects (`TitleOrder`).
+            case .title: parts.append("\(TitleOrder.sqlName)(t.title) \(direction)")
             case .created: parts.append("t.created_at \(direction)")
             case .updated: parts.append("t.updated_at \(direction)")
             case .rank: parts.append("t.rank \(direction)")

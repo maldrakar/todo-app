@@ -3,7 +3,8 @@ import CSQLite
 /// One prepared statement, finalized when the last reference goes away.
 public final class Statement {
     /// `SQLITE_TRANSIENT` is a macro the importer drops; SQLite copies the bound bytes when it sees this sentinel.
-    private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    /// Internal for the one other place that hands SQLite bytes it has to copy, a defined function's answer.
+    static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     private let handle: OpaquePointer
     /// Held so the connection outlives every statement prepared on it: `sqlite3_close_v2` on a connection with

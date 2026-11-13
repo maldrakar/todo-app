@@ -261,10 +261,11 @@ extension TaskList {
     }
 
     /// The tags the open tasks of the blocks carry, each task once however many blocks draw it, the most used first,
-    /// ties by title as a person reads it, whatever its case, then by its characters, so that the order is always the
-    /// same (canvas, `localeCompare`), and a tag every one of those tasks carries left out, since it
-    /// would filter nothing (spec section 7; the controller's ruling on #175, 2026-11-04). A tag the read does not
-    /// hold, which the store's reading rule never leaves on a task, has no title to show and no chip.
+    /// ties by title as a person reads it, whatever its case, by the key every title is ordered by (`TitleOrder`), then
+    /// by its characters, so that the order is always the same (canvas, `localeCompare`), and a tag every one of those
+    /// tasks carries left out, since it would filter nothing (spec section 7; the controller's ruling on #175,
+    /// 2026-11-04). A tag the read does not hold, which the store's reading rule never leaves on a task, has no title
+    /// to show and no chip.
     static func chips(in blocks: [PageBlock], tags: [Tag]) -> [Chip] {
         var counted: Set<TaskID> = []
         var counts: [TagID: Int] = [:]
@@ -278,7 +279,7 @@ extension TaskList {
         }
         return carried.sorted { lhs, rhs in
             if lhs.count != rhs.count { return lhs.count > rhs.count }
-            let (left, right) = (lhs.tag.title.lowercased(), rhs.tag.title.lowercased())
+            let (left, right) = (TitleOrder.key(of: lhs.tag.title), TitleOrder.key(of: rhs.tag.title))
             if left != right { return left < right }
             if lhs.tag.title != rhs.tag.title { return lhs.tag.title < rhs.tag.title }
             return lhs.index < rhs.index
