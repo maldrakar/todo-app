@@ -4,9 +4,11 @@
 /// Unicode tables cover, `Ялта` with `ялта` as `Apple` with `apple` (#45). This is the one statement of that order. A
 /// list sorted by title asks it of SQL by `sqlName`, quick find asks it of the tasks, tags and views it sorts in
 /// Swift, the task list asks it of the chips on its tag bar, and the command line of a task's tags, so that a title
-/// stands in the same place in each. Both sides compare keys by their UTF-8 bytes: SQLite does so with any text, and
-/// `Key` does so in Swift, where `<` on strings compares the composed form and would put a title spelled with a
-/// combining mark, as a name copied from the Finder is, somewhere other than where SQL puts it.
+/// stands in the same place in each. Both sides compare keys by their UTF-8 bytes: SQLite does so in a database whose
+/// text is UTF-8, which every file the store creates is, and `Key` does so in Swift, where `<` on strings compares the
+/// composed form and would put a title spelled with a combining mark, as a name copied from the Finder is, somewhere
+/// other than where SQL puts it. A file another program made in UTF-16 sorts every text column by UTF-16 bytes, this
+/// key among them, and puts Cyrillic ahead of Latin in a list where Swift puts it after.
 ///
 /// The key is computed by the read that orders by it and is never stored. A stored key would keep the fold of
 /// whichever version of the app wrote it, and the standard library's tables move with its Unicode version, while a

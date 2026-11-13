@@ -82,9 +82,13 @@ public final class Connection {
     ///
     /// The function takes one argument. A text goes through `body` and its answer comes back as text, every byte of
     /// it; any other value, a number, a blob or a null, comes back as it went in, since there is no text in it for
-    /// `body` to read. `body` answers the same for the same text, and SQLite is told so (`SQLITE_DETERMINISTIC`), which
-    /// lets it compute a call over a constant once per statement. An `ORDER BY` over the function computes it once
-    /// per row, as the row enters the sort, and not once per comparison.
+    /// `body` to read. An `ORDER BY` over the function computes it once per row, as the row enters the sort, and not
+    /// once per comparison.
+    ///
+    /// Two things are asked of `body`. It answers the same for the same text: SQLite is told so
+    /// (`SQLITE_DETERMINISTIC`) and may compute a call over a constant once per statement, so a body that does not
+    /// would be answered wrongly and in silence. And it does not hold this connection: SQLite keeps `body` until the
+    /// connection closes, so a body that held it would keep it open for good.
     ///
     /// The function lives on the connection and not in the file, so the schema may not call it: SQLite refuses it to
     /// a view, a trigger, an index and a generated column (`SQLITE_DIRECTONLY`). A file that called it would fail in
