@@ -53,6 +53,7 @@ struct BlockView: View {
             BlockRow(item.row, in: block.id, gestures: gestures, send: send)
                 .equatable()
                 .blockPart(.row(item.row.id), of: block.id, to: gestures.dragState)
+                .settlingPlace(gestures.isSettling(item.id))
             mark(after: item.row.id)
         }
         if parts.add, let addTask = block.addTask {
@@ -107,6 +108,14 @@ struct BlockDropTints: View {
 }
 
 extension View {
+    /// A row of a block or a column as its stack draws it while a dropped copy settles onto it: under the rows round
+    /// it, which so uncover it as they close up on the slot's motion. Over them, its ground and tint crossed their
+    /// words as it went to its place (macOS 26, 2026-11-14).
+    @MainActor
+    func settlingPlace(_ isSettling: Bool) -> some View {
+        zIndex(isSettling ? -1 : 0)
+    }
+
     /// A part of a list's block, the screen's width whatever it holds, reporting its frame among its block's
     /// (`RowDragState.report`): a block of "+ Add task" alone was only as wide as that row, its tint a pill round it
     /// and its frame a drop's nearest block for none of the screen's right side.
@@ -223,9 +232,6 @@ struct BlockRow: View {
                     .modifier(RowDragSource(task, row: row, gestures: gestures, delete: delete))
                     .modifier(SwipeToDelete(task.swipe, of: row, in: gestures.swipe, delete: delete))
                     .reportsLiftFrame(\.rows, row, to: gestures.dragState)
-                    #if os(macOS)
-                    .anchorPreference(key: SettlingRowBounds.self, value: .bounds) { isSettling ? $0 : nil }
-                    #endif
             } else {
                 face.modifier(TaskLanding(task.style))
             }
@@ -342,14 +348,3 @@ extension BlockRow: @MainActor Equatable {
     }
 }
 
-#if os(macOS)
-/// Where the row a dropped copy settles onto stands, once the drop's layout has stood it there, which the Mac's copy
-/// goes to in the same pass (`RowPointerDrag`): the one row whose copy settles gives its bounds, and every other none.
-struct SettlingRowBounds: PreferenceKey {
-    static var defaultValue: Anchor<CGRect>? { nil }
-
-    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
-        value = value ?? nextValue()
-    }
-}
-#endif
