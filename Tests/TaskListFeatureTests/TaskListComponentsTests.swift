@@ -77,14 +77,16 @@ private func phoneRow(
 }
 
 /// A row lifted: grown to 1.03, rounded 14 on the surface with the lifted shadow, and dimmed to .35 where it is dragged
-/// from.
+/// from; its slot moving on the slot's spring, and a light impact felt as it lifts and lands (#211).
 private let rowLift = TaskLiftStyle(
-    scale: 1.03, opacity: 0.35, cornerRadius: 14, background: .surface, shadow: .lifted, dimAnimation: .dropHighlights
+    scale: 1.03, opacity: 0.35, cornerRadius: 14, background: .surface, shadow: .lifted, dimAnimation: .dropHighlights,
+    slotAnimation: .slotMoves, impact: .light
 )
 
 /// A column's card lifted: the row's, but rounded as the card is, 13.
 private let cardLift = TaskLiftStyle(
-    scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, dimAnimation: .dropHighlights
+    scale: 1.03, opacity: 0.35, cornerRadius: 13, background: .surface, shadow: .lifted, dimAnimation: .dropHighlights,
+    slotAnimation: .slotMoves, impact: .light
 )
 
 /// The mark of a drop's place among a block's rows, in the check fill of the block's list, 10 high: the circle 8 across

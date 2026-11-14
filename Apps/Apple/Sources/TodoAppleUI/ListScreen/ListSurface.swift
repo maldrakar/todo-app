@@ -26,9 +26,10 @@ import TaskListFeature
 /// card takes its own (`TaskCardView`).
 ///
 /// A row's drag, menu, swipe and landing are its own (`BlockRow`); the surface keeps what they share, the drag in
-/// progress and the row swiped aside, and stands the system's drop on its scroll views on iOS (`RowDropTarget`) and the
-/// pointer's drag on their content on the Mac (`RowPointerDrag`). Any control of the content, and either "+", closes a
-/// row left swiped open.
+/// progress, the rows a dropped copy settles between and the row swiped aside, and stands the system's drag, drop and
+/// menu on its scroll views on iOS (`RowSystemDrag`) and the pointer's drag on their content on the Mac
+/// (`RowPointerDrag`).
+/// Any control of the content, and either "+", closes a row left swiped open.
 ///
 /// `ListSurface` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-09).
@@ -63,7 +64,7 @@ struct ListSurface<Buttons: ViewModifier>: View {
             .contentShape(.rect)
             .onTapGesture { sendClosingSwipe(.backgroundTapped) }
             // The content goes down under the home indicator, whichever its layout, while no sentence's strip stands
-            // under it, and ends at the strip's top while one does (`stripUnder`, #193): for the drop (`RowDropTarget`)
+            // under it, and ends at the strip's top while one does (`stripUnder`, #193): for the drop (`RowSystemDrag`)
             // and so that the board's columns end above the screen's bottom or the strip and not the safe area's
             // (`.board`'s padding); and here, outside the shape above, which ends a hit where it ends: inside it, a
             // drop's point left the target at the safe area's foot (the iOS 26.3 simulator, 2026-11-07). The keyboard
@@ -140,7 +141,7 @@ struct ListSurface<Buttons: ViewModifier>: View {
             .modifier(rowGestures.listContent(blocks, send: send))
         }
         .scrollIndicators(.hidden)
-        .modifier(rowGestures.dropTarget(blocks, settleInset: nil, send: send))
+        .modifier(rowGestures.dragViewport())
         // A row left open is not open when the list comes back, from the board or from a screen over it.
         .onDisappear { rowGestures.closeSwipe() }
         // Each block's frame the union of the parts it draws now.
@@ -205,11 +206,12 @@ struct ListSurface<Buttons: ViewModifier>: View {
             }
             BoardView(
                 board, gestures: rowGestures.forRows(delete: send),
-                dragContent: rowGestures.boardContent(board.columns, send: send), send: sendClosingSwipe
+                dragContent: rowGestures.boardContent(
+                    board.columns, settleInset: board.snaps ? board.horizontalPadding : nil, send: send
+                ),
+                send: sendClosingSwipe
             )
-            .modifier(rowGestures.dropTarget(
-                board.columns, settleInset: board.snaps ? board.horizontalPadding : nil, send: send
-            ))
+            .modifier(rowGestures.dragViewport())
         }
         .padding(.top, model.style.contentTop)
         .modifier(ContentWidth(model.style))

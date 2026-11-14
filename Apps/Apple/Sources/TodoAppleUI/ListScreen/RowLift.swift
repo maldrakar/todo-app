@@ -1,5 +1,6 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowLift.swift
 import CoreGraphics
+import DesignSystemComponents
 import Foundation
 import TaskListFeature
 import TodoCore
@@ -11,6 +12,15 @@ import TodoCore
 struct BlockRowID: Hashable {
     let block: TaskList.Model.BlockID
     let task: TaskID
+
+    /// The model of this task's row where the blocks drawn draw it as a task's row, and nil where they draw it as an
+    /// open card or not at all: one switch over a row's kinds, every case named.
+    func rowModel(among blocks: [TaskList.Model.Block]) -> TaskRowModel<TaskList.UserAction>? {
+        switch blocks.first(where: { $0.id == block })?.rows.first(where: { $0.id == task }) {
+        case .task(_, let model)?: model
+        case .card?, nil: nil
+        }
+    }
 }
 
 /// A task lifted out of a block, by the system's drag on iOS (spike #174, y1), from its first point over the screen's
@@ -27,15 +37,15 @@ struct BlockRowID: Hashable {
 /// read by the rows' middles alone, so that the gap the mark opens, which moves the rows under a still finger, does not
 /// move the slot; on a column only among the cards in sight, since a card scrolled out of it keeps a frame under its
 /// header. A block that keeps no dropped place, a list inside whose tasks stand in more than one group, offers none,
-/// since the task would keep to its own group wherever it was let go. In another block the module writes no place, a manual list taking the
-/// task last and any other standing it by its order, so the slot is that block, which its tint marks, and no place in
-/// it (the owner's review of #177, 2026-11-08).
+/// since the task would keep to its own group wherever it was let go. In another block the module writes no place, a
+/// manual list taking the task last and any other standing it by its order, so the slot is that block, which its tint
+/// marks, and no place in it (the owner's review of #177, 2026-11-08).
 struct RowLift: Equatable {
-    /// A stage of the drag, as its drop delegate reports it (`RowDragSessions`) or the Mac's pointer does
+    /// A stage of the drag, as its drop's delegate reports it (`RowDragSessions`) or the Mac's pointer does
     /// (`RowPointerPress`), with the point in the content's own coordinates where it has one: the drag is first seen,
-    /// moves, is let go once, or leaves. `onDrag` says what is carried and the first point over the scroll view says
-    /// where, since the drag has no other beginning that a press which opens the menu instead does not also have (spike
-    /// #174); the pointer's press says both at its first move.
+    /// moves, is let go once, or leaves. The drag's item says what is carried (`RowSystemDrag`) and the first point
+    /// over the scroll view says where, since the drag has no other beginning that a press which opens the menu instead
+    /// does not also have (spike #174); the pointer's press says both at its first move.
     enum Phase {
         case began(task: TaskID, block: TaskList.Model.BlockID, session: String, at: CGPoint)
         case changed(CGPoint)
@@ -116,6 +126,27 @@ struct RowLift: Equatable {
         func lineEnd(in block: TaskList.Model.BlockID) -> CGFloat {
             blocks[block]?.width ?? 0
         }
+
+        /// Forgets the row's frame where the blocks drawn do not draw that row: a row keeps the frame it had after it
+        /// has left its block, so that a drop bringing its task back would find it where it stood before it left.
+        mutating func forgetRow(_ row: BlockRowID, notDrawnBy drawn: [TaskList.Model.Block]) {
+            let isDrawn = drawn.first { $0.id == row.block }?.rows.contains { $0.id == row.task } == true
+            if !isDrawn { rows[row] = nil }
+        }
+
+        /// The row whose frame holds the point, among the rows of the blocks drawn, which leaves out those that have
+        /// left and kept their frames; and on a column only where the point is in sight of its cards, since a card
+        /// scrolled out of it keeps a frame under its header.
+        func row(at point: CGPoint, among drawn: [TaskList.Model.Block]) -> BlockRowID? {
+            for block in drawn {
+                if block.column != nil, let area = columns[block.id], !area.contains(point) { continue }
+                for row in block.rows {
+                    let id = BlockRowID(block: block.id, task: row.id)
+                    if rows[id]?.contains(point) == true { return id }
+                }
+            }
+            return nil
+        }
     }
 
     let task: TaskID
@@ -130,9 +161,9 @@ struct RowLift: Equatable {
     /// Where it would land, and nil over a block that takes no drop and over its own where it keeps no dropped place.
     private(set) var slot: Slot?
 
-    /// The drag after a stage, among the blocks drawn and the frames they last reported, and the drop that
-    /// stage reports: the first point lifts the row `onDrag` named, where it is still drawn and lifts; a move moves the
-    /// slot; the release reports the drop once, where there is a slot, and puts the task down; and a cancel puts it
+    /// The drag after a stage, among the blocks drawn and the frames they last reported, and the drop that stage
+    /// reports: the first point lifts the row the drag's item named, where it is still drawn and lifts; a move moves
+    /// the slot; the release reports the drop once, where there is a slot, and puts the task down; and a cancel puts it
     /// down and reports nothing. A stage with no task lifted moves nothing.
     static func after(
         _ phase: Phase, from lift: RowLift?, among blocks: [TaskList.Model.Block], frames: Frames
@@ -223,15 +254,84 @@ struct RowLift: Equatable {
         case nil: nil
         }
     }
+
+    /// Where the copy of the task goes once the drag is let go (#211): onto the row the task stands as, or toward a
+    /// point in sight where none of that row shows.
+    enum Settling: Equatable {
+        /// Onto the row at its frame, which stands hidden under the copy until the copy is there.
+        case onto(BlockRowID, CGRect)
+
+        /// Toward the point, where the copy fades as it goes.
+        case toward(CGPoint)
+
+        /// Where the top left corner of a copy of the size stands once it has settled: at the row's, or with the
+        /// copy's middle at the point.
+        func origin(forCopyOf size: CGSize) -> CGPoint {
+            switch self {
+            case .onto(_, let frame): frame.origin
+            case .toward(let point): CGPoint(x: point.x - size.width / 2, y: point.y - size.height / 2)
+            }
+        }
+
+        /// Whether the copy settles turned into the row, neither lifted nor fading.
+        var turnsIntoRow: Bool {
+            switch self {
+            case .onto: true
+            case .toward: false
+            }
+        }
+    }
+
+    /// Where the copy goes, this being the lift as the release found it, among the blocks drawn and the frames their
+    /// layout reports once the drop has been made, and with the part of the content in sight, all in the content's own
+    /// coordinates. The row is the one the task landed as, in the block of its slot, or its own where nothing landed.
+    /// Any of it in sight, on a column among the cards in sight or, with none of them in sight, on the board, the copy
+    /// settles onto it, going on past the edge of what is in sight as the row does: the Mac's scroll view hides the
+    /// rest of both, and iOS's copy goes on over the window's edge as briefly as its motion; a card, though, only with
+    /// its middle among its column's cards in sight, up and down, since its column's own scroll hides the card and not
+    /// the copy, which would stand over the column's header. Otherwise, toward the
+    /// edge of what is in sight nearest its middle; not laid out, toward the middle of what of its block is in sight,
+    /// the block's tinted area, or the edge nearest the block; and with neither laid out, nowhere, nil. By the row's
+    /// middle alone, a card half in sight at the board's edge sent the copy off toward that edge to fade beside it (the
+    /// owner's iPhone, 2026-11-14).
+    func settling(among blocks: [TaskList.Model.Block], frames: Frames, inSight sight: CGRect) -> Settling? {
+        Self.settling(
+            onto: BlockRowID(block: slot?.block ?? source, task: task), among: blocks, frames: frames, inSight: sight
+        )
+    }
+
+    /// Where a copy goes to settle onto the row, as `settling(among:frames:inSight:)` reads it: a lift's own where the
+    /// drag it stood for has put it down, and its copy goes back to the row it was dragged from.
+    static func settling(
+        onto row: BlockRowID, among blocks: [TaskList.Model.Block], frames: Frames, inSight sight: CGRect
+    ) -> Settling? {
+        let isColumn = blocks.first { $0.id == row.block }?.column != nil
+        let cardsSeen = isColumn ? frames.columns[row.block].map(sight.intersection) : nil
+        let seen = cardsSeen.flatMap { $0.isNull ? nil : $0 } ?? sight
+        if let frame = frames.rows[row] {
+            let middle = CGPoint(x: frame.midX, y: frame.midY)
+            let isClear = !isColumn || (seen.minY...seen.maxY).contains(middle.y)
+            return frame.intersects(seen) && isClear ? .onto(row, frame) : .toward(nearest(to: middle, in: seen))
+        }
+        guard let block = frames.blocks[row.block] else { return nil }
+        let blockSeen = block.intersection(seen)
+        if blockSeen.isNull { return .toward(nearest(to: CGPoint(x: block.midX, y: block.midY), in: seen)) }
+        return .toward(CGPoint(x: blockSeen.midX, y: blockSeen.midY))
+    }
+
+    /// The point of the area nearest the point, the point itself where the area holds it.
+    private static func nearest(to point: CGPoint, in area: CGRect) -> CGPoint {
+        CGPoint(x: min(max(point.x, area.minX), area.maxX), y: min(max(point.y, area.minY), area.maxY))
+    }
 }
 
-/// The drags `onDrag` has begun on a screen, each by the token its item provider carries, which reaches the drop's
-/// delegate through `DropInfo` (`NSItemProvider.suggestedName`; the iOS 26.3 simulator, 2026-11-07), so that a lift is
-/// tied to its drag: a second finger pressing another row begins another session and takes nothing from the first, and
-/// another window's drag of the private type names a session this screen did not begin. What each call of the delegate
-/// means is one step, `phase(for:session:lift:)`, which knows no platform (`RowLiftTests`). A press that opens the menu
-/// asks `onDrag` too, so a session is no drag until the delegate hears it; they are all forgotten at a drop. A session
-/// outlives a lift that ended with no release: the drag may come back, or go quiet and be let go.
+/// The drags the system's drag has begun on a screen's rows (`RowSystemDrag`), each by the token its item carries,
+/// which reaches the drop's delegate through the drag's local item, so that a lift is tied to its drag: a second finger
+/// pressing another row begins another session and takes nothing from the first, and another window's drag of the
+/// private type names a session this screen did not begin. What each call of the delegate means is one step,
+/// `phase(for:session:lift:)`, which knows no platform (`RowLiftTests`). A session is no drag until the delegate hears
+/// it; a drag's end forgets its own, and a drop all of them. A session outlives a lift that ended with no release, the
+/// drag having left the scroll view: it may come back.
 ///
 /// `RowDragSessions` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
@@ -245,7 +345,7 @@ struct RowDragSessions {
 
     private var rows: [String: BlockRowID] = [:]
 
-    /// Begins a session for what `onDrag` carries, and answers its token.
+    /// Begins a session for the row the drag carries, and answers its token.
     mutating func begin(_ row: BlockRowID) -> String {
         let session = UUID().uuidString
         rows[session] = row
@@ -254,6 +354,11 @@ struct RowDragSessions {
 
     mutating func forget() {
         rows = [:]
+    }
+
+    /// Forgets the session of a drag that has ended, and no other, which another drag may still be using.
+    mutating func forget(_ session: String) {
+        rows[session] = nil
     }
 
     /// The stage a call of the delegate is, in the session it names, nil for one that moves nothing: a session this

@@ -33,11 +33,12 @@ private enum RowEqualityTestError: Error {
     case notATask
 }
 
-/// What a screen's gestures stand at, with the lift given and a Delete made anew, as every pass makes it.
+/// What a screen's gestures stand at, with the lift and the rows a copy settles between given and a Delete made anew,
+/// as every pass makes it.
 @MainActor private func screenGestures(
-    lift: RowLift? = nil, dragState: RowDragState, swipe: ScreenSwipe
+    lift: RowLift? = nil, settling: RowSettling? = nil, dragState: RowDragState, swipe: ScreenSwipe
 ) -> RowGestures {
-    RowGestures(lift: lift, dragState: dragState, swipe: swipe, delete: { _ in })
+    RowGestures(lift: lift, settling: settling, dragState: dragState, swipe: swipe, delete: { _ in })
 }
 
 /// A row of a block as a pass of its block draws it, with a `send` made anew.
@@ -112,6 +113,27 @@ private enum RowEqualityTestError: Error {
     #expect(drawn(b, in: own, none) == drawn(b, in: own, atFirst), "another row lifted")
     #expect(drawn(b, in: own, atFirst) == drawn(b, in: own, atNext), "another row's slot moved")
     #expect(drawn(a, in: house, none) == drawn(a, in: house, atFirst), "the task lifted from another block")
+}
+
+/// The rows a dropped copy settles between are drawn by those rows alone, hidden: the row it settles onto, under the
+/// copy, and the row it was dragged from, gone with the copy in its place. Each is another row while the copy settles,
+/// and every other row stays equal, the same task's row in a third block among them (#211).
+@Test @MainActor func aCopySettlingChangesTheRowsItSettlesBetweenAlone() throws {
+    let list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let a = try row(list.a, of: list)
+    let b = try row(list.b, of: list)
+    let dragState = RowDragState()
+    let swipe = ScreenSwipe()
+    let none = screenGestures(dragState: dragState, swipe: swipe)
+    let between = RowSettling(onto: BlockRowID(block: own, task: list.a), from: BlockRowID(block: house, task: list.a))
+    let settling = screenGestures(settling: between, dragState: dragState, swipe: swipe)
+    #expect(drawn(a, in: own, none) != drawn(a, in: own, settling), "the row it settles onto")
+    #expect(drawn(a, in: house, none) != drawn(a, in: house, settling), "the row it was dragged from")
+    #expect(drawn(b, in: own, none) == drawn(b, in: own, settling), "another row settles")
+    #expect(drawn(a, in: office, none) == drawn(a, in: office, settling), "the task settles in other blocks")
 }
 
 /// A row is drawn with its screen's drag and swipe, one instance of each for the screen's life: another instance is

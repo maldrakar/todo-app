@@ -1,19 +1,21 @@
 // Apps/Apple/Sources/TodoAppleUI/ListScreen/RowDragState.swift
+import DesignSystemComponents
 import SwiftUI
 import TaskListFeature
 #if os(iOS)
-// A drop's point is carried into the content through the window, and a board settles by its scroll view: UIKit's alone.
+// The content and the scroll view a board settles by are UIKit's alone.
 import UIKit
 #endif
 
 /// What the screen's gestures stand at now, which its blocks and rows draw from: the lift, nil while no row is lifted,
-/// what the drag knows of the layout, the swipe, and what a row's Delete sends, which leaves the swipe as it stands,
-/// since the row goes from where it stands.
+/// the rows a dropped task's copy is settling between, nil while none is, what the drag knows of the layout, the swipe,
+/// and what a row's Delete sends, which leaves the swipe as it stands, since the row goes from where it stands.
 ///
 /// `RowGestures` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 struct RowGestures {
     let lift: RowLift?
+    let settling: RowSettling?
     let dragState: RowDragState
     let swipe: ScreenSwipe
     let delete: (TaskList.UserAction) -> Void
@@ -22,6 +24,39 @@ struct RowGestures {
     func isLifted(_ row: BlockRowID) -> Bool {
         lift?.task == row.task && lift?.source == row.block
     }
+
+    /// Whether a dropped task's copy is settling onto the row, which stands hidden under it until it is there, or from
+    /// it, which stands hidden till it goes (#211).
+    func isSettling(_ row: BlockRowID) -> Bool {
+        settling?.onto == row || settling?.from == row
+    }
+
+    /// Sends what a row's swipe or its menu chose, on the motion that takes the row away as a done row leaves with no
+    /// wait, the rows under it closing up. A swiped row goes from where it stands, aside, and its swipe ends with the
+    /// motion, which brings it back where the store refused.
+    @MainActor
+    func sendLeaving(_ action: TaskList.UserAction, row: BlockRowID, on leaving: TaskLeavingStyle, reduceMotion: Bool) {
+        guard !reduceMotion else {
+            delete(action)
+            swipe.rowLeft(row)
+            return
+        }
+        withAnimation(Animation(leaving.deleteAnimation), completionCriteria: .logicallyComplete) {
+            delete(action)
+        } completion: { [swipe] in
+            swipe.rowLeft(row)
+        }
+    }
+}
+
+/// The rows a dropped task's copy settles between (#211): the row the task landed as, which stands hidden under the
+/// copy until the copy is there, and the row it was dragged from, which stands hidden too, the copy being the task,
+/// until the drop takes it away; one row where the task stays in its block. Gone by the lift alone, which the drop
+/// puts down, it faded where it stood as the rows under it closed up through it, and so it did with a removal at once
+/// set by the lift (the owner's iPhone and the iOS 26.3 simulator, 2026-11-14).
+struct RowSettling {
+    let onto: BlockRowID
+    let from: BlockRowID
 }
 
 /// What a drag and a swipe read of the layout and of the drag under way, and draw nothing from but the tint of the
@@ -72,28 +107,18 @@ final class RowDragState {
 
     // iOS alone: only there does a system drag stand on the screen, and these are UIKit's.
     #if os(iOS)
-    /// The drags `onDrag` has begun.
+    /// The drags the system's drag has begun on the screen's rows (`RowSystemDrag`).
     var sessions = RowDragSessions()
 
-    /// Whether the drop's delegate has heard of the drag since this was last read (`RowDropTarget`).
-    var wasHeard = false
-
-    /// Where the drop's view stands in the window, and the content and the scroll view it is drawn in.
-    var dropOrigin = CGPoint.zero
+    /// The content the rows reported their frames in, and the scroll view it is drawn in (`ScrollContentFinder`).
     weak var content: UIView?
     weak var scrollView: UIScrollView?
 
-    /// A point of the drop's view, whose frame is the scroll view's, as a point of the content the rows reported their
-    /// frames in, through the window (spike #174).
-    func contentPoint(fromDrop point: CGPoint) -> CGPoint {
-        let window = CGPoint(x: dropOrigin.x + point.x, y: dropOrigin.y + point.y)
-        return content?.convert(window, from: nil) ?? point
-    }
-
     /// Brings the board to the nearest column's leading edge, its start or its end, where the system's scroll under a
-    /// drag left it between two: that scroll knows nothing of the board's snap (spike #174).
-    func settle(among blocks: [TaskList.Model.Block], inset: CGFloat, animated: Bool) {
-        guard let scrollView, let content else { return }
+    /// drag left it between two: that scroll knows nothing of the board's snap (spike #174). Answers how far it moves
+    /// the board across, which a copy settling onto a card of it goes along with (#211).
+    func settle(among blocks: [TaskList.Model.Block], inset: CGFloat, animated: Bool) -> CGFloat {
+        guard let scrollView, let content else { return 0 }
         let low = -scrollView.adjustedContentInset.left
         let high = max(
             low, scrollView.contentSize.width - scrollView.bounds.width + scrollView.adjustedContentInset.right
@@ -104,13 +129,14 @@ final class RowDragState {
         let current = scrollView.contentOffset.x
         guard let nearest = (columns + [low, high]).min(by: { abs($0 - current) < abs($1 - current) }),
               nearest != current
-        else { return }
+        else { return 0 }
         scrollView.setContentOffset(CGPoint(x: nearest, y: scrollView.contentOffset.y), animated: animated)
+        return nearest - current
     }
     #elseif os(macOS)
     /// How large the scroll view the content stands in is, below the window's bar, and where the content's top left
     /// corner stands in it, as the sidebar reads its own (`ListsTree`'s `viewport` and `contentTop`): the one reported
-    /// by the scroll view (`RowDropTarget`), the other by the content (`RowPointerDrag`).
+    /// by the scroll view (`RowDragViewport`), the other by the content (`RowPointerDrag`).
     var viewportSize = CGSize.zero
     var contentOrigin = CGPoint.zero
 
@@ -172,17 +198,29 @@ extension RowLift {
     #endif
 
     /// A stage of a screen's drag, the system's on iOS or the pointer's on the Mac: the lift it leaves, written into
-    /// the screen's where it changed, and the drop it reports, sent; and whether it put a lift down.
+    /// the screen's where it changed, and the drop it reports, sent, both on the motion the lifted task's slot moves on
+    /// (`TaskLiftStyle.slotAnimation`), so that the mark goes from place to place and the rows open and close its gap
+    /// and close up at the drop on it, or at once where a person asked for less motion (#211); and whether it put a
+    /// lift down.
     @MainActor @discardableResult
     static func step(
         _ phase: Phase, of lift: Binding<RowLift?>, among blocks: [TaskList.Model.Block], frames: Frames,
-        send: (TaskList.UserAction) -> Void
+        reduceMotion: Bool, send: (TaskList.UserAction) -> Void
     ) -> Bool {
-        let step = after(phase, from: lift.wrappedValue, among: blocks, frames: frames)
-        let hasEnded = lift.wrappedValue != nil && step.lift == nil
-        if step.lift != lift.wrappedValue { lift.wrappedValue = step.lift }
-        if let drop = step.drop { send(drop) }
-        return hasEnded
+        let current = lift.wrappedValue
+        let step = after(phase, from: current, among: blocks, frames: frames)
+        let style = (step.lift ?? current)?.style(among: blocks)
+        withAnimation(reduceMotion ? nil : style.map { Animation($0.slotAnimation) }) {
+            if step.lift != current { lift.wrappedValue = step.lift }
+            if let drop = step.drop { send(drop) }
+        }
+        return current != nil && step.lift == nil
+    }
+
+    /// How the lifted task looks lifted, by its row among the blocks drawn, and nil where that row is drawn no longer
+    /// or has no lift.
+    private func style(among blocks: [TaskList.Model.Block]) -> TaskLiftStyle? {
+        BlockRowID(block: source, task: task).rowModel(among: blocks)?.style.lift
     }
 }
 

@@ -48,6 +48,11 @@ extension DesignSystem {
         /// `cardDrop`).
         public static let drop = Animation(curve: .spring, duration: 0.32)
 
+        /// A dragged task's slot moving, over 0.3 s on a spring: the mark going from place to place, the rows opening
+        /// and closing its gap, and the copy settling into it where the platform's drag does not move it itself, as
+        /// the owner's reference moves them (#211).
+        public static let slotMoves = Animation(curve: .spring, duration: 0.3)
+
         /// A row sliding aside for its Delete and back, over 0.25 s (`Phone.dc.html`, the row's `translateX`).
         public static let swipe = Animation(curve: settle, duration: 0.25)
 

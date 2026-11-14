@@ -77,7 +77,7 @@ private func taskRowStyle(
 private func lift(_ radius: Double) -> TaskLiftStyle {
     TaskLiftStyle(
         scale: 1.03, opacity: 0.35, cornerRadius: radius, background: .surface, shadow: .lifted,
-        dimAnimation: .dropHighlights
+        dimAnimation: .dropHighlights, slotAnimation: .slotMoves, impact: .light
     )
 }
 

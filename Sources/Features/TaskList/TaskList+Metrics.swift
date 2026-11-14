@@ -473,11 +473,12 @@ extension TaskList {
         /// How the phone's row or a column's card looks lifted (Task 8's table, Lift and slot), rounded as it says, a
         /// row 14 and a card its own 13, which the table gives the card no other number for: grown to 1.03 on the
         /// surface and casting the lifted shadow, and dimmed to .35 where it is dragged from, as the system's copy of
-        /// it moves (the controller's ruling on #177, 2026-11-07).
+        /// it moves (the controller's ruling on #177, 2026-11-07); its slot moving on the slot's spring, and a light
+        /// impact felt as it lifts and lands (#211).
         static func taskLift(cornerRadius: Double) -> TaskLiftStyle {
             TaskLiftStyle(
                 scale: 1.03, opacity: 0.35, cornerRadius: cornerRadius, background: .surface, shadow: .lifted,
-                dimAnimation: .dropHighlights
+                dimAnimation: .dropHighlights, slotAnimation: .slotMoves, impact: .light
             )
         }
 

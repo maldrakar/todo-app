@@ -37,6 +37,7 @@ struct ColumnView: View {
                     ForEach(block.rows) { row in
                         BlockRow(row, in: block.id, column: column.style, gestures: gestures, send: send)
                             .equatable()
+                            .settlingPlace(gestures.isSettling(BlockRowID(block: block.id, task: row.id)))
                     }
                     if let addTask = block.addTask {
                         AddRowView(addTask, send: send)

@@ -53,6 +53,16 @@ private typealias Animation = DesignSystem.Animation
     }
 }
 
+/// A dragged task's slot moves on a 0.3 s spring, the mark and the rows that open and close its gap, and the copy
+/// settles into it on the same motion where the platform's drag does not move it itself, as the owner's reference
+/// moves them (#211). It starts at once.
+@Test func aDraggedTasksSlotMovesOnAQuickSpring() {
+    let motion = DesignSystem.Animation.slotMoves
+    #expect(motion.curve == .spring)
+    #expect(motion.duration == 0.3)
+    #expect(motion.delay == 0)
+}
+
 /// Where a person asked for less motion a done row still waits for its check to be read, and then goes with nothing to
 /// see: on a motion of no length SwiftUI took the task away at the tap, the wait and all (the iOS 26.3 simulator,
 /// 2026-11-07), so this one has a length too short to see.

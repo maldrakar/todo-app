@@ -53,6 +53,7 @@ struct BlockView: View {
             BlockRow(item.row, in: block.id, gestures: gestures, send: send)
                 .equatable()
                 .blockPart(.row(item.row.id), of: block.id, to: gestures.dragState)
+                .settlingPlace(gestures.isSettling(item.id))
             mark(after: item.row.id)
         }
         if parts.add, let addTask = block.addTask {
@@ -107,6 +108,14 @@ struct BlockDropTints: View {
 }
 
 extension View {
+    /// A row of a block or a column as its stack draws it while a dropped copy settles onto it or from it: under the
+    /// rows round it, which so uncover it as they close up on the slot's motion. Over them, its ground and tint crossed
+    /// their words as it went to its place (macOS 26, 2026-11-14).
+    @MainActor
+    func settlingPlace(_ isSettling: Bool) -> some View {
+        zIndex(isSettling ? -1 : 0)
+    }
+
     /// A part of a list's block, the screen's width whatever it holds, reporting its frame among its block's
     /// (`RowDragState.report`): a block of "+ Add task" alone was only as wide as that row, its tint a pill round it
     /// and its frame a drop's nearest block for none of the screen's right side.
@@ -166,11 +175,13 @@ private struct BlockDropTint: View {
 ///
 /// A row of a block or a column has the screen's gestures and reports its frame to them: a task's row lands, opens its
 /// menu, is dragged and swiped where its model says it can be (`TaskLanding`, `RowDragSource`, `SwipeToDelete`), and an
-/// open card, which is neither lifted nor has a menu, is only a row a drag can stand after. A row of the strip has none
-/// of them. A tap on a row while a row stands swiped open only closes that one (`Phone.dc.html`, `expand`), and a
-/// Delete takes the row away on its leaving motion. A row stands on its style's ground, which the system's menu lifts
-/// with it, and which its swipe moves off the Delete behind it: with nothing under it, the menu's shadow showed through
-/// the row (the iOS 26.3 simulator, 2026-11-07).
+/// open card, which is neither lifted nor has a menu, is only a row a drag can stand after. While a dropped task's copy
+/// settles onto a row, the row stands hidden under it, at once both ways, and its landing plays under the copy, its
+/// tint showing through; the row it was dragged from stands hidden too, till the drop takes it away (`RowSettling`,
+/// #211). A row of the strip has none of them. A tap on a row while a row stands swiped open only
+/// closes that one (`Phone.dc.html`, `expand`), and a Delete takes the row away on its leaving motion. A row stands on
+/// its style's ground, which its swipe moves off the Delete behind it; the menu stands over its lifted copy
+/// (`RowSystemDrag`).
 struct BlockRow: View {
     private let row: TaskList.Model.Row
     private let block: TaskList.Model.BlockID?
@@ -204,24 +215,26 @@ struct BlockRow: View {
     var body: some View {
         switch row {
         case .task(let id, let task):
-            // The face skips its body where only the lift changed the row.
-            let face = TaskRowView(task, send: sendFromRow(task))
-            .equatable()
-            .modifier(ColumnCardSurface(column: column))
-            .modifier(ColumnCardRing(column: column))
-            .modifier(TaskLanding(task.style))
+            let face = RowFace(task, column: column, send: sendFromRow(task))
             if let block, let gestures {
                 let row = BlockRowID(block: block, task: id)
+                let isSettling = gestures.isSettling(row)
                 let delete = { (action: TaskList.UserAction) in
-                    sendDelete(action, row: row, leaving: task.style.leaving, gestures: gestures)
+                    gestures.sendLeaving(action, row: row, on: task.style.leaving, reduceMotion: reduceMotion)
                 }
                 face
+                    // Hidden as it is drawn and not to accessibility, which an opacity of 0 took the row out of: a
+                    // walk let go of a card and found no row of it while its copy went back (the iOS 26.3 simulator,
+                    // 2026-11-13).
+                    .visualEffect { [isSettling] face, _ in face.opacity(isSettling ? 0 : 1) }
+                    .transaction(value: isSettling) { $0.animation = nil }
+                    .modifier(TaskLanding(task.style))
                     .background { task.style.ground.map { Color($0) } }
                     .modifier(RowDragSource(task, row: row, gestures: gestures, delete: delete))
                     .modifier(SwipeToDelete(task.swipe, of: row, in: gestures.swipe, delete: delete))
                     .reportsLiftFrame(\.rows, row, to: gestures.dragState)
             } else {
-                face
+                face.modifier(TaskLanding(task.style))
             }
         case .card(let id, let card):
             let face = TaskCardView(
@@ -249,74 +262,106 @@ struct BlockRow: View {
             }
         }
     }
+}
 
-    /// Sends a Delete, on the motion that takes the row away as a done row leaves with no wait, the rows under it
-    /// closing up. A swiped row goes from where it stands, aside, and its swipe ends with the motion, which brings it
-    /// back where the store refused.
-    private func sendDelete(
-        _ action: TaskList.UserAction, row: BlockRowID, leaving: TaskLeavingStyle, gestures: RowGestures
+/// A task's row as its block draws it, with none of the screen's gestures: its face, which skips its body where only
+/// the gestures changed the row, on a column's card's look where it stands in a column, whose style it is given
+/// (`Phone.dc.html`, `.card`). The row of a block draws it, and so does iOS's copy a drop settles onto it, which turns
+/// into it on its way (`RowSystemDrag`).
+struct RowFace: View {
+    private let task: TaskRowModel<TaskList.UserAction>
+    private let column: ColumnStyle?
+    private let send: (TaskList.UserAction) -> Void
+
+    init(
+        _ task: TaskRowModel<TaskList.UserAction>, column: ColumnStyle?, send: @escaping (TaskList.UserAction) -> Void
     ) {
-        guard !reduceMotion else {
-            gestures.delete(action)
-            gestures.swipe.rowLeft(row)
-            return
-        }
-        withAnimation(Animation(leaving.deleteAnimation), completionCriteria: .logicallyComplete) {
-            gestures.delete(action)
-        } completion: {
-            gestures.swipe.rowLeft(row)
-        }
+        self.task = task
+        self.column = column
+        self.send = send
     }
 
-    /// What a card of a column stands on, casting its shadow, or the deeper one its style gives while the pointer is
-    /// over it (`Hovering`; `Mac.dc.html`, `.card:hover`); and nothing for a row of the list.
-    private struct ColumnCardSurface: ViewModifier {
-        let column: ColumnStyle?
+    var body: some View {
+        TaskRowView(task, send: send)
+            .equatable()
+            .modifier(ColumnCardSurface(column: column))
+            .modifier(ColumnCardRing(column: column))
+    }
+}
 
-        func body(content: Content) -> some View {
-            if let column {
-                content.modifier(Hovering(animation: column.cardHover?.animation) { isHovered in
-                    RoundedRectangle(cornerRadius: column.cardCornerRadius, style: .circular)
-                        .fill(Color(column.cardBackground))
-                        .shadow(isHovered ? column.cardHover?.shadow ?? column.cardShadow : column.cardShadow)
-                })
-            } else {
-                content
-            }
-        }
+/// What a row stands on as its block draws it, with nothing of the row itself: a column's card's surface and
+/// hairline, and nothing for a row of the list. The Mac's copy settling onto the row turns its lift's background into
+/// it (`RowPointerDrag`).
+struct RowGround: View {
+    private let column: ColumnStyle?
+
+    init(column: ColumnStyle?) {
+        self.column = column
     }
 
-    /// The hairline round a card of a column, and nothing for a row of the list.
-    private struct ColumnCardRing: ViewModifier {
-        let column: ColumnStyle?
+    var body: some View {
+        Color.clear
+            .modifier(ColumnCardSurface(column: column))
+            .modifier(ColumnCardRing(column: column))
+    }
+}
 
-        func body(content: Content) -> some View {
-            if let column {
-                content.overlay {
-                    RoundedRectangle(cornerRadius: column.cardCornerRadius, style: .circular)
-                        .stroke(column.cardRing)
-                }
-            } else {
-                content
-            }
+/// What a card of a column stands on, casting its shadow, or the deeper one its style gives while the pointer is
+/// over it (`Hovering`; `Mac.dc.html`, `.card:hover`); and nothing for a row of the list.
+private struct ColumnCardSurface: ViewModifier {
+    let column: ColumnStyle?
+
+    func body(content: Content) -> some View {
+        if let column {
+            content.modifier(Hovering(animation: column.cardHover?.animation) { isHovered in
+                RoundedRectangle(cornerRadius: column.cardCornerRadius, style: .circular)
+                    .fill(Color(column.cardBackground))
+                    .shadow(isHovered ? column.cardHover?.shadow ?? column.cardShadow : column.cardShadow)
+            })
+        } else {
+            content
         }
     }
 }
 
-/// A row is drawn from its row, its block, its column's look and whether the drag has lifted it, with its screen's drag
-/// and swipe, and a row none of them changed skips its body: a change to one row ran every row's body, twice (#196).
-/// Its `send` and its gestures' Delete are left out, since whichever pass made them they reach the same screen's one
-/// `send`, and SwiftUI would compare them by identity, which every pass changes; and so is the row swiped aside, which
-/// `SwipeToDelete` reads where it is drawn. On the main actor, since the gestures' Delete is not `Sendable`.
+/// The hairline round a card of a column, and nothing for a row of the list.
+private struct ColumnCardRing: ViewModifier {
+    let column: ColumnStyle?
+
+    func body(content: Content) -> some View {
+        if let column {
+            content.overlay {
+                RoundedRectangle(cornerRadius: column.cardCornerRadius, style: .circular)
+                    .stroke(column.cardRing)
+            }
+        } else {
+            content
+        }
+    }
+}
+
+/// A row is drawn from its row, its block, its column's look, whether the drag has lifted it and whether a dropped copy
+/// settles onto it or from it, with its screen's drag and swipe, and a row none of them changed skips its body: a
+/// change to one row ran every row's body, twice (#196). Its `send` and its gestures' Delete are left out, since
+/// whichever pass made them they reach the same screen's one `send`, and SwiftUI would compare them by identity, which
+/// every pass changes; and so is the row swiped aside, which `SwipeToDelete` reads where it is drawn. On the main
+/// actor, since the gestures' Delete is not `Sendable`.
 extension BlockRow: @MainActor Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.row == rhs.row && lhs.block == rhs.block && lhs.column == rhs.column && lhs.isLifted == rhs.isLifted
-            && lhs.gestures?.dragState === rhs.gestures?.dragState && lhs.gestures?.swipe === rhs.gestures?.swipe
+            && lhs.isSettling == rhs.isSettling && lhs.gestures?.dragState === rhs.gestures?.dragState
+            && lhs.gestures?.swipe === rhs.gestures?.swipe
     }
 
     /// Whether the drag has lifted this row, which a row of the strip never is.
     private var isLifted: Bool {
         guard let block, let gestures else { return false }
         return gestures.isLifted(BlockRowID(block: block, task: row.id))
+    }
+
+    /// Whether a dropped copy is settling onto this row or from it, which a row of the strip never is.
+    private var isSettling: Bool {
+        guard let block, let gestures else { return false }
+        return gestures.isSettling(BlockRowID(block: block, task: row.id))
     }
 }

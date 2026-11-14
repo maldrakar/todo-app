@@ -1,0 +1,240 @@
+import CoreGraphics
+import Testing
+@testable import TodoAppleUI
+import TaskListFeature
+import TodoCore
+
+// Where the copy of a dragged task goes once it is let go (`RowLift.Settling`, #211), read from the lift as the release
+// found it and the frames the layout reports once the drop has been sent to the module, over the list of `LiftedList`.
+// What is in sight is the part of the content a test leaves in sight, the whole of it unless the test scrolls.
+
+/// Let go on a place in its own block, the copy settles onto the row where the drop has stood it: under the row the
+/// mark stood after.
+@Test func aCopyLetGoOnAPlaceSettlesOntoTheRowWhereTheDropStoodIt() throws {
+    var list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    list.press(.began(task: list.b, block: own, session: "first", at: list.centre(of: list.b, in: own)))
+    list.press(.changed(list.lowerHalf(of: list.c, in: own)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    let row = BlockRowID(block: own, task: list.b)
+    let frame = try #require(list.frames.rows[row])
+    #expect(frame.minY == list.frames.rows[BlockRowID(block: own, task: list.c)]?.maxY)
+    #expect(released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport) == .onto(row, frame))
+}
+
+/// Let go in another block, the copy settles onto the row the task appears as there, which the block it was dragged
+/// from no longer draws.
+@Test func aCopyLetGoInAnotherBlockSettlesOntoTheRowItAppearsAs() throws {
+    var list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.h2, block: house, session: "first", at: list.centre(of: list.h2, in: house)))
+    list.press(.changed(list.centre(of: list.o1, in: office)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    let row = BlockRowID(block: office, task: list.h2)
+    let frame = try #require(list.frames.rows[row])
+    #expect(released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport) == .onto(row, frame))
+}
+
+/// Let go where nothing lands, over a block that takes no drop, the copy settles back onto its own row, where it was
+/// dragged from.
+@Test func aCopyLetGoWhereNothingLandsSettlesBackOntoItsOwnRow() throws {
+    var list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    let either = TaskList.Model.BlockID.list(list.either)
+    list.press(.began(task: list.a, block: own, session: "first", at: list.centre(of: list.a, in: own)))
+    list.press(.changed(list.centre(of: list.e1, in: either)))
+    let released = try #require(list.lift)
+    #expect(released.slot == nil)
+    list.press(.ended)
+    #expect(list.drops.isEmpty)
+    let row = BlockRowID(block: own, task: list.a)
+    let frame = try #require(list.frames.rows[row])
+    #expect(released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport) == .onto(row, frame))
+}
+
+/// A row wholly out of sight, the content scrolled past it, takes the copy toward the edge of what is in sight nearest
+/// it, where the copy fades: a copy settled onto it would go where nothing shows it.
+@Test func aRowOutOfSightTakesTheCopyTowardTheEdgeOfWhatIsInSight() throws {
+    var list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.h2, block: house, session: "first", at: list.centre(of: list.h2, in: house)))
+    list.press(.changed(list.centre(of: list.o1, in: office)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    let frame = try #require(list.frames.rows[BlockRowID(block: office, task: list.h2)])
+    list.scroll(to: frame.maxY + 100)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport)
+            == .toward(CGPoint(x: frame.midX, y: list.viewport.minY))
+    )
+}
+
+/// A row the lazy stack has not laid out has no frame to settle onto, and the copy goes toward the middle of what of
+/// its block is in sight, the block's tinted area.
+@Test func aRowNotLaidOutTakesTheCopyTowardWhatOfItsBlockIsInSight() throws {
+    var list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.h2, block: house, session: "first", at: list.centre(of: list.h2, in: house)))
+    list.press(.changed(list.centre(of: list.o1, in: office)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    list.leaveNotLaidOut(list.h2, in: office)
+    let block = try #require(list.frames.blocks[office])
+    list.scroll(to: block.midY)
+    let seen = block.intersection(list.viewport)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport)
+            == .toward(CGPoint(x: seen.midX, y: seen.midY))
+    )
+}
+
+/// A card whose place is scrolled out of its column's cards in sight takes the copy toward the edge of those in sight,
+/// a column's own scroll hiding what the board's does not.
+@Test func aCardScrolledOutOfItsColumnTakesTheCopyTowardTheCardsInSight() throws {
+    var list = try LiftedList(columns: true)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.o1, block: office, session: "first", at: list.centre(of: list.o1, in: office)))
+    list.press(.changed(list.centre(of: list.h1, in: house)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    list.scrollColumn(house, by: 1_000)
+    let card = try #require(list.frames.rows[BlockRowID(block: house, task: list.o1)])
+    let area = list.visibleArea(of: house)
+    #expect(card.maxY < area.minY)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport)
+            == .toward(CGPoint(x: card.midX, y: area.minY))
+    )
+}
+
+/// A card whose middle its column has scrolled out of its cards' area, under the column's header, takes the copy
+/// toward that area's edge, though some of it shows: the column's own scroll hides the card and not the copy, which
+/// stands over the board, and a copy settled onto it would stand over the header.
+@Test func aCardHalfUnderItsColumnsHeaderTakesTheCopyTowardTheCardsInSight() throws {
+    var list = try LiftedList(columns: true)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.o1, block: office, session: "first", at: list.centre(of: list.o1, in: office)))
+    list.press(.changed(list.centre(of: list.h1, in: house)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    let area = list.visibleArea(of: house)
+    let unscrolled = try #require(list.frames.rows[BlockRowID(block: house, task: list.o1)])
+    list.scrollColumn(house, by: unscrolled.midY - area.minY + 1)
+    let card = try #require(list.frames.rows[BlockRowID(block: house, task: list.o1)])
+    #expect(card.maxY > area.minY && card.midY < area.minY)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport)
+            == .toward(CGPoint(x: card.midX, y: area.minY))
+    )
+}
+
+/// With nothing of the row or its block laid out, the copy has nowhere to go, and the platform lets it go as it would.
+@Test func aCopyWithNothingLaidOutHasNowhereToSettle() throws {
+    var list = try LiftedList()
+    let own = TaskList.Model.BlockID.own(nil)
+    list.press(.began(task: list.a, block: own, session: "first", at: list.centre(of: list.a, in: own)))
+    let released = try #require(list.lift)
+    #expect(released.settling(among: list.blocks, frames: RowLift.Frames(), inSight: list.viewport) == nil)
+}
+
+/// A column scrolled out of the board's sight has no cards in sight, and a copy going back to its card goes toward the
+/// edge of what of the board is in sight nearest it.
+@Test func aCardInAColumnOutOfSightTakesTheCopyTowardTheEdgeOfTheBoardInSight() throws {
+    var list = try LiftedList(columns: true)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let either = TaskList.Model.BlockID.list(list.either)
+    list.press(.began(task: list.o1, block: office, session: "first", at: list.centre(of: list.o1, in: office)))
+    list.press(.changed(list.centre(of: list.e1, in: either)))
+    let released = try #require(list.lift)
+    #expect(released.slot == nil)
+    list.press(.ended)
+    let card = try #require(list.frames.rows[BlockRowID(block: office, task: list.o1)])
+    let sight = CGRect(x: 0, y: 0, width: list.columnFrame(of: office).minX - 100, height: list.viewport.height)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: sight)
+            == .toward(CGPoint(x: sight.maxX, y: card.midY))
+    )
+}
+
+/// A card partly in sight, its column at the board's edge, takes the copy onto it, which goes on past that edge as the
+/// card does: by the card's middle, out of sight, the copy went off toward the edge and faded beside the card it was to
+/// turn into (the owner's iPhone, 2026-11-14).
+@Test func aCardPartlyInSightTakesTheCopyOntoIt() throws {
+    var list = try LiftedList(columns: true)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let either = TaskList.Model.BlockID.list(list.either)
+    list.press(.began(task: list.o1, block: office, session: "first", at: list.centre(of: list.o1, in: office)))
+    list.press(.changed(list.centre(of: list.e1, in: either)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    let row = BlockRowID(block: office, task: list.o1)
+    let card = try #require(list.frames.rows[row])
+    let sight = CGRect(x: 0, y: 0, width: card.midX - 1, height: list.viewport.height)
+    #expect(card.minX < sight.maxX)
+    #expect(released.settling(among: list.blocks, frames: list.frames, inSight: sight) == .onto(row, card))
+}
+
+/// A row not laid out whose block is wholly out of sight takes the copy toward the edge of what is in sight nearest the
+/// block.
+@Test func aRowNotLaidOutInABlockOutOfSightTakesTheCopyTowardTheEdgeNearestTheBlock() throws {
+    var list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.h2, block: house, session: "first", at: list.centre(of: list.h2, in: house)))
+    list.press(.changed(list.centre(of: list.o1, in: office)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    list.leaveNotLaidOut(list.h2, in: office)
+    let block = try #require(list.frames.blocks[office])
+    list.scroll(to: block.maxY + 100)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport)
+            == .toward(CGPoint(x: block.midX, y: list.viewport.minY))
+    )
+}
+
+/// A copy settled onto a row stands where the row does, turned into it; one going toward a point stands with its middle
+/// there, still lifted, and fades.
+@Test func aSettledCopyStandsOnItsRowOrWithItsMiddleAtThePoint() {
+    let row = BlockRowID(block: .own(nil), task: TaskID())
+    let frame = CGRect(x: 10, y: 200, width: 380, height: 44)
+    let size = CGSize(width: 380, height: 44)
+    let onto = RowLift.Settling.onto(row, frame)
+    let toward = RowLift.Settling.toward(CGPoint(x: 200, y: 30))
+    #expect(onto.origin(forCopyOf: size) == frame.origin)
+    #expect(onto.turnsIntoRow)
+    #expect(toward.origin(forCopyOf: size) == CGPoint(x: 10, y: 8))
+    #expect(!toward.turnsIntoRow)
+}
+
+/// A row's frame is forgotten where the blocks drawn do not draw that row, which keeps the frame it had before it left
+/// its block, so that a drop bringing the task back does not find it there; a row they draw keeps its frame.
+@Test func aFrameOfARowNotDrawnIsForgotten() throws {
+    let list = try LiftedList()
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    var frames = list.frames
+    let left = BlockRowID(block: office, task: list.h1)
+    let drawn = BlockRowID(block: house, task: list.h1)
+    frames.rows[left] = CGRect(x: 0, y: 500, width: 400, height: 44)
+    let kept = frames.rows[drawn]
+    frames.forgetRow(left, notDrawnBy: list.blocks)
+    frames.forgetRow(drawn, notDrawnBy: list.blocks)
+    #expect(frames.rows[left] == nil)
+    #expect(kept != nil)
+    #expect(frames.rows[drawn] == kept)
+}
