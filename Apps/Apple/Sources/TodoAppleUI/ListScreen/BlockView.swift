@@ -108,9 +108,9 @@ struct BlockDropTints: View {
 }
 
 extension View {
-    /// A row of a block or a column as its stack draws it while a dropped copy settles onto it: under the rows round
-    /// it, which so uncover it as they close up on the slot's motion. Over them, its ground and tint crossed their
-    /// words as it went to its place (macOS 26, 2026-11-14).
+    /// A row of a block or a column as its stack draws it while a dropped copy settles onto it or from it: under the
+    /// rows round it, which so uncover it as they close up on the slot's motion. Over them, its ground and tint crossed
+    /// their words as it went to its place (macOS 26, 2026-11-14).
     @MainActor
     func settlingPlace(_ isSettling: Bool) -> some View {
         zIndex(isSettling ? -1 : 0)
@@ -177,7 +177,8 @@ private struct BlockDropTint: View {
 /// menu, is dragged and swiped where its model says it can be (`TaskLanding`, `RowDragSource`, `SwipeToDelete`), and an
 /// open card, which is neither lifted nor has a menu, is only a row a drag can stand after. While a dropped task's copy
 /// settles onto a row, the row stands hidden under it, at once both ways, and its landing plays under the copy, its
-/// tint showing through (#211). A row of the strip has none of them. A tap on a row while a row stands swiped open only
+/// tint showing through; the row it was dragged from stands hidden too, till the drop takes it away (`RowSettling`,
+/// #211). A row of the strip has none of them. A tap on a row while a row stands swiped open only
 /// closes that one (`Phone.dc.html`, `expand`), and a Delete takes the row away on its leaving motion. A row stands on
 /// its style's ground, which its swipe moves off the Delete behind it; the menu stands over its lifted copy
 /// (`RowSystemDrag`).
@@ -265,8 +266,8 @@ struct BlockRow: View {
 
 /// A task's row as its block draws it, with none of the screen's gestures: its face, which skips its body where only
 /// the gestures changed the row, on a column's card's look where it stands in a column, whose style it is given
-/// (`Phone.dc.html`, `.card`). The row of a block draws it, and so does the copy a drop settles onto it, which turns
-/// into it on its way (`RowSystemDrag`, `RowPointerDrag`).
+/// (`Phone.dc.html`, `.card`). The row of a block draws it, and so does iOS's copy a drop settles onto it, which turns
+/// into it on its way (`RowSystemDrag`).
 struct RowFace: View {
     private let task: TaskRowModel<TaskList.UserAction>
     private let column: ColumnStyle?
@@ -283,6 +284,23 @@ struct RowFace: View {
     var body: some View {
         TaskRowView(task, send: send)
             .equatable()
+            .modifier(ColumnCardSurface(column: column))
+            .modifier(ColumnCardRing(column: column))
+    }
+}
+
+/// What a row stands on as its block draws it, with nothing of the row itself: a column's card's surface and
+/// hairline, and nothing for a row of the list. The Mac's copy settling onto the row turns its lift's background into
+/// it (`RowPointerDrag`).
+struct RowGround: View {
+    private let column: ColumnStyle?
+
+    init(column: ColumnStyle?) {
+        self.column = column
+    }
+
+    var body: some View {
+        Color.clear
             .modifier(ColumnCardSurface(column: column))
             .modifier(ColumnCardRing(column: column))
     }
@@ -323,11 +341,11 @@ private struct ColumnCardRing: ViewModifier {
 }
 
 /// A row is drawn from its row, its block, its column's look, whether the drag has lifted it and whether a dropped copy
-/// settles onto it, with its screen's drag and swipe, and a row none of them changed skips its body: a change to one
-/// row ran every row's body, twice (#196). Its `send` and its gestures' Delete are left out, since whichever pass made
-/// them they reach the same screen's one `send`, and SwiftUI would compare them by identity, which every pass changes;
-/// and so is the row swiped aside, which `SwipeToDelete` reads where it is drawn. On the main actor, since the
-/// gestures' Delete is not `Sendable`.
+/// settles onto it or from it, with its screen's drag and swipe, and a row none of them changed skips its body: a
+/// change to one row ran every row's body, twice (#196). Its `send` and its gestures' Delete are left out, since
+/// whichever pass made them they reach the same screen's one `send`, and SwiftUI would compare them by identity, which
+/// every pass changes; and so is the row swiped aside, which `SwipeToDelete` reads where it is drawn. On the main
+/// actor, since the gestures' Delete is not `Sendable`.
 extension BlockRow: @MainActor Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.row == rhs.row && lhs.block == rhs.block && lhs.column == rhs.column && lhs.isLifted == rhs.isLifted
@@ -341,10 +359,9 @@ extension BlockRow: @MainActor Equatable {
         return gestures.isLifted(BlockRowID(block: block, task: row.id))
     }
 
-    /// Whether a dropped copy is settling onto this row, which a row of the strip never is.
+    /// Whether a dropped copy is settling onto this row or from it, which a row of the strip never is.
     private var isSettling: Bool {
         guard let block, let gestures else { return false }
         return gestures.isSettling(BlockRowID(block: block, task: row.id))
     }
 }
-

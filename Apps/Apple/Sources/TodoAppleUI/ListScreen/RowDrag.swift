@@ -46,10 +46,26 @@ struct RowDragSource: ViewModifier {
     }
 }
 
-/// The copy of the row a drag carries, the system's on iOS (`RowSystemDrag`) and the one under the Mac's pointer
-/// (`RowPointerDrag`), on the lift's background and corners, as wide as the row stands: alone it would stand as wide as
-/// its title on one line. A view of its own, so that the width is read when the copy is drawn, by when the row has laid
-/// out.
+/// What a lifted copy's words stand on: the lift's background within its corners, under the copy the system's drag
+/// carries on iOS (`RowDragCopy`) and the one under the Mac's pointer (`RowPointerDrag`).
+struct LiftGround: View {
+    private let lift: TaskLiftStyle
+
+    init(_ lift: TaskLiftStyle) {
+        self.lift = lift
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: lift.cornerRadius, style: .circular)
+            .fill(Color(lift.background))
+    }
+}
+
+// iOS alone: the system's drag carries a picture of the copy, which the Mac's pointer drag draws as a view.
+#if os(iOS)
+/// The copy of the row the system's drag carries (`RowSystemDrag`), on the lift's ground (`LiftGround`), as wide as the
+/// row stands: alone it would stand as wide as its title on one line. A view of its own, so that the width is read when
+/// the copy is drawn, by when the row has laid out.
 struct RowDragCopy: View {
     let task: TaskRowModel<TaskList.UserAction>
     let lift: TaskLiftStyle
@@ -59,9 +75,10 @@ struct RowDragCopy: View {
     var body: some View {
         TaskRowView(task, send: { _ in })
             .frame(width: dragState.frames.rows[row]?.width)
-            .background(Color(lift.background), in: .rect(cornerRadius: lift.cornerRadius, style: .circular))
+            .background { LiftGround(lift) }
     }
 }
+#endif
 
 /// The scroll view of the list or the board as what the Mac's pointer drag reads of it: the space the content's place
 /// is read in and how large it is, which say what of the content is in sight, where a drop can land

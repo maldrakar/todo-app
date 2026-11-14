@@ -30,18 +30,21 @@ extension UTType {
 /// Let go, the copy settles (`RowLift.Settling`): the drop is sent on the slot's motion and the layout it makes read at
 /// once, and the copy goes onto the row the task landed as, or back onto its own where nothing landed, turning on its
 /// way into the row as its block draws it, while that row stands hidden under it (`RowGestures.isSettling`) until the
-/// system's motion ends; or, where that row is out of sight or not laid out, toward the edge of what is in sight or
-/// into its block's tinted area, fading as it goes. A drop that lands plays the lift's impact; one that lands nothing
+/// system's motion is done; or, where that row is wholly out of sight or not laid out, toward the edge of what is in
+/// sight or into its block's tinted area, fading as it goes. The system reports its motion done about a second after
+/// it looks done, and holds its preview over the window till then: a person who went back at once saw the copy over
+/// the next screen (the owner's iPhone, 2026-11-14). So the copy is put out, and its row shown, once the motion looks
+/// done (`glide`), and when the screen is taken down. A drop that lands plays the lift's impact; one that lands nothing
 /// plays none. The board, which the system's scroll left between two columns, comes to rest on one as the copy settles,
 /// and the copy goes where its card will stand.
 @MainActor
 final class RowSystemDrag: NSObject {
-    /// What the screen hands the drag at each pass: the blocks drawn, the lift and the row a copy settles onto, which
-    /// it writes, the screen's gestures, the board's inset to settle by where it snaps, and what a drop sends.
+    /// What the screen hands the drag at each pass: the blocks drawn, the lift and the rows a copy settles between,
+    /// which it writes, the screen's gestures, the board's inset to settle by where it snaps, and what a drop sends.
     struct Screen {
         let blocks: [TaskList.Model.Block]
         let lift: Binding<RowLift?>
-        let settling: Binding<BlockRowID?>
+        let settling: Binding<RowSettling?>
         let gestures: RowGestures
         let settleInset: CGFloat?
         let send: (TaskList.UserAction) -> Void
@@ -84,11 +87,18 @@ final class RowSystemDrag: NSObject {
     private var dropped: (source: Source, settling: RowLift.Settling?)?
 
     /// How far the board will still move across once it settles, from the drop to the preview's target, whose place in
-    /// the window is read before the board has moved.
+    /// the window is read before the board has moved; none otherwise.
     private var boardShift: CGFloat = 0
 
-    /// The copy fading on its way toward a point, which fades with the system's motion.
-    private var fadingCopy: UIView?
+    /// The copy's picture in the preview the system's drop or cancel carries, and whether it fades as it goes, toward a
+    /// point. The system shows that preview's view as it stands, so hiding the picture puts the copy out at once,
+    /// however long the system keeps the preview (the iOS 26.3 simulator, 2026-11-14).
+    private var settlingCopy: (picture: UIView, fades: Bool)?
+
+    /// How long the system's motion of a copy let go looks to last, after which its copy is put out: it reached its row
+    /// within four tenths of a second, a card's in three, and reports that motion done about a second after (the iOS
+    /// 26.3 simulator, 2026-11-14).
+    private static let glide = Duration.milliseconds(500)
 
     /// The row the menu stands on, from the menu's configuration to its end.
     private var menuRow: Source?
@@ -112,6 +122,10 @@ final class RowSystemDrag: NSObject {
     }
 
     func uninstall() {
+        // A copy still settling goes with the screen, and its rows show again on its end, whose state goes with the
+        // screen too, written to then.
+        settlingCopy?.picture.isHidden = true
+        settlingCopy = nil
         guard let scrollView else { return }
         scrollView.removeInteraction(menu)
         scrollView.removeInteraction(drag)
@@ -220,28 +234,47 @@ final class RowSystemDrag: NSObject {
         case .onto(let row, let frame)?:
             guard let copy = settledCopy(of: row), let target = target(at: CGPoint(x: frame.midX, y: frame.midY))
             else { return nil }
-            return UITargetedDragPreview(view: copy.view, parameters: copy.parameters, target: target)
+            return carried(copy.view, parameters: copy.parameters, fading: false, to: target)
         case .toward(let point)?:
             guard let copy = liftedCopy(of: source), let target = target(at: point) else { return nil }
-            fadingCopy = copy.view
-            return UITargetedDragPreview(view: copy.view, parameters: dragParameters(copy.parameters), target: target)
+            return carried(copy.view, parameters: dragParameters(copy.parameters), fading: true, to: target)
         case nil:
             return nil
         }
     }
 
-    /// Fades the copy going toward a point with the system's motion, and shows the row a copy settled onto once it
-    /// ends.
+    /// The preview of the picture the system carries to the target: the picture inside a view of its own, which the
+    /// system shows, so that the picture can be hidden (`settlingCopy`).
+    private func carried(
+        _ picture: UIView, parameters: UIDragPreviewParameters, fading: Bool, to target: UIDragPreviewTarget
+    ) -> UITargetedDragPreview {
+        let view = UIView(frame: picture.bounds)
+        view.addSubview(picture)
+        settlingCopy = (picture, fading)
+        return UITargetedDragPreview(view: view, parameters: parameters, target: target)
+    }
+
+    /// Fades the copy going toward a point with the system's motion, and puts the copy out and shows the row it settled
+    /// onto once that motion looks done (`glide`), or once the system says it is, if that comes first.
     private func settle(with animator: UIDragAnimating, onto row: BlockRowID?) {
-        if let fadingCopy {
-            animator.addAnimations { fadingCopy.alpha = 0 }
+        let picture = settlingCopy?.picture
+        if let picture, settlingCopy?.fades == true {
+            animator.addAnimations { picture.alpha = 0 }
         }
-        animator.addCompletion { [weak self] _ in
-            guard let self else { return }
-            fadingCopy = nil
-            boardShift = 0
-            if let row, let settling = screen?.settling, settling.wrappedValue == row { settling.wrappedValue = nil }
+        animator.addCompletion { [weak self] _ in self?.endSettling(picture, onto: row) }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.glide)
+            self?.endSettling(picture, onto: row)
         }
+    }
+
+    /// Puts out the copy whose picture is given and shows the rows it settled between, unless another drop's copy has
+    /// taken its place since: the system ends a drop's motion about a second after it began.
+    private func endSettling(_ picture: UIView?, onto row: BlockRowID?) {
+        picture?.isHidden = true
+        guard settlingCopy == nil || settlingCopy?.picture === picture else { return }
+        settlingCopy = nil
+        if let row, let settling = screen?.settling, settling.wrappedValue?.onto == row { settling.wrappedValue = nil }
     }
 
     // MARK: - The drag's stages
@@ -335,17 +368,19 @@ extension RowSystemDrag: UIDragInteractionDelegate {
         true
     }
 
-    /// Let go where no drop takes it, outside the scroll view, the copy goes back onto the row it was dragged from.
+    /// Let go where no drop takes it, outside the scroll view, the copy goes back onto the row it was dragged from, by
+    /// the board as it stands.
     func dragInteraction(
         _ interaction: UIDragInteraction, previewForCancelling item: UIDragItem,
         withDefault defaultPreview: UITargetedDragPreview
     ) -> UITargetedDragPreview? {
+        boardShift = 0
         guard let screen, let dragState, let row = (item.localObject as? Item)?.row, let source = source(of: row),
               let sight = sight()
         else { return defaultPreview }
         let settling = RowLift.settling(onto: row, among: screen.blocks, frames: dragState.frames, inSight: sight)
         guard let preview = preview(settling: settling, from: source) else { return defaultPreview }
-        if case .onto = settling { screen.settling.wrappedValue = row }
+        if case .onto = settling { screen.settling.wrappedValue = RowSettling(onto: row, from: row) }
         return preview
     }
 
@@ -393,11 +428,11 @@ extension RowSystemDrag: UIDropInteractionDelegate {
         hear(.left, session)
     }
 
-    /// The drop: the slot read at the point let go, the impact played where it lands, the row it settles onto hidden,
-    /// the drop sent on the slot's motion and the board settled, and where the copy goes read from the layout the drop
-    /// makes, which laying the window out now gives at once (the iOS 26.3 simulator, 2026-11-13). The frame that row
-    /// kept from before it left its block, if it did, is forgotten first, so that a row the drop does not lay out is
-    /// not settled onto where it stood then.
+    /// The drop: the slot read at the point let go, the impact played where it lands, the rows the copy settles between
+    /// hidden (`RowSettling`) before the drop is sent, the drop sent on the slot's motion and the board settled, and
+    /// where the copy goes read from the layout the drop makes, which laying the window out now gives at once (the iOS
+    /// 26.3 simulator, 2026-11-13). The frame the row it settles onto kept from before it left its block, if it did,
+    /// is forgotten first, so that a row the drop does not lay out is not settled onto where it stood then.
     func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
         if let point = point(of: session) { hear(.moved(point), session) }
         guard let screen, let dragState, let released = screen.lift.wrappedValue,
@@ -407,7 +442,9 @@ extension RowSystemDrag: UIDropInteractionDelegate {
         if released.slot != nil { impact?.impactOccurred() }
         let row = BlockRowID(block: released.slot?.block ?? released.source, task: released.task)
         dragState.frames.forgetRow(row, notDrawnBy: screen.blocks)
-        screen.settling.wrappedValue = row
+        screen.settling.wrappedValue = RowSettling(
+            onto: row, from: BlockRowID(block: released.source, task: released.task)
+        )
         let before = scrollView?.contentOffset.x ?? 0
         let shift = step(phase)
         dragState.sessions.forget()
@@ -418,15 +455,16 @@ extension RowSystemDrag: UIDropInteractionDelegate {
             released.settling(among: screen.blocks, frames: dragState.frames, inSight: sight)
         }
         dropped = (source, settling)
-        if case .onto? = settling { return }
-        screen.settling.wrappedValue = nil
     }
 
     func dropInteraction(
         _ interaction: UIDropInteraction, previewForDropping item: UIDragItem,
         withDefault defaultPreview: UITargetedDragPreview
     ) -> UITargetedDragPreview? {
-        defer { dropped = nil }
+        defer {
+            dropped = nil
+            boardShift = 0
+        }
         guard let dropped else { return defaultPreview }
         return preview(settling: dropped.settling, from: dropped.source) ?? defaultPreview
     }
@@ -434,7 +472,7 @@ extension RowSystemDrag: UIDropInteractionDelegate {
     func dropInteraction(
         _ interaction: UIDropInteraction, item: UIDragItem, willAnimateDropWith animator: UIDragAnimating
     ) {
-        settle(with: animator, onto: screen?.settling.wrappedValue)
+        settle(with: animator, onto: screen?.settling.wrappedValue?.onto)
     }
 }
 

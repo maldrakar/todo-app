@@ -26,8 +26,9 @@ import TaskListFeature
 /// card takes its own (`TaskCardView`).
 ///
 /// A row's drag, menu, swipe and landing are its own (`BlockRow`); the surface keeps what they share, the drag in
-/// progress, the row a dropped copy settles onto and the row swiped aside, and stands the system's drag, drop and menu
-/// on its scroll views on iOS (`RowSystemDrag`) and the pointer's drag on their content on the Mac (`RowPointerDrag`).
+/// progress, the rows a dropped copy settles between and the row swiped aside, and stands the system's drag, drop and
+/// menu on its scroll views on iOS (`RowSystemDrag`) and the pointer's drag on their content on the Mac
+/// (`RowPointerDrag`).
 /// Any control of the content, and either "+", closes a row left swiped open.
 ///
 /// `ListSurface` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and

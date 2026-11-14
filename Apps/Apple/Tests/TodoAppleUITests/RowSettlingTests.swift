@@ -57,8 +57,8 @@ import TodoCore
     #expect(released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport) == .onto(row, frame))
 }
 
-/// A row whose middle is out of sight, the content scrolled past it, takes the copy toward the edge of what is in sight
-/// nearest it, where the copy fades: a copy settled onto it would go where nothing shows it.
+/// A row wholly out of sight, the content scrolled past it, takes the copy toward the edge of what is in sight nearest
+/// it, where the copy fades: a copy settled onto it would go where nothing shows it.
 @Test func aRowOutOfSightTakesTheCopyTowardTheEdgeOfWhatIsInSight() throws {
     var list = try LiftedList()
     let house = TaskList.Model.BlockID.list(list.house)
@@ -118,6 +118,29 @@ import TodoCore
     )
 }
 
+/// A card whose middle its column has scrolled out of its cards' area, under the column's header, takes the copy
+/// toward that area's edge, though some of it shows: the column's own scroll hides the card and not the copy, which
+/// stands over the board, and a copy settled onto it would stand over the header.
+@Test func aCardHalfUnderItsColumnsHeaderTakesTheCopyTowardTheCardsInSight() throws {
+    var list = try LiftedList(columns: true)
+    let house = TaskList.Model.BlockID.list(list.house)
+    let office = TaskList.Model.BlockID.list(list.office)
+    list.press(.began(task: list.o1, block: office, session: "first", at: list.centre(of: list.o1, in: office)))
+    list.press(.changed(list.centre(of: list.h1, in: house)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    list.sendDrops()
+    let area = list.visibleArea(of: house)
+    let unscrolled = try #require(list.frames.rows[BlockRowID(block: house, task: list.o1)])
+    list.scrollColumn(house, by: unscrolled.midY - area.minY + 1)
+    let card = try #require(list.frames.rows[BlockRowID(block: house, task: list.o1)])
+    #expect(card.maxY > area.minY && card.midY < area.minY)
+    #expect(
+        released.settling(among: list.blocks, frames: list.frames, inSight: list.viewport)
+            == .toward(CGPoint(x: card.midX, y: area.minY))
+    )
+}
+
 /// With nothing of the row or its block laid out, the copy has nowhere to go, and the platform lets it go as it would.
 @Test func aCopyWithNothingLaidOutHasNowhereToSettle() throws {
     var list = try LiftedList()
@@ -144,6 +167,24 @@ import TodoCore
         released.settling(among: list.blocks, frames: list.frames, inSight: sight)
             == .toward(CGPoint(x: sight.maxX, y: card.midY))
     )
+}
+
+/// A card partly in sight, its column at the board's edge, takes the copy onto it, which goes on past that edge as the
+/// card does: by the card's middle, out of sight, the copy went off toward the edge and faded beside the card it was to
+/// turn into (the owner's iPhone, 2026-11-14).
+@Test func aCardPartlyInSightTakesTheCopyOntoIt() throws {
+    var list = try LiftedList(columns: true)
+    let office = TaskList.Model.BlockID.list(list.office)
+    let either = TaskList.Model.BlockID.list(list.either)
+    list.press(.began(task: list.o1, block: office, session: "first", at: list.centre(of: list.o1, in: office)))
+    list.press(.changed(list.centre(of: list.e1, in: either)))
+    let released = try #require(list.lift)
+    list.press(.ended)
+    let row = BlockRowID(block: office, task: list.o1)
+    let card = try #require(list.frames.rows[row])
+    let sight = CGRect(x: 0, y: 0, width: card.midX - 1, height: list.viewport.height)
+    #expect(card.minX < sight.maxX)
+    #expect(released.settling(among: list.blocks, frames: list.frames, inSight: sight) == .onto(row, card))
 }
 
 /// A row not laid out whose block is wholly out of sight takes the copy toward the edge of what is in sight nearest the

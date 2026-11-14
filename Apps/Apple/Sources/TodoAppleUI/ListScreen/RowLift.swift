@@ -256,7 +256,7 @@ struct RowLift: Equatable {
     }
 
     /// Where the copy of the task goes once the drag is let go (#211): onto the row the task stands as, or toward a
-    /// point in sight where that row cannot show it.
+    /// point in sight where none of that row shows.
     enum Settling: Equatable {
         /// Onto the row at its frame, which stands hidden under the copy until the copy is there.
         case onto(BlockRowID, CGRect)
@@ -285,10 +285,15 @@ struct RowLift: Equatable {
     /// Where the copy goes, this being the lift as the release found it, among the blocks drawn and the frames their
     /// layout reports once the drop has been made, and with the part of the content in sight, all in the content's own
     /// coordinates. The row is the one the task landed as, in the block of its slot, or its own where nothing landed.
-    /// Whose middle is in sight, on a column among the cards in sight or, with none of them in sight, on the board, the
-    /// copy settles onto it; out of sight, toward the edge of what is in sight nearest it; not laid out, toward the
-    /// middle of what of its block is in sight, the block's tinted area, or the edge nearest the block; and with
-    /// neither laid out, nowhere, nil.
+    /// Any of it in sight, on a column among the cards in sight or, with none of them in sight, on the board, the copy
+    /// settles onto it, going on past the edge of what is in sight as the row does: the Mac's scroll view hides the
+    /// rest of both, and iOS's copy goes on over the window's edge as briefly as its motion; a card, though, only with
+    /// its middle among its column's cards in sight, up and down, since its column's own scroll hides the card and not
+    /// the copy, which would stand over the column's header. Otherwise, toward the
+    /// edge of what is in sight nearest its middle; not laid out, toward the middle of what of its block is in sight,
+    /// the block's tinted area, or the edge nearest the block; and with neither laid out, nowhere, nil. By the row's
+    /// middle alone, a card half in sight at the board's edge sent the copy off toward that edge to fade beside it (the
+    /// owner's iPhone, 2026-11-14).
     func settling(among blocks: [TaskList.Model.Block], frames: Frames, inSight sight: CGRect) -> Settling? {
         Self.settling(
             onto: BlockRowID(block: slot?.block ?? source, task: task), among: blocks, frames: frames, inSight: sight
@@ -305,7 +310,8 @@ struct RowLift: Equatable {
         let seen = cardsSeen.flatMap { $0.isNull ? nil : $0 } ?? sight
         if let frame = frames.rows[row] {
             let middle = CGPoint(x: frame.midX, y: frame.midY)
-            return seen.contains(middle) ? .onto(row, frame) : .toward(nearest(to: middle, in: seen))
+            let isClear = !isColumn || (seen.minY...seen.maxY).contains(middle.y)
+            return frame.intersects(seen) && isClear ? .onto(row, frame) : .toward(nearest(to: middle, in: seen))
         }
         guard let block = frames.blocks[row.block] else { return nil }
         let blockSeen = block.intersection(seen)

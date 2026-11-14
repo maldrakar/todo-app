@@ -3,8 +3,8 @@ import SwiftUI
 import TaskListFeature
 
 /// What a list screen keeps of its rows' gestures, the view's own, which nothing else can know: the drag in progress,
-/// the row a dropped copy settles onto, what the drag reads of the layout, and the row swiped aside; and what its views
-/// take of them.
+/// the rows a dropped copy settles between, what the drag reads of the layout, and the row swiped aside; and what its
+/// views take of them.
 ///
 /// `ListScreenGestures` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
@@ -13,8 +13,8 @@ struct ListScreenGestures: DynamicProperty {
     /// The task a drag has lifted, the system's on iOS or the pointer's on the Mac, and nil while none is.
     @State private var lift: RowLift?
 
-    /// The row a dropped task's copy is settling onto, hidden under it, and nil while none is (#211).
-    @State private var settling: BlockRowID?
+    /// The rows a dropped task's copy is settling between, both hidden, and nil while none is (#211).
+    @State private var settling: RowSettling?
 
     /// What the drag and the swipe read of the layout, which nothing observes.
     @State private var dragState = RowDragState()

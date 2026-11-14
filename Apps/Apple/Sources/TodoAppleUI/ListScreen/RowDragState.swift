@@ -8,14 +8,14 @@ import UIKit
 #endif
 
 /// What the screen's gestures stand at now, which its blocks and rows draw from: the lift, nil while no row is lifted,
-/// the row a dropped task's copy is settling onto, nil while none is, what the drag knows of the layout, the swipe, and
-/// what a row's Delete sends, which leaves the swipe as it stands, since the row goes from where it stands.
+/// the rows a dropped task's copy is settling between, nil while none is, what the drag knows of the layout, the swipe,
+/// and what a row's Delete sends, which leaves the swipe as it stands, since the row goes from where it stands.
 ///
 /// `RowGestures` was probed free as `DesignSystem` was: unresolved in a file importing SwiftUI, Foundation and
 /// Observation for macOS 14, iOS 17 and watchOS 10 with Xcode 27.1 (2026-11-07).
 struct RowGestures {
     let lift: RowLift?
-    let settling: BlockRowID?
+    let settling: RowSettling?
     let dragState: RowDragState
     let swipe: ScreenSwipe
     let delete: (TaskList.UserAction) -> Void
@@ -25,9 +25,10 @@ struct RowGestures {
         lift?.task == row.task && lift?.source == row.block
     }
 
-    /// Whether a dropped task's copy is settling onto the row, which stands hidden under it until it is there (#211).
+    /// Whether a dropped task's copy is settling onto the row, which stands hidden under it until it is there, or from
+    /// it, which stands hidden till it goes (#211).
     func isSettling(_ row: BlockRowID) -> Bool {
-        settling == row
+        settling?.onto == row || settling?.from == row
     }
 
     /// Sends what a row's swipe or its menu chose, on the motion that takes the row away as a done row leaves with no
@@ -46,6 +47,16 @@ struct RowGestures {
             swipe.rowLeft(row)
         }
     }
+}
+
+/// The rows a dropped task's copy settles between (#211): the row the task landed as, which stands hidden under the
+/// copy until the copy is there, and the row it was dragged from, which stands hidden too, the copy being the task,
+/// until the drop takes it away; one row where the task stays in its block. Gone by the lift alone, which the drop
+/// puts down, it faded where it stood as the rows under it closed up through it, and so it did with a removal at once
+/// set by the lift (the owner's iPhone and the iOS 26.3 simulator, 2026-11-14).
+struct RowSettling {
+    let onto: BlockRowID
+    let from: BlockRowID
 }
 
 /// What a drag and a swipe read of the layout and of the drag under way, and draw nothing from but the tint of the
