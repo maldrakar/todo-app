@@ -123,7 +123,7 @@ progress and Linked pull requests.
 | ------ | ------- |
 | `Todo` | Not started |
 | `In progress` | The engineer is working on it |
-| `In review` | The owner's move: a spec, a plan or a pull request waits for review |
+| `In review` | The owner's move: a spec, a plan, a pull request or a spike's answer waits for the owner |
 | `Done` | Closed |
 
 The project has two views. `Backlog` is a table of every open issue
@@ -133,13 +133,21 @@ grooming and says so in chat. `Board` lays the current milestone's
 issues out by status.
 
 The project's workflows add every new issue of the repository and every
-sub-issue of an item, set `Todo` on an added item, `In review` when a
-pull request is linked to the issue, and `Done` when the issue closes;
-moving an item to `Done` closes its issue. The engineer moves the rest
-by hand: `In progress` when work on the issue starts, `In review` when a
-spec or plan is published for the owner's review, back to `In progress`
-when a review asks for changes, and to `In review` again when they are
-pushed. The owner never has to move a status.
+sub-issue of an item, set `Todo` on an added or reopened item,
+`In review` when a pull request is linked to the issue, and `Done` when
+the issue closes; moving an item to `Done` closes its issue. The
+engineer moves the rest by hand:
+
+- `In progress` when work on the issue starts.
+- `In review` when a spec, a plan or a spike's answer is handed to the
+  owner.
+- Out of `In review` when the owner answers and the issue stays open:
+  back to `In progress` on a request for changes, and on an approval
+  that leaves work to do, such as an approved spec whose issue becomes
+  the epic.
+- `In review` again when the requested changes are pushed.
+
+The owner never has to move a status.
 
 ## 5. Sizes of work
 
@@ -192,8 +200,9 @@ flowchart LR
    scope, for example `feat(core): add task repository`. Scopes: `core`,
    `apple`, `web`, `docs`, `infra`, `ci`. Linking the PR moves its issue
    to `In review`.
-5. **Review and merge.** The owner reviews. A review that asks for
-   changes moves the issue back to `In progress` until they are pushed.
+5. **Review and merge.** The owner reviews. When a review asks for
+   changes, the engineer moves the issue back to `In progress`, and to
+   `In review` again once they are pushed.
    Merging happens either by the owner in GitHub or by the engineer via
    `gh pr merge` after an explicit OK in chat. Squash merge, one commit
    per issue, the branch is deleted and the issue closes automatically.
