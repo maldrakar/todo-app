@@ -65,11 +65,13 @@ docs/plans/<topic>.md     implementation plans derived from approved specs
 ## 4. Backlog
 
 The backlog lives in GitHub Issues. Milestones represent product
-increments. Specs and ADRs live in the repository.
+increments. A GitHub Project holds the backlog's order and each issue's
+status. Specs and ADRs live in the repository.
 
 **Issues.** One task is one issue. The issue template has four fields:
 Context, Goal, Acceptance criteria, Out of scope. Priority inside a
-milestone is expressed by order, not by a label.
+milestone is expressed by order, not by a label: the order of the rows
+in the project's `Backlog` view.
 
 **Labels.** Deliberately minimal; new ones are added when a real need
 appears.
@@ -107,6 +109,46 @@ tag (section 9). The initial set follows the brief:
 | `M3 Navigation` | The navigation epic (#67): routes, windows, links, restoration and the first iPhone build, brought forward on 2026-10-14 so that product screens are built on settled mechanics |
 | `M4+` | Product functionality, planned after M3 |
 
+**Project.** The private GitHub Project `Todo app`
+(`users/maldrakar/projects/2`), linked to this repository, holds what
+an issue and a milestone cannot: the order of the backlog and the status
+of each issue. Milestones stay the increments and version tags (section
+9); the project does not replace them. Its items are issues only, a
+pull request showing on its issue through `Closes #N`. Every open issue
+is an item, those without a milestone included. Only GitHub's built-in
+fields are used: Status, Milestone, Labels, Parent issue, Sub-issues
+progress and Linked pull requests.
+
+| Status | Meaning |
+| ------ | ------- |
+| `Todo` | Not started |
+| `In progress` | The engineer is working on it |
+| `In review` | The owner's move: a spec, a plan, a pull request or a spike's answer waits for the owner |
+| `Done` | Closed |
+
+The project has two views. `Backlog` is a table of every open issue
+grouped by milestone, and its row order is the priority: the owner
+reprioritizes by dragging rows, and the engineer reorders them when
+grooming and says so in chat. `Board` lays the current milestone's
+issues out by status.
+
+The project's workflows add every new issue of the repository and every
+sub-issue of an item, set `Todo` on an added or reopened item,
+`In review` when a pull request is linked to the issue, and `Done` when
+the issue closes; moving an item to `Done` closes its issue. The
+engineer moves the rest by hand:
+
+- `In progress` when work on the issue starts.
+- `In review` when a spec, a plan or a spike's answer is handed to the
+  owner.
+- Out of `In review` when the owner answers and the issue stays open:
+  back to `In progress` on a request for changes, and on an approval
+  that leaves work to do, such as an approved spec whose issue becomes
+  the epic.
+- `In review` again when the requested changes are pushed.
+
+The owner never has to move a status.
+
 ## 5. Sizes of work
 
 Every task is classified before work starts, and the classification is
@@ -129,7 +171,7 @@ created as its sub-issues, and the spec and plan PRs reference it.
 
 ```mermaid
 flowchart LR
-  I[Top open issue<br/>in current milestone] --> C{Size?}
+  I[Top Todo row<br/>in current milestone] --> C{Size?}
   C -->|spike| S[Investigate,<br/>answer in issue]
   C -->|bounded| D[Short design in chat,<br/>owner OK]
   C -->|architectural| B[Brainstorm, spec, review,<br/>plan, child issues]
@@ -140,8 +182,9 @@ flowchart LR
   R -->|merge button, or OK in chat| M[Squash into main,<br/>issue closes]
 ```
 
-1. **Pick.** The engineer takes the top open issue of the current
-   milestone and classifies it (section 5).
+1. **Pick.** The engineer takes the top `Todo` row of the current
+   milestone in the project's `Backlog` view, classifies it (section 5)
+   and moves it to `In progress` (section 4).
 2. **Branch.** `<type>/<issue-number>-<slug>`, for example
    `feature/12-task-repository`. Development is test-first.
 3. **Verify.** Before opening a PR: build, tests, a self-review of the
@@ -155,12 +198,16 @@ flowchart LR
 4. **Pull request.** Follows the PR template: what changed, how it was
    verified, `Closes #N`. The title uses Conventional Commits with a
    scope, for example `feat(core): add task repository`. Scopes: `core`,
-   `apple`, `web`, `docs`, `infra`, `ci`.
-5. **Review and merge.** The owner reviews. Merging happens either by the
-   owner in GitHub or by the engineer via `gh pr merge` after an explicit
-   OK in chat. Squash merge, one commit per issue, the branch is deleted
-   and the issue closes automatically. The squash commit message is the
-   PR title, so `main` history reads as a list of Conventional Commits.
+   `apple`, `web`, `docs`, `infra`, `ci`. Linking the PR moves its issue
+   to `In review`.
+5. **Review and merge.** The owner reviews. When a review asks for
+   changes, the engineer moves the issue back to `In progress`, and to
+   `In review` again once they are pushed.
+   Merging happens either by the owner in GitHub or by the engineer via
+   `gh pr merge` after an explicit OK in chat. Squash merge, one commit
+   per issue, the branch is deleted and the issue closes automatically.
+   The squash commit message is the PR title, so `main` history reads as
+   a list of Conventional Commits.
 
 **Working from a plan.** A task that comes from a plan (section 7)
 starts by reading its section against the code its dependencies
@@ -317,6 +364,7 @@ A milestone is closed when all of the following hold:
 - `CHANGELOG.md` moves the Unreleased section into a versioned one.
 - `main` is tagged `v0.N.0` and a GitHub Release is created with
   `gh release create`.
+- The project's `Board` view is filtered to the next milestone.
 - There is something runnable on at least one platform. For M0 that is
   the repository with the process in place; for M1, the core test suite
   and a command-line demo of the core.
@@ -371,3 +419,9 @@ merge starts it from the Actions tab.
   after it.
 - `docs/style.md` was written from the reviews of M1's first seven tasks
   and is not complete; it grows with each review.
+- Part of the project's setup lives only in GitHub's web interface. The
+  API sets a field's options, an item's position and a view's name,
+  layout, filter and visible fields, but not a view's grouping or
+  sorting and not the workflows, which it can only read or delete. If
+  the project is ever rebuilt, section 4 is its description and those
+  settings are made by hand.

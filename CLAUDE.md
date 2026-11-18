@@ -24,7 +24,8 @@ Everything in the repository and on GitHub is in English. Conversation with the 
 ## Backlog
 
 - GitHub Issues. Milestones are increments: `M0 Process`, `M1 Core architecture`, `M2 Feature-module architecture`, `M3 Navigation`, `M4 Product functionality`.
-- Issue body has four sections: Context, Goal, Acceptance criteria, Out of scope. Priority inside a milestone is the order of issues, not a label.
+- Issue body has four sections: Context, Goal, Acceptance criteria, Out of scope. Priority inside a milestone is the order of rows in the project's `Backlog` view, not a label.
+- Project: private `Todo app` (`users/maldrakar/projects/2`), issues only, every open issue, built-in fields only. Views: `Backlog` (open issues grouped by milestone, row order is priority; I reorder when grooming and say so in chat) and `Board` (current milestone by status). Status `Todo`, `In progress`, `In review` (the owner's move), `Done`. Workflows add new issues and sub-issues, set `Todo` on add or reopen, `In review` on a linked PR, `Done` on close. I move the rest: `In progress` when work starts; `In review` when a spec, a plan or a spike's answer goes to the owner; back to `In progress` when the owner asks for changes or approves with work left (an approved spec's epic); `In review` again when the changes are pushed. View grouping and workflows exist only in the web UI (`docs/process.md` §12).
 - Labels: type `feature` `bug` `arch` `infra` `docs` `spike` `epic`; area `core` `ui-apple` `ui-web`.
 - Epic: an issue labeled `epic` that links the spec and plan. Children are attached as sub-issues through `gh api graphql`; a task list in the epic body is the fallback.
 
@@ -38,7 +39,7 @@ Say the classification out loud before starting; when in doubt go heavier, never
 
 ## Task lifecycle
 
-1. Take the top open issue of the current milestone and classify it.
+1. Take the top `Todo` row of the current milestone in the project's `Backlog` view, classify it, move it to `In progress`.
 2. Branch `<type>/<issue>-<slug>`, for example `feature/12-task-repository`. Test-first.
 3. Before the PR: build, tests, self-review of the diff against the spec, the plan and `docs/style.md`, then a review pass by a second agent over the finished diff. Every finding is confirmed by a failing test before the code changes. A change to the list screen also runs `scripts/ui-walks.sh`, and the PR says which walks ran and how they ended.
 4. PR title in Conventional Commits with a scope from `core` `apple` `web` `docs` `infra` `ci`, for example `feat(core): add task repository`. Body follows the PR template and ends with `Closes #N`.
@@ -69,7 +70,7 @@ Definition of Done: acceptance criteria met, tests green, CI green, diff holds t
 
 ## Closing a milestone
 
-All issues closed, CI green, `CHANGELOG.md` moves Unreleased into `[0.N.0]`, tag `v0.N.0`, `gh release create`, something runnable on at least one platform.
+All issues closed, CI green, `CHANGELOG.md` moves Unreleased into `[0.N.0]`, tag `v0.N.0`, `gh release create`, the project's `Board` filtered to the next milestone, something runnable on at least one platform.
 
 ## Toolchain notes
 
